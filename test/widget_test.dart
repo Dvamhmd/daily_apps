@@ -294,11 +294,11 @@ void main() {
       );
     });
 
-    testWidgets('Tabungan menampilkan target nominal dan progress bar',
+    testWidgets('Tabungan menampilkan item dengan format sederhana',
         (WidgetTester tester) async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList('tabungan', [
-        '{"nama":"Liburan","jumlah":3000000,"targetNominal":5000000}',
+        '{"nama":"Liburan","jumlah":3000000}',
       ]);
 
       await tester.pumpWidget(
@@ -319,10 +319,8 @@ void main() {
       await tester.tap(find.text('Tabunganku'));
       await tester.pumpAndSettle();
 
-      // Cek nama, jumlah, persentase 60%, dan target nominal
+      // Cek nama dan jumlah
       expect(find.text('Liburan : 3.000.000'), findsOneWidget);
-      expect(find.text('60%'), findsOneWidget);
-      expect(find.text('Target: 5.000.000'), findsOneWidget);
     });
 
     testWidgets('RiwayatPage memiliki filter rentang waktu',

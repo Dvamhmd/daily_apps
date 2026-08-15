@@ -416,13 +416,24 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  widget.title,
-                  style: GoogleFonts.poppins(
-                    fontSize: 15,
-                    color: Colors.pink,
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.account_balance_wallet_rounded,
+                      color: Colors.pink,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      widget.title,
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        color: Colors.pink,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
                 Icon(
                   isExpanded
