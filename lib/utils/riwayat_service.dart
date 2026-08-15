@@ -56,7 +56,7 @@ class RiwayatService {
     final jumlahFormat = RupiahFormatter.format(jumlah);
     await catatRiwayat(
       kategori: 'Tagihan',
-      perubahan: '$namaFormat $jumlahFormat ditambahkan ke tagihan',
+      perubahan: '$namaFormat $jumlahFormat ditambah ke tagihan',
       tipe: 'tambah',
       nominal: jumlah,
     );
@@ -103,7 +103,7 @@ class RiwayatService {
         final selisihFormat = RupiahFormatter.format(selisih);
         await catatRiwayat(
           kategori: 'Tagihan',
-          perubahan: '$namaBaruFormat $selisihFormat ditambahkan ke tagihan',
+          perubahan: '$namaBaruFormat $selisihFormat ditambah ke tagihan',
           tipe: 'tambah',
           nominal: selisih,
         );
@@ -132,7 +132,7 @@ class RiwayatService {
         await catatRiwayat(
           kategori: 'Tagihan',
           perubahan:
-              '$namaLamaFormat diubah menjadi $namaBaruFormat ($selisihFormat ditambahkan ke tagihan)',
+              '$namaLamaFormat diubah menjadi $namaBaruFormat ($selisihFormat ditambah ke tagihan)',
           tipe: 'tambah',
           nominal: selisih,
         );
@@ -146,7 +146,7 @@ class RiwayatService {
     final jumlahFormat = RupiahFormatter.format(jumlah);
     await catatRiwayat(
       kategori: 'Uangku',
-      perubahan: '$namaFormat $jumlahFormat ditambahkan ke uangku',
+      perubahan: '$namaFormat $jumlahFormat ditambah ke uangku',
       tipe: 'tambah',
       nominal: jumlah,
     );
@@ -193,7 +193,7 @@ class RiwayatService {
         final selisihFormat = RupiahFormatter.format(selisih);
         await catatRiwayat(
           kategori: 'Uangku',
-          perubahan: '$namaBaruFormat $selisihFormat ditambahkan ke uangku',
+          perubahan: '$namaBaruFormat $selisihFormat ditambah ke uangku',
           tipe: 'tambah',
           nominal: selisih,
         );
@@ -222,7 +222,7 @@ class RiwayatService {
         await catatRiwayat(
           kategori: 'Uangku',
           perubahan:
-              '$namaLamaFormat diubah menjadi $namaBaruFormat ($selisihFormat ditambahkan ke uangku)',
+              '$namaLamaFormat diubah menjadi $namaBaruFormat ($selisihFormat ditambah ke uangku)',
           tipe: 'tambah',
           nominal: selisih,
         );
@@ -236,7 +236,7 @@ class RiwayatService {
     final jumlahFormat = RupiahFormatter.format(jumlah);
     await catatRiwayat(
       kategori: 'Tabungan',
-      perubahan: '$namaFormat $jumlahFormat ditambahkan ke tabungan',
+      perubahan: '$namaFormat $jumlahFormat ditambah ke tabungan',
       tipe: 'tambah',
       nominal: jumlah,
     );
@@ -283,7 +283,7 @@ class RiwayatService {
         final selisihFormat = RupiahFormatter.format(selisih);
         await catatRiwayat(
           kategori: 'Tabungan',
-          perubahan: '$namaBaruFormat $selisihFormat ditambahkan ke tabungan',
+          perubahan: '$namaBaruFormat $selisihFormat ditambah ke tabungan',
           tipe: 'tambah',
           nominal: selisih,
         );
@@ -312,7 +312,7 @@ class RiwayatService {
         await catatRiwayat(
           kategori: 'Tabungan',
           perubahan:
-              '$namaLamaFormat diubah menjadi $namaBaruFormat ($selisihFormat ditambahkan ke tabungan)',
+              '$namaLamaFormat diubah menjadi $namaBaruFormat ($selisihFormat ditambah ke tabungan)',
           tipe: 'tambah',
           nominal: selisih,
         );

@@ -5,10 +5,13 @@ import 'package:daily_apps/models/model_tagihan.dart';
 import 'package:daily_apps/models/model_tabungan.dart';
 import 'package:daily_apps/models/model_uangku.dart';
 import 'package:daily_apps/pages/riwayat_page.dart';
+import 'package:daily_apps/utils/notification_service.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
+import 'package:daily_apps/widgets/app_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
@@ -51,6 +54,9 @@ class _KeuanganPageState extends State<KeuanganPage> {
   DateTime? targetDate;
   int targetTabungan = 0;
 
+  String danaAmanFilterMode = 'all'; // 'all', 'has_deadline', 'custom_date'
+  DateTime? danaAmanCutoffDate;
+
   // Total Keuangan Harian
   int get totalTagihan =>
       tagihanList.fold<int>(0, (sum, e) => sum + e.jumlah);
@@ -58,8 +64,47 @@ class _KeuanganPageState extends State<KeuanganPage> {
   int get totalUangku =>
       uangkuList.fold<int>(0, (sum, e) => sum + e.jumlah);
 
-  // Dana Aman untuk Keuangan Harian
-  int get danaAman => totalUangku - totalTagihan;
+  // Tagihan yang di-include dalam perhitungan Dana Aman
+  List<Tagihan> get filteredTagihanDanaAman {
+    if (danaAmanFilterMode == 'has_deadline') {
+      return tagihanList.where((t) => t.deadline != null).toList();
+    } else if (danaAmanFilterMode == 'custom_date' &&
+        danaAmanCutoffDate != null) {
+      final cutoff = DateTime(
+        danaAmanCutoffDate!.year,
+        danaAmanCutoffDate!.month,
+        danaAmanCutoffDate!.day,
+        23,
+        59,
+        59,
+      );
+      return tagihanList.where((t) {
+        if (t.deadline == null) return false;
+        final d =
+            DateTime(t.deadline!.year, t.deadline!.month, t.deadline!.day);
+        return d.isBefore(cutoff) ||
+            d.isAtSameMomentAs(DateTime(danaAmanCutoffDate!.year,
+                danaAmanCutoffDate!.month, danaAmanCutoffDate!.day));
+      }).toList();
+    }
+    return tagihanList;
+  }
+
+  int get totalTagihanDanaAman =>
+      filteredTagihanDanaAman.fold<int>(0, (sum, e) => sum + e.jumlah);
+
+  // Dana Aman untuk Keuangan Harian (disesuaikan dengan filter deadline)
+  int get danaAman => totalUangku - totalTagihanDanaAman;
+
+  String get danaAmanFilterLabel {
+    if (danaAmanFilterMode == 'has_deadline') {
+      return 'Hanya tagihan berdeadline';
+    } else if (danaAmanFilterMode == 'custom_date' &&
+        danaAmanCutoffDate != null) {
+      return 'Tagihan s/d ${DateFormat('dd/MM/yy').format(danaAmanCutoffDate!)}';
+    }
+    return 'Semua tagihan';
+  }
 
   // Total Tabungan Terkumpul (Terpisah dari Keuangan Harian)
   int get totalTabungan =>
@@ -128,11 +173,247 @@ class _KeuanganPageState extends State<KeuanganPage> {
   @override
   void initState() {
     super.initState();
+    NotificationService.initialize();
     _loadTagihan();
     _loadUangku();
     _loadTabungan();
     _loadTarget();
     _loadLastUpdated();
+    _loadDanaAmanFilter();
+  }
+
+  Future<void> _loadDanaAmanFilter() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      danaAmanFilterMode = prefs.getString('dana_aman_filter_mode') ?? 'all';
+      final dateMillis = prefs.getInt('dana_aman_cutoff_date');
+      danaAmanCutoffDate = dateMillis != null
+          ? DateTime.fromMillisecondsSinceEpoch(dateMillis)
+          : null;
+    });
+  }
+
+  Future<void> _saveDanaAmanFilter() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('dana_aman_filter_mode', danaAmanFilterMode);
+    if (danaAmanCutoffDate != null) {
+      await prefs.setInt(
+        'dana_aman_cutoff_date',
+        danaAmanCutoffDate!.millisecondsSinceEpoch,
+      );
+    } else {
+      await prefs.remove('dana_aman_cutoff_date');
+    }
+  }
+
+  void showOpsiDeadlineDanaAman() {
+    String tempMode = danaAmanFilterMode;
+    DateTime? tempCutoff = danaAmanCutoffDate;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  const Icon(
+                    Icons.tune_rounded,
+                    color: Color(0xFF5E35B1),
+                    size: 22,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Opsi Deadline Dana Aman',
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RadioGroup<String>(
+                      groupValue: tempMode,
+                      onChanged: (val) {
+                        if (val != null) {
+                          setDialogState(() {
+                            tempMode = val;
+                            if (tempMode == 'custom_date') {
+                              tempCutoff ??= DateTime.now();
+                            }
+                          });
+                        }
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          RadioListTile<String>(
+                            contentPadding: EdgeInsets.zero,
+                            value: 'all',
+                            activeColor: const Color(0xFF5E35B1),
+                            title: Text(
+                              'Semua Tagihan (Default)',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Semua tagihan akan mengurangi uangku',
+                              style: GoogleFonts.poppins(fontSize: 12),
+                            ),
+                          ),
+                          const Divider(),
+                          RadioListTile<String>(
+                            contentPadding: EdgeInsets.zero,
+                            value: 'has_deadline',
+                            activeColor: const Color(0xFF5E35B1),
+                            title: Text(
+                              'Hanya Tagihan Berdeadline',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Hanya tagihan yang memiliki deadline yang mengurangi uangku',
+                              style: GoogleFonts.poppins(fontSize: 12),
+                            ),
+                          ),
+                          const Divider(),
+                          RadioListTile<String>(
+                            contentPadding: EdgeInsets.zero,
+                            value: 'custom_date',
+                            activeColor: const Color(0xFF5E35B1),
+                            title: Text(
+                              'Sesuaikan Batas Deadline',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Hanya tagihan dengan deadline s/d tanggal yang dipilih',
+                              style: GoogleFonts.poppins(fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (tempMode == 'custom_date') ...[
+                      const SizedBox(height: 6),
+                      InkWell(
+                        onTap: () async {
+                          final now = DateTime.now();
+                          final today = DateTime(now.year, now.month, now.day);
+                          final initial = (tempCutoff != null &&
+                                  !tempCutoff!.isBefore(today))
+                              ? tempCutoff!
+                              : today;
+
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: initial,
+                            firstDate: today,
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null) {
+                            setDialogState(() {
+                              tempCutoff = picked;
+                            });
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: const Color(0xFF5E35B1)
+                                  .withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.calendar_month_rounded,
+                                size: 18,
+                                color: Color(0xFF5E35B1),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  tempCutoff == null
+                                      ? 'Pilih Tanggal Batas'
+                                      : 's/d ${DateFormat('dd/MM/yyyy').format(tempCutoff!)}',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF5E35B1),
+                                  ),
+                                ),
+                              ),
+                              const Icon(
+                                Icons.edit_calendar_rounded,
+                                size: 18,
+                                color: Color(0xFF5E35B1),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF5E35B1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        danaAmanFilterMode = tempMode;
+                        danaAmanCutoffDate = tempCutoff;
+                      });
+                      _saveDanaAmanFilter();
+                      Navigator.pop(context);
+                    },
+                    child: Text(
+                      'Terapkan',
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _loadUangku() async {
@@ -313,11 +594,37 @@ class _KeuanganPageState extends State<KeuanganPage> {
 
   @override
   Widget build(BuildContext context) {
+    final status = FinancialHealthHelper.getStatus(totalUangku, totalTagihan);
+    final statusColor = FinancialHealthHelper.getStatusColor(status);
+
+    final urgentTagihan = tagihanList.where((t) {
+      if (t.deadline == null) return false;
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final target =
+          DateTime(t.deadline!.year, t.deadline!.month, t.deadline!.day);
+      final diff = target.difference(today).inDays;
+      return diff <= 3;
+    }).toList();
+
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FC),
+      drawer: AppDrawer(
+        totalUangku: totalUangku,
+        totalTagihan: totalTagihan,
+        totalTabungan: totalTabungan,
+        onDataChanged: () async {
+          await _loadTagihan();
+          await _loadUangku();
+          await _loadTabungan();
+          await _loadTarget();
+          await _loadLastUpdated();
+        },
+      ),
       appBar: AppBar(
         backgroundColor: const Color(0xFF5E35B1),
         centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
         systemOverlayStyle: const SystemUiOverlayStyle(
           statusBarColor: Colors.black,
           statusBarIconBrightness: Brightness.light,
@@ -331,11 +638,59 @@ class _KeuanganPageState extends State<KeuanganPage> {
           ),
         ),
         actions: [
+          // Smart Health Badge
+          Builder(
+            builder: (context) {
+              return InkWell(
+                onTap: () => Scaffold.of(context).openDrawer(),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  margin: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        status == StatusKesehatan.sehat
+                            ? 'Sehat'
+                            : (status == StatusKesehatan.perhatian
+                                ? 'Perhatian'
+                                : 'Kritis'),
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 4),
           IconButton(
             icon: const Icon(
               Icons.history_rounded,
               color: Colors.white,
-              size: 28,
+              size: 26,
             ),
             tooltip: 'Riwayat Perubahan',
             onPressed: () {
@@ -344,10 +699,14 @@ class _KeuanganPageState extends State<KeuanganPage> {
                 MaterialPageRoute(
                   builder: (context) => const RiwayatPage(),
                 ),
-              );
+              ).then((_) async {
+                await _loadTagihan();
+                await _loadUangku();
+                await _loadTabungan();
+              });
             },
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
         ],
       ),
       body: SingleChildScrollView(
@@ -355,6 +714,45 @@ class _KeuanganPageState extends State<KeuanganPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (urgentTagihan.isNotEmpty) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFFE65100).withValues(alpha: 0.12),
+                      const Color(0xFFFFA726).withValues(alpha: 0.08),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFFE65100).withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.notifications_active_rounded,
+                      color: Color(0xFFE65100),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Ada ${urgentTagihan.length} tagihan mendekati jatuh tempo (H-3/H-1/Hari ini)!',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFFE65100),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             Text(
               lastUpdated == null
                   ? 'Belum pernah diperbarui'
@@ -420,42 +818,137 @@ class _KeuanganPageState extends State<KeuanganPage> {
                   ),
                 ],
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF5E35B1).withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.shield_rounded,
-                          color: Color(0xFF5E35B1),
-                          size: 20,
-                        ),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF5E35B1).withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.shield_rounded,
+                              color: Color(0xFF5E35B1),
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Dana Aman :',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF1E293B),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 10),
                       Text(
-                        'Dana Aman :',
+                        RupiahFormatter.format(danaAman),
                         style: GoogleFonts.poppins(
-                          fontSize: 16,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: const Color(0xFF1E293B),
+                          color: const Color(0xFF5E35B1),
                         ),
                       ),
                     ],
                   ),
-                  Text(
-                    RupiahFormatter.format(danaAman),
-                    style: GoogleFonts.poppins(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF5E35B1),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3E8FF),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.tune_rounded,
+                          size: 16,
+                          color: Color(0xFF5E35B1),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            danaAmanFilterLabel,
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF5E35B1),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        InkWell(
+                          onTap: showOpsiDeadlineDanaAman,
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Sesuaikan',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF5E35B1),
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.arrow_drop_down,
+                                  size: 18,
+                                  color: Color(0xFF5E35B1),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                  if (danaAmanFilterMode != 'all') ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Tagihan terhitung: ${RupiahFormatter.format(totalTagihanDanaAman)} (${filteredTagihanDanaAman.length} tagihan)',
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () {
+                            setState(() {
+                              danaAmanFilterMode = 'all';
+                              danaAmanCutoffDate = null;
+                            });
+                            _saveDanaAmanFilter();
+                          },
+                          child: Text(
+                            'Reset',
+                            style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              color: Colors.red[600],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

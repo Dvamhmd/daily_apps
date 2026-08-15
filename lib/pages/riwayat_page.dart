@@ -14,7 +14,9 @@ class RiwayatPage extends StatefulWidget {
 class _RiwayatPageState extends State<RiwayatPage> {
   List<ModelRiwayat> _riwayatList = [];
   bool _isLoading = true;
-  String _selectedFilter = 'Semua'; // 'Semua', 'Tagihan', 'Uangku'
+  String _selectedFilter = 'Semua'; // 'Semua', 'Tagihan', 'Uangku', 'Tabungan'
+  String _dateRangeFilter = 'semua'; // 'semua', 'hari_ini', 'minggu_ini', 'bulan_ini', 'custom'
+  DateTimeRange? _customDateRange;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
@@ -40,13 +42,40 @@ class _RiwayatPageState extends State<RiwayatPage> {
   }
 
   List<ModelRiwayat> get _filteredRiwayat {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final weekStart = todayStart.subtract(Duration(days: now.weekday - 1));
+    final monthStart = DateTime(now.year, now.month, 1);
+
     return _riwayatList.where((item) {
       final matchesFilter = _selectedFilter == 'Semua' ||
           item.kategori.toLowerCase() == _selectedFilter.toLowerCase();
       final matchesSearch = _searchQuery.isEmpty ||
           item.perubahan.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           item.kategori.toLowerCase().contains(_searchQuery.toLowerCase());
-      return matchesFilter && matchesSearch;
+
+      bool matchesDate = true;
+      if (_dateRangeFilter == 'hari_ini') {
+        matchesDate = item.datetime.isAfter(todayStart) ||
+            item.datetime.isAtSameMomentAs(todayStart);
+      } else if (_dateRangeFilter == 'minggu_ini') {
+        matchesDate = item.datetime.isAfter(weekStart) ||
+            item.datetime.isAtSameMomentAs(weekStart);
+      } else if (_dateRangeFilter == 'bulan_ini') {
+        matchesDate = item.datetime.isAfter(monthStart) ||
+            item.datetime.isAtSameMomentAs(monthStart);
+      } else if (_dateRangeFilter == 'custom' && _customDateRange != null) {
+        final start = DateTime(_customDateRange!.start.year,
+            _customDateRange!.start.month, _customDateRange!.start.day);
+        final end = DateTime(_customDateRange!.end.year,
+            _customDateRange!.end.month, _customDateRange!.end.day, 23, 59, 59);
+        matchesDate = (item.datetime.isAfter(start) ||
+                item.datetime.isAtSameMomentAs(start)) &&
+            (item.datetime.isBefore(end) ||
+                item.datetime.isAtSameMomentAs(end));
+      }
+
+      return matchesFilter && matchesSearch && matchesDate;
     }).toList();
   }
 
@@ -333,6 +362,41 @@ class _RiwayatPageState extends State<RiwayatPage> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 10),
+
+                // Date Range Filter Chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildDateFilterChip(
+                        id: 'semua',
+                        label: 'Semua Waktu',
+                        icon: Icons.all_inclusive_rounded,
+                      ),
+                      const SizedBox(width: 6),
+                      _buildDateFilterChip(
+                        id: 'hari_ini',
+                        label: 'Hari Ini',
+                        icon: Icons.today_rounded,
+                      ),
+                      const SizedBox(width: 6),
+                      _buildDateFilterChip(
+                        id: 'minggu_ini',
+                        label: 'Minggu Ini',
+                        icon: Icons.date_range_rounded,
+                      ),
+                      const SizedBox(width: 6),
+                      _buildDateFilterChip(
+                        id: 'bulan_ini',
+                        label: 'Bulan Ini',
+                        icon: Icons.calendar_month_rounded,
+                      ),
+                      const SizedBox(width: 6),
+                      _buildCustomDateChip(),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -415,6 +479,139 @@ class _RiwayatPageState extends State<RiwayatPage> {
                   fontWeight: FontWeight.bold,
                   color: isSelected ? Colors.white : Colors.grey[800],
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDateFilterChip({
+    required String id,
+    required String label,
+    required IconData icon,
+  }) {
+    final isSelected = _dateRangeFilter == id;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () {
+        setState(() {
+          _dateRangeFilter = id;
+          if (id != 'custom') _customDateRange = null;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF1976D2).withValues(alpha: 0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF1976D2)
+                : Colors.grey.withValues(alpha: 0.3),
+            width: isSelected ? 1.4 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isSelected ? const Color(0xFF1976D2) : Colors.grey[600],
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 11.5,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? const Color(0xFF1976D2) : Colors.grey[700],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomDateChip() {
+    final isSelected = _dateRangeFilter == 'custom';
+    final hasRange = _customDateRange != null;
+
+    final label = hasRange
+        ? '${_customDateRange!.start.day}/${_customDateRange!.start.month} - ${_customDateRange!.end.day}/${_customDateRange!.end.month}'
+        : 'Pilih Tanggal';
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () async {
+        final now = DateTime.now();
+        final picked = await showDateRangePicker(
+          context: context,
+          firstDate: DateTime(2020),
+          lastDate: DateTime(2100),
+          initialDateRange: _customDateRange ??
+              DateTimeRange(
+                start: now.subtract(const Duration(days: 7)),
+                end: now,
+              ),
+          builder: (context, child) {
+            return Theme(
+              data: Theme.of(context).copyWith(
+                colorScheme: const ColorScheme.light(
+                  primary: Color(0xFF5E35B1),
+                  onPrimary: Colors.white,
+                  onSurface: Color(0xFF1E293B),
+                ),
+              ),
+              child: child!,
+            );
+          },
+        );
+
+        if (picked != null) {
+          setState(() {
+            _customDateRange = picked;
+            _dateRangeFilter = 'custom';
+          });
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF1976D2).withValues(alpha: 0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF1976D2)
+                : Colors.grey.withValues(alpha: 0.3),
+            width: isSelected ? 1.4 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.edit_calendar_rounded,
+              size: 14,
+              color: isSelected ? const Color(0xFF1976D2) : Colors.grey[600],
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 11.5,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? const Color(0xFF1976D2) : Colors.grey[700],
               ),
             ),
           ],
@@ -541,7 +738,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
                       Text(
                         'Perubahan:',
                         style: GoogleFonts.poppins(
-                          fontSize: 11,
+                          fontSize: 10.5,
                           fontWeight: FontWeight.w600,
                           color: Colors.grey[500],
                         ),
@@ -550,7 +747,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
                       Text(
                         item.perubahan,
                         style: GoogleFonts.poppins(
-                          fontSize: 14,
+                          fontSize: 12.5,
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFF1E293B),
                           height: 1.35,
