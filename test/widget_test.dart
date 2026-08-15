@@ -341,6 +341,46 @@ void main() {
       expect(find.text('Bulan Ini'), findsOneWidget);
       expect(find.text('Pilih Tanggal'), findsOneWidget);
     });
+
+    testWidgets('Pembayaran Tagihan Sebagian dan Pelunasan Penuh',
+        (WidgetTester tester) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('tagihan', [
+        '{"nama":"Makan","jumlah":20000}',
+      ]);
+      await prefs.setStringList('uangku', [
+        '{"nama":"Cash","jumlah":2000}',
+        '{"nama":"Debit","jumlah":20000}',
+      ]);
+
+      await tester.pumpWidget(const MyApp());
+      await tester.pumpAndSettle();
+
+      // Buka kartu Tagihanku
+      await tester.tap(find.text('Tagihanku'));
+      await tester.pumpAndSettle();
+
+      // Tekan tombol Bayar
+      await tester.tap(find.text('Bayar'));
+      await tester.pumpAndSettle();
+
+      // Dialog pembayaran terbuka, pilih Cash (2.000) yang merupakan opsi pertama (default)
+      expect(find.text('Bayar Tagihan'), findsOneWidget);
+      expect(find.textContaining('Cash'), findsWidgets);
+
+      // Tekan Konfirmasi Bayar
+      await tester.tap(find.text('Konfirmasi Bayar'));
+      await tester.pumpAndSettle();
+
+      // Sekarang tagihan menjadi 18.000 dan uangku Cash menjadi 0
+      expect(find.text('Makan : 18.000'), findsOneWidget);
+
+      // Buka kartu Uangku dan cek Cash : 0
+      await tester.tap(find.text('Uangku'));
+      await tester.pumpAndSettle();
+      expect(find.text('Cash : 0'), findsOneWidget);
+      expect(find.text('Debit : 20.000'), findsOneWidget);
+    });
   });
 }
 

@@ -592,6 +592,59 @@ class _KeuanganPageState extends State<KeuanganPage> {
     );
   }
 
+  String _getUrgentTagihanMessage(List<Tagihan> urgentList) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    if (urgentList.isEmpty) return '';
+
+    if (urgentList.length == 1) {
+      final t = urgentList.first;
+      final target =
+          DateTime(t.deadline!.year, t.deadline!.month, t.deadline!.day);
+      final diff = target.difference(today).inDays;
+
+      if (diff == 0) {
+        return 'Tagihan "${t.nama}" jatuh tempo hari ini!';
+      } else if (diff == 1) {
+        return 'Tagihan "${t.nama}" kurang 1 hari lagi!';
+      } else if (diff > 1) {
+        return 'Tagihan "${t.nama}" kurang $diff hari lagi!';
+      } else {
+        return 'Tagihan "${t.nama}" sudah lewat ${-diff} hari!';
+      }
+    }
+
+    final sorted = List<Tagihan>.from(urgentList)
+      ..sort((a, b) => a.deadline!.compareTo(b.deadline!));
+
+    final nearest = sorted.first;
+    final target = DateTime(
+        nearest.deadline!.year, nearest.deadline!.month, nearest.deadline!.day);
+    final diff = target.difference(today).inDays;
+
+    String detail;
+    if (diff == 0) {
+      detail = '"${nearest.nama}" jatuh tempo hari ini';
+    } else if (diff == 1) {
+      detail = '"${nearest.nama}" kurang 1 hari lagi';
+    } else if (diff > 1) {
+      detail = '"${nearest.nama}" kurang $diff hari lagi';
+    } else {
+      detail = '"${nearest.nama}" lewat ${-diff} hari';
+    }
+
+    return 'Ada ${urgentList.length} tagihan mendesak ($detail)';
+  }
+
+  Future<void> _refreshAll() async {
+    await _loadTagihan();
+    await _loadUangku();
+    await _loadTabungan();
+    await _loadTarget();
+    await _updateLastUpdated();
+  }
+
   @override
   Widget build(BuildContext context) {
     final status = FinancialHealthHelper.getStatus(totalUangku, totalTagihan);
@@ -741,7 +794,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Ada ${urgentTagihan.length} tagihan mendekati jatuh tempo (H-3/H-1/Hari ini)!',
+                        _getUrgentTagihanMessage(urgentTagihan),
                         style: GoogleFonts.poppins(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -775,10 +828,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                         'amount': e.jumlah.toString(),
                       })
                   .toList(),
-              onChanged: () async {
-                await _loadTagihan();
-                await _updateLastUpdated();
-              },
+              onChanged: _refreshAll,
             ),
 
             const SizedBox(height: 16),
@@ -792,10 +842,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                         'amount': e.jumlah.toString(),
                       })
                   .toList(),
-              onChanged: () async {
-                await _loadUangku();
-                await _updateLastUpdated();
-              },
+              onChanged: _refreshAll,
             ),
 
             const SizedBox(height: 16),
@@ -1050,10 +1097,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                         'amount': e.jumlah.toString(),
                       })
                   .toList(),
-              onChanged: () async {
-                await _loadTabungan();
-                await _updateLastUpdated();
-              },
+              onChanged: _refreshAll,
             ),
 
             const SizedBox(height: 18),

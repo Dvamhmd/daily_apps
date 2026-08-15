@@ -37,6 +37,12 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
     _loadUangku();
   }
 
+  @override
+  void didUpdateWidget(covariant InfoCardUangku oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _loadUangku();
+  }
+
   Future<void> _saveUangku() async {
     final prefs = await SharedPreferences.getInstance();
     final data = uangkuList
