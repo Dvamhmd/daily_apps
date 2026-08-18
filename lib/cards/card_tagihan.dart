@@ -729,12 +729,11 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                 onPressed: () async {
                   final chosenUangku = listUangku[selectedUangkuIndex];
 
-                  // Validasi jika saldo bernilai 0
                   if (chosenUangku.jumlah <= 0) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                          'Saldo "${chosenUangku.nama}" bernilai Rp 0, tidak dapat digunakan untuk membayar.',
+                          'Saldo "${chosenUangku.nama}" Rp 0, tidak ada saldo yang dapat digunakan untuk membayar.',
                           style: GoogleFonts.poppins(),
                         ),
                         backgroundColor: const Color(0xFFD46A6A),
@@ -745,9 +744,9 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                   }
 
                   final jumlahClean = nominalCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
-                  final nominalBayar = int.tryParse(jumlahClean) ?? 0;
+                  final nominalBayarTarget = int.tryParse(jumlahClean) ?? 0;
 
-                  if (nominalBayar <= 0) {
+                  if (nominalBayarTarget <= 0) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
@@ -761,7 +760,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                     return;
                   }
 
-                  if (nominalBayar > item.jumlah) {
+                  if (nominalBayarTarget > item.jumlah) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
@@ -775,25 +774,16 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                     return;
                   }
 
-                  if (nominalBayar > chosenUangku.jumlah) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Saldo "${chosenUangku.nama}" tidak mencukupi (${RupiahFormatter.format(chosenUangku.jumlah)}).',
-                          style: GoogleFonts.poppins(),
-                        ),
-                        backgroundColor: const Color(0xFFD46A6A),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                    return;
-                  }
+                  // Batasi pembayaran maksimal sebesar saldo Uangku yang tersedia (agar tidak minus)
+                  final nominalBayar = (nominalBayarTarget > chosenUangku.jumlah)
+                      ? chosenUangku.jumlah
+                      : nominalBayarTarget;
 
                   final namaFormat = RiwayatService.capitalize(item.nama);
                   final sumberFormat =
                       RiwayatService.capitalize(chosenUangku.nama);
 
-                  final sisaSaldo = chosenUangku.jumlah - nominalBayar;
+                  final sisaSaldo = chosenUangku.jumlah - nominalBayar; // Minimal 0
 
                   // Update Saldo Uangku
                   listUangku[selectedUangkuIndex] =
@@ -839,10 +829,14 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                     widget.onChanged();
                     if (context.mounted) {
                       Navigator.pop(context);
+                      final isSaldoHabis = nominalBayar < nominalBayarTarget;
+                      final msg = isSaldoHabis
+                          ? 'Membayar ${RupiahFormatter.format(nominalBayar)} (seluruh saldo $sumberFormat). Sisa tagihan "$namaFormat": ${RupiahFormatter.format(sisaTagihan)}'
+                          : 'Dibayar sebagian! Sisa tagihan "$namaFormat": ${RupiahFormatter.format(sisaTagihan)}';
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            'Dibayar sebagian! Sisa tagihan "$namaFormat": ${RupiahFormatter.format(sisaTagihan)}',
+                            msg,
                             style: GoogleFonts.poppins(),
                           ),
                           backgroundColor: const Color(0xFFE65100),
