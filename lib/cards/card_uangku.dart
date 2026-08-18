@@ -1,3 +1,4 @@
+import 'package:daily_apps/models/model_tagihan.dart';
 import 'package:daily_apps/models/model_uangku.dart';
 import 'package:daily_apps/utils/riwayat_service.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
@@ -60,6 +61,48 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
           .map((e) => Uangku.fromJson(jsonDecode(e)))
           .toList();
     });
+  }
+
+  Future<void> _tambah10PersenKeTagihanDp(int nominalTambahUangku) async {
+    if (nominalTambahUangku <= 0) return;
+    final nominalDp = (nominalTambahUangku * 0.10).round();
+    if (nominalDp <= 0) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getStringList('tagihan') ?? [];
+    List<Tagihan> tagihanList =
+        data.map((e) => Tagihan.fromJson(jsonDecode(e))).toList();
+
+    final index = tagihanList.indexWhere(
+      (t) => t.nama.trim().toLowerCase() == 'dp',
+    );
+
+    if (index != -1) {
+      final itemLama = tagihanList[index];
+      final totalBaru = itemLama.jumlah + nominalDp;
+      tagihanList[index] = itemLama.copyWith(jumlah: totalBaru);
+
+      final prefsData =
+          tagihanList.map((e) => jsonEncode(e.toJson())).toList();
+      await prefs.setStringList('tagihan', prefsData);
+
+      await RiwayatService.catatRiwayat(
+        kategori: 'Tagihan',
+        perubahan:
+            '${itemLama.nama} ${RupiahFormatter.format(nominalDp)} ditambah ke tagihan (Otomatis 10% Uangku)',
+        tipe: 'tambah',
+        nominal: nominalDp,
+      );
+    } else {
+      final newDp = Tagihan('DP', nominalDp);
+      tagihanList.add(newDp);
+
+      final prefsData =
+          tagihanList.map((e) => jsonEncode(e.toJson())).toList();
+      await prefs.setStringList('tagihan', prefsData);
+
+      await RiwayatService.catatTambahTagihan('DP', nominalDp);
+    }
   }
 
   void showTambahUangku() {
@@ -137,7 +180,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              onPressed: () {
+              onPressed: () async {
                 final nama = namaCtrl.text.trim();
                 final jumlahText = jumlahCtrl.text.replaceAll('.', '');
 
@@ -154,10 +197,15 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                   );
                 });
 
-                _saveUangku();
-                RiwayatService.catatTambahUangku(nama, jumlah);
+                await _saveUangku();
+                if (jumlah > 0) {
+                  await _tambah10PersenKeTagihanDp(jumlah);
+                }
+                await RiwayatService.catatTambahUangku(nama, jumlah);
                 widget.onChanged();
-                Navigator.pop(context);
+                if (mounted) {
+                  Navigator.pop(context);
+                }
               },
 
               child: Text(
@@ -246,7 +294,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              onPressed: () {
+              onPressed: () async {
                 final nama = namaCtrl.text.trim();
                 final jumlahClean =
                 jumlahCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
@@ -264,15 +312,21 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                   );
                 });
 
-                _saveUangku();
-                RiwayatService.catatEditUangku(
+                await _saveUangku();
+                if (jumlahBaru > jumlahLama) {
+                  final selisih = jumlahBaru - jumlahLama;
+                  await _tambah10PersenKeTagihanDp(selisih);
+                }
+                await RiwayatService.catatEditUangku(
                   namaLama: namaLama,
                   jumlahLama: jumlahLama,
                   namaBaru: nama,
                   jumlahBaru: jumlahBaru,
                 );
                 widget.onChanged();
-                Navigator.pop(context);
+                if (mounted) {
+                  Navigator.pop(context);
+                }
               },
               child: Text(
                 'Simpan Perubahan',
@@ -289,6 +343,204 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
     );
   }
 
+
+  void showKelolaNominalUangku(int index) {
+    final item = uangkuList[index];
+    final nominalCtrl = TextEditingController();
+    String? errorText;
+
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Text(
+              'Kelola ${item.nama}',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Saldo saat ini: ${RupiahFormatter.format(item.jumlah)}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.blueGrey[700],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: nominalCtrl,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    RupiahInputFormatter(),
+                  ],
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Nominal',
+                    hintStyle: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w500,
+                      color: Colors.blueGrey,
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[200],
+                    errorText: errorText,
+                    errorMaxLines: 2,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  onChanged: (val) {
+                    if (errorText != null) {
+                      setDialogState(() {
+                        errorText = null;
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF63B967),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: () async {
+                        final cleanText =
+                            nominalCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
+                        if (cleanText.isEmpty) {
+                          setDialogState(() {
+                            errorText = 'Masukkan nominal terlebih dahulu';
+                          });
+                          return;
+                        }
+
+                        final nominal = int.parse(cleanText);
+                        if (nominal <= 0) {
+                          setDialogState(() {
+                            errorText = 'Nominal harus lebih dari 0';
+                          });
+                          return;
+                        }
+
+                        final namaLama = item.nama;
+                        final jumlahLama = item.jumlah;
+                        final jumlahBaru = jumlahLama + nominal;
+
+                        setState(() {
+                          uangkuList[index] = Uangku(namaLama, jumlahBaru);
+                        });
+
+                        await _saveUangku();
+                        await _tambah10PersenKeTagihanDp(nominal);
+                        await RiwayatService.catatEditUangku(
+                          namaLama: namaLama,
+                          jumlahLama: jumlahLama,
+                          namaBaru: namaLama,
+                          jumlahBaru: jumlahBaru,
+                        );
+                        widget.onChanged();
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext);
+                        }
+                      },
+                      child: Text(
+                        'Tambahkan',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD46A6A),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: () {
+                        final cleanText =
+                            nominalCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
+                        if (cleanText.isEmpty) {
+                          setDialogState(() {
+                            errorText = 'Masukkan nominal terlebih dahulu';
+                          });
+                          return;
+                        }
+
+                        final nominal = int.parse(cleanText);
+                        if (nominal <= 0) {
+                          setDialogState(() {
+                            errorText = 'Nominal harus lebih dari 0';
+                          });
+                          return;
+                        }
+
+                        if (nominal > item.jumlah) {
+                          setDialogState(() {
+                            errorText =
+                                'Nominal melebihi saldo ${item.nama} (${RupiahFormatter.format(item.jumlah)})';
+                          });
+                          return;
+                        }
+
+                        final namaLama = item.nama;
+                        final jumlahLama = item.jumlah;
+                        final jumlahBaru = jumlahLama - nominal;
+
+                        setState(() {
+                          uangkuList[index] = Uangku(namaLama, jumlahBaru);
+                        });
+
+                        _saveUangku();
+                        RiwayatService.catatEditUangku(
+                          namaLama: namaLama,
+                          jumlahLama: jumlahLama,
+                          namaBaru: namaLama,
+                          jumlahBaru: jumlahBaru,
+                        );
+                        widget.onChanged();
+                        Navigator.pop(context);
+                      },
+                      child: Text(
+                        'Kurangi',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
   void showHapusUangku() {
     final selected = <int>{};
@@ -485,12 +737,53 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                           children: [
                             const Icon(Icons.circle, size: 7, color: Colors.grey),
                             const SizedBox(width: 8),
-                            Text(
-                              '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                color: Colors.grey[700],
-                                fontWeight: FontWeight.w500,
+                            Expanded(
+                              child: Text(
+                                '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: Colors.grey[700],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            InkWell(
+                              borderRadius: BorderRadius.circular(6),
+                              onTap: () => showKelolaNominalUangku(index),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF63B967)
+                                      .withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: const Color(0xFF63B967)
+                                        .withValues(alpha: 0.5),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.exposure_rounded,
+                                      size: 14,
+                                      color: Color(0xFF2E7D32),
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      '+/-',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFF2E7D32),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
