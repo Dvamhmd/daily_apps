@@ -456,40 +456,78 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                 const SizedBox(height: 4),
 
                 /// LIST TABUNGAN
-                ...tabunganList.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final item = entry.value;
-
-                  return Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(8),
-                      splashColor: Colors.green.withValues(alpha: 0.2),
-                      highlightColor: Colors.green.withValues(alpha: 0.1),
-                      onLongPress: () {
-                        showEditTabungan(index);
+                ReorderableListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  buildDefaultDragHandles: false,
+                  itemCount: tabunganList.length,
+                  proxyDecorator: (child, index, animation) {
+                    return AnimatedBuilder(
+                      animation: animation,
+                      builder: (context, child) {
+                        return Material(
+                          elevation: 3,
+                          color: const Color(0xFFFFF0F1),
+                          borderRadius: BorderRadius.circular(8),
+                          child: child,
+                        );
                       },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.circle,
-                                size: 7, color: Colors.grey),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                color: Colors.grey[700],
-                                fontWeight: FontWeight.w500,
+                      child: child,
+                    );
+                  },
+                  onReorderItem: (oldIndex, newIndex) {
+                    setState(() {
+                      final item = tabunganList.removeAt(oldIndex);
+                      tabunganList.insert(newIndex, item);
+                    });
+                    _saveTabungan();
+                    widget.onChanged();
+                  },
+                  itemBuilder: (context, index) {
+                    final item = tabunganList[index];
+                    return Material(
+                      key: ValueKey('${item.nama}_${item.jumlah}_$index'),
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        splashColor: Colors.green.withValues(alpha: 0.2),
+                        highlightColor: Colors.green.withValues(alpha: 0.1),
+                        onLongPress: () {
+                          showEditTabungan(index);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              ReorderableDragStartListener(
+                                index: index,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: Icon(
+                                    Icons.drag_handle_rounded,
+                                    size: 18,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
                               ),
-                            ),
-                          ],
+                              const Icon(Icons.circle,
+                                  size: 7, color: Colors.grey),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: Colors.grey[700],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }),
+                    );
+                  },
+                ),
 
                 const SizedBox(height: 8),
 

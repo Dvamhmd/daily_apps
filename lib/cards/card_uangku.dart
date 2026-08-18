@@ -718,80 +718,118 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                 const SizedBox(height: 4),
 
                 /// LIST UANGKU
-                ...uangkuList.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final item = entry.value;
-
-                  return Material(
-                    color: Colors.transparent, // penting biar warna card tetap
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(8),
-                      splashColor: Colors.green.withValues(alpha: 0.2),
-                      highlightColor: Colors.green.withValues(alpha: 0.1),
-                      onLongPress: () {
-                        showEditUangku(index);
+                ReorderableListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  buildDefaultDragHandles: false,
+                  itemCount: uangkuList.length,
+                  proxyDecorator: (child, index, animation) {
+                    return AnimatedBuilder(
+                      animation: animation,
+                      builder: (context, child) {
+                        return Material(
+                          elevation: 3,
+                          color: const Color(0xFFEBFDE5),
+                          borderRadius: BorderRadius.circular(8),
+                          child: child,
+                        );
                       },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.circle, size: 7, color: Colors.grey),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  color: Colors.grey[700],
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                            InkWell(
-                              borderRadius: BorderRadius.circular(6),
-                              onTap: () => showKelolaNominalUangku(index),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF63B967)
-                                      .withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: const Color(0xFF63B967)
-                                        .withValues(alpha: 0.5),
-                                    width: 1,
+                      child: child,
+                    );
+                  },
+                  onReorderItem: (oldIndex, newIndex) {
+                    setState(() {
+                      final item = uangkuList.removeAt(oldIndex);
+                      uangkuList.insert(newIndex, item);
+                    });
+                    _saveUangku();
+                    widget.onChanged();
+                  },
+                  itemBuilder: (context, index) {
+                    final item = uangkuList[index];
+                    return Material(
+                      key: ValueKey('${item.nama}_${item.jumlah}_$index'),
+                      color: Colors.transparent, // penting biar warna card tetap
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        splashColor: Colors.green.withValues(alpha: 0.2),
+                        highlightColor: Colors.green.withValues(alpha: 0.1),
+                        onLongPress: () {
+                          showEditUangku(index);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              ReorderableDragStartListener(
+                                index: index,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: Icon(
+                                    Icons.drag_handle_rounded,
+                                    size: 18,
+                                    color: Colors.grey[600],
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.exposure_rounded,
-                                      size: 14,
-                                      color: Color(0xFF2E7D32),
-                                    ),
-                                    const SizedBox(width: 2),
-                                    Text(
-                                      '+/-',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: const Color(0xFF2E7D32),
-                                      ),
-                                    ),
-                                  ],
+                              ),
+                              const Icon(Icons.circle, size: 7, color: Colors.grey),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 14,
+                                    color: Colors.grey[700],
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                              InkWell(
+                                borderRadius: BorderRadius.circular(6),
+                                onTap: () => showKelolaNominalUangku(index),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF63B967)
+                                        .withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: const Color(0xFF63B967)
+                                          .withValues(alpha: 0.5),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.exposure_rounded,
+                                        size: 14,
+                                        color: Color(0xFF2E7D32),
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        '+/-',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFF2E7D32),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }),
+                    );
+                  },
+                ),
 
                 const SizedBox(height: 8),
 

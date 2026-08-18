@@ -1088,94 +1088,132 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                 const SizedBox(height: 4),
 
                 /// LIST TAGIHAN
-                ...tagihanList.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final item = entry.value;
-
-                  return Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(8),
-                      splashColor: Colors.green.withValues(alpha: 0.2),
-                      highlightColor: Colors.green.withValues(alpha: 0.1),
-                      onLongPress: () {
-                        showEditTagihan(index);
+                ReorderableListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  buildDefaultDragHandles: false,
+                  itemCount: tagihanList.length,
+                  proxyDecorator: (child, index, animation) {
+                    return AnimatedBuilder(
+                      animation: animation,
+                      builder: (context, child) {
+                        return Material(
+                          elevation: 3,
+                          color: const Color(0xFFEBFDE5),
+                          borderRadius: BorderRadius.circular(8),
+                          child: child,
+                        );
                       },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 5),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.circle,
-                                size: 7, color: Colors.grey),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 14,
-                                      color: Colors.grey[800],
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  if (item.formattedDeadline != null)
-                                    Text(
-                                      'Tempo: ${item.formattedDeadline!}',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 11,
-                                        color: Colors.grey[600],
-                                        fontWeight: FontWeight.w400,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            // Quick "Bayar" Chip Button
-                            InkWell(
-                              onTap: () => showBayarTagihan(item, index),
-                              borderRadius: BorderRadius.circular(6),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF2E7D32)
-                                      .withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: const Color(0xFF2E7D32)
-                                        .withValues(alpha: 0.3),
+                      child: child,
+                    );
+                  },
+                  onReorderItem: (oldIndex, newIndex) {
+                    setState(() {
+                      final item = tagihanList.removeAt(oldIndex);
+                      tagihanList.insert(newIndex, item);
+                    });
+                    _saveTagihan();
+                    widget.onChanged();
+                  },
+                  itemBuilder: (context, index) {
+                    final item = tagihanList[index];
+                    return Material(
+                      key: ValueKey('${item.nama}_${item.jumlah}_$index'),
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        splashColor: Colors.green.withValues(alpha: 0.2),
+                        highlightColor: Colors.green.withValues(alpha: 0.1),
+                        onLongPress: () {
+                          showEditTagihan(index);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 5),
+                          child: Row(
+                            children: [
+                              ReorderableDragStartListener(
+                                index: index,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: Icon(
+                                    Icons.drag_handle_rounded,
+                                    size: 18,
+                                    color: Colors.grey[600],
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
+                              ),
+                              const Icon(Icons.circle,
+                                  size: 7, color: Colors.grey),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Icon(
-                                      Icons.check_circle_rounded,
-                                      size: 14,
-                                      color: Color(0xFF2E7D32),
-                                    ),
-                                    const SizedBox(width: 4),
                                     Text(
-                                      'Bayar',
+                                      '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
                                       style: GoogleFonts.poppins(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: const Color(0xFF2E7D32),
+                                        fontSize: 14,
+                                        color: Colors.grey[800],
+                                        fontWeight: FontWeight.w500,
                                       ),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
+                                    if (item.formattedDeadline != null)
+                                      Text(
+                                        'Tempo: ${item.formattedDeadline!}',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 11,
+                                          color: Colors.grey[600],
+                                          fontWeight: FontWeight.w400,
+                                        ),
+                                      ),
                                   ],
                                 ),
                               ),
-                            ),
-                          ],
+                              // Quick "Bayar" Chip Button
+                              InkWell(
+                                onTap: () => showBayarTagihan(item, index),
+                                borderRadius: BorderRadius.circular(6),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF2E7D32)
+                                        .withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: const Color(0xFF2E7D32)
+                                          .withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.check_circle_rounded,
+                                        size: 14,
+                                        color: Color(0xFF2E7D32),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Bayar',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFF2E7D32),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }),
+                    );
+                  },
+                ),
 
                 const SizedBox(height: 8),
 
