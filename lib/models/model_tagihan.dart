@@ -28,16 +28,16 @@ class Tagihan {
 
   factory Tagihan.fromJson(Map<String, dynamic> json) {
     return Tagihan(
-      json['nama'],
-      json['jumlah'],
+      json['nama']?.toString() ?? '',
+      (json['jumlah'] as num?)?.toInt() ?? 0,
       deadline: json['deadline'] != null
-          ? DateTime.tryParse(json['deadline'])
+          ? DateTime.tryParse(json['deadline'].toString())
           : null,
       isLunas: json['isLunas'] == true,
       tanggalLunas: json['tanggalLunas'] != null
-          ? DateTime.tryParse(json['tanggalLunas'])
+          ? DateTime.tryParse(json['tanggalLunas'].toString())
           : null,
-      dibayarDari: json['dibayarDari'],
+      dibayarDari: json['dibayarDari']?.toString(),
     );
   }
 

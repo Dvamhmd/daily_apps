@@ -475,11 +475,23 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
     }
 
     int selectedUangkuIndex = 0;
+    final nominalCtrl = TextEditingController(
+      text: RupiahFormatter.format(item.jumlah),
+    );
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) {
+          final currentNominalClean =
+              nominalCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
+          final currentNominal = int.tryParse(currentNominalClean) ?? 0;
+          final isLunas = currentNominal >= item.jumlah;
+          final labelText = isLunas ? 'Lunas' : 'dicicil :v';
+          final labelColor = isLunas
+              ? const Color(0xFF2E7D32)
+              : const Color(0xFFE65100);
+
           return AlertDialog(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -536,7 +548,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Nominal: ${RupiahFormatter.format(item.jumlah)}',
+                          'Sisa Tagihan: ${RupiahFormatter.format(item.jumlah)}',
                           style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
@@ -580,15 +592,14 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                         final u = entry.value;
                         final isSelected = selectedUangkuIndex == idx;
                         final isZero = u.jumlah <= 0;
-                        final isCukup = u.jumlah >= item.jumlah;
 
                         String statusLabel;
                         Color statusColor;
                         if (isZero) {
                           statusLabel = '(Saldo 0)';
                           statusColor = const Color(0xFFD46A6A);
-                        } else if (!isCukup) {
-                          statusLabel = '(Bayar Sebagian)';
+                        } else if (u.jumlah < item.jumlah) {
+                          statusLabel = '(Saldo < Tagihan)';
                           statusColor = const Color(0xFFE65100);
                         } else {
                           statusLabel = '(Cukup)';
@@ -635,6 +646,65 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                       }).toList(),
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Jumlah Pembayaran :',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        child: Text(
+                          labelText,
+                          key: ValueKey<String>(labelText),
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: labelColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: nominalCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      RupiahInputFormatter(),
+                    ],
+                    onChanged: (_) {
+                      setModalState(() {});
+                    },
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Masukkan nominal',
+                      filled: true,
+                      fillColor: Colors.grey[100],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 1.5),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -674,24 +744,70 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                     return;
                   }
 
+                  final jumlahClean = nominalCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
+                  final nominalBayar = int.tryParse(jumlahClean) ?? 0;
+
+                  if (nominalBayar <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Masukkan nominal pembayaran yang valid (lebih dari 0).',
+                          style: GoogleFonts.poppins(),
+                        ),
+                        backgroundColor: const Color(0xFFD46A6A),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (nominalBayar > item.jumlah) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Nominal pembayaran tidak boleh melebihi sisa tagihan (${RupiahFormatter.format(item.jumlah)}).',
+                          style: GoogleFonts.poppins(),
+                        ),
+                        backgroundColor: const Color(0xFFD46A6A),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (nominalBayar > chosenUangku.jumlah) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Saldo "${chosenUangku.nama}" tidak mencukupi (${RupiahFormatter.format(chosenUangku.jumlah)}).',
+                          style: GoogleFonts.poppins(),
+                        ),
+                        backgroundColor: const Color(0xFFD46A6A),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    return;
+                  }
+
                   final namaFormat = RiwayatService.capitalize(item.nama);
                   final sumberFormat =
                       RiwayatService.capitalize(chosenUangku.nama);
 
-                  // Kasus 1: Bayar Sebagian (Saldo Uangku < Jumlah Tagihan)
-                  if (chosenUangku.jumlah < item.jumlah) {
-                    final bayar = chosenUangku.jumlah;
-                    final sisaTagihan = item.jumlah - bayar;
+                  final sisaSaldo = chosenUangku.jumlah - nominalBayar;
 
-                    // Saldo Uangku menjadi 0
-                    listUangku[selectedUangkuIndex] =
-                        Uangku(chosenUangku.nama, 0);
-                    await prefs.setStringList(
-                      'uangku',
-                      listUangku
-                          .map((e) => jsonEncode(e.toJson()))
-                          .toList(),
-                    );
+                  // Update Saldo Uangku
+                  listUangku[selectedUangkuIndex] =
+                      Uangku(chosenUangku.nama, sisaSaldo);
+                  await prefs.setStringList(
+                    'uangku',
+                    listUangku
+                        .map((e) => jsonEncode(e.toJson()))
+                        .toList(),
+                  );
+
+                  // Kasus 1: Bayar Sebagian (nominalBayar < item.jumlah)
+                  if (nominalBayar < item.jumlah) {
+                    final sisaTagihan = item.jumlah - nominalBayar;
 
                     // Tagihan berkurang nominalnya
                     final updatedTagihan = item.copyWith(jumlah: sisaTagihan);
@@ -707,17 +823,17 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                     await RiwayatService.catatRiwayat(
                       kategori: 'Tagihan',
                       perubahan:
-                          '$namaFormat dibayar sebagian ${RupiahFormatter.format(bayar)} (sisa ${RupiahFormatter.format(sisaTagihan)}) dari $sumberFormat',
+                          '$namaFormat dibayar sebagian ${RupiahFormatter.format(nominalBayar)} (sisa ${RupiahFormatter.format(sisaTagihan)}) dari $sumberFormat',
                       tipe: 'kurang',
-                      nominal: bayar,
+                      nominal: nominalBayar,
                     );
 
                     await RiwayatService.catatRiwayat(
                       kategori: 'Uangku',
                       perubahan:
-                          '$sumberFormat ${RupiahFormatter.format(bayar)} dikurangi untuk bayar tagihan $namaFormat',
+                          '$sumberFormat ${RupiahFormatter.format(nominalBayar)} dikurangi untuk bayar tagihan $namaFormat',
                       tipe: 'kurang',
-                      nominal: bayar,
+                      nominal: nominalBayar,
                     );
 
                     widget.onChanged();
@@ -735,19 +851,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                       );
                     }
                   } else {
-                    // Kasus 2: Pelunasan Penuh (Saldo Uangku >= Jumlah Tagihan)
-                    final sisaSaldo = chosenUangku.jumlah - item.jumlah;
-
-                    // Update Saldo Uangku
-                    listUangku[selectedUangkuIndex] =
-                        Uangku(chosenUangku.nama, sisaSaldo);
-                    await prefs.setStringList(
-                      'uangku',
-                      listUangku
-                          .map((e) => jsonEncode(e.toJson()))
-                          .toList(),
-                    );
-
+                    // Kasus 2: Pelunasan Penuh (nominalBayar == item.jumlah)
                     // Archive Tagihan Lunas
                     final rawLunas =
                         prefs.getStringList('tagihan_lunas') ?? [];

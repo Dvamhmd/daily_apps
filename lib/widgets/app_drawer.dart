@@ -1,6 +1,5 @@
 import 'package:daily_apps/models/model_tagihan.dart';
 import 'package:daily_apps/pages/riwayat_page.dart';
-import 'package:daily_apps/utils/notification_service.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -247,20 +246,9 @@ class AppDrawer extends StatelessWidget {
                   title: 'Arsip Tagihan Lunas',
                   subtitle: 'Lihat daftar tagihan yang telah dibayar',
                   onTap: () {
+                    final navContext = Navigator.of(context).context;
                     Navigator.pop(context);
-                    _showArsipTagihanLunas(context);
-                  },
-                ),
-
-                _buildMenuItem(
-                  context: context,
-                  icon: Icons.notifications_active_rounded,
-                  iconColor: const Color(0xFFE65100),
-                  title: 'Pengingat Notifikasi',
-                  subtitle: 'Pengingat deadline tagihan H-3 & H-1',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showPengaturanNotifikasi(context);
+                    _showArsipTagihanLunas(navContext);
                   },
                 ),
               ],
@@ -271,7 +259,7 @@ class AppDrawer extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
-              'Daily Apps v1.0.0',
+              'Daily Apps v1.3.0',
               style: GoogleFonts.poppins(
                 fontSize: 11,
                 color: Colors.grey[400],
@@ -352,8 +340,15 @@ class AppDrawer extends StatelessWidget {
   void _showArsipTagihanLunas(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
     final rawLunas = prefs.getStringList('tagihan_lunas') ?? [];
-    final listLunas =
-        rawLunas.map((e) => Tagihan.fromJson(jsonDecode(e))).toList();
+    final listLunas = rawLunas.map((e) {
+      try {
+        final decoded = jsonDecode(e);
+        if (decoded is Map<String, dynamic>) {
+          return Tagihan.fromJson(decoded);
+        }
+      } catch (_) {}
+      return null;
+    }).whereType<Tagihan>().toList();
 
     if (!context.mounted) return;
 
@@ -362,7 +357,7 @@ class AppDrawer extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        height: MediaQuery.of(context).size.height * 0.75,
+        height: MediaQuery.sizeOf(ctx).height * 0.75,
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -511,115 +506,6 @@ class AppDrawer extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showPengaturanNotifikasi(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.notifications_active_rounded,
-                color: Color(0xFFE65100), size: 24),
-            const SizedBox(width: 8),
-            Text(
-              'Pengingat Deadline',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Aplikasi akan mengirimkan notifikasi otomatis ke HP kamu:',
-              style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[700]),
-            ),
-            const SizedBox(height: 12),
-            _buildNotificationFeatureItem(
-              '🔔 H-3 Sebelum Jatuh Tempo',
-              'Memberi waktu persiapan dana untuk membayar tagihan.',
-            ),
-            const SizedBox(height: 8),
-            _buildNotificationFeatureItem(
-              '⚠️ H-1 Sebelum Jatuh Tempo',
-              'Mengingatkan tagihan yang jatuh tempo besok agar tidak terlewat.',
-            ),
-            const SizedBox(height: 14),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF5E35B1),
-                minimumSize: const Size(double.infinity, 40),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              icon: const Icon(Icons.security_update_good_rounded, color: Colors.white, size: 18),
-              label: Text(
-                'Minta Izin Notifikasi',
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  fontSize: 13,
-                ),
-              ),
-              onPressed: () async {
-                await NotificationService.requestPermissions();
-                if (ctx.mounted) {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Izin notifikasi telah diminta!',
-                        style: GoogleFonts.poppins(),
-                      ),
-                      backgroundColor: const Color(0xFF2E7D32),
-                    ),
-                  );
-                }
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Tutup', style: GoogleFonts.poppins()),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNotificationFeatureItem(String title, String desc) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F9FC),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.15)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.bold,
-              fontSize: 12.5,
-              color: const Color(0xFF1E293B),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            desc,
-            style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey[600]),
-          ),
-        ],
       ),
     );
   }
