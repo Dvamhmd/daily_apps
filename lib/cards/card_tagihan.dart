@@ -1107,8 +1107,11 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                       child: child,
                     );
                   },
-                  onReorderItem: (oldIndex, newIndex) {
+                  onReorder: (oldIndex, newIndex) {
                     setState(() {
+                      if (newIndex > oldIndex) {
+                        newIndex -= 1;
+                      }
                       final item = tagihanList.removeAt(oldIndex);
                       tagihanList.insert(newIndex, item);
                     });

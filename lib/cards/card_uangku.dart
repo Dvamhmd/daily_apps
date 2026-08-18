@@ -461,7 +461,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                         }
                       },
                       child: Text(
-                        'Tambahkan',
+                        'Debit',
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -524,7 +524,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                         Navigator.pop(context);
                       },
                       child: Text(
-                        'Kurangi',
+                        'Kredit',
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -737,8 +737,11 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                       child: child,
                     );
                   },
-                  onReorderItem: (oldIndex, newIndex) {
+                  onReorder: (oldIndex, newIndex) {
                     setState(() {
+                      if (newIndex > oldIndex) {
+                        newIndex -= 1;
+                      }
                       final item = uangkuList.removeAt(oldIndex);
                       uangkuList.insert(newIndex, item);
                     });
