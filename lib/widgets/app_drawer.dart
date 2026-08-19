@@ -70,6 +70,7 @@ class AppDrawer extends StatelessWidget {
   final int totalTagihan;
   final int totalTabungan;
   final VoidCallback onDataChanged;
+  final DateTime? selectedMonth;
 
   const AppDrawer({
     super.key,
@@ -77,7 +78,13 @@ class AppDrawer extends StatelessWidget {
     required this.totalTagihan,
     required this.totalTabungan,
     required this.onDataChanged,
+    this.selectedMonth,
   });
+
+  static const List<String> _namaBulan = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -89,6 +96,9 @@ class AppDrawer extends StatelessWidget {
     final statusIcon = FinancialHealthHelper.getStatusIcon(status);
 
     final danaAman = totalUangku - totalTagihan;
+    final monthStr = selectedMonth != null
+        ? '${_namaBulan[selectedMonth!.month - 1]} ${selectedMonth!.year}'
+        : null;
 
     return Drawer(
       backgroundColor: const Color(0xFFF7F9FC),
@@ -123,25 +133,30 @@ class AppDrawer extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Daily Apps',
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Daily Apps',
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        Text(
-                          'Manajemen Keuangan Harian',
-                          style: GoogleFonts.poppins(
-                            color: Colors.white70,
-                            fontSize: 11,
+                          Text(
+                            monthStr != null
+                                ? 'Ringkasan: $monthStr'
+                                : 'Manajemen Keuangan Harian',
+                            style: GoogleFonts.poppins(
+                              color: Colors.white70,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),

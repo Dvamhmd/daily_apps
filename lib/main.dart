@@ -54,6 +54,27 @@ class _KeuanganPageState extends State<KeuanganPage> {
   DateTime? targetDate;
   int targetTabungan = 0;
 
+  DateTime selectedMonth =
+      DateTime(DateTime.now().year, DateTime.now().month, 1);
+
+  static const List<String> namaBulan = [
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember',
+  ];
+
+  String get selectedMonthKey =>
+      '${selectedMonth.year}_${selectedMonth.month.toString().padLeft(2, '0')}';
+
   String danaAmanFilterMode = 'all'; // 'all', 'has_deadline', 'custom_date'
   DateTime? danaAmanCutoffDate;
 
@@ -418,21 +439,53 @@ class _KeuanganPageState extends State<KeuanganPage> {
 
   Future<void> _loadUangku() async {
     final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getStringList('uangku') ?? [];
+    final key = 'uangku_$selectedMonthKey';
+    var data = prefs.getStringList(key);
 
+    // Migrasi data legacy jika bulan ini belum punya data tapi ada data legacy 'uangku'
+    if (data == null) {
+      final now = DateTime.now();
+      if (selectedMonth.year == now.year && selectedMonth.month == now.month) {
+        final legacy = prefs.getStringList('uangku');
+        if (legacy != null) {
+          data = legacy;
+          await prefs.setStringList(key, legacy);
+        }
+      }
+    }
+
+    data ??= [];
+
+    if (!mounted) return;
     setState(() {
       uangkuList =
-          data.map((e) => Uangku.fromJson(jsonDecode(e))).toList();
+          data!.map((e) => Uangku.fromJson(jsonDecode(e))).toList();
     });
   }
 
   Future<void> _loadTagihan() async {
     final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getStringList('tagihan') ?? [];
+    final key = 'tagihan_$selectedMonthKey';
+    var data = prefs.getStringList(key);
 
+    // Migrasi data legacy jika bulan ini belum punya data tapi ada data legacy 'tagihan'
+    if (data == null) {
+      final now = DateTime.now();
+      if (selectedMonth.year == now.year && selectedMonth.month == now.month) {
+        final legacy = prefs.getStringList('tagihan');
+        if (legacy != null) {
+          data = legacy;
+          await prefs.setStringList(key, legacy);
+        }
+      }
+    }
+
+    data ??= [];
+
+    if (!mounted) return;
     setState(() {
       tagihanList =
-          data.map((e) => Tagihan.fromJson(jsonDecode(e))).toList();
+          data!.map((e) => Tagihan.fromJson(jsonDecode(e))).toList();
     });
   }
 
@@ -487,6 +540,238 @@ class _KeuanganPageState extends State<KeuanganPage> {
     setState(() {
       lastUpdated = now;
     });
+  }
+
+  void _prevMonth() {
+    setState(() {
+      selectedMonth =
+          DateTime(selectedMonth.year, selectedMonth.month - 1, 1);
+    });
+    _loadMonthData();
+  }
+
+  void _nextMonth() {
+    setState(() {
+      selectedMonth =
+          DateTime(selectedMonth.year, selectedMonth.month + 1, 1);
+    });
+    _loadMonthData();
+  }
+
+  Future<void> _loadMonthData() async {
+    await _loadTagihan();
+    await _loadUangku();
+    await _updateLastUpdated();
+  }
+
+  void _showMonthYearPicker() {
+    int tempYear = selectedMonth.year;
+    int tempMonth = selectedMonth.month;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Pilih Bulan & Tahun',
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () {
+                      final now = DateTime.now();
+                      setDialogState(() {
+                        tempYear = now.year;
+                        tempMonth = now.month;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color:
+                            const Color(0xFF5E35B1).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Bulan Ini',
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF5E35B1),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 320,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Year Selector
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.chevron_left_rounded),
+                            onPressed: () {
+                              setDialogState(() {
+                                tempYear--;
+                              });
+                            },
+                          ),
+                          Text(
+                            '$tempYear',
+                            style: GoogleFonts.poppins(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF5E35B1),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.chevron_right_rounded),
+                            onPressed: () {
+                              setDialogState(() {
+                                tempYear++;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    // Month Grid (4 rows x 3 cols)
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        mainAxisSpacing: 8,
+                        crossAxisSpacing: 8,
+                        childAspectRatio: 2.2,
+                      ),
+                      itemCount: 12,
+                      itemBuilder: (context, idx) {
+                        final monthNum = idx + 1;
+                        final isSelected = tempMonth == monthNum;
+                        final isCurrentActual =
+                            (monthNum == DateTime.now().month &&
+                                tempYear == DateTime.now().year);
+
+                        return InkWell(
+                          onTap: () {
+                            setDialogState(() {
+                              tempMonth = monthNum;
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? const Color(0xFF5E35B1)
+                                  : (isCurrentActual
+                                      ? const Color(0xFF5E35B1)
+                                          .withValues(alpha: 0.1)
+                                      : Colors.grey[100]),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isSelected
+                                    ? const Color(0xFF5E35B1)
+                                    : (isCurrentActual
+                                        ? const Color(0xFF5E35B1)
+                                            .withValues(alpha: 0.4)
+                                        : Colors.transparent),
+                                width: 1.5,
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              namaBulan[idx].substring(0, 3),
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : (isCurrentActual
+                                        ? FontWeight.w600
+                                        : FontWeight.normal),
+                                color: isSelected
+                                    ? Colors.white
+                                    : (isCurrentActual
+                                        ? const Color(0xFF5E35B1)
+                                        : const Color(0xFF1E293B)),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    'Batal',
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF5E35B1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      selectedMonth = DateTime(tempYear, tempMonth, 1);
+                    });
+                    _loadMonthData();
+                    Navigator.pop(context);
+                  },
+                  child: Text(
+                    'Pilih',
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void showEditTarget() {
@@ -666,6 +951,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
         totalUangku: totalUangku,
         totalTagihan: totalTagihan,
         totalTabungan: totalTabungan,
+        selectedMonth: selectedMonth,
         onDataChanged: () async {
           await _loadTagihan();
           await _loadUangku();
@@ -806,13 +1092,84 @@ class _KeuanganPageState extends State<KeuanganPage> {
                 ),
               ),
             ],
-            Text(
-              lastUpdated == null
-                  ? 'Belum pernah diperbarui'
-                  : 'Diperbarui : ${formatTanggal(lastUpdated!)}',
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
+            // BULAN SELECTOR BAR
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF5E35B1).withValues(alpha: 0.06),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+                border: Border.all(
+                  color: const Color(0xFF5E35B1).withValues(alpha: 0.15),
+                ),
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 18,
+                      color: Color(0xFF5E35B1),
+                    ),
+                    tooltip: 'Bulan Sebelumnya',
+                    onPressed: _prevMonth,
+                  ),
+                  Expanded(
+                    child: InkWell(
+                      onTap: _showMonthYearPicker,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF5E35B1)
+                              .withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.calendar_month_rounded,
+                              size: 18,
+                              color: Color(0xFF5E35B1),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${namaBulan[selectedMonth.month - 1]} ${selectedMonth.year}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF5E35B1),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              size: 20,
+                              color: Color(0xFF5E35B1),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 18,
+                      color: Color(0xFF5E35B1),
+                    ),
+                    tooltip: 'Bulan Berikutnya',
+                    onPressed: _nextMonth,
+                  ),
+                ],
               ),
             ),
 
@@ -822,6 +1179,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
             InfoCardTagihan(
               title: 'Tagihanku',
               amount: totalTagihan.toString(),
+              selectedMonth: selectedMonth,
               items: tagihanList
                   .map((e) => {
                         'name': e.nama,
@@ -836,6 +1194,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
             InfoCardUangku(
               title: 'Uangku',
               amount: totalUangku.toString(),
+              selectedMonth: selectedMonth,
               items: uangkuList
                   .map((e) => {
                         'name': e.nama,

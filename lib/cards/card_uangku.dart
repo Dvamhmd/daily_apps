@@ -13,15 +13,15 @@ class InfoCardUangku extends StatefulWidget {
   final String amount;
   final List<Map<String, String>> items;
   final VoidCallback onChanged;
-
-
+  final DateTime? selectedMonth;
 
   const InfoCardUangku({
     super.key,
     required this.title,
     required this.amount,
     required this.items,
-    required this.onChanged
+    required this.onChanged,
+    this.selectedMonth,
   });
 
   @override
@@ -31,6 +31,11 @@ class InfoCardUangku extends StatefulWidget {
 class _InfoCardExpandableState extends State<InfoCardUangku> {
   bool isExpanded = false;
   List<Uangku> uangkuList = [];
+
+  String get _monthKey {
+    final d = widget.selectedMonth ?? DateTime.now();
+    return '${d.year}_${d.month.toString().padLeft(2, '0')}';
+  }
 
   @override
   void initState() {
@@ -49,15 +54,32 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
     final data = uangkuList
         .map((e) => jsonEncode(e.toJson()))
         .toList();
-    await prefs.setStringList('uangku', data);
+    await prefs.setStringList('uangku_$_monthKey', data);
   }
 
   Future<void> _loadUangku() async {
     final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getStringList('uangku') ?? [];
+    final key = 'uangku_$_monthKey';
+    var data = prefs.getStringList(key);
 
+    // Migrasi data legacy jika bulan ini belum punya data tapi ada data di 'uangku'
+    if (data == null) {
+      final now = DateTime.now();
+      final d = widget.selectedMonth ?? now;
+      if (d.year == now.year && d.month == now.month) {
+        final legacy = prefs.getStringList('uangku');
+        if (legacy != null) {
+          data = legacy;
+          await prefs.setStringList(key, legacy);
+        }
+      }
+    }
+
+    data ??= [];
+
+    if (!mounted) return;
     setState(() {
-      uangkuList = data
+      uangkuList = data!
           .map((e) => Uangku.fromJson(jsonDecode(e)))
           .toList();
     });
@@ -69,7 +91,17 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
     if (nominalDp <= 0) return;
 
     final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getStringList('tagihan') ?? [];
+    final tagihanKey = 'tagihan_$_monthKey';
+    var data = prefs.getStringList(tagihanKey);
+    if (data == null) {
+      final now = DateTime.now();
+      final d = widget.selectedMonth ?? now;
+      if (d.year == now.year && d.month == now.month) {
+        data = prefs.getStringList('tagihan');
+      }
+    }
+    data ??= [];
+
     List<Tagihan> tagihanList =
         data.map((e) => Tagihan.fromJson(jsonDecode(e))).toList();
 
@@ -84,12 +116,14 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
 
       final prefsData =
           tagihanList.map((e) => jsonEncode(e.toJson())).toList();
-      await prefs.setStringList('tagihan', prefsData);
+      await prefs.setStringList(tagihanKey, prefsData);
 
+      final bSuffix = RiwayatService.formatBulanSuffix(
+          widget.selectedMonth ?? DateTime.now());
       await RiwayatService.catatRiwayat(
         kategori: 'Tagihan',
         perubahan:
-            '${itemLama.nama} ${RupiahFormatter.format(nominalDp)} ditambah ke tagihan (Otomatis 10% Uangku)',
+            '${itemLama.nama} ${RupiahFormatter.format(nominalDp)} Otomatis ditambah ke tagihan$bSuffix',
         tipe: 'tambah',
         nominal: nominalDp,
       );
@@ -99,9 +133,17 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
 
       final prefsData =
           tagihanList.map((e) => jsonEncode(e.toJson())).toList();
-      await prefs.setStringList('tagihan', prefsData);
+      await prefs.setStringList(tagihanKey, prefsData);
 
-      await RiwayatService.catatTambahTagihan('DP', nominalDp);
+      final bSuffix = RiwayatService.formatBulanSuffix(
+          widget.selectedMonth ?? DateTime.now());
+      await RiwayatService.catatRiwayat(
+        kategori: 'Tagihan',
+        perubahan:
+            'DP ${RupiahFormatter.format(nominalDp)} Otomatis ditambah ke tagihan$bSuffix',
+        tipe: 'tambah',
+        nominal: nominalDp,
+      );
     }
   }
 
@@ -201,7 +243,11 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                 if (jumlah > 0) {
                   await _tambah10PersenKeTagihanDp(jumlah);
                 }
-                await RiwayatService.catatTambahUangku(nama, jumlah);
+                await RiwayatService.catatTambahUangku(
+                  nama,
+                  jumlah,
+                  bulan: widget.selectedMonth ?? DateTime.now(),
+                );
                 widget.onChanged();
                 if (mounted) {
                   Navigator.pop(context);
@@ -322,6 +368,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                   jumlahLama: jumlahLama,
                   namaBaru: nama,
                   jumlahBaru: jumlahBaru,
+                  bulan: widget.selectedMonth ?? DateTime.now(),
                 );
                 widget.onChanged();
                 if (mounted) {
@@ -454,6 +501,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                           jumlahLama: jumlahLama,
                           namaBaru: namaLama,
                           jumlahBaru: jumlahBaru,
+                          bulan: widget.selectedMonth ?? DateTime.now(),
                         );
                         widget.onChanged();
                         if (dialogContext.mounted) {
@@ -519,6 +567,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                           jumlahLama: jumlahLama,
                           namaBaru: namaLama,
                           jumlahBaru: jumlahBaru,
+                          bulan: widget.selectedMonth ?? DateTime.now(),
                         );
                         widget.onChanged();
                         Navigator.pop(context);
@@ -620,7 +669,11 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     });
                     _saveUangku();
                     for (final item in itemsToDelete) {
-                      RiwayatService.catatHapusUangku(item.nama, item.jumlah);
+                      RiwayatService.catatHapusUangku(
+                        item.nama,
+                        item.jumlah,
+                        bulan: widget.selectedMonth ?? DateTime.now(),
+                      );
                     }
                     widget.onChanged();
                     Navigator.pop(context);

@@ -7,6 +7,27 @@ class RiwayatService {
   static const String _storageKey = 'riwayat_keuangan';
   static int _counter = 0;
 
+  static const List<String> namaBulan = [
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember',
+  ];
+
+  /// Helper untuk format suffix bulan, misal: " (Juli)"
+  static String formatBulanSuffix(DateTime? bulan) {
+    if (bulan == null) return '';
+    return ' (${namaBulan[bulan.month - 1]})';
+  }
+
   /// Helper untuk merapikan kapitalisasi nama
   static String capitalize(String text) {
     if (text.trim().isEmpty) return text;
@@ -51,24 +72,34 @@ class RiwayatService {
   }
 
   /// Catat saat menambah Tagihan
-  static Future<void> catatTambahTagihan(String nama, int jumlah) async {
+  static Future<void> catatTambahTagihan(
+    String nama,
+    int jumlah, {
+    DateTime? bulan,
+  }) async {
     final namaFormat = capitalize(nama);
     final jumlahFormat = RupiahFormatter.format(jumlah);
+    final bSuffix = formatBulanSuffix(bulan);
     await catatRiwayat(
       kategori: 'Tagihan',
-      perubahan: '$namaFormat $jumlahFormat ditambah ke tagihan',
+      perubahan: '$namaFormat $jumlahFormat ditambah ke tagihan$bSuffix',
       tipe: 'tambah',
       nominal: jumlah,
     );
   }
 
   /// Catat saat menghapus Tagihan
-  static Future<void> catatHapusTagihan(String nama, int jumlah) async {
+  static Future<void> catatHapusTagihan(
+    String nama,
+    int jumlah, {
+    DateTime? bulan,
+  }) async {
     final namaFormat = capitalize(nama);
     final jumlahFormat = RupiahFormatter.format(jumlah);
+    final bSuffix = formatBulanSuffix(bulan);
     await catatRiwayat(
       kategori: 'Tagihan',
-      perubahan: '$namaFormat $jumlahFormat dihapus dari tagihan',
+      perubahan: '$namaFormat $jumlahFormat dihapus dari tagihan$bSuffix',
       tipe: 'hapus',
       nominal: jumlah,
     );
@@ -80,9 +111,11 @@ class RiwayatService {
     required int jumlahLama,
     required String namaBaru,
     required int jumlahBaru,
+    DateTime? bulan,
   }) async {
     final namaLamaFormat = capitalize(namaLama);
     final namaBaruFormat = capitalize(namaBaru);
+    final bSuffix = formatBulanSuffix(bulan);
 
     if (namaLamaFormat == namaBaruFormat && jumlahLama == jumlahBaru) {
       return; // Tidak ada perubahan
@@ -94,7 +127,8 @@ class RiwayatService {
         final selisihFormat = RupiahFormatter.format(selisih);
         await catatRiwayat(
           kategori: 'Tagihan',
-          perubahan: '$namaBaruFormat $selisihFormat dikurangi dari tagihan',
+          perubahan:
+              '$namaBaruFormat $selisihFormat dikurangi dari tagihan$bSuffix',
           tipe: 'kurang',
           nominal: selisih,
         );
@@ -103,7 +137,8 @@ class RiwayatService {
         final selisihFormat = RupiahFormatter.format(selisih);
         await catatRiwayat(
           kategori: 'Tagihan',
-          perubahan: '$namaBaruFormat $selisihFormat ditambah ke tagihan',
+          perubahan:
+              '$namaBaruFormat $selisihFormat ditambah ke tagihan$bSuffix',
           tipe: 'tambah',
           nominal: selisih,
         );
@@ -111,7 +146,8 @@ class RiwayatService {
     } else if (jumlahLama == jumlahBaru) {
       await catatRiwayat(
         kategori: 'Tagihan',
-        perubahan: '$namaLamaFormat diubah namanya menjadi $namaBaruFormat',
+        perubahan:
+            '$namaLamaFormat diubah namanya menjadi $namaBaruFormat$bSuffix',
         tipe: 'edit',
         nominal: jumlahBaru,
       );
@@ -122,7 +158,7 @@ class RiwayatService {
         await catatRiwayat(
           kategori: 'Tagihan',
           perubahan:
-              '$namaLamaFormat diubah menjadi $namaBaruFormat ($selisihFormat dikurangi dari tagihan)',
+              '$namaLamaFormat diubah menjadi $namaBaruFormat ($selisihFormat dikurangi dari tagihan)$bSuffix',
           tipe: 'kurang',
           nominal: selisih,
         );
@@ -132,7 +168,7 @@ class RiwayatService {
         await catatRiwayat(
           kategori: 'Tagihan',
           perubahan:
-              '$namaLamaFormat diubah menjadi $namaBaruFormat ($selisihFormat ditambah ke tagihan)',
+              '$namaLamaFormat diubah menjadi $namaBaruFormat ($selisihFormat ditambah ke tagihan)$bSuffix',
           tipe: 'tambah',
           nominal: selisih,
         );
@@ -141,24 +177,34 @@ class RiwayatService {
   }
 
   /// Catat saat menambah Uangku
-  static Future<void> catatTambahUangku(String nama, int jumlah) async {
+  static Future<void> catatTambahUangku(
+    String nama,
+    int jumlah, {
+    DateTime? bulan,
+  }) async {
     final namaFormat = capitalize(nama);
     final jumlahFormat = RupiahFormatter.format(jumlah);
+    final bSuffix = formatBulanSuffix(bulan);
     await catatRiwayat(
       kategori: 'Uangku',
-      perubahan: '$namaFormat $jumlahFormat ditambah ke uangku',
+      perubahan: '$namaFormat $jumlahFormat ditambah ke uangku$bSuffix',
       tipe: 'tambah',
       nominal: jumlah,
     );
   }
 
   /// Catat saat menghapus Uangku
-  static Future<void> catatHapusUangku(String nama, int jumlah) async {
+  static Future<void> catatHapusUangku(
+    String nama,
+    int jumlah, {
+    DateTime? bulan,
+  }) async {
     final namaFormat = capitalize(nama);
     final jumlahFormat = RupiahFormatter.format(jumlah);
+    final bSuffix = formatBulanSuffix(bulan);
     await catatRiwayat(
       kategori: 'Uangku',
-      perubahan: '$namaFormat $jumlahFormat dihapus dari uangku',
+      perubahan: '$namaFormat $jumlahFormat dihapus dari uangku$bSuffix',
       tipe: 'hapus',
       nominal: jumlah,
     );
@@ -170,9 +216,11 @@ class RiwayatService {
     required int jumlahLama,
     required String namaBaru,
     required int jumlahBaru,
+    DateTime? bulan,
   }) async {
     final namaLamaFormat = capitalize(namaLama);
     final namaBaruFormat = capitalize(namaBaru);
+    final bSuffix = formatBulanSuffix(bulan);
 
     if (namaLamaFormat == namaBaruFormat && jumlahLama == jumlahBaru) {
       return; // Tidak ada perubahan
@@ -184,7 +232,8 @@ class RiwayatService {
         final selisihFormat = RupiahFormatter.format(selisih);
         await catatRiwayat(
           kategori: 'Uangku',
-          perubahan: '$namaBaruFormat $selisihFormat dikurangi dari uangku',
+          perubahan:
+              '$namaBaruFormat $selisihFormat dikurangi dari uangku$bSuffix',
           tipe: 'kurang',
           nominal: selisih,
         );
@@ -193,7 +242,8 @@ class RiwayatService {
         final selisihFormat = RupiahFormatter.format(selisih);
         await catatRiwayat(
           kategori: 'Uangku',
-          perubahan: '$namaBaruFormat $selisihFormat ditambah ke uangku',
+          perubahan:
+              '$namaBaruFormat $selisihFormat ditambah ke uangku$bSuffix',
           tipe: 'tambah',
           nominal: selisih,
         );
@@ -201,7 +251,8 @@ class RiwayatService {
     } else if (jumlahLama == jumlahBaru) {
       await catatRiwayat(
         kategori: 'Uangku',
-        perubahan: '$namaLamaFormat diubah namanya menjadi $namaBaruFormat',
+        perubahan:
+            '$namaLamaFormat diubah namanya menjadi $namaBaruFormat$bSuffix',
         tipe: 'edit',
         nominal: jumlahBaru,
       );
@@ -212,7 +263,7 @@ class RiwayatService {
         await catatRiwayat(
           kategori: 'Uangku',
           perubahan:
-              '$namaLamaFormat diubah menjadi $namaBaruFormat ($selisihFormat dikurangi dari uangku)',
+              '$namaLamaFormat diubah menjadi $namaBaruFormat ($selisihFormat dikurangi dari uangku)$bSuffix',
           tipe: 'kurang',
           nominal: selisih,
         );
@@ -222,7 +273,7 @@ class RiwayatService {
         await catatRiwayat(
           kategori: 'Uangku',
           perubahan:
-              '$namaLamaFormat diubah menjadi $namaBaruFormat ($selisihFormat ditambah ke uangku)',
+              '$namaLamaFormat diubah menjadi $namaBaruFormat ($selisihFormat ditambah ke uangku)$bSuffix',
           tipe: 'tambah',
           nominal: selisih,
         );
