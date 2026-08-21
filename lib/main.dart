@@ -77,6 +77,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
 
   String danaAmanFilterMode = 'all'; // 'all', 'has_deadline', 'custom_date'
   DateTime? danaAmanCutoffDate;
+  bool uangkuOnlyCair = false;
 
   // Total Keuangan Harian
   int get totalTagihan =>
@@ -84,6 +85,12 @@ class _KeuanganPageState extends State<KeuanganPage> {
 
   int get totalUangku =>
       uangkuList.fold<int>(0, (sum, e) => sum + e.jumlah);
+
+  int get totalUangkuCair =>
+      uangkuList.where((e) => e.isCair).fold<int>(0, (sum, e) => sum + e.jumlah);
+
+  int get totalUangkuDihitung =>
+      uangkuOnlyCair ? totalUangkuCair : totalUangku;
 
   // Tagihan yang di-include dalam perhitungan Dana Aman
   List<Tagihan> get filteredTagihanDanaAman {
@@ -114,8 +121,8 @@ class _KeuanganPageState extends State<KeuanganPage> {
   int get totalTagihanDanaAman =>
       filteredTagihanDanaAman.fold<int>(0, (sum, e) => sum + e.jumlah);
 
-  // Dana Aman untuk Keuangan Harian (disesuaikan dengan filter deadline)
-  int get danaAman => totalUangku - totalTagihanDanaAman;
+  // Dana Aman untuk Keuangan Harian (disesuaikan dengan filter deadline & filter uangku cair)
+  int get danaAman => totalUangkuDihitung - totalTagihanDanaAman;
 
   String get danaAmanFilterLabel {
     if (danaAmanFilterMode == 'has_deadline') {
@@ -201,6 +208,15 @@ class _KeuanganPageState extends State<KeuanganPage> {
     _loadTarget();
     _loadLastUpdated();
     _loadDanaAmanFilter();
+    _loadUangkuFilter();
+  }
+
+  Future<void> _loadUangkuFilter() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      uangkuOnlyCair = prefs.getBool('uangku_only_cair') ?? false;
+    });
   }
 
   Future<void> _loadDanaAmanFilter() async {
@@ -927,6 +943,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
     await _loadUangku();
     await _loadTabungan();
     await _loadTarget();
+    await _loadUangkuFilter();
     await _updateLastUpdated();
   }
 
@@ -1195,6 +1212,12 @@ class _KeuanganPageState extends State<KeuanganPage> {
               title: 'Uangku',
               amount: totalUangku.toString(),
               selectedMonth: selectedMonth,
+              onlyCair: uangkuOnlyCair,
+              onFilterChanged: (val) {
+                setState(() {
+                  uangkuOnlyCair = val;
+                });
+              },
               items: uangkuList
                   .map((e) => {
                         'name': e.nama,
@@ -1322,6 +1345,27 @@ class _KeuanganPageState extends State<KeuanganPage> {
                       ],
                     ),
                   ),
+                  if (uangkuOnlyCair) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.filter_alt_rounded,
+                          size: 13,
+                          color: Color(0xFF2E7D32),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Uangku terhitung: ${RupiahFormatter.format(totalUangkuCair)} (Hanya cair)',
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF2E7D32),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   if (danaAmanFilterMode != 'all') ...[
                     const SizedBox(height: 6),
                     Row(

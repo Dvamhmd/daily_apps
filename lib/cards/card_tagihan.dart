@@ -647,37 +647,47 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 6),
-                          decoration: BoxDecoration(
+                          child: Material(
                             color: isSelected
                                 ? const Color(0xFF5E35B1).withValues(alpha: 0.08)
                                 : Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: isSelected
-                                  ? const Color(0xFF5E35B1)
-                                  : Colors.grey[300]!,
-                              width: isSelected ? 1.5 : 1,
-                            ),
-                          ),
-                          child: RadioListTile<int>(
-                            value: idx,
-                            activeColor: const Color(0xFF5E35B1),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 0),
-                            dense: true,
-                            title: Text(
-                              u.nama,
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              side: BorderSide(
+                                color: isSelected
+                                    ? const Color(0xFF5E35B1)
+                                    : Colors.grey[300]!,
+                                width: isSelected ? 1.5 : 1,
                               ),
                             ),
-                            subtitle: Text(
-                              'Saldo: ${RupiahFormatter.format(u.jumlah)} $statusLabel',
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                color: statusColor,
-                                fontWeight: FontWeight.w500,
+                            child: RadioListTile<int>(
+                              value: idx,
+                              groupValue: selectedUangkuIndex,
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setModalState(() {
+                                    selectedUangkuIndex = val;
+                                  });
+                                }
+                              },
+                              activeColor: const Color(0xFF5E35B1),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 0),
+                              dense: true,
+                              title: Text(
+                                u.nama,
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              subtitle: Text(
+                                'Saldo: ${RupiahFormatter.format(u.jumlah)} $statusLabel',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: statusColor,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ),
                           ),
@@ -826,7 +836,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
 
                   // Update Saldo Uangku
                   listUangku[selectedUangkuIndex] =
-                      Uangku(chosenUangku.nama, sisaSaldo);
+                      chosenUangku.copyWith(jumlah: sisaSaldo);
                   await prefs.setStringList(
                     'uangku_$_monthKey',
                     listUangku

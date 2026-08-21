@@ -1,5 +1,7 @@
 import 'package:daily_apps/cards/card_tabungan.dart';
 import 'package:daily_apps/cards/card_tagihan.dart';
+import 'package:daily_apps/cards/card_uangku.dart';
+import 'package:daily_apps/models/model_uangku.dart';
 import 'package:daily_apps/main.dart';
 import 'package:daily_apps/pages/riwayat_page.dart';
 import 'package:daily_apps/utils/riwayat_service.dart';
@@ -459,7 +461,195 @@ void main() {
       expect(list[2].perubahan, 'Cash 50.000 ditambah ke tagihan (Juli)');
     });
   });
+
+  group('Uangku Klasifikasi Cair / Belum Cair Tests', () {
+    test('Uangku tanpa tanggal otomatis terhitung sudah cair', () {
+      final u = Uangku('Dompet', 100000);
+      expect(u.isCair, isTrue);
+      expect(u.tanggalCair, isNull);
+      expect(u.formattedTanggalCair, isNull);
+    });
+
+    test('Uangku dengan tanggal hari ini atau masa lalu terhitung sudah cair', () {
+      final now = DateTime.now();
+      final hariIni = DateTime(now.year, now.month, now.day);
+      final masaLalu = DateTime(now.year, now.month, now.day - 5);
+
+      final uHariIni = Uangku('Gaji Hari Ini', 5000000, tanggalCair: hariIni);
+      expect(uHariIni.isCair, isTrue);
+      expect(uHariIni.formattedTanggalCair, isNotNull);
+
+      final uMasaLalu = Uangku('Transfer Lalu', 200000, tanggalCair: masaLalu);
+      expect(uMasaLalu.isCair, isTrue);
+    });
+
+    test('Uangku dengan tanggal masa depan terhitung belum cair', () {
+      final now = DateTime.now();
+      final masaDepan = DateTime(now.year, now.month, now.day + 7);
+
+      final uMasaDepan = Uangku('Bonus Proyek', 3000000, tanggalCair: masaDepan);
+      expect(uMasaDepan.isCair, isFalse);
+      expect(uMasaDepan.formattedTanggalCair, isNotNull);
+    });
+
+    test('Uangku toJson dan fromJson serializes tanggalCair dengan benar', () {
+      final tanggal = DateTime(2026, 8, 25);
+      final u = Uangku('Investasi', 1500000, tanggalCair: tanggal);
+      final json = u.toJson();
+
+      expect(json['nama'], 'Investasi');
+      expect(json['jumlah'], 1500000);
+      expect(json['tanggalCair'], tanggal.toIso8601String());
+
+      final restored = Uangku.fromJson(json);
+      expect(restored.nama, 'Investasi');
+      expect(restored.jumlah, 1500000);
+      expect(restored.tanggalCair?.year, 2026);
+      expect(restored.tanggalCair?.month, 8);
+      expect(restored.tanggalCair?.day, 25);
+    });
+
+    testWidgets('InfoCardUangku menampilkan badge Belum Cair dan summary breakdown',
+        (WidgetTester tester) async {
+      final now = DateTime.now();
+      final futureDate = DateTime(now.year, now.month, now.day + 5);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('uangku', [
+        '{"nama":"Cash","jumlah":500000}',
+        '{"nama":"Gaji Belum Cair","jumlah":2000000,"tanggalCair":"${futureDate.toIso8601String()}"}',
+      ]);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: InfoCardUangku(
+              title: 'Uangku',
+              amount: '2500000',
+              items: const [],
+              onChanged: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Cek breakdown summary di header kartu
+      expect(find.textContaining('Cair:'), findsOneWidget);
+      expect(find.textContaining('Belum:'), findsOneWidget);
+
+      // Expand kartu Uangku
+      await tester.tap(find.text('Uangku'));
+      await tester.pumpAndSettle();
+
+      // Cek item dan status badge Belum Cair
+      expect(find.text('Cash : 500.000'), findsOneWidget);
+      expect(find.text('Gaji Belum Cair : 2.000.000'), findsOneWidget);
+      expect(find.textContaining('Belum Cair •'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Tombol filter di samping total nominal Uangku menyaring hanya dana yang sudah cair',
+        (WidgetTester tester) async {
+      final now = DateTime.now();
+      final futureDate = DateTime(now.year, now.month, now.day + 5);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('uangku', [
+        '{"nama":"Dompet Cash","jumlah":300000}',
+        '{"nama":"Gaji Belum Cair","jumlah":2000000,"tanggalCair":"${futureDate.toIso8601String()}"}',
+      ]);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: InfoCardUangku(
+              title: 'Uangku',
+              amount: '2300000',
+              items: const [],
+              onChanged: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Buka list Uangku
+      await tester.tap(find.text('Uangku'));
+      await tester.pumpAndSettle();
+
+      // Default: filter kecoret (filter_alt_off_rounded) dan menampilkan semua (2.300.000)
+      expect(find.byIcon(Icons.filter_alt_off_rounded), findsOneWidget);
+      expect(find.text('2.300.000'), findsOneWidget);
+      expect(find.text('Dompet Cash : 300.000'), findsOneWidget);
+      expect(find.text('Gaji Belum Cair : 2.000.000'), findsOneWidget);
+
+      // Tekan tombol filter
+      await tester.tap(find.byIcon(Icons.filter_alt_off_rounded));
+      await tester.pumpAndSettle();
+
+      // Sekarang icon filter aktif (filter_alt_rounded)
+      expect(find.byIcon(Icons.filter_alt_rounded), findsOneWidget);
+      // Nominal hanya menampilkan dana yang sudah cair (300.000)
+      expect(find.text('300.000'), findsOneWidget);
+      // Item dalam list hanya yang sudah cair
+      expect(find.text('Dompet Cash : 300.000'), findsOneWidget);
+      expect(find.text('Gaji Belum Cair : 2.000.000'), findsNothing);
+
+      // Tekan filter lagi untuk reset
+      await tester.tap(find.byIcon(Icons.filter_alt_rounded));
+      await tester.pumpAndSettle();
+
+      // Kembali menampilkan semua
+      expect(find.byIcon(Icons.filter_alt_off_rounded), findsOneWidget);
+      expect(find.text('2.300.000'), findsOneWidget);
+      expect(find.text('Gaji Belum Cair : 2.000.000'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Dana Aman terintegrasi dengan filter uangku (cair vs semua dana)',
+        (WidgetTester tester) async {
+      final now = DateTime.now();
+      final futureDate = DateTime(now.year, now.month, now.day + 5);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      await prefs.setStringList('uangku', [
+        '{"nama":"Cash","jumlah":300000}',
+        '{"nama":"Gaji Belum Cair","jumlah":1000000,"tanggalCair":"${futureDate.toIso8601String()}"}',
+      ]);
+      await prefs.setStringList('tagihan', [
+        '{"nama":"Listrik","jumlah":200000}',
+      ]);
+
+      await tester.pumpWidget(const MyApp());
+      await tester.pumpAndSettle();
+
+      // Default filter Uangku off: Dana Aman = 1.300.000 - 200.000 = 1.100.000
+      expect(find.text('1.100.000'), findsOneWidget);
+
+      // Buka filter uangku (klik icon filter di samping total nominal Uangku)
+      await tester.tap(find.byIcon(Icons.filter_alt_off_rounded));
+      await tester.pumpAndSettle();
+
+      // Filter Uangku on: Uangku terhitung hanya 300.000, Dana Aman = 300.000 - 200.000 = 100.000
+      expect(find.text('100.000'), findsOneWidget);
+      expect(find.textContaining('Uangku terhitung: 300.000 (Hanya cair)'), findsOneWidget);
+
+      // Matikan kembali filter Uangku
+      final uangkuFilterBtn = find.descendant(
+        of: find.byType(InfoCardUangku),
+        matching: find.byType(IconButton),
+      );
+      await tester.tap(uangkuFilterBtn);
+      await tester.pumpAndSettle();
+
+      // Dana Aman kembali = 1.100.000 (semua dana dikurangi tagihan)
+      expect(find.text('1.100.000'), findsOneWidget);
+    });
+  });
 }
+
 
 
 
