@@ -647,8 +647,49 @@ void main() {
       // Dana Aman kembali = 1.100.000 (semua dana dikurangi tagihan)
       expect(find.text('1.100.000'), findsOneWidget);
     });
+
+    testWidgets(
+        'Tambah Uangku belum cair TIDAK menambah DP, tapi Uangku sudah cair menambah DP',
+        (WidgetTester tester) async {
+      final now = DateTime.now();
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+
+      await tester.pumpWidget(const MyApp());
+      await tester.pumpAndSettle();
+
+      // Buka kartu Uangku
+      await tester.tap(find.text('Uangku'));
+      await tester.pumpAndSettle();
+
+      // 1. Tambah Uangku yang sudah cair (tanpa tanggal)
+      final tambahUangkuBtn = find.descendant(
+        of: find.byType(InfoCardUangku),
+        matching: find.widgetWithText(ElevatedButton, 'Tambah'),
+      );
+      await tester.tap(tambahUangkuBtn);
+      await tester.pumpAndSettle();
+
+      final namaField = find.widgetWithText(TextField, 'nama');
+      final nominalField = find.widgetWithText(TextField, 'jumlah');
+      await tester.enterText(namaField, 'Gaji Pokok');
+      await tester.enterText(nominalField, '1000000');
+
+      // Submit dialog (tanpa tanggal cair -> otomatis cair)
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Tambah Uangku'));
+      await tester.pumpAndSettle();
+
+      // DP harus dibuat 10% (100.000)
+      final currentMonthKey = '${now.year}_${now.month.toString().padLeft(2, '0')}';
+      final tagihanData = prefs.getStringList('tagihan_$currentMonthKey') ?? prefs.getStringList('tagihan') ?? [];
+      expect(tagihanData.isNotEmpty, true);
+      expect(tagihanData.first, contains('"DP"'));
+      expect(tagihanData.first, contains('100000'));
+    });
   });
 }
+
 
 
 

@@ -5,7 +5,6 @@ import 'package:daily_apps/utils/riwayat_service.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -102,20 +101,20 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
             ),
             title: Text(
               'Tambah Tagihan',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
                   controller: namaCtrl,
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
                   decoration: InputDecoration(
                     hintText: 'nama',
-                    hintStyle: GoogleFonts.poppins(
+                    hintStyle: TextStyle(
                         fontWeight: FontWeight.w500,
                         color: Colors.blueGrey
                     ),
@@ -135,13 +134,13 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                     FilteringTextInputFormatter.digitsOnly,
                     RupiahInputFormatter(),
                   ],
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
                   decoration: InputDecoration(
                     hintText: 'jumlah',
-                    hintStyle: GoogleFonts.poppins(
+                    hintStyle: TextStyle(
                         fontWeight: FontWeight.w500,
                         color: Colors.blueGrey
                     ),
@@ -199,7 +198,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                                 ? 'Pilih Deadline (Opsional)'
                                 : DateFormat('dd/MM/yyyy')
                                     .format(selectedDeadline!),
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                               color: selectedDeadline == null
@@ -267,7 +266,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                   },
                   child: Text(
                     'Tambah Tagihan',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                         fontSize: 18
@@ -301,14 +300,14 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
             ),
             title: Text(
               'Edit Tagihan',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
                   controller: namaCtrl,
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
@@ -330,7 +329,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                     FilteringTextInputFormatter.digitsOnly,
                     RupiahInputFormatter(),
                   ],
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
@@ -390,7 +389,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                                 ? 'Pilih Deadline (Opsional)'
                                 : DateFormat('dd/MM/yyyy')
                                     .format(selectedDeadline!),
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                               color: selectedDeadline == null
@@ -465,7 +464,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                   },
                   child: Text(
                     'Simpan Perubahan',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                       fontSize: 18,
@@ -505,7 +504,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
         SnackBar(
           content: Text(
             'Belum ada pos Uangku untuk membayar tagihan ini.',
-            style: GoogleFonts.poppins(),
+            style: TextStyle(),
           ),
           backgroundColor: const Color(0xFFD46A6A),
         ),
@@ -553,7 +552,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                 Expanded(
                   child: Text(
                     'Bayar Tagihan',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 17,
                     ),
@@ -579,7 +578,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                       children: [
                         Text(
                           item.nama,
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 15,
                             color: const Color(0xFF1E293B),
@@ -588,7 +587,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                         const SizedBox(height: 4),
                         Text(
                           'Sisa Tagihan: ${RupiahFormatter.format(item.jumlah)}',
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
                             color: const Color(0xFFE65100),
@@ -598,7 +597,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                           const SizedBox(height: 2),
                           Text(
                             'Jatuh Tempo: ${item.formattedDeadline}',
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey[600],
                             ),
@@ -610,7 +609,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                   const SizedBox(height: 14),
                   Text(
                     'Pilih Sumber Dana (Uangku):',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                       color: Colors.grey[700],
@@ -676,14 +675,14 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                               dense: true,
                               title: Text(
                                 u.nama,
-                                style: GoogleFonts.poppins(
+                                style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 14,
                                 ),
                               ),
                               subtitle: Text(
                                 'Saldo: ${RupiahFormatter.format(u.jumlah)} $statusLabel',
-                                style: GoogleFonts.poppins(
+                                style: TextStyle(
                                   fontSize: 12,
                                   color: statusColor,
                                   fontWeight: FontWeight.w500,
@@ -701,7 +700,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                     children: [
                       Text(
                         'Jumlah Pembayaran :',
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 13,
                           color: Colors.grey[700],
@@ -712,7 +711,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                         child: Text(
                           labelText,
                           key: ValueKey<String>(labelText),
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                             color: labelColor,
@@ -732,7 +731,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                     onChanged: (_) {
                       setModalState(() {});
                     },
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
@@ -762,7 +761,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                 onPressed: () => Navigator.pop(context),
                 child: Text(
                   'Batal',
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     color: Colors.grey[600],
                     fontWeight: FontWeight.w500,
                   ),
@@ -783,7 +782,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                       SnackBar(
                         content: Text(
                           'Saldo "${chosenUangku.nama}" Rp 0, tidak ada saldo yang dapat digunakan untuk membayar.',
-                          style: GoogleFonts.poppins(),
+                          style: TextStyle(),
                         ),
                         backgroundColor: const Color(0xFFD46A6A),
                         behavior: SnackBarBehavior.floating,
@@ -800,7 +799,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                       SnackBar(
                         content: Text(
                           'Masukkan nominal pembayaran yang valid (lebih dari 0).',
-                          style: GoogleFonts.poppins(),
+                          style: TextStyle(),
                         ),
                         backgroundColor: const Color(0xFFD46A6A),
                         behavior: SnackBarBehavior.floating,
@@ -814,7 +813,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                       SnackBar(
                         content: Text(
                           'Nominal pembayaran tidak boleh melebihi sisa tagihan (${RupiahFormatter.format(item.jumlah)}).',
-                          style: GoogleFonts.poppins(),
+                          style: TextStyle(),
                         ),
                         backgroundColor: const Color(0xFFD46A6A),
                         behavior: SnackBarBehavior.floating,
@@ -888,7 +887,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                         SnackBar(
                           content: Text(
                             msg,
-                            style: GoogleFonts.poppins(),
+                            style: TextStyle(),
                           ),
                           backgroundColor: const Color(0xFFE65100),
                           behavior: SnackBarBehavior.floating,
@@ -944,7 +943,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                         SnackBar(
                           content: Text(
                             'Tagihan "$namaFormat" berhasil dilunasi!',
-                            style: GoogleFonts.poppins(),
+                            style: TextStyle(),
                           ),
                           backgroundColor: const Color(0xFF2E7D32),
                           behavior: SnackBarBehavior.floating,
@@ -955,7 +954,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                 },
                 child: Text(
                   'Konfirmasi Bayar',
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
@@ -981,7 +980,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
             ),
             title: Text(
               'Hapus Tagihan',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -997,7 +996,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                   },
                   title: Text(
                     item.nama,
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
                     ),
@@ -1058,7 +1057,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                   },
                   child: Text(
                     'Konfirmasi Hapus',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                         fontSize: 18
@@ -1106,7 +1105,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                     const SizedBox(width: 8),
                     Text(
                       widget.title,
-                      style: GoogleFonts.poppins(
+                      style: TextStyle(
                         fontSize: 15,
                         color: Colors.pink,
                         fontWeight: FontWeight.bold,
@@ -1130,7 +1129,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
           /// TOTAL
           Text(
             RupiahFormatter.format(int.parse(widget.amount)),
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.w600,
             ),
@@ -1211,7 +1210,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                                   children: [
                                     Text(
                                       '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
-                                      style: GoogleFonts.poppins(
+                                      style: TextStyle(
                                         fontSize: 14,
                                         color: Colors.grey[800],
                                         fontWeight: FontWeight.w500,
@@ -1221,7 +1220,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                                     if (item.formattedDeadline != null)
                                       Text(
                                         'Tempo: ${item.formattedDeadline!}',
-                                        style: GoogleFonts.poppins(
+                                        style: TextStyle(
                                           fontSize: 11,
                                           color: Colors.grey[600],
                                           fontWeight: FontWeight.w400,
@@ -1257,7 +1256,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                                       const SizedBox(width: 4),
                                       Text(
                                         'Bayar',
-                                        style: GoogleFonts.poppins(
+                                        style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.bold,
                                           color: const Color(0xFF2E7D32),
@@ -1292,7 +1291,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                         onPressed: showTambahTagihan,
                         child: Text(
                           'Tambah',
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -1313,7 +1312,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                         onPressed: showHapusTagihan,
                         child: Text(
                           'Hapus',
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,

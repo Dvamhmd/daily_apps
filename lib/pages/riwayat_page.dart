@@ -2,7 +2,6 @@ import 'package:daily_apps/models/model_riwayat.dart';
 import 'package:daily_apps/utils/riwayat_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class RiwayatPage extends StatefulWidget {
   const RiwayatPage({super.key});
@@ -121,7 +120,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
             const SizedBox(width: 10),
             Text(
               'Hapus Semua Riwayat?',
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
               ),
@@ -130,14 +129,14 @@ class _RiwayatPageState extends State<RiwayatPage> {
         ),
         content: Text(
           'Seluruh catatan perubahan keuangan akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.',
-          style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[700]),
+          style: TextStyle(fontSize: 14, color: Colors.grey[700]),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: Text(
               'Batal',
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontWeight: FontWeight.w600,
                 color: Colors.grey[600],
               ),
@@ -159,7 +158,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
                   SnackBar(
                     content: Text(
                       'Semua riwayat berhasil dihapus',
-                      style: GoogleFonts.poppins(),
+                      style: TextStyle(),
                     ),
                     backgroundColor: const Color(0xFF5E35B1),
                     behavior: SnackBarBehavior.floating,
@@ -172,7 +171,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
             },
             child: Text(
               'Hapus Semua',
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
@@ -191,7 +190,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
         SnackBar(
           content: Text(
             '1 riwayat dihapus',
-            style: GoogleFonts.poppins(),
+            style: TextStyle(),
           ),
           backgroundColor: const Color(0xFF5E35B1),
           behavior: SnackBarBehavior.floating,
@@ -276,7 +275,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
         ),
         title: Text(
           'Riwayat Keuangan',
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
             fontSize: 20,
@@ -316,10 +315,10 @@ class _RiwayatPageState extends State<RiwayatPage> {
                   onChanged: (val) {
                     setState(() => _searchQuery = val);
                   },
-                  style: GoogleFonts.poppins(fontSize: 14),
+                  style: TextStyle(fontSize: 14),
                   decoration: InputDecoration(
                     hintText: 'Cari riwayat perubahan...',
-                    hintStyle: GoogleFonts.poppins(
+                    hintStyle: TextStyle(
                       color: Colors.grey[400],
                       fontSize: 14,
                     ),
@@ -457,7 +456,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
           children: [
             Text(
               title,
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                 color: isSelected ? Colors.white : Colors.grey[700],
@@ -474,7 +473,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
               ),
               child: Text(
                 '$count',
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                   color: isSelected ? Colors.white : Colors.grey[800],
@@ -528,7 +527,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
             const SizedBox(width: 4),
             Text(
               label,
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                 color: isSelected ? const Color(0xFF1976D2) : Colors.grey[700],
@@ -608,7 +607,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
             const SizedBox(width: 4),
             Text(
               label,
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                 color: isSelected ? const Color(0xFF1976D2) : Colors.grey[700],
@@ -660,7 +659,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
                     const SizedBox(width: 5),
                     Text(
                       _formatDateTime(item.datetime),
-                      style: GoogleFonts.poppins(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                         color: Colors.grey[600],
@@ -684,7 +683,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
                       ),
                       child: Text(
                         item.kategori,
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                           color: kategoriColor,
@@ -737,7 +736,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
                     children: [
                       Text(
                         'Perubahan:',
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w600,
                           color: Colors.grey[500],
@@ -746,7 +745,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
                       const SizedBox(height: 2),
                       Text(
                         item.perubahan,
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFF1E293B),
@@ -792,7 +791,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
               isSearching
                   ? 'Riwayat Tidak Ditemukan'
                   : 'Belum Ada Riwayat Perubahan',
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.bold,
                 color: const Color(0xFF1E293B),
@@ -804,7 +803,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
                   ? 'Coba kata kunci lain untuk mencari riwayat perubahan.'
                   : 'Setiap kamu menambah, mengubah, atau menghapus Tagihan dan Uangku, riwayat perubahannya akan otomatis tercatat di sini.',
               textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontSize: 13,
                 color: Colors.grey[600],
                 height: 1.4,

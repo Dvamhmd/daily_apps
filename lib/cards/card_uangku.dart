@@ -4,7 +4,6 @@ import 'package:daily_apps/utils/riwayat_service.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -199,20 +198,20 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
             ),
             title: Text(
               'Tambah Uangku',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
                   controller: namaCtrl,
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
                   decoration: InputDecoration(
                     hintText: 'nama',
-                    hintStyle: GoogleFonts.poppins(
+                    hintStyle: TextStyle(
                         fontWeight: FontWeight.w500,
                         color: Colors.blueGrey),
                     filled: true,
@@ -231,13 +230,13 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     FilteringTextInputFormatter.digitsOnly,
                     RupiahInputFormatter(),
                   ],
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
                   decoration: InputDecoration(
                     hintText: 'jumlah',
-                    hintStyle: GoogleFonts.poppins(
+                    hintStyle: TextStyle(
                         fontWeight: FontWeight.w500,
                         color: Colors.blueGrey),
                     filled: true,
@@ -291,7 +290,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                                 ? 'Pilih Tanggal Cair (Opsional)'
                                 : DateFormat('dd/MM/yyyy')
                                     .format(selectedTanggalCair!),
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                               color: selectedTanggalCair == null
@@ -338,18 +337,18 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
 
                     final jumlah = int.parse(jumlahText);
 
+                    final newUangku = Uangku(
+                      nama,
+                      jumlah,
+                      tanggalCair: selectedTanggalCair,
+                    );
+
                     setState(() {
-                      uangkuList.add(
-                        Uangku(
-                          nama,
-                          jumlah,
-                          tanggalCair: selectedTanggalCair,
-                        ),
-                      );
+                      uangkuList.add(newUangku);
                     });
 
                     await _saveUangku();
-                    if (jumlah > 0) {
+                    if (jumlah > 0 && newUangku.isCair) {
                       await _tambah10PersenKeTagihanDp(jumlah);
                     }
                     await RiwayatService.catatTambahUangku(
@@ -364,7 +363,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                   },
                   child: Text(
                     'Tambah Uangku',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                         fontSize: 18),
@@ -397,14 +396,14 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
             ),
             title: Text(
               'Edit Uangku',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
                   controller: namaCtrl,
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
@@ -426,7 +425,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     FilteringTextInputFormatter.digitsOnly,
                     RupiahInputFormatter(),
                   ],
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
@@ -483,7 +482,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                                 ? 'Pilih Tanggal Cair (Opsional)'
                                 : DateFormat('dd/MM/yyyy')
                                     .format(selectedTanggalCair!),
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                               color: selectedTanggalCair == null
@@ -526,24 +525,32 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     final jumlahClean =
                         jumlahCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
 
-                    if (nama.isEmpty || jumlahClean.isEmpty) return;
-
                     final namaLama = item.nama;
                     final jumlahLama = item.jumlah;
+                    final itemLama = item;
                     final jumlahBaru = int.parse(jumlahClean);
+                    final itemBaru = Uangku(
+                      nama,
+                      jumlahBaru,
+                      tanggalCair: selectedTanggalCair,
+                    );
 
                     setState(() {
-                      uangkuList[index] = Uangku(
-                        nama,
-                        jumlahBaru,
-                        tanggalCair: selectedTanggalCair,
-                      );
+                      uangkuList[index] = itemBaru;
                     });
 
                     await _saveUangku();
-                    if (jumlahBaru > jumlahLama) {
-                      final selisih = jumlahBaru - jumlahLama;
-                      await _tambah10PersenKeTagihanDp(selisih);
+                    if (itemBaru.isCair) {
+                      if (!itemLama.isCair) {
+                        if (jumlahBaru > 0) {
+                          await _tambah10PersenKeTagihanDp(jumlahBaru);
+                        }
+                      } else {
+                        if (jumlahBaru > jumlahLama) {
+                          final selisih = jumlahBaru - jumlahLama;
+                          await _tambah10PersenKeTagihanDp(selisih);
+                        }
+                      }
                     }
                     await RiwayatService.catatEditUangku(
                       namaLama: namaLama,
@@ -559,7 +566,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                   },
                   child: Text(
                     'Simpan Perubahan',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                       fontSize: 18,
@@ -589,7 +596,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
             ),
             title: Text(
               'Kelola ${item.nama}',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -597,7 +604,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
               children: [
                 Text(
                   'Saldo saat ini: ${RupiahFormatter.format(item.jumlah)}',
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                     color: Colors.blueGrey[700],
@@ -611,13 +618,13 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     FilteringTextInputFormatter.digitsOnly,
                     RupiahInputFormatter(),
                   ],
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
                   decoration: InputDecoration(
                     hintText: 'Nominal',
-                    hintStyle: GoogleFonts.poppins(
+                    hintStyle: TextStyle(
                       fontWeight: FontWeight.w500,
                       color: Colors.blueGrey,
                     ),
@@ -679,7 +686,9 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                         });
 
                         await _saveUangku();
-                        await _tambah10PersenKeTagihanDp(nominal);
+                        if (item.isCair) {
+                          await _tambah10PersenKeTagihanDp(nominal);
+                        }
                         await RiwayatService.catatEditUangku(
                           namaLama: namaLama,
                           jumlahLama: jumlahLama,
@@ -694,7 +703,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                       },
                       child: Text(
                         'Debit',
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                           fontSize: 15,
@@ -759,7 +768,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                       },
                       child: Text(
                         'Kredit',
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                           fontSize: 15,
@@ -789,7 +798,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
             ),
             title: Text(
               'Hapus Uangku',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -805,7 +814,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                   },
                   title: Text(
                     item.nama,
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
                     ),
@@ -862,7 +871,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                   },
                   child: Text(
                     'Konfirmasi Hapus',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                         fontSize: 18),
@@ -913,7 +922,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     const SizedBox(width: 8),
                     Text(
                       widget.title,
-                      style: GoogleFonts.poppins(
+                      style: TextStyle(
                         fontSize: 15,
                         color: Colors.pink,
                         fontWeight: FontWeight.bold,
@@ -943,7 +952,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                 RupiahFormatter.format(
                   onlyCair ? totalSudahCair : int.parse(widget.amount),
                 ),
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w600,
                 ),
@@ -998,7 +1007,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                       const SizedBox(width: 4),
                       Text(
                         'Cair: ${RupiahFormatter.format(totalSudahCair)}',
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFF2E7D32),
@@ -1028,7 +1037,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                       const SizedBox(width: 4),
                       Text(
                         'Belum: ${RupiahFormatter.format(totalBelumCair)}',
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFFE65100),
@@ -1058,7 +1067,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                         onlyCair
                             ? 'Tidak ada dana yang sudah cair'
                             : 'Belum ada data uangku',
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontSize: 13,
                           color: Colors.grey[600],
                           fontStyle: FontStyle.italic,
@@ -1146,7 +1155,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                                     children: [
                                       Text(
                                         '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
-                                        style: GoogleFonts.poppins(
+                                        style: TextStyle(
                                           fontSize: 14,
                                           color: Colors.grey[800],
                                           fontWeight: FontWeight.w500,
@@ -1172,7 +1181,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                                               item.isCair
                                                   ? 'Cair • ${item.formattedTanggalCair}'
                                                   : 'Belum Cair • ${item.formattedTanggalCair}',
-                                              style: GoogleFonts.poppins(
+                                              style: TextStyle(
                                                 fontSize: 11,
                                                 color: item.isCair
                                                     ? const Color(0xFF2E7D32)
@@ -1219,7 +1228,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                                         const SizedBox(width: 2),
                                         Text(
                                           '+/-',
-                                          style: GoogleFonts.poppins(
+                                          style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.bold,
                                             color: const Color(0xFF2E7D32),
@@ -1254,7 +1263,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                         onPressed: showTambahUangku,
                         child: Text(
                           'Tambah',
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -1275,7 +1284,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                         onPressed: showHapusUangku,
                         child: Text(
                           'Hapus',
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,

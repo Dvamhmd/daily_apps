@@ -2,7 +2,6 @@ import 'package:daily_apps/models/model_tagihan.dart';
 import 'package:daily_apps/pages/riwayat_page.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
@@ -139,7 +138,7 @@ class AppDrawer extends StatelessWidget {
                         children: [
                           Text(
                             'Daily Apps',
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               color: Colors.white,
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -149,7 +148,7 @@ class AppDrawer extends StatelessWidget {
                             monthStr != null
                                 ? 'Ringkasan: $monthStr'
                                 : 'Manajemen Keuangan Harian',
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               color: Colors.white70,
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
@@ -195,7 +194,7 @@ class AppDrawer extends StatelessWidget {
                           const SizedBox(width: 8),
                           Text(
                             statusTitle,
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               color: statusColor,
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
@@ -206,7 +205,7 @@ class AppDrawer extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         statusDesc,
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           color: Colors.grey[700],
                           fontSize: 12,
                           height: 1.3,
@@ -229,7 +228,7 @@ class AppDrawer extends StatelessWidget {
                 const SizedBox(height: 18),
                 Text(
                   'FITUR & MENU',
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                     color: Colors.grey[500],
@@ -275,7 +274,7 @@ class AppDrawer extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Text(
               'Daily Apps v1.3.0',
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontSize: 11,
                 color: Colors.grey[400],
               ),
@@ -292,11 +291,11 @@ class AppDrawer extends StatelessWidget {
       children: [
         Text(
           label,
-          style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey[500]),
+          style: TextStyle(fontSize: 10, color: Colors.grey[500]),
         ),
         Text(
           RupiahFormatter.format(amount),
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.bold,
             color: color,
@@ -334,7 +333,7 @@ class AppDrawer extends StatelessWidget {
         ),
         title: Text(
           title,
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w600,
             color: const Color(0xFF1E293B),
@@ -342,7 +341,7 @@ class AppDrawer extends StatelessWidget {
         ),
         subtitle: Text(
           subtitle,
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             fontSize: 11,
             color: Colors.grey[500],
           ),
@@ -413,7 +412,7 @@ class AppDrawer extends StatelessWidget {
                     children: [
                       Text(
                         'Arsip Tagihan Lunas',
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: const Color(0xFF1E293B),
@@ -421,7 +420,7 @@ class AppDrawer extends StatelessWidget {
                       ),
                       Text(
                         'Daftar tagihan yang telah diselesaikan',
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[600],
                         ),
@@ -446,7 +445,7 @@ class AppDrawer extends StatelessWidget {
                           const SizedBox(height: 12),
                           Text(
                             'Belum ada tagihan yang dibayar',
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: Colors.grey[600],
@@ -456,7 +455,7 @@ class AppDrawer extends StatelessWidget {
                           Text(
                             'Klik tombol "Bayar" pada kartu Tagihan saat sudah melunasi.',
                             textAlign: TextAlign.center,
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey[400],
                             ),
@@ -489,7 +488,7 @@ class AppDrawer extends StatelessWidget {
                                 children: [
                                   Text(
                                     item.nama,
-                                    style: GoogleFonts.poppins(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 14,
                                       color: const Color(0xFF1E293B),
@@ -498,7 +497,7 @@ class AppDrawer extends StatelessWidget {
                                   const SizedBox(height: 2),
                                   Text(
                                     'Lunas: $tglStr ${item.dibayarDari != null ? '• dari ${item.dibayarDari}' : ''}',
-                                    style: GoogleFonts.poppins(
+                                    style: TextStyle(
                                       fontSize: 11,
                                       color: Colors.grey[500],
                                     ),
@@ -507,7 +506,7 @@ class AppDrawer extends StatelessWidget {
                               ),
                               Text(
                                 RupiahFormatter.format(item.jumlah),
-                                style: GoogleFonts.poppins(
+                                style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
                                   color: const Color(0xFF2E7D32),

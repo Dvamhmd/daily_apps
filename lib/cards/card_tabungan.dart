@@ -4,7 +4,6 @@ import 'package:daily_apps/utils/riwayat_service.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class InfoCardTabungan extends StatefulWidget {
@@ -69,20 +68,20 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
         ),
         title: Text(
           'Tambah Tabungan',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: namaCtrl,
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
               ),
               decoration: InputDecoration(
                 hintText: 'nama',
-                hintStyle: GoogleFonts.poppins(
+                hintStyle: TextStyle(
                   fontWeight: FontWeight.w500,
                   color: Colors.blueGrey,
                 ),
@@ -102,13 +101,13 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                 FilteringTextInputFormatter.digitsOnly,
                 RupiahInputFormatter(),
               ],
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
               ),
               decoration: InputDecoration(
                 hintText: 'jumlah',
-                hintStyle: GoogleFonts.poppins(
+                hintStyle: TextStyle(
                   fontWeight: FontWeight.w500,
                   color: Colors.blueGrey,
                 ),
@@ -156,7 +155,7 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
               },
               child: Text(
                 'Tambah Tabungan',
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                   fontSize: 18,
@@ -185,14 +184,14 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
         ),
         title: Text(
           'Edit Tabungan',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: namaCtrl,
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
               ),
@@ -214,7 +213,7 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                 FilteringTextInputFormatter.digitsOnly,
                 RupiahInputFormatter(),
               ],
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
               ),
@@ -270,7 +269,7 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
               },
               child: Text(
                 'Simpan Perubahan',
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                   fontSize: 18,
@@ -296,7 +295,7 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
             ),
             title: Text(
               'Hapus Tabungan',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -312,7 +311,7 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                   },
                   title: Text(
                     item.nama,
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
                     ),
@@ -364,7 +363,7 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                   },
                   child: Text(
                     'Konfirmasi Hapus',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                       fontSize: 18,
@@ -416,7 +415,7 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                     const SizedBox(width: 8),
                     Text(
                       widget.title,
-                      style: GoogleFonts.poppins(
+                      style: TextStyle(
                         fontSize: 15,
                         color: const Color(0xFFE53935),
                         fontWeight: FontWeight.bold,
@@ -440,7 +439,7 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
           /// TOTAL
           Text(
             RupiahFormatter.format(int.parse(widget.amount)),
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.w600,
               color: const Color(0xFF1E293B),
@@ -518,7 +517,7 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                               const SizedBox(width: 8),
                               Text(
                                 '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
-                                style: GoogleFonts.poppins(
+                                style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.grey[700],
                                   fontWeight: FontWeight.w500,
@@ -549,7 +548,7 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                         onPressed: showTambahTabungan,
                         child: Text(
                           'Tambah',
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -570,7 +569,7 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                         onPressed: showHapusTabungan,
                         child: Text(
                           'Hapus',
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,

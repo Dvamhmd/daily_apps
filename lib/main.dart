@@ -9,7 +9,6 @@ import 'package:daily_apps/utils/notification_service.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:daily_apps/widgets/app_drawer.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -34,6 +33,9 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Keuangan',
+      theme: ThemeData(
+        fontFamily: 'Poppins',
+      ),
       home: const KeuanganPage(),
     );
   }
@@ -267,7 +269,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                   Expanded(
                     child: Text(
                       'Opsi Deadline Dana Aman',
-                      style: GoogleFonts.poppins(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
@@ -300,14 +302,14 @@ class _KeuanganPageState extends State<KeuanganPage> {
                             activeColor: const Color(0xFF5E35B1),
                             title: Text(
                               'Semua Tagihan (Default)',
-                              style: GoogleFonts.poppins(
+                              style: TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 14,
                               ),
                             ),
                             subtitle: Text(
                               'Semua tagihan akan mengurangi uangku',
-                              style: GoogleFonts.poppins(fontSize: 12),
+                              style: TextStyle(fontSize: 12),
                             ),
                           ),
                           const Divider(),
@@ -317,14 +319,14 @@ class _KeuanganPageState extends State<KeuanganPage> {
                             activeColor: const Color(0xFF5E35B1),
                             title: Text(
                               'Hanya Tagihan Berdeadline',
-                              style: GoogleFonts.poppins(
+                              style: TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 14,
                               ),
                             ),
                             subtitle: Text(
                               'Hanya tagihan yang memiliki deadline yang mengurangi uangku',
-                              style: GoogleFonts.poppins(fontSize: 12),
+                              style: TextStyle(fontSize: 12),
                             ),
                           ),
                           const Divider(),
@@ -334,14 +336,14 @@ class _KeuanganPageState extends State<KeuanganPage> {
                             activeColor: const Color(0xFF5E35B1),
                             title: Text(
                               'Sesuaikan Batas Deadline',
-                              style: GoogleFonts.poppins(
+                              style: TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 14,
                               ),
                             ),
                             subtitle: Text(
                               'Hanya tagihan dengan deadline s/d tanggal yang dipilih',
-                              style: GoogleFonts.poppins(fontSize: 12),
+                              style: TextStyle(fontSize: 12),
                             ),
                           ),
                         ],
@@ -397,7 +399,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                                   tempCutoff == null
                                       ? 'Pilih Tanggal Batas'
                                       : 's/d ${DateFormat('dd/MM/yyyy').format(tempCutoff!)}',
-                                  style: GoogleFonts.poppins(
+                                  style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
                                     color: const Color(0xFF5E35B1),
@@ -437,7 +439,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                     },
                     child: Text(
                       'Terapkan',
-                      style: GoogleFonts.poppins(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                         color: Colors.white,
@@ -601,7 +603,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                 children: [
                   Text(
                     'Pilih Bulan & Tahun',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
@@ -625,7 +627,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                       ),
                       child: Text(
                         'Bulan Ini',
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                           color: const Color(0xFF5E35B1),
@@ -661,7 +663,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                           ),
                           Text(
                             '$tempYear',
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: const Color(0xFF5E35B1),
@@ -728,7 +730,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                             alignment: Alignment.center,
                             child: Text(
                               namaBulan[idx].substring(0, 3),
-                              style: GoogleFonts.poppins(
+                              style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: isSelected
                                     ? FontWeight.bold
@@ -754,7 +756,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                   onPressed: () => Navigator.pop(context),
                   child: Text(
                     'Batal',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontWeight: FontWeight.w600,
                       color: Colors.grey[600],
                     ),
@@ -776,7 +778,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                   },
                   child: Text(
                     'Pilih',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
@@ -808,7 +810,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
               ),
               title: Text(
                 'Edit Target',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -832,7 +834,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                       targetDate == null
                           ? 'Pilih Deadline'
                           : formatTanggal(targetDate!),
-                      style: GoogleFonts.poppins(),
+                      style: TextStyle(),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -843,13 +845,13 @@ class _KeuanganPageState extends State<KeuanganPage> {
                       FilteringTextInputFormatter.digitsOnly,
                       RupiahInputFormatter(),
                     ],
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
                     decoration: InputDecoration(
                       hintText: 'Target Tabungan',
-                      hintStyle: GoogleFonts.poppins(),
+                      hintStyle: TextStyle(),
                     ),
                   ),
                 ],
@@ -877,7 +879,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                     },
                     child: Text(
                       'Simpan',
-                      style: GoogleFonts.poppins(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                         color: Colors.white,
@@ -988,7 +990,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
         ),
         title: Text(
           'Keuangan',
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
           ),
@@ -1029,7 +1031,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                             : (status == StatusKesehatan.perhatian
                                 ? 'Perhatian'
                                 : 'Kritis'),
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           color: Colors.white,
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -1098,7 +1100,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                     Expanded(
                       child: Text(
                         _getUrgentTagihanMessage(urgentTagihan),
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFFE65100),
@@ -1160,7 +1162,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                             const SizedBox(width: 8),
                             Text(
                               '${namaBulan[selectedMonth.month - 1]} ${selectedMonth.year}',
-                              style: GoogleFonts.poppins(
+                              style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
                                 color: const Color(0xFF5E35B1),
@@ -1270,7 +1272,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                           const SizedBox(width: 10),
                           Text(
                             'Dana Aman :',
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: const Color(0xFF1E293B),
@@ -1280,7 +1282,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                       ),
                       Text(
                         RupiahFormatter.format(danaAman),
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: const Color(0xFF5E35B1),
@@ -1306,7 +1308,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                         Expanded(
                           child: Text(
                             danaAmanFilterLabel,
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
                               color: const Color(0xFF5E35B1),
@@ -1327,7 +1329,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                               children: [
                                 Text(
                                   'Sesuaikan',
-                                  style: GoogleFonts.poppins(
+                                  style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                     color: const Color(0xFF5E35B1),
@@ -1357,7 +1359,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                         const SizedBox(width: 4),
                         Text(
                           'Uangku terhitung: ${RupiahFormatter.format(totalUangkuCair)} (Hanya cair)',
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
                             color: const Color(0xFF2E7D32),
@@ -1373,7 +1375,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                       children: [
                         Text(
                           'Tagihan terhitung: ${RupiahFormatter.format(totalTagihanDanaAman)} (${filteredTagihanDanaAman.length} tagihan)',
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             fontSize: 11,
                             color: Colors.grey[600],
                             fontStyle: FontStyle.italic,
@@ -1389,7 +1391,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                           },
                           child: Text(
                             'Reset',
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               fontSize: 11,
                               color: Colors.red[600],
                               fontWeight: FontWeight.w600,
@@ -1421,7 +1423,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                       targetDate == null
                           ? 'Target Tabungan'
                           : 'Target : ${formatTanggal(targetDate!)}',
-                      style: GoogleFonts.poppins(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: const Color(0xFF1E293B),
@@ -1441,7 +1443,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
               targetTabungan == 0
                   ? '0'
                   : RupiahFormatter.format(targetTabungan),
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontSize: 36,
                 fontWeight: FontWeight.w600,
                 color: const Color(0xFF1E293B),
@@ -1469,7 +1471,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                 children: [
                   Text(
                     'Terkumpul: ${RupiahFormatter.format(totalTabungan)} ($persenTabungan%)',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: Colors.grey[600],
@@ -1478,7 +1480,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                   if (sisaHari > 0)
                     Text(
                       '$sisaHari hari lagi',
-                      style: GoogleFonts.poppins(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: const Color(0xFF5E35B1),
@@ -1524,7 +1526,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                     children: [
                       Text(
                         'Kekurangan Dana',
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
                           color: Colors.grey[600],
@@ -1532,7 +1534,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                       ),
                       Text(
                         RupiahFormatter.format(sisaTarget),
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: Colors.red[700],
@@ -1567,7 +1569,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                         sisaHari > 0
                             ? 'Tabungan per hari ($sisaHari hari)'
                             : 'Tabungan per hari',
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
                           color: Colors.grey[600],
@@ -1575,7 +1577,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                       ),
                       Text(
                         RupiahFormatter.format(tabunganPerHari),
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: Colors.green[800],
