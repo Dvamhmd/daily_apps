@@ -252,11 +252,14 @@ class _KeuanganPageState extends State<KeuanganPage> {
     );
 
     final diff = target.difference(today).inDays;
-    return diff > 0 ? diff : 0;
+    if (diff < 0) return 0;
+    if (diff == 0) return 1; // Deadline hari ini dihitung 1 hari
+    return diff;
   }
 
   int get tabunganPerHari {
-    if (sisaHari == 0) return 0;
+    if (sisaTarget <= 0) return 0;
+    if (sisaHari <= 0) return 0;
     return (sisaTarget / sisaHari).ceil(); // dibulatkan ke atas
   }
 
@@ -667,6 +670,8 @@ class _KeuanganPageState extends State<KeuanganPage> {
         'target_date',
         targetDate!.millisecondsSinceEpoch,
       );
+    } else {
+      await prefs.remove('target_date');
     }
     await prefs.setInt('target_amount', targetTabungan);
   }
@@ -925,6 +930,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
   }
 
   void showEditTarget() {
+    DateTime? tempTargetDate = targetDate;
     final targetCtrl = TextEditingController(
       text: targetTabungan == 0
           ? ''
@@ -940,36 +946,23 @@ class _KeuanganPageState extends State<KeuanganPage> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              title: Text(
-                'Edit Target',
+              title: const Text(
+                'Edit Target Tabungan',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ElevatedButton(
-                    onPressed: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: targetDate ?? DateTime.now(),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime(2100),
-                      );
-
-                      if (picked != null) {
-                        setLocalState(() {
-                          targetDate = picked;
-                        });
-                      }
-                    },
-                    child: Text(
-                      targetDate == null
-                          ? 'Pilih Deadline'
-                          : formatTanggal(targetDate!),
-                      style: TextStyle(),
+                  const Text(
+                    'Target Tabungan (Rp)',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   TextField(
                     controller: targetCtrl,
                     keyboardType: TextInputType.number,
@@ -977,14 +970,91 @@ class _KeuanganPageState extends State<KeuanganPage> {
                       FilteringTextInputFormatter.digitsOnly,
                       RupiahInputFormatter(),
                     ],
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                     ),
                     decoration: InputDecoration(
-                      hintText: 'Target Tabungan',
-                      hintStyle: TextStyle(),
+                      hintText: 'Contoh: 1.000.000',
+                      filled: true,
+                      fillColor: Colors.grey[100],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
                     ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Deadline Target',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 11),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: () async {
+                            final now = DateTime.now();
+                            final today =
+                                DateTime(now.year, now.month, now.day);
+                            final initial = (tempTargetDate != null &&
+                                    tempTargetDate!.isAfter(today))
+                                ? tempTargetDate!
+                                : today;
+
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: initial,
+                              firstDate: DateTime(now.year - 1),
+                              lastDate: DateTime(2100),
+                            );
+
+                            if (picked != null) {
+                              setLocalState(() {
+                                tempTargetDate = picked;
+                              });
+                            }
+                          },
+                          icon: const Icon(Icons.calendar_month_rounded,
+                              size: 18),
+                          label: Text(
+                            tempTargetDate == null
+                                ? 'Pilih Deadline'
+                                : DateFormat('dd MMM yyyy')
+                                    .format(tempTargetDate!),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (tempTargetDate != null) ...[
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded,
+                              color: Colors.red),
+                          tooltip: 'Hapus Deadline',
+                          onPressed: () {
+                            setLocalState(() {
+                              tempTargetDate = null;
+                            });
+                          },
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
@@ -997,6 +1067,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                     onPressed: () {
                       final cleanValue =
@@ -1004,12 +1075,13 @@ class _KeuanganPageState extends State<KeuanganPage> {
 
                       setState(() {
                         targetTabungan = int.tryParse(cleanValue) ?? 0;
+                        targetDate = tempTargetDate;
                       });
 
                       _saveTarget();
                       Navigator.pop(context);
                     },
-                    child: Text(
+                    child: const Text(
                       'Simpan',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
@@ -1416,7 +1488,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                           ),
                           const SizedBox(width: 10),
                           const Text(
-                            'Dana Aman (Sisa Bebas)',
+                            'Dana Aman',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
@@ -1538,7 +1610,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'Uangku terhitung: ${RupiahFormatter.format(totalUangkuCair)} (Hanya cair)',
+                          'Uangku terhitung: ${RupiahFormatter.format(totalUangkuCair)} (Cair)',
                           style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w500,

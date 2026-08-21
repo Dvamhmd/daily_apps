@@ -1,5 +1,6 @@
 import 'package:daily_apps/models/model_tagihan.dart';
 import 'package:daily_apps/pages/riwayat_page.dart';
+import 'package:daily_apps/pages/struktur_page.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -238,6 +239,21 @@ class AppDrawer extends StatelessWidget {
                 const SizedBox(height: 8),
 
                 // Menu items
+                _buildMenuItem(
+                  context: context,
+                  icon: Icons.corporate_fare_rounded,
+                  iconColor: const Color(0xFF5E35B1),
+                  title: 'Struktur',
+                  subtitle: 'Rekening struktur, on hand debit & cash',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const StrukturPage()),
+                    ).then((_) => onDataChanged());
+                  },
+                ),
+
                 _buildMenuItem(
                   context: context,
                   icon: Icons.history_rounded,

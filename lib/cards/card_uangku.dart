@@ -1042,7 +1042,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        onlyCair ? 'Hanya Cair' : 'Semua',
+                        onlyCair ? 'Cair' : 'Semua',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -1240,14 +1240,6 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                                         ),
                                       ),
                                     ),
-                                  Icon(
-                                    Icons.circle,
-                                    size: 8,
-                                    color: item.isCair
-                                        ? const Color(0xFF2E7D32)
-                                        : const Color(0xFFE65100),
-                                  ),
-                                  const SizedBox(width: 8),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:

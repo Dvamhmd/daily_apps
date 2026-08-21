@@ -596,12 +596,6 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                                       ),
                                     ),
                                   ),
-                                  const Icon(
-                                    Icons.circle,
-                                    size: 8,
-                                    color: Color(0xFFE11D48),
-                                  ),
-                                  const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
                                       '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
