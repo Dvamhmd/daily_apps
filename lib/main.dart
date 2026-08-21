@@ -11,6 +11,7 @@ import 'package:daily_apps/utils/notification_service.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:daily_apps/widgets/app_drawer.dart';
 import 'package:daily_apps/widgets/gta_switch_wheel.dart';
+import 'package:daily_apps/widgets/menu_transition_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -58,6 +59,8 @@ class MainScreenWrapper extends StatefulWidget {
 }
 
 class _MainScreenWrapperState extends State<MainScreenWrapper> {
+  final GlobalKey<MenuTransitionWrapperState> _transitionKey =
+      GlobalKey<MenuTransitionWrapperState>();
   int _currentPageIndex = 0;
 
   @override
@@ -78,27 +81,41 @@ class _MainScreenWrapperState extends State<MainScreenWrapper> {
 
   void _onPageSelected(int index) {
     if (_currentPageIndex != index) {
-      setState(() {
-        _currentPageIndex = index;
-      });
+      if (_transitionKey.currentState != null) {
+        _transitionKey.currentState!.triggerTransition(index, () {
+          if (mounted) {
+            setState(() {
+              _currentPageIndex = index;
+            });
+          }
+        });
+      } else {
+        setState(() {
+          _currentPageIndex = index;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: _currentPageIndex == 1
-          ? const Color(0xFFF0FDF4)
-          : (_currentPageIndex == 2
-              ? const Color(0xFFFBF8F6)
-              : const Color(0xFFF7F9FC)),
-      child: IndexedStack(
-        index: _currentPageIndex,
-        children: [
-          KeuanganPage(onPageSelected: _onPageSelected),
-          RundownPage(onPageSelected: _onPageSelected),
-          TodoPage(onPageSelected: _onPageSelected),
-        ],
+    return MenuTransitionWrapper(
+      key: _transitionKey,
+      currentPageIndex: _currentPageIndex,
+      child: Container(
+        color: _currentPageIndex == 1
+            ? const Color(0xFFF0FDF4)
+            : (_currentPageIndex == 2
+                ? const Color(0xFFFBF8F6)
+                : const Color(0xFFF7F9FC)),
+        child: IndexedStack(
+          index: _currentPageIndex,
+          children: [
+            KeuanganPage(onPageSelected: _onPageSelected),
+            RundownPage(onPageSelected: _onPageSelected),
+            TodoPage(onPageSelected: _onPageSelected),
+          ],
+        ),
       ),
     );
   }
@@ -1076,7 +1093,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FC),
+      backgroundColor: const Color(0xFFF8FAFC),
       floatingActionButton: GtaSwitchWheel(
         currentIndex: 0,
         onPageSelected: widget.onPageSelected ?? (index) {},
@@ -1097,13 +1114,14 @@ class _KeuanganPageState extends State<KeuanganPage> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF5E35B1),
         centerTitle: true,
+        elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         systemOverlayStyle: const SystemUiOverlayStyle(
           statusBarColor: Colors.black,
           statusBarIconBrightness: Brightness.light,
           statusBarBrightness: Brightness.dark,
         ),
-        title: Text(
+        title: const Text(
           'Keuangan',
           style: TextStyle(
             color: Colors.white,
@@ -1146,7 +1164,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                             : (status == StatusKesehatan.perhatian
                                 ? 'Perhatian'
                                 : 'Kritis'),
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -1163,7 +1181,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
             icon: const Icon(
               Icons.history_rounded,
               color: Colors.white,
-              size: 26,
+              size: 24,
             ),
             tooltip: 'Riwayat Perubahan',
             onPressed: () {
@@ -1189,36 +1207,43 @@ class _KeuanganPageState extends State<KeuanganPage> {
           children: [
             if (urgentTagihan.isNotEmpty) ...[
               Container(
-                margin: const EdgeInsets.only(bottom: 12),
+                margin: const EdgeInsets.only(bottom: 14),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      const Color(0xFFE65100).withValues(alpha: 0.12),
-                      const Color(0xFFFFA726).withValues(alpha: 0.08),
+                      const Color(0xFFFFFBEB),
+                      const Color(0xFFFEF3C7),
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: const Color(0xFFE65100).withValues(alpha: 0.3),
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
                   ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(
-                      Icons.notifications_active_rounded,
-                      color: Color(0xFFE65100),
-                      size: 20,
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.notifications_active_rounded,
+                        color: Color(0xFFD97706),
+                        size: 18,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         _getUrgentTagihanMessage(urgentTagihan),
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: const Color(0xFFE65100),
+                          color: Color(0xFFB45309),
                         ),
                       ),
                     ),
@@ -1226,29 +1251,30 @@ class _KeuanganPageState extends State<KeuanganPage> {
                 ),
               ),
             ],
+
             // BULAN SELECTOR BAR
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF5E35B1).withValues(alpha: 0.06),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
+                    color: const Color(0xFF5E35B1).withValues(alpha: 0.05),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
                 ],
                 border: Border.all(
-                  color: const Color(0xFF5E35B1).withValues(alpha: 0.15),
+                  color: const Color(0xFF5E35B1).withValues(alpha: 0.12),
                 ),
               ),
               child: Row(
                 children: [
                   IconButton(
                     icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: 18,
+                      Icons.chevron_left_rounded,
+                      size: 24,
                       color: Color(0xFF5E35B1),
                     ),
                     tooltip: 'Bulan Sebelumnya',
@@ -1257,14 +1283,14 @@ class _KeuanganPageState extends State<KeuanganPage> {
                   Expanded(
                     child: InkWell(
                       onTap: _showMonthYearPicker,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
+                            horizontal: 14, vertical: 9),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF5E35B1)
-                              .withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(12),
+                          color:
+                              const Color(0xFF5E35B1).withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(14),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -1277,10 +1303,10 @@ class _KeuanganPageState extends State<KeuanganPage> {
                             const SizedBox(width: 8),
                             Text(
                               '${namaBulan[selectedMonth.month - 1]} ${selectedMonth.year}',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
-                                color: const Color(0xFF5E35B1),
+                                color: Color(0xFF5E35B1),
                               ),
                             ),
                             const SizedBox(width: 4),
@@ -1296,8 +1322,8 @@ class _KeuanganPageState extends State<KeuanganPage> {
                   ),
                   IconButton(
                     icon: const Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 18,
+                      Icons.chevron_right_rounded,
+                      size: 24,
                       color: Color(0xFF5E35B1),
                     ),
                     tooltip: 'Bulan Berikutnya',
@@ -1307,7 +1333,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             // KEUANGAN HARIAN
             InfoCardTagihan(
@@ -1323,7 +1349,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
               onChanged: _refreshAll,
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             InfoCardUangku(
               title: 'Uangku',
@@ -1344,23 +1370,27 @@ class _KeuanganPageState extends State<KeuanganPage> {
               onChanged: _refreshAll,
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
-            // DANA AMAN (KEUANGAN HARIAN)
+            // DANA AMAN (KEUANGAN HARIAN) - STANDOUT HERO CARD
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: const Color(0xFF5E35B1).withValues(alpha: 0.2),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF5E35B1),
+                    Color(0xFF7E57C2),
+                  ],
                 ),
+                borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
+                    color: const Color(0xFF5E35B1).withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
@@ -1373,92 +1403,127 @@ class _KeuanganPageState extends State<KeuanganPage> {
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(7),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF5E35B1).withValues(alpha: 0.1),
+                              color: Colors.white.withValues(alpha: 0.2),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
                               Icons.shield_rounded,
-                              color: Color(0xFF5E35B1),
-                              size: 20,
+                              color: Colors.white,
+                              size: 18,
                             ),
                           ),
                           const SizedBox(width: 10),
-                          Text(
-                            'Dana Aman :',
+                          const Text(
+                            'Dana Aman (Sisa Bebas)',
                             style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF1E293B),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white70,
                             ),
                           ),
                         ],
                       ),
-                      Text(
-                        RupiahFormatter.format(danaAman),
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF5E35B1),
+                      InkWell(
+                        onTap: showOpsiDeadlineDanaAman,
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 9, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.tune_rounded,
+                                size: 13,
+                                color: Colors.white,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'Filter',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Icon(
+                                Icons.arrow_drop_down,
+                                size: 16,
+                                color: Colors.white,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    RupiahFormatter.format(danaAman),
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
                   const SizedBox(height: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF3E8FF),
-                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.black.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(
                       children: [
                         const Icon(
-                          Icons.tune_rounded,
-                          size: 16,
-                          color: Color(0xFF5E35B1),
+                          Icons.info_outline_rounded,
+                          size: 14,
+                          color: Colors.white70,
                         ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             danaAmanFilterLabel,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
-                              color: const Color(0xFF5E35B1),
+                              color: Colors.white,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        InkWell(
-                          onTap: showOpsiDeadlineDanaAman,
-                          borderRadius: BorderRadius.circular(6),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Sesuaikan',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF5E35B1),
-                                  ),
+                        if (danaAmanFilterMode != 'all')
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                danaAmanFilterMode = 'all';
+                                danaAmanCutoffDate = null;
+                              });
+                              _saveDanaAmanFilter();
+                            },
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 4),
+                              child: Text(
+                                'Reset',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFFFFCDD2),
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                const Icon(
-                                  Icons.arrow_drop_down,
-                                  size: 18,
-                                  color: Color(0xFF5E35B1),
-                                ),
-                              ],
+                              ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -1467,52 +1532,172 @@ class _KeuanganPageState extends State<KeuanganPage> {
                     Row(
                       children: [
                         const Icon(
-                          Icons.filter_alt_rounded,
+                          Icons.check_circle_rounded,
                           size: 13,
-                          color: Color(0xFF2E7D32),
+                          color: Color(0xFFA7F3D0),
                         ),
                         const SizedBox(width: 4),
                         Text(
                           'Uangku terhitung: ${RupiahFormatter.format(totalUangkuCair)} (Hanya cair)',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
-                            color: const Color(0xFF2E7D32),
+                            color: Color(0xFFA7F3D0),
                           ),
                         ),
                       ],
                     ),
                   ],
-                  if (danaAmanFilterMode != 'all') ...[
-                    const SizedBox(height: 6),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            // TARGET TABUNGAN (MODERN GOAL CARD)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: const Color(0xFF5E35B1).withValues(alpha: 0.15),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF5E35B1).withValues(alpha: 0.05),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF5E35B1)
+                                  .withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.flag_circle_rounded,
+                              color: Color(0xFF5E35B1),
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            targetDate == null
+                                ? 'Target Tabungan'
+                                : 'Target: ${DateFormat('dd MMM yyyy').format(targetDate!)}',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E293B),
+                            ),
+                          ),
+                        ],
+                      ),
+                      InkWell(
+                        onTap: showEditTarget,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF5E35B1)
+                                .withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.edit_rounded,
+                                size: 14,
+                                color: Color(0xFF5E35B1),
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'Edit',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF5E35B1),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    targetTabungan == 0
+                        ? 'Rp 0'
+                        : RupiahFormatter.format(targetTabungan),
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  if (targetTabungan > 0) ...[
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: progressTabungan,
+                        minHeight: 8,
+                        backgroundColor: Colors.grey[200],
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          progressTabungan >= 1.0
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFF5E35B1),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Tagihan terhitung: ${RupiahFormatter.format(totalTagihanDanaAman)} (${filteredTagihanDanaAman.length} tagihan)',
+                          'Terkumpul: ${RupiahFormatter.format(totalTabungan)} ($persenTabungan%)',
                           style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[600],
-                            fontStyle: FontStyle.italic,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
                           ),
                         ),
-                        InkWell(
-                          onTap: () {
-                            setState(() {
-                              danaAmanFilterMode = 'all';
-                              danaAmanCutoffDate = null;
-                            });
-                            _saveDanaAmanFilter();
-                          },
-                          child: Text(
-                            'Reset',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.red[600],
-                              fontWeight: FontWeight.w600,
+                        if (sisaHari > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF5E35B1)
+                                  .withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '$sisaHari hari lagi',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF5E35B1),
+                              ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                   ],
@@ -1520,92 +1705,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
               ),
             ),
 
-            const Divider(height: 36, thickness: 1.2),
-
-            // TARGET TABUNGAN (TERPISAH DARI KEUANGAN HARIAN)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.flag_circle_rounded,
-                      color: Color(0xFF5E35B1),
-                      size: 22,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      targetDate == null
-                          ? 'Target Tabungan'
-                          : 'Target : ${formatTanggal(targetDate!)}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF1E293B),
-                      ),
-                    ),
-                  ],
-                ),
-                IconButton(
-                  icon: const Icon(Icons.edit, size: 24, color: Color(0xFF5E35B1)),
-                  tooltip: 'Edit Target',
-                  onPressed: showEditTarget,
-                ),
-              ],
-            ),
-
-            Text(
-              targetTabungan == 0
-                  ? '0'
-                  : RupiahFormatter.format(targetTabungan),
-              style: TextStyle(
-                fontSize: 36,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF1E293B),
-              ),
-            ),
-
-            if (targetTabungan > 0) ...[
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: LinearProgressIndicator(
-                  value: progressTabungan,
-                  minHeight: 8,
-                  backgroundColor: Colors.grey[200],
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    progressTabungan >= 1.0
-                        ? const Color(0xFF63B967)
-                        : const Color(0xFF5E35B1),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Terkumpul: ${RupiahFormatter.format(totalTabungan)} ($persenTabungan%)',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  if (sisaHari > 0)
-                    Text(
-                      '$sisaHari hari lagi',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF5E35B1),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             // KARTU TABUNGANKU (INPUT MANDIRI TERPISAH)
             InfoCardTabungan(
@@ -1620,85 +1720,142 @@ class _KeuanganPageState extends State<KeuanganPage> {
               onChanged: _refreshAll,
             ),
 
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
 
-            // KEKURANGAN DANA (SISA TARGET)
+            // STATS DUO CARDS: KEKURANGAN DANA & TABUNGAN PER HARI
             Row(
               children: [
-                const CircleAvatar(
-                  backgroundColor: Colors.red,
-                  radius: 14,
-                  child: Icon(
-                    Icons.remove,
-                    color: Colors.white,
-                    size: 18,
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFFFECDD3),
+                        width: 1.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color:
+                              const Color(0xFFEF4444).withValues(alpha: 0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444)
+                                    .withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.trending_down_rounded,
+                                color: Color(0xFFEF4444),
+                                size: 15,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Expanded(
+                              child: Text(
+                                'Kekurangan',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF64748B),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          RupiahFormatter.format(sisaTarget),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFDC2626),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Kekurangan Dana',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[600],
-                        ),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFFBBF7D0),
+                        width: 1.2,
                       ),
-                      Text(
-                        RupiahFormatter.format(sisaTarget),
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.red[700],
+                      boxShadow: [
+                        BoxShadow(
+                          color:
+                              const Color(0xFF10B981).withValues(alpha: 0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            // TABUNGAN PER HARI
-            Row(
-              children: [
-                const CircleAvatar(
-                  backgroundColor: Colors.green,
-                  radius: 14,
-                  child: Icon(
-                    Icons.attach_money,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        sisaHari > 0
-                            ? 'Tabungan per hari ($sisaHari hari)'
-                            : 'Tabungan per hari',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[600],
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981)
+                                    .withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.savings_rounded,
+                                color: Color(0xFF10B981),
+                                size: 15,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                sisaHari > 0
+                                    ? 'Nabung/Hari ($sisaHari hr)'
+                                    : 'Nabung/Hari',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF64748B),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      Text(
-                        RupiahFormatter.format(tabunganPerHari),
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green[800],
+                        const SizedBox(height: 6),
+                        Text(
+                          RupiahFormatter.format(tabunganPerHari),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF16A34A),
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],

@@ -382,14 +382,21 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFDFE0),
-        borderRadius: BorderRadius.circular(14),
+        color: const Color(0xFFFFE4E8),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(0xFFFF8B8B),
-          width: 1,
+          color: const Color(0xFFFB7185),
+          width: 1.5,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFE11D48).withValues(alpha: 0.12),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -401,48 +408,88 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                 isExpanded = !isExpanded;
               });
             },
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.savings_rounded, // Icon Celengan Babi
-                      color: Color(0xFFE53935),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color:
+                              const Color(0xFFE11D48).withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.savings_rounded,
+                          color: Color(0xFFE11D48),
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        widget.title,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: Color(0xFF9F1239),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (tabunganList.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE11D48)
+                                .withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${tabunganList.length}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFE11D48),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF9F1239).withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      isExpanded
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      color: const Color(0xFF9F1239),
                       size: 20,
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      widget.title,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: const Color(0xFFE53935),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                Icon(
-                  isExpanded
-                      ? Icons.keyboard_arrow_up
-                      : Icons.keyboard_arrow_down,
-                  color: const Color(0xFFE53935),
-                  size: 22,
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
           ),
 
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
 
           /// TOTAL
           Text(
             RupiahFormatter.format(int.parse(widget.amount)),
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 26,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF1E293B),
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+              letterSpacing: -0.5,
             ),
           ),
 
@@ -452,129 +499,178 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
             secondChild: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 4),
+                const SizedBox(height: 10),
 
                 /// LIST TABUNGAN
-                ReorderableListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  buildDefaultDragHandles: false,
-                  itemCount: tabunganList.length,
-                  proxyDecorator: (child, index, animation) {
-                    return AnimatedBuilder(
-                      animation: animation,
-                      builder: (context, child) {
-                        return Material(
-                          elevation: 3,
-                          color: const Color(0xFFFFF0F1),
-                          borderRadius: BorderRadius.circular(8),
-                          child: child,
-                        );
-                      },
-                      child: child,
-                    );
-                  },
-                  onReorder: (oldIndex, newIndex) {
-                    setState(() {
-                      if (newIndex > oldIndex) {
-                        newIndex -= 1;
-                      }
-                      final item = tabunganList.removeAt(oldIndex);
-                      tabunganList.insert(newIndex, item);
-                    });
-                    _saveTabungan();
-                    widget.onChanged();
-                  },
-                  itemBuilder: (context, index) {
-                    final item = tabunganList[index];
-                    return Material(
-                      key: ValueKey('${item.nama}_${item.jumlah}_$index'),
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        splashColor: Colors.green.withValues(alpha: 0.2),
-                        highlightColor: Colors.green.withValues(alpha: 0.1),
-                        onLongPress: () {
-                          showEditTabungan(index);
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            children: [
-                              ReorderableDragStartListener(
-                                index: index,
-                                child: Padding(
-                                  padding: const EdgeInsets.only(right: 6),
-                                  child: Icon(
-                                    Icons.drag_handle_rounded,
-                                    size: 18,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ),
-                              const Icon(Icons.circle,
-                                  size: 7, color: Colors.grey),
-                              const SizedBox(width: 8),
-                              Text(
-                                '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[700],
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
+                if (tabunganList.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Center(
+                      child: Text(
+                        'Belum ada data tabungan',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[600],
+                          fontStyle: FontStyle.italic,
                         ),
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  )
+                else
+                  ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    buildDefaultDragHandles: false,
+                    itemCount: tabunganList.length,
+                    proxyDecorator: (child, index, animation) {
+                      return AnimatedBuilder(
+                        animation: animation,
+                        builder: (context, child) {
+                          return Material(
+                            elevation: 4,
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            shadowColor: Colors.black.withValues(alpha: 0.15),
+                            child: child,
+                          );
+                        },
+                        child: child,
+                      );
+                    },
+                    onReorder: (oldIndex, newIndex) {
+                      setState(() {
+                        if (newIndex > oldIndex) {
+                          newIndex -= 1;
+                        }
+                        final item = tabunganList.removeAt(oldIndex);
+                        tabunganList.insert(newIndex, item);
+                      });
+                      _saveTabungan();
+                      widget.onChanged();
+                    },
+                    itemBuilder: (context, index) {
+                      final item = tabunganList[index];
+                      return Container(
+                        key: ValueKey('${item.nama}_${item.jumlah}_$index'),
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFFB7185)
+                                .withValues(alpha: 0.65),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFE11D48)
+                                  .withValues(alpha: 0.05),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            splashColor:
+                                const Color(0xFFE11D48).withValues(alpha: 0.1),
+                            highlightColor:
+                                const Color(0xFFE11D48).withValues(alpha: 0.05),
+                            onLongPress: () {
+                              showEditTabungan(index);
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 8),
+                              child: Row(
+                                children: [
+                                  ReorderableDragStartListener(
+                                    index: index,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(right: 8),
+                                      child: Icon(
+                                        Icons.drag_indicator_rounded,
+                                        size: 18,
+                                        color: Colors.grey[400],
+                                      ),
+                                    ),
+                                  ),
+                                  const Icon(
+                                    Icons.circle,
+                                    size: 8,
+                                    color: Color(0xFFE11D48),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Color(0xFF1E293B),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
 
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
 
                 /// BUTTONS
                 Row(
                   children: [
                     Expanded(
-                      child: ElevatedButton(
+                      child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF63B967),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
-                        onPressed: showTambahTabungan,
-                        child: Text(
+                        icon: const Icon(Icons.add_circle_outline_rounded,
+                            size: 18),
+                        label: const Text(
                           'Tambah',
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
                           ),
                         ),
+                        onPressed: showTambahTabungan,
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: ElevatedButton(
+                      child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFD46A6A),
+                          backgroundColor: const Color(0xFFEF5350),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
-                        onPressed: showHapusTabungan,
-                        child: Text(
+                        icon:
+                            const Icon(Icons.delete_outline_rounded, size: 18),
+                        label: const Text(
                           'Hapus',
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
                           ),
                         ),
+                        onPressed: showHapusTabungan,
                       ),
                     ),
                   ],

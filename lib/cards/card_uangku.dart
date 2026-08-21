@@ -361,7 +361,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                       bulan: widget.selectedMonth ?? DateTime.now(),
                     );
                     widget.onChanged();
-                    if (mounted) {
+                    if (context.mounted) {
                       Navigator.pop(context);
                     }
                   },
@@ -564,7 +564,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                       bulan: widget.selectedMonth ?? DateTime.now(),
                     );
                     widget.onChanged();
-                    if (mounted) {
+                    if (context.mounted) {
                       Navigator.pop(context);
                     }
                   },
@@ -897,10 +897,21 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFFD9FAD1),
-        borderRadius: BorderRadius.circular(14),
+        color: const Color(0xFFF3F7E6),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFF86EFAC),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF15803D).withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -912,40 +923,79 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                 isExpanded = !isExpanded;
               });
             },
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.account_balance_wallet_rounded,
-                      color: Colors.pink,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color:
+                              const Color(0xFF16A34A).withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.account_balance_wallet_rounded,
+                          color: Color(0xFF16A34A),
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        widget.title,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: Color(0xFF15803D),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (uangkuList.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF16A34A)
+                                .withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${uangkuList.length}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF16A34A),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF15803D).withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      isExpanded
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      color: const Color(0xFF15803D),
                       size: 20,
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      widget.title,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.pink,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                Icon(
-                  isExpanded
-                      ? Icons.keyboard_arrow_up
-                      : Icons.keyboard_arrow_down,
-                  color: Colors.pink,
-                  size: 22,
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
           ),
 
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
 
           /// TOTAL & FILTER
           Row(
@@ -956,28 +1006,52 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                 RupiahFormatter.format(
                   onlyCair ? totalSudahCair : int.parse(widget.amount),
                 ),
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 26,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                  letterSpacing: -0.5,
                 ),
               ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                splashRadius: 20,
-                onPressed: _toggleOnlyCair,
-                tooltip: onlyCair
-                    ? 'Hanya dana sudah cair (Klik untuk tampilkan semua)'
-                    : 'Filter dana yang sudah cair',
-                icon: Icon(
-                  onlyCair
-                      ? Icons.filter_alt_rounded
-                      : Icons.filter_alt_off_rounded,
-                  color: onlyCair
-                      ? const Color(0xFF2E7D32)
-                      : Colors.grey[600],
-                  size: 24,
+              InkWell(
+                onTap: _toggleOnlyCair,
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: onlyCair
+                        ? const Color(0xFF16A34A)
+                        : const Color(0xFF16A34A).withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFF16A34A)
+                          .withValues(alpha: onlyCair ? 1.0 : 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        onlyCair
+                            ? Icons.filter_alt_rounded
+                            : Icons.filter_alt_off_rounded,
+                        size: 14,
+                        color:
+                            onlyCair ? Colors.white : const Color(0xFF15803D),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        onlyCair ? 'Hanya Cair' : 'Semua',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color:
+                              onlyCair ? Colors.white : const Color(0xFF15803D),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -985,17 +1059,17 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
 
           /// KLASIFIKASI STATUS (Jika ada yang belum cair)
           if (hasBelumCair) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 4,
               children: [
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(6),
+                    color: const Color(0xFF2E7D32).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: const Color(0xFF2E7D32).withValues(alpha: 0.25),
                     ),
@@ -1008,13 +1082,13 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                         size: 13,
                         color: Color(0xFF2E7D32),
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 5),
                       Text(
                         'Cair: ${RupiahFormatter.format(totalSudahCair)}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: const Color(0xFF2E7D32),
+                          color: Color(0xFF2E7D32),
                         ),
                       ),
                     ],
@@ -1022,10 +1096,10 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                 ),
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE65100).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(6),
+                    color: const Color(0xFFE65100).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: const Color(0xFFE65100).withValues(alpha: 0.25),
                     ),
@@ -1038,13 +1112,13 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                         size: 13,
                         color: Color(0xFFE65100),
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 5),
                       Text(
                         'Belum: ${RupiahFormatter.format(totalBelumCair)}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: const Color(0xFFE65100),
+                          color: Color(0xFFE65100),
                         ),
                       ),
                     ],
@@ -1060,7 +1134,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
             secondChild: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 4),
+                const SizedBox(height: 10),
 
                 /// LIST UANGKU
                 if (displayedList.isEmpty)
@@ -1090,9 +1164,10 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                         animation: animation,
                         builder: (context, child) {
                           return Material(
-                            elevation: 3,
-                            color: const Color(0xFFEBFDE5),
-                            borderRadius: BorderRadius.circular(8),
+                            elevation: 4,
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            shadowColor: Colors.black.withValues(alpha: 0.15),
                             child: child,
                           );
                         },
@@ -1115,134 +1190,157 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                       final item = displayedList[index];
                       final originalIndex = uangkuList.indexOf(item);
 
-                      return Material(
+                      return Container(
                         key: ValueKey('${item.nama}_${item.jumlah}_$index'),
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(8),
-                          splashColor: Colors.green.withValues(alpha: 0.2),
-                          highlightColor: Colors.green.withValues(alpha: 0.1),
-                          onLongPress: () {
-                            if (originalIndex != -1) {
-                              showEditUangku(originalIndex);
-                            }
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Row(
-                              children: [
-                                if (!onlyCair)
-                                  ReorderableDragStartListener(
-                                    index: index,
-                                    child: Padding(
-                                      padding:
-                                          const EdgeInsets.only(right: 6),
-                                      child: Icon(
-                                        Icons.drag_handle_rounded,
-                                        size: 18,
-                                        color: Colors.grey[600],
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFF86EFAC)
+                                .withValues(alpha: 0.6),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF15803D)
+                                  .withValues(alpha: 0.04),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            splashColor:
+                                const Color(0xFF16A34A).withValues(alpha: 0.1),
+                            highlightColor:
+                                const Color(0xFF16A34A).withValues(alpha: 0.05),
+                            onLongPress: () {
+                              if (originalIndex != -1) {
+                                showEditUangku(originalIndex);
+                              }
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 8),
+                              child: Row(
+                                children: [
+                                  if (!onlyCair)
+                                    ReorderableDragStartListener(
+                                      index: index,
+                                      child: Padding(
+                                        padding:
+                                            const EdgeInsets.only(right: 8),
+                                        child: Icon(
+                                          Icons.drag_indicator_rounded,
+                                          size: 18,
+                                          color: Colors.grey[400],
+                                        ),
                                       ),
                                     ),
+                                  Icon(
+                                    Icons.circle,
+                                    size: 8,
+                                    color: item.isCair
+                                        ? const Color(0xFF2E7D32)
+                                        : const Color(0xFFE65100),
                                   ),
-                                Icon(
-                                  Icons.circle,
-                                  size: 7,
-                                  color: item.isCair
-                                      ? Colors.grey
-                                      : const Color(0xFFE65100),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey[800],
-                                          fontWeight: FontWeight.w500,
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            color: Color(0xFF1E293B),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      if (item.tanggalCair != null) ...[
-                                        const SizedBox(height: 2),
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              item.isCair
-                                                  ? Icons.check_circle_rounded
-                                                  : Icons.schedule_rounded,
-                                              size: 12,
-                                              color: item.isCair
-                                                  ? const Color(0xFF2E7D32)
-                                                  : const Color(0xFFE65100),
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              item.isCair
-                                                  ? 'Cair • ${item.formattedTanggalCair}'
-                                                  : 'Belum Cair • ${item.formattedTanggalCair}',
-                                              style: TextStyle(
-                                                fontSize: 11,
+                                        if (item.tanggalCair != null) ...[
+                                          const SizedBox(height: 2),
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                item.isCair
+                                                    ? Icons.check_circle_rounded
+                                                    : Icons.schedule_rounded,
+                                                size: 12,
                                                 color: item.isCair
                                                     ? const Color(0xFF2E7D32)
                                                     : const Color(0xFFE65100),
-                                                fontWeight: FontWeight.w500,
                                               ),
-                                            ),
-                                          ],
-                                        ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                item.isCair
+                                                    ? 'Cair • ${item.formattedTanggalCair}'
+                                                    : 'Belum Cair • ${item.formattedTanggalCair}',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: item.isCair
+                                                      ? const Color(0xFF2E7D32)
+                                                      : const Color(0xFFE65100),
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
                                       ],
-                                    ],
-                                  ),
-                                ),
-                                InkWell(
-                                  borderRadius: BorderRadius.circular(6),
-                                  onTap: () {
-                                    if (originalIndex != -1) {
-                                      showKelolaNominalUangku(originalIndex);
-                                    }
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
                                     ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF63B967)
-                                          .withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
+                                  ),
+                                  const SizedBox(width: 6),
+                                  InkWell(
+                                    borderRadius: BorderRadius.circular(8),
+                                    onTap: () {
+                                      if (originalIndex != -1) {
+                                        showKelolaNominalUangku(originalIndex);
+                                      }
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 5,
+                                      ),
+                                      decoration: BoxDecoration(
                                         color: const Color(0xFF63B967)
-                                            .withValues(alpha: 0.5),
-                                        width: 1,
+                                            .withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: const Color(0xFF63B967)
+                                              .withValues(alpha: 0.5),
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.exposure_rounded,
+                                            size: 14,
+                                            color: Color(0xFF2E7D32),
+                                          ),
+                                          SizedBox(width: 3),
+                                          Text(
+                                            '+/-',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF2E7D32),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.exposure_rounded,
-                                          size: 14,
-                                          color: Color(0xFF2E7D32),
-                                        ),
-                                        const SizedBox(width: 2),
-                                        Text(
-                                          '+/-',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: const Color(0xFF2E7D32),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -1250,50 +1348,56 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     },
                   ),
 
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
 
                 /// BUTTONS
                 Row(
                   children: [
                     Expanded(
-                      child: ElevatedButton(
+                      child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF63B967),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
-                        onPressed: showTambahUangku,
-                        child: Text(
+                        icon: const Icon(Icons.add_circle_outline_rounded,
+                            size: 18),
+                        label: const Text(
                           'Tambah',
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
                           ),
                         ),
+                        onPressed: showTambahUangku,
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: ElevatedButton(
+                      child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFD46A6A),
+                          backgroundColor: const Color(0xFFEF5350),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
-                        onPressed: showHapusUangku,
-                        child: Text(
+                        icon:
+                            const Icon(Icons.delete_outline_rounded, size: 18),
+                        label: const Text(
                           'Hapus',
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
                           ),
                         ),
+                        onPressed: showHapusUangku,
                       ),
                     ),
                   ],

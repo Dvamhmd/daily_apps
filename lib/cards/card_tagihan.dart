@@ -1079,10 +1079,21 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFFD9FAD1),
-        borderRadius: BorderRadius.circular(14),
+        color: const Color(0xFFFFF3EC),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFFDBA74),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFEA580C).withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1094,47 +1105,87 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                 isExpanded = !isExpanded;
               });
             },
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.receipt_long_rounded,
-                      color: Colors.pink,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE11D48).withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.receipt_long_rounded,
+                          color: Color(0xFFE11D48),
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        widget.title,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: Color(0xFF9F1239),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (tagihanList.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE11D48)
+                                .withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${tagihanList.length}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFE11D48),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF9F1239).withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      isExpanded
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      color: const Color(0xFF9F1239),
                       size: 20,
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      widget.title,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.pink,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                Icon(
-                  isExpanded
-                      ? Icons.keyboard_arrow_up
-                      : Icons.keyboard_arrow_down,
-                  color: Colors.pink,
-                  size: 22,
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
           ),
 
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
 
           /// TOTAL
           Text(
             RupiahFormatter.format(int.parse(widget.amount)),
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 26,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+              letterSpacing: -0.5,
             ),
           ),
 
@@ -1144,183 +1195,239 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
             secondChild: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 4),
+                const SizedBox(height: 10),
 
                 /// LIST TAGIHAN
-                ReorderableListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  buildDefaultDragHandles: false,
-                  itemCount: tagihanList.length,
-                  proxyDecorator: (child, index, animation) {
-                    return AnimatedBuilder(
-                      animation: animation,
-                      builder: (context, child) {
-                        return Material(
-                          elevation: 3,
-                          color: const Color(0xFFEBFDE5),
-                          borderRadius: BorderRadius.circular(8),
-                          child: child,
-                        );
-                      },
-                      child: child,
-                    );
-                  },
-                  onReorder: (oldIndex, newIndex) {
-                    setState(() {
-                      if (newIndex > oldIndex) {
-                        newIndex -= 1;
-                      }
-                      final item = tagihanList.removeAt(oldIndex);
-                      tagihanList.insert(newIndex, item);
-                    });
-                    _saveTagihan();
-                    widget.onChanged();
-                  },
-                  itemBuilder: (context, index) {
-                    final item = tagihanList[index];
-                    return Material(
-                      key: ValueKey('${item.nama}_${item.jumlah}_$index'),
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        splashColor: Colors.green.withValues(alpha: 0.2),
-                        highlightColor: Colors.green.withValues(alpha: 0.1),
-                        onLongPress: () {
-                          showEditTagihan(index);
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 5),
-                          child: Row(
-                            children: [
-                              ReorderableDragStartListener(
-                                index: index,
-                                child: Padding(
-                                  padding: const EdgeInsets.only(right: 6),
-                                  child: Icon(
-                                    Icons.drag_handle_rounded,
-                                    size: 18,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ),
-                              const Icon(Icons.circle,
-                                  size: 7, color: Colors.grey),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey[800],
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    if (item.formattedDeadline != null)
-                                      Text(
-                                        'Tempo: ${item.formattedDeadline!}',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey[600],
-                                          fontWeight: FontWeight.w400,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              // Quick "Bayar" Chip Button
-                              InkWell(
-                                onTap: () => showBayarTagihan(item, index),
-                                borderRadius: BorderRadius.circular(6),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF2E7D32)
-                                        .withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(
-                                      color: const Color(0xFF2E7D32)
-                                          .withValues(alpha: 0.3),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.check_circle_rounded,
-                                        size: 14,
-                                        color: Color(0xFF2E7D32),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Bayar',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFF2E7D32),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                if (tagihanList.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Center(
+                      child: Text(
+                        'Belum ada data tagihan',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[600],
+                          fontStyle: FontStyle.italic,
                         ),
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  )
+                else
+                  ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    buildDefaultDragHandles: false,
+                    itemCount: tagihanList.length,
+                    proxyDecorator: (child, index, animation) {
+                      return AnimatedBuilder(
+                        animation: animation,
+                        builder: (context, child) {
+                          return Material(
+                            elevation: 4,
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            shadowColor: Colors.black.withValues(alpha: 0.15),
+                            child: child,
+                          );
+                        },
+                        child: child,
+                      );
+                    },
+                    onReorder: (oldIndex, newIndex) {
+                      setState(() {
+                        if (newIndex > oldIndex) {
+                          newIndex -= 1;
+                        }
+                        final item = tagihanList.removeAt(oldIndex);
+                        tagihanList.insert(newIndex, item);
+                      });
+                      _saveTagihan();
+                      widget.onChanged();
+                    },
+                    itemBuilder: (context, index) {
+                      final item = tagihanList[index];
+                      return Container(
+                        key: ValueKey('${item.nama}_${item.jumlah}_$index'),
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFFDBA74)
+                                .withValues(alpha: 0.6),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFEA580C)
+                                  .withValues(alpha: 0.04),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            splashColor:
+                                const Color(0xFFE11D48).withValues(alpha: 0.1),
+                            highlightColor:
+                                const Color(0xFFE11D48).withValues(alpha: 0.05),
+                            onLongPress: () {
+                              showEditTagihan(index);
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 8),
+                              child: Row(
+                                children: [
+                                  ReorderableDragStartListener(
+                                    index: index,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(right: 8),
+                                      child: Icon(
+                                        Icons.drag_indicator_rounded,
+                                        size: 18,
+                                        color: Colors.grey[400],
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            color: Color(0xFF1E293B),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        if (item.formattedDeadline != null) ...[
+                                          const SizedBox(height: 2),
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.event_rounded,
+                                                size: 12,
+                                                color: Colors.grey[600],
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'Tempo: ${item.formattedDeadline!}',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.grey[600],
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  // Quick "Bayar" Chip Button
+                                  InkWell(
+                                    onTap: () => showBayarTagihan(item, index),
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF2E7D32)
+                                            .withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: const Color(0xFF2E7D32)
+                                              .withValues(alpha: 0.35),
+                                        ),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.check_circle_rounded,
+                                            size: 14,
+                                            color: Color(0xFF2E7D32),
+                                          ),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'Bayar',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF2E7D32),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
 
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
 
                 /// BUTTONS
                 Row(
                   children: [
                     Expanded(
-                      child: ElevatedButton(
+                      child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF63B967),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
-                        onPressed: showTambahTagihan,
-                        child: Text(
+                        icon: const Icon(Icons.add_circle_outline_rounded,
+                            size: 18),
+                        label: const Text(
                           'Tambah',
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
                           ),
                         ),
+                        onPressed: showTambahTagihan,
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: ElevatedButton(
+                      child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFD46A6A),
+                          backgroundColor: const Color(0xFFEF5350),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
-                        onPressed: showHapusTagihan,
-                        child: Text(
+                        icon:
+                            const Icon(Icons.delete_outline_rounded, size: 18),
+                        label: const Text(
                           'Hapus',
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
                           ),
                         ),
+                        onPressed: showHapusTagihan,
                       ),
                     ),
                   ],
