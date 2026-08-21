@@ -68,6 +68,9 @@ class RiwayatService {
 
     // Sisipkan di posisi pertama agar riwayat terbaru tampil di atas
     data.insert(0, jsonEncode(baru.toJson()));
+    if (data.length > 500) {
+      data.removeRange(500, data.length);
+    }
     await prefs.setStringList(_storageKey, data);
   }
 

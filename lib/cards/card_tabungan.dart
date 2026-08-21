@@ -37,10 +37,10 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
   @override
   void didUpdateWidget(covariant InfoCardTabungan oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _loadTabungan();
-  }
-
-  Future<void> _saveTabungan() async {
+    if (oldWidget.amount != widget.amount) {
+      _loadTabungan();
+    }
+  }  Future<void> _saveTabungan() async {
     final prefs = await SharedPreferences.getInstance();
     final data = tabunganList.map((e) => jsonEncode(e.toJson())).toList();
     await prefs.setStringList('tabungan', data);

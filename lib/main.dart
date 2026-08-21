@@ -5,9 +5,12 @@ import 'package:daily_apps/models/model_tagihan.dart';
 import 'package:daily_apps/models/model_tabungan.dart';
 import 'package:daily_apps/models/model_uangku.dart';
 import 'package:daily_apps/pages/riwayat_page.dart';
+import 'package:daily_apps/pages/rundown_page.dart';
+import 'package:daily_apps/pages/todo_page.dart';
 import 'package:daily_apps/utils/notification_service.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:daily_apps/widgets/app_drawer.dart';
+import 'package:daily_apps/widgets/gta_switch_wheel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -32,17 +35,79 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Keuangan',
+      title: 'Daily Apps',
       theme: ThemeData(
         fontFamily: 'Poppins',
+        scaffoldBackgroundColor: const Color(0xFFF7F9FC),
+        canvasColor: const Color(0xFFF7F9FC),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF5E35B1),
+          surface: const Color(0xFFF7F9FC),
+        ),
       ),
-      home: const KeuanganPage(),
+      home: const MainScreenWrapper(),
+    );
+  }
+}
+
+class MainScreenWrapper extends StatefulWidget {
+  const MainScreenWrapper({super.key});
+
+  @override
+  State<MainScreenWrapper> createState() => _MainScreenWrapperState();
+}
+
+class _MainScreenWrapperState extends State<MainScreenWrapper> {
+  int _currentPageIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDefaultMainPage();
+  }
+
+  Future<void> _loadDefaultMainPage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedIndex = prefs.getInt('default_main_page') ?? 0;
+    if (mounted && savedIndex >= 0 && savedIndex <= 2) {
+      setState(() {
+        _currentPageIndex = savedIndex;
+      });
+    }
+  }
+
+  void _onPageSelected(int index) {
+    if (_currentPageIndex != index) {
+      setState(() {
+        _currentPageIndex = index;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: _currentPageIndex == 1
+          ? const Color(0xFFF0FDF4)
+          : (_currentPageIndex == 2
+              ? const Color(0xFFFBF8F6)
+              : const Color(0xFFF7F9FC)),
+      child: IndexedStack(
+        index: _currentPageIndex,
+        children: [
+          KeuanganPage(onPageSelected: _onPageSelected),
+          RundownPage(onPageSelected: _onPageSelected),
+          TodoPage(onPageSelected: _onPageSelected),
+        ],
+      ),
     );
   }
 }
 
 class KeuanganPage extends StatefulWidget {
-  const KeuanganPage({super.key});
+  final ValueChanged<int>? onPageSelected;
+
+  const KeuanganPage({super.key, this.onPageSelected});
 
   @override
   State<KeuanganPage> createState() => _KeuanganPageState();
@@ -204,33 +269,83 @@ class _KeuanganPageState extends State<KeuanganPage> {
   void initState() {
     super.initState();
     NotificationService.initialize();
-    _loadTagihan();
-    _loadUangku();
-    _loadTabungan();
-    _loadTarget();
-    _loadLastUpdated();
-    _loadDanaAmanFilter();
-    _loadUangkuFilter();
+    _loadInitialData();
   }
 
-  Future<void> _loadUangkuFilter() async {
+  Future<void> _loadInitialData() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // Tagihan
+    final tagihanKey = 'tagihan_$selectedMonthKey';
+    var rawTagihan = prefs.getStringList(tagihanKey);
+    if (rawTagihan == null) {
+      final now = DateTime.now();
+      if (selectedMonth.year == now.year && selectedMonth.month == now.month) {
+        final legacy = prefs.getStringList('tagihan');
+        if (legacy != null) {
+          rawTagihan = legacy;
+          await prefs.setStringList(tagihanKey, legacy);
+        }
+      }
+    }
+    rawTagihan ??= [];
+
+    // Uangku
+    final uangkuKey = 'uangku_$selectedMonthKey';
+    var rawUangku = prefs.getStringList(uangkuKey);
+    if (rawUangku == null) {
+      final now = DateTime.now();
+      if (selectedMonth.year == now.year && selectedMonth.month == now.month) {
+        final legacy = prefs.getStringList('uangku');
+        if (legacy != null) {
+          rawUangku = legacy;
+          await prefs.setStringList(uangkuKey, legacy);
+        }
+      }
+    }
+    rawUangku ??= [];
+
+    // Tabungan
+    final rawTabungan = prefs.getStringList('tabungan') ?? [];
+
+    // Target
+    final dateMillis = prefs.getInt('target_date');
+    final loadedTargetDate = dateMillis != null
+        ? DateTime.fromMillisecondsSinceEpoch(dateMillis)
+        : null;
+    final loadedTargetAmount = prefs.getInt('target_amount') ?? 0;
+
+    // Last Updated
+    final millis = prefs.getInt('last_updated');
+    final loadedLastUpdated =
+        millis != null ? DateTime.fromMillisecondsSinceEpoch(millis) : null;
+
+    // Filter Dana Aman & Uangku
+    final loadedFilterMode = prefs.getString('dana_aman_filter_mode') ?? 'all';
+    final cutoffMillis = prefs.getInt('dana_aman_cutoff_date');
+    final loadedCutoffDate = cutoffMillis != null
+        ? DateTime.fromMillisecondsSinceEpoch(cutoffMillis)
+        : null;
+    final loadedOnlyCair = prefs.getBool('uangku_only_cair') ?? false;
+
     if (!mounted) return;
     setState(() {
-      uangkuOnlyCair = prefs.getBool('uangku_only_cair') ?? false;
+      tagihanList =
+          rawTagihan!.map((e) => Tagihan.fromJson(jsonDecode(e))).toList();
+      uangkuList =
+          rawUangku!.map((e) => Uangku.fromJson(jsonDecode(e))).toList();
+      tabunganList =
+          rawTabungan.map((e) => Tabungan.fromJson(jsonDecode(e))).toList();
+      targetDate = loadedTargetDate;
+      targetTabungan = loadedTargetAmount;
+      lastUpdated = loadedLastUpdated;
+      danaAmanFilterMode = loadedFilterMode;
+      danaAmanCutoffDate = loadedCutoffDate;
+      uangkuOnlyCair = loadedOnlyCair;
     });
   }
 
-  Future<void> _loadDanaAmanFilter() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      danaAmanFilterMode = prefs.getString('dana_aman_filter_mode') ?? 'all';
-      final dateMillis = prefs.getInt('dana_aman_cutoff_date');
-      danaAmanCutoffDate = dateMillis != null
-          ? DateTime.fromMillisecondsSinceEpoch(dateMillis)
-          : null;
-    });
-  }
+
 
   Future<void> _saveDanaAmanFilter() async {
     final prefs = await SharedPreferences.getInstance();
@@ -941,11 +1056,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
   }
 
   Future<void> _refreshAll() async {
-    await _loadTagihan();
-    await _loadUangku();
-    await _loadTabungan();
-    await _loadTarget();
-    await _loadUangkuFilter();
+    await _loadInitialData();
     await _updateLastUpdated();
   }
 
@@ -966,6 +1077,10 @@ class _KeuanganPageState extends State<KeuanganPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FC),
+      floatingActionButton: GtaSwitchWheel(
+        currentIndex: 0,
+        onPageSelected: widget.onPageSelected ?? (index) {},
+      ),
       drawer: AppDrawer(
         totalUangku: totalUangku,
         totalTagihan: totalTagihan,

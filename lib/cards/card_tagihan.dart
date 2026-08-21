@@ -47,7 +47,10 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
   @override
   void didUpdateWidget(covariant InfoCardTagihan oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _loadTagihan();
+    if (oldWidget.selectedMonth != widget.selectedMonth ||
+        oldWidget.amount != widget.amount) {
+      _loadTagihan();
+    }
   }
 
   Future<void> _saveTagihan() async {

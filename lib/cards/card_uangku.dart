@@ -82,7 +82,11 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
   @override
   void didUpdateWidget(covariant InfoCardUangku oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _loadUangku();
+    if (oldWidget.selectedMonth != widget.selectedMonth ||
+        oldWidget.onlyCair != widget.onlyCair ||
+        oldWidget.amount != widget.amount) {
+      _loadUangku();
+    }
   }
 
   Future<void> _saveUangku() async {
