@@ -350,18 +350,18 @@ class _StrukturPageState extends State<StrukturPage> {
       } catch (_) {}
     }
 
-    // Default sample values if newly opened without any history
+    // Default initial values if newly opened without any history
     final defaultData = StrukturData(
       rekeningStruktur: RekeningStruktur(
         bankName: 'BCA',
-        accountNumber: '1234567890',
-        accountHolder: 'Bendahara Struktur',
-        balance: 5000000,
+        accountNumber: '',
+        accountHolder: '',
+        balance: 0,
       ),
       onHandDebit: OnHandDebit(
         bankName: 'BCA',
         accountNumber: '',
-        accountHolder: 'PIC On Hand',
+        accountHolder: '',
         balance: 0,
       ),
       onHandCash: OnHandCash(balance: 0),
@@ -383,6 +383,793 @@ class _StrukturPageState extends State<StrukturPage> {
     await prefs.setString(monthlyKey, jsonEncode(_data.toJson()));
     // Simpan juga versi terkini ke key legacy sebagai cadangan/template
     await prefs.setString('struktur_keuangan_data', jsonEncode(_data.toJson()));
+  }
+
+  // --- MODAL KELOLA KUSTOM KODE TRANSAKSI ---
+  void _showKelolaKustomKodeModal() {
+    String searchQuery = '';
+    String testInput = '';
+    final searchCtrl = TextEditingController();
+    final testCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetCtx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            final rules = _data.customKodeRules.where((r) {
+              if (searchQuery.isEmpty) return true;
+              return r.keyword.toLowerCase().contains(searchQuery.toLowerCase()) ||
+                  r.kode.toLowerCase().contains(searchQuery.toLowerCase());
+            }).toList();
+
+            final testResult = StrukturTransaction.resolveKodeFromText(
+              testInput,
+              customRules: _data.customKodeRules,
+            );
+
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.90,
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Header Modal
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.style_rounded,
+                            color: Color(0xFF6366F1), size: 22),
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Kustom Kode Transaksi',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                            Text(
+                              'Atur kata kunci pesan keterangan yang memicu auto-input kode',
+                              style: TextStyle(
+                                  fontSize: 11.5, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(bottomSheetCtx),
+                        icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Info Box
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.info_outline_rounded,
+                            size: 16, color: Color(0xFF6366F1)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Saat Anda mengisi Keterangan saat Pemasukan atau Pengeluaran, kata kunci yang cocok otomatis menentukan Kode Transaksi pada tabel mutasi.',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: Colors.grey[700],
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Search Bar & Tambah Button Row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          height: 40,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: TextField(
+                            controller: searchCtrl,
+                            textAlignVertical: TextAlignVertical.center,
+                            onChanged: (val) {
+                              setModalState(() {
+                                searchQuery = val.trim();
+                              });
+                            },
+                            style: const TextStyle(fontSize: 12),
+                            decoration: InputDecoration(
+                              isDense: true,
+                              hintText: 'Cari kata kunci / kode...',
+                              hintStyle: TextStyle(
+                                  fontSize: 12, color: Colors.grey[400]),
+                              prefixIcon: Icon(Icons.search_rounded,
+                                  size: 18, color: Colors.grey[400]),
+                              suffixIcon: searchQuery.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear_rounded,
+                                          size: 16),
+                                      onPressed: () {
+                                        searchCtrl.clear();
+                                        setModalState(() => searchQuery = '');
+                                      },
+                                    )
+                                  : null,
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 0),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          _showFormKustomKodeDialog(
+                            null,
+                            () => setModalState(() {}),
+                          );
+                        },
+                        icon: const Icon(Icons.add_rounded, size: 16),
+                        label: const Text(
+                          'Tambah',
+                          style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6366F1),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Interactive Live Test Box
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.bolt_rounded,
+                                size: 15, color: Color(0xFF059669)),
+                            SizedBox(width: 4),
+                            Text(
+                              'Uji Coba Auto-Kode Langsung:',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF065F46),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          height: 38,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: const Color(0xFF10B981)
+                                    .withValues(alpha: 0.4)),
+                          ),
+                          child: TextField(
+                            controller: testCtrl,
+                            textAlignVertical: TextAlignVertical.center,
+                            onChanged: (val) {
+                              setModalState(() {
+                                testInput = val;
+                              });
+                            },
+                            style: const TextStyle(fontSize: 12),
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              hintText: 'Ketik contoh keterangan di sini...',
+                              hintStyle: TextStyle(fontSize: 11.5),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 0),
+                              border: InputBorder.none,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Text(
+                              'Kode Terdeteksi: ',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF047857),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: testResult != '-'
+                                    ? const Color(0xFF059669)
+                                    : const Color(0xFF94A3B8),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                testResult,
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Daftar Aturan Label & Reset Button Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Daftar Aturan (${rules.length}):',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF334155),
+                        ),
+                      ),
+                      if (rules.isNotEmpty)
+                        TextButton.icon(
+                          onPressed: () {
+                            _confirmClearAllKodeRules(
+                              () => setModalState(() {}),
+                            );
+                          },
+                          icon: const Icon(Icons.delete_sweep_rounded,
+                              size: 14, color: Color(0xFFE11D48)),
+                          label: const Text(
+                            'Kosongkan',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFE11D48),
+                            ),
+                          ),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+
+                  // List of Rules
+                  Expanded(
+                    child: rules.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.rule_folder_outlined,
+                                        size: 32, color: Color(0xFF64748B)),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    searchQuery.isNotEmpty
+                                        ? 'Tidak ditemukan aturan yang cocok'
+                                        : 'Daftar aturan masih kosong (0)',
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF334155)),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    searchQuery.isNotEmpty
+                                        ? 'Coba kata kunci lain atau bersihkan pencarian.'
+                                        : 'Tekan tombol "+ Tambah" di atas untuk menambahkan kata kunci keterangan dan kode transaksi pertama Anda.',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                        fontSize: 11, color: Color(0xFF64748B)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : ListView.separated(
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: rules.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 6),
+                            itemBuilder: (ctx, idx) {
+                              final rule = rules[idx];
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    // Kata Kunci (Pesan Keterangan)
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets
+                                                    .symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFFEF3C7),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                  border: Border.all(
+                                                      color: const Color(
+                                                          0xFFFDE68A)),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(Icons.key_rounded,
+                                                        size: 11,
+                                                        color:
+                                                            Color(0xFFB45309)),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      '"${rule.keyword}"',
+                                                      style: const TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color:
+                                                            Color(0xFF92400E),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              const Icon(
+                                                  Icons.arrow_forward_rounded,
+                                                  size: 13,
+                                                  color: Color(0xFF94A3B8)),
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: Container(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFEEF2FF),
+                                                    borderRadius:
+                                                        BorderRadius.circular(6),
+                                                    border: Border.all(
+                                                        color: const Color(
+                                                            0xFFC7D2FE)),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      const Icon(
+                                                          Icons.tag_rounded,
+                                                          size: 11,
+                                                          color:
+                                                              Color(0xFF4F46E5)),
+                                                      const SizedBox(width: 3),
+                                                      Flexible(
+                                                        child: Text(
+                                                          rule.kode,
+                                                          style: const TextStyle(
+                                                            fontSize: 11,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            color:
+                                                                Color(0xFF3730A3),
+                                                          ),
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    // Action Buttons: Edit & Delete
+                                    IconButton(
+                                      icon: const Icon(Icons.edit_outlined,
+                                          size: 17, color: Color(0xFF6366F1)),
+                                      tooltip: 'Edit Aturan',
+                                      padding: const EdgeInsets.all(4),
+                                      constraints: const BoxConstraints(),
+                                      onPressed: () {
+                                        _showFormKustomKodeDialog(
+                                          rule,
+                                          () => setModalState(() {}),
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(width: 4),
+                                    IconButton(
+                                      icon: const Icon(
+                                          Icons.delete_outline_rounded,
+                                          size: 17,
+                                          color: Color(0xFFE11D48)),
+                                      tooltip: 'Hapus Aturan',
+                                      padding: const EdgeInsets.all(4),
+                                      constraints: const BoxConstraints(),
+                                      onPressed: () {
+                                        setState(() {
+                                          _data.customKodeRules.removeWhere(
+                                              (r) => r.id == rule.id);
+                                        });
+                                        _saveData();
+                                        setModalState(() {});
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                                'Aturan untuk "${rule.keyword}" berhasil dihapus'),
+                                            behavior: SnackBarBehavior.floating,
+                                            duration:
+                                                const Duration(seconds: 2),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // --- DIALOG FORM TAMBAH / EDIT KUSTOM KODE TRANSAKSI ---
+  void _showFormKustomKodeDialog(
+    CustomKodeRule? existingRule,
+    VoidCallback onSaved,
+  ) {
+    final isEdit = existingRule != null;
+    final keywordCtrl =
+        TextEditingController(text: existingRule != null ? existingRule.keyword : '');
+    final kodeCtrl =
+        TextEditingController(text: existingRule != null ? existingRule.kode : '');
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+          contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  isEdit ? Icons.edit_rounded : Icons.add_rounded,
+                  color: const Color(0xFF6366F1),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                isEdit ? 'Edit Aturan Kode' : 'Tambah Aturan Kode',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '1. Kata Kunci Keterangan (Pemicu):',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF334155),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: keywordCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'Contoh: konsumsi, bensin, sewa tempat',
+                    hintStyle:
+                        TextStyle(fontSize: 12, color: Colors.grey[400]),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    prefixIcon: const Icon(Icons.key_rounded,
+                        size: 16, color: Color(0xFFB45309)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  '2. Kode Transaksi yang Dihasilkan:',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF334155),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: kodeCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'Contoh: Biaya Konsumsi Acara, Sewa Tempat',
+                    hintStyle:
+                        TextStyle(fontSize: 12, color: Colors.grey[400]),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    prefixIcon: const Icon(Icons.tag_rounded,
+                        size: 16, color: Color(0xFF4F46E5)),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '* Pencocokan tidak sensitif huruf besar/kecil (case-insensitive).',
+                  style: TextStyle(fontSize: 10.5, color: Colors.grey[500]),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final key = keywordCtrl.text.trim();
+                final kode = kodeCtrl.text.trim();
+
+                if (key.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('⚠️ Kata kunci pemicu wajib diisi!'),
+                      backgroundColor: Colors.redAccent,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  return;
+                }
+
+                if (kode.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('⚠️ Kode transaksi wajib diisi!'),
+                      backgroundColor: Colors.redAccent,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  return;
+                }
+
+                setState(() {
+                  if (isEdit) {
+                    existingRule.keyword = key;
+                    existingRule.kode = kode;
+                  } else {
+                    _data.customKodeRules.add(
+                      CustomKodeRule(keyword: key, kode: kode),
+                    );
+                  }
+                });
+
+                _saveData();
+                onSaved();
+                Navigator.pop(dialogCtx);
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      isEdit
+                          ? 'Aturan "$key" -> "$kode" berhasil diperbarui!'
+                          : 'Aturan baru "$key" -> "$kode" berhasil ditambahkan!',
+                    ),
+                    backgroundColor: const Color(0xFF059669),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6366F1),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: Text(isEdit ? 'Simpan' : 'Tambah'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // --- DIALOG KONFIRMASI KOSONGKAN SEMUA ATURAN KODE ---
+  void _confirmClearAllKodeRules(VoidCallback onReset) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Color(0xFFE11D48)),
+              SizedBox(width: 8),
+              Text(
+                'Kosongkan Semua Aturan?',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Semua aturan kustom kode transaksi akan dihapus dan daftar aturan menjadi kosong (0).',
+            style: TextStyle(fontSize: 13),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _data.customKodeRules = [];
+                });
+                _saveData();
+                onReset();
+                Navigator.pop(dialogCtx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content:
+                        Text('Semua aturan kode transaksi berhasil dikosongkan!'),
+                    backgroundColor: Color(0xFF059669),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE11D48),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text('Kosongkan'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   // --- MODAL EDIT REKENING STRUKTUR ---
@@ -841,10 +1628,13 @@ class _StrukturPageState extends State<StrukturPage> {
     }
 
     String targetWadah = 'rekening'; // 'rekening', 'debit', 'cash'
-    final sourceCtrl = TextEditingController();
     final amountCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
-    final kodeCtrl = TextEditingController();
+
+    final amountKey = GlobalKey();
+    final amountFocus = FocusNode();
+
+    bool amountHasError = false;
 
     showModalBottomSheet(
       context: context,
@@ -874,9 +1664,6 @@ class _StrukturPageState extends State<StrukturPage> {
               wadahColor = const Color(0xFF059669);
               currentWadahBalance = _data.onHandCash.balance;
             }
-
-            final isFormValid =
-                nominal > 0 && sourceCtrl.text.trim().isNotEmpty;
 
             return Container(
               constraints: BoxConstraints(
@@ -1008,44 +1795,8 @@ class _StrukturPageState extends State<StrukturPage> {
 
                     const SizedBox(height: 14),
 
-                    // 2. Sumber Dana (Tulis Manual)
-                    const Text('2. Sumber Dana (Asal):',
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF334155))),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: sourceCtrl,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: InputDecoration(
-                        hintText:
-                            'Tulis sumber dana (contoh: DP KK Barqi, Donasi, Kasbon)',
-                        hintStyle: const TextStyle(fontSize: 12),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                      ),
-                      onChanged: (val) {
-                        final autoKode =
-                            StrukturTransaction.resolveKodeFromText('$val ${noteCtrl.text}');
-                        if (autoKode != '-') {
-                          kodeCtrl.text = autoKode;
-                        }
-                        setModalState(() {});
-                      },
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // 3. Wadah Dana (Tujuan Penerimaan)
-                    const Text('3. Wadah Dana (Masuk Ke):',
+                    // 2. Wadah Dana (Tujuan Penerimaan)
+                    const Text('2. Wadah Dana (Masuk Ke):',
                         style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
@@ -1093,48 +1844,96 @@ class _StrukturPageState extends State<StrukturPage> {
 
                     const SizedBox(height: 14),
 
-                    // 4. Jumlah Dana (Nominal Rp)
-                    const Text('4. Jumlah Dana (Rp):',
+                    // 3. Jumlah Dana (Nominal Rp)
+                    const Text('3. Jumlah Dana (Rp):',
                         style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF334155))),
                     const SizedBox(height: 6),
-                    TextField(
-                      controller: amountCtrl,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        RupiahInputFormatter(),
-                      ],
-                      style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF059669)),
-                      decoration: InputDecoration(
-                        prefixText: 'Rp ',
-                        prefixStyle: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF059669)),
-                        hintText: '0',
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
+                    Container(
+                      key: amountKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            controller: amountCtrl,
+                            focusNode: amountFocus,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              RupiahInputFormatter(),
+                            ],
+                            style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF059669)),
+                            decoration: InputDecoration(
+                              prefixText: 'Rp ',
+                              prefixStyle: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF059669)),
+                              hintText: '0',
+                              filled: true,
+                              fillColor: const Color(0xFFF8FAFC),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 12),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: amountHasError
+                                      ? Colors.redAccent
+                                      : const Color(0xFFE2E8F0),
+                                  width: amountHasError ? 1.6 : 1.0,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: amountHasError
+                                      ? Colors.redAccent
+                                      : const Color(0xFFE2E8F0),
+                                  width: amountHasError ? 1.6 : 1.0,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: amountHasError
+                                      ? Colors.redAccent
+                                      : const Color(0xFF059669),
+                                  width: 1.8,
+                                ),
+                              ),
+                            ),
+                            onChanged: (val) {
+                              if (amountHasError && nominal > 0) {
+                                amountHasError = false;
+                              }
+                              setModalState(() {});
+                            },
+                          ),
+                          if (amountHasError)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 4, left: 4),
+                              child: Text(
+                                '⚠️ Jumlah dana harus lebih dari 0',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: Colors.redAccent,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                      onChanged: (_) => setModalState(() {}),
                     ),
 
                     const SizedBox(height: 14),
 
-                    // 5. Keterangan / Catatan Tambahan
-                    const Text('5. Keterangan (Opsional):',
+                    // 4. Keterangan / Catatan Tambahan
+                    const Text('4. Keterangan (Opsional):',
                         style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
@@ -1143,7 +1942,7 @@ class _StrukturPageState extends State<StrukturPage> {
                     TextField(
                       controller: noteCtrl,
                       decoration: InputDecoration(
-                        hintText: 'Catatan tambahan / rincian pemasukan',
+                        hintText: 'Catatan tambahan / rincian pemasukan (contoh: DP KK Barqi, Donasi)',
                         hintStyle: const TextStyle(fontSize: 12),
                         filled: true,
                         fillColor: const Color(0xFFF8FAFC),
@@ -1156,117 +1955,8 @@ class _StrukturPageState extends State<StrukturPage> {
                         ),
                       ),
                       onChanged: (val) {
-                        final autoKode =
-                            StrukturTransaction.resolveKodeFromText('${sourceCtrl.text} $val');
-                        if (autoKode != '-') {
-                          kodeCtrl.text = autoKode;
-                        }
                         setModalState(() {});
                       },
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // 6. Kode Transaksi (Auto-input / Pilihan)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('6. Kode Transaksi:',
-                            style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF334155))),
-                        if (kodeCtrl.text.isNotEmpty && kodeCtrl.text != '-')
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFD1FAE5),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFA7F3D0)),
-                            ),
-                            child: const Text('Auto-terdeteksi',
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF065F46))),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: kodeCtrl,
-                      decoration: InputDecoration(
-                        hintText: 'Contoh: Terima DP DTK, Kontribusi DP S4, dll.',
-                        hintStyle: const TextStyle(fontSize: 12),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                        prefixIcon: const Icon(Icons.tag_rounded,
-                            size: 18, color: Color(0xFF64748B)),
-                      ),
-                      onChanged: (_) => setModalState(() {}),
-                    ),
-                    const SizedBox(height: 8),
-                    // Quick chips for Kode
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      child: Row(
-                        children: [
-                          'Terima DP DTK',
-                          'Kontribusi DP S4',
-                          'Biaya Konsumsi Acara',
-                          'Sewa Tempat',
-                          'Biaya RTK',
-                        ].map((kodeOpt) {
-                          final isSelected = kodeCtrl.text.trim() == kodeOpt;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: InkWell(
-                              onTap: () {
-                                setModalState(() {
-                                  kodeCtrl.text = kodeOpt;
-                                });
-                              },
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? const Color(0xFF059669)
-                                      : const Color(0xFFF1F5F9),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? const Color(0xFF059669)
-                                        : const Color(0xFFCBD5E1),
-                                  ),
-                                ),
-                                child: Text(
-                                  kodeOpt,
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: isSelected
-                                        ? FontWeight.bold
-                                        : FontWeight.w500,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : const Color(0xFF475569),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
                     ),
 
                     if (nominal > 0) ...[
@@ -1308,61 +1998,83 @@ class _StrukturPageState extends State<StrukturPage> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: isFormValid
-                            ? () {
-                                final sourceName = sourceCtrl.text.trim();
-                                setState(() {
-                                  // 1. Tambah Saldo Wadah
-                                  if (targetWadah == 'rekening') {
-                                    _data.rekeningStruktur.balance += nominal;
-                                  } else if (targetWadah == 'debit') {
-                                    _data.onHandDebit.balance += nominal;
-                                  } else {
-                                    _data.onHandCash.balance += nominal;
-                                  }
+                        onPressed: () {
+                          if (nominal <= 0) {
+                            setModalState(() => amountHasError = true);
+                            if (amountKey.currentContext != null) {
+                              Scrollable.ensureVisible(
+                                amountKey.currentContext!,
+                                duration: const Duration(milliseconds: 350),
+                                curve: Curves.easeInOut,
+                                alignment: 0.3,
+                              );
+                            }
+                            amountFocus.requestFocus();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('⚠️ Silakan masukkan Jumlah Dana (Rp)!'),
+                                backgroundColor: Colors.redAccent,
+                                behavior: SnackBarBehavior.floating,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                            return;
+                          }
 
-                                  // 2. Catat Transaksi (Tambahkan ke paling bawah / chronological)
-                                  _data.transactions.add(
-                                    StrukturTransaction(
-                                      id: DateTime.now()
-                                          .microsecondsSinceEpoch
-                                          .toString(),
-                                      title: sourceName,
-                                      type: 'pemasukan',
-                                      manualSource: sourceName,
-                                      targetAccount: targetWadah,
-                                      amount: nominal,
-                                      adminFee: 0,
-                                      note: noteCtrl.text.trim().isNotEmpty
-                                          ? noteCtrl.text.trim()
-                                          : null,
-                                      kode: kodeCtrl.text.trim().isNotEmpty &&
-                                              kodeCtrl.text.trim() != '-'
-                                          ? kodeCtrl.text.trim()
-                                          : null,
-                                      timestamp: selectedDate,
-                                    ),
-                                  );
-                                });
+                          final noteText = noteCtrl.text.trim();
+                          final autoKode =
+                              StrukturTransaction.resolveKodeFromText(
+                                  noteText.isNotEmpty ? noteText : 'Pemasukan',
+                                  customRules: _data.customKodeRules);
 
-                                _saveData();
-                                Navigator.pop(ctx);
+                          setState(() {
+                            // 1. Tambah Saldo Wadah
+                            if (targetWadah == 'rekening') {
+                              _data.rekeningStruktur.balance += nominal;
+                            } else if (targetWadah == 'debit') {
+                              _data.onHandDebit.balance += nominal;
+                            } else {
+                              _data.onHandCash.balance += nominal;
+                            }
 
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Pemasukan Rp ${RupiahFormatter.format(nominal)} dari $sourceName berhasil dicatat!',
-                                    ),
-                                    backgroundColor: const Color(0xFF059669),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            : null,
+                            // 2. Catat Transaksi (Tambahkan dan urutkan chronological berdasarkan tanggal)
+                            _data.transactions.add(
+                              StrukturTransaction(
+                                id: DateTime.now()
+                                    .microsecondsSinceEpoch
+                                    .toString(),
+                                title: noteText.isNotEmpty
+                                    ? noteText
+                                    : 'Pemasukan Dana',
+                                type: 'pemasukan',
+                                targetAccount: targetWadah,
+                                amount: nominal,
+                                adminFee: 0,
+                                note: noteText.isNotEmpty ? noteText : null,
+                                kode: autoKode != '-' ? autoKode : null,
+                                timestamp: selectedDate,
+                              ),
+                            );
+                            _data.transactions.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+                          });
+
+                          _saveData();
+                          Navigator.pop(ctx);
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Pemasukan Rp ${RupiahFormatter.format(nominal)} berhasil dicatat!',
+                              ),
+                              backgroundColor: const Color(0xFF059669),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF059669),
                           foregroundColor: Colors.white,
-                          disabledBackgroundColor: Colors.grey[300],
+                          elevation: 2,
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12)),
                         ),
@@ -1395,7 +2107,14 @@ class _StrukturPageState extends State<StrukturPage> {
     String sourceAccount = initialSource; // 'rekening', 'debit', 'cash'
     final amountCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
-    final kodeCtrl = TextEditingController();
+
+    final amountKey = GlobalKey();
+    final noteKey = GlobalKey();
+    final amountFocus = FocusNode();
+    final noteFocus = FocusNode();
+
+    bool amountHasError = false;
+    bool noteHasError = false;
 
     showModalBottomSheet(
       context: context,
@@ -1428,8 +2147,6 @@ class _StrukturPageState extends State<StrukturPage> {
             }
 
             final isSaldoCukup = sourceBalance >= nominal && nominal > 0;
-            final isFormValid =
-                isSaldoCukup && noteCtrl.text.trim().isNotEmpty;
 
             return Container(
               constraints: BoxConstraints(
@@ -1623,6 +2340,9 @@ class _StrukturPageState extends State<StrukturPage> {
                           onTap: () {
                             amountCtrl.text =
                                 RupiahFormatter.format(sourceBalance);
+                            if (amountHasError && sourceBalance > 0) {
+                              amountHasError = false;
+                            }
                             setModalState(() {});
                           },
                           child: const Text(
@@ -1637,38 +2357,88 @@ class _StrukturPageState extends State<StrukturPage> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    TextField(
-                      controller: amountCtrl,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        RupiahInputFormatter(),
-                      ],
-                      style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFFE11D48)),
-                      decoration: InputDecoration(
-                        prefixText: 'Rp ',
-                        prefixStyle: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFE11D48)),
-                        hintText: '0',
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
+                    Container(
+                      key: amountKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            controller: amountCtrl,
+                            focusNode: amountFocus,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              RupiahInputFormatter(),
+                            ],
+                            style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFE11D48)),
+                            decoration: InputDecoration(
+                              prefixText: 'Rp ',
+                              prefixStyle: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFE11D48)),
+                              hintText: '0',
+                              filled: true,
+                              fillColor: const Color(0xFFF8FAFC),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 12),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: amountHasError
+                                      ? Colors.redAccent
+                                      : const Color(0xFFE2E8F0),
+                                  width: amountHasError ? 1.6 : 1.0,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: amountHasError
+                                      ? Colors.redAccent
+                                      : const Color(0xFFE2E8F0),
+                                  width: amountHasError ? 1.6 : 1.0,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: amountHasError
+                                      ? Colors.redAccent
+                                      : const Color(0xFFE11D48),
+                                  width: 1.8,
+                                ),
+                              ),
+                            ),
+                            onChanged: (val) {
+                              if (amountHasError && nominal > 0 && isSaldoCukup) {
+                                amountHasError = false;
+                              }
+                              setModalState(() {});
+                            },
+                          ),
+                          if (amountHasError)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4, left: 4),
+                              child: Text(
+                                nominal <= 0
+                                    ? '⚠️ Jumlah pengeluaran harus lebih dari 0'
+                                    : '⚠️ Saldo $sourceName tidak mencukupi (Saldo: Rp ${RupiahFormatter.format(sourceBalance)})',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: Colors.redAccent,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                      onChanged: (_) => setModalState(() {}),
                     ),
 
-                    if (!isSaldoCukup && nominal > 0)
+                    if (!isSaldoCukup && nominal > 0 && !amountHasError)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
@@ -1689,133 +2459,70 @@ class _StrukturPageState extends State<StrukturPage> {
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF334155))),
                     const SizedBox(height: 6),
-                    TextField(
-                      controller: noteCtrl,
-                      decoration: InputDecoration(
-                        hintText:
-                            'Contoh: konsumsi pembinaan AB Afwan, Sewa ruangan pembinaan AB Afwan',
-                        hintStyle: const TextStyle(fontSize: 12),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                      ),
-                      onChanged: (val) {
-                        final autoKode =
-                            StrukturTransaction.resolveKodeFromText(val);
-                        if (autoKode != '-') {
-                          kodeCtrl.text = autoKode;
-                        }
-                        setModalState(() {});
-                      },
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // 5. Kode Transaksi (Auto-input / Pilihan)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('5. Kode Transaksi:',
-                            style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF334155))),
-                        if (kodeCtrl.text.isNotEmpty && kodeCtrl.text != '-')
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFEF3C7),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFFDE68A)),
-                            ),
-                            child: const Text('Auto-terdeteksi',
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFFB45309))),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: kodeCtrl,
-                      decoration: InputDecoration(
-                        hintText: 'Contoh: Biaya Konsumsi Acara, Sewa Tempat, dll.',
-                        hintStyle: const TextStyle(fontSize: 12),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                        prefixIcon: const Icon(Icons.tag_rounded,
-                            size: 18, color: Color(0xFF64748B)),
-                      ),
-                      onChanged: (_) => setModalState(() {}),
-                    ),
-                    const SizedBox(height: 8),
-                    // Quick chips for Kode
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      child: Row(
+                    Container(
+                      key: noteKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          'Biaya Konsumsi Acara',
-                          'Sewa Tempat',
-                          'Biaya RTK',
-                          'Terima DP DTK',
-                          'Kontribusi DP S4',
-                        ].map((kodeOpt) {
-                          final isSelected = kodeCtrl.text.trim() == kodeOpt;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: InkWell(
-                              onTap: () {
-                                setModalState(() {
-                                  kodeCtrl.text = kodeOpt;
-                                });
-                              },
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? const Color(0xFFE11D48)
-                                      : const Color(0xFFF1F5F9),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? const Color(0xFFE11D48)
-                                        : const Color(0xFFCBD5E1),
-                                  ),
+                          TextField(
+                            controller: noteCtrl,
+                            focusNode: noteFocus,
+                            decoration: InputDecoration(
+                              hintText:
+                                  'Contoh: konsumsi pembinaan AB Afwan, Sewa ruangan pembinaan AB Afwan',
+                              hintStyle: const TextStyle(fontSize: 12),
+                              filled: true,
+                              fillColor: const Color(0xFFF8FAFC),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 12),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: noteHasError
+                                      ? Colors.redAccent
+                                      : const Color(0xFFE2E8F0),
+                                  width: noteHasError ? 1.6 : 1.0,
                                 ),
-                                child: Text(
-                                  kodeOpt,
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: isSelected
-                                        ? FontWeight.bold
-                                        : FontWeight.w500,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : const Color(0xFF475569),
-                                  ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: noteHasError
+                                      ? Colors.redAccent
+                                      : const Color(0xFFE2E8F0),
+                                  width: noteHasError ? 1.6 : 1.0,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: noteHasError
+                                      ? Colors.redAccent
+                                      : const Color(0xFFE11D48),
+                                  width: 1.8,
                                 ),
                               ),
                             ),
-                          );
-                        }).toList(),
+                            onChanged: (val) {
+                              if (noteHasError && val.trim().isNotEmpty) {
+                                noteHasError = false;
+                              }
+                              setModalState(() {});
+                            },
+                          ),
+                          if (noteHasError)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 4, left: 4),
+                              child: Text(
+                                '⚠️ Keterangan keperluan wajib diisi',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: Colors.redAccent,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
 
@@ -1858,58 +2565,125 @@ class _StrukturPageState extends State<StrukturPage> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: isFormValid
-                            ? () {
-                                final keterangan = noteCtrl.text.trim();
-                                setState(() {
-                                  // 1. Kurangi Saldo Sumber
-                                  if (sourceAccount == 'rekening') {
-                                    _data.rekeningStruktur.balance -= nominal;
-                                  } else if (sourceAccount == 'debit') {
-                                    _data.onHandDebit.balance -= nominal;
-                                  } else {
-                                    _data.onHandCash.balance -= nominal;
-                                  }
+                        onPressed: () {
+                          if (nominal <= 0) {
+                            setModalState(() => amountHasError = true);
+                            if (amountKey.currentContext != null) {
+                              Scrollable.ensureVisible(
+                                amountKey.currentContext!,
+                                duration: const Duration(milliseconds: 350),
+                                curve: Curves.easeInOut,
+                                alignment: 0.3,
+                              );
+                            }
+                            amountFocus.requestFocus();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('⚠️ Silakan masukkan Jumlah Pengeluaran (Rp)!'),
+                                backgroundColor: Colors.redAccent,
+                                behavior: SnackBarBehavior.floating,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                            return;
+                          }
 
-                                  // 2. Catat Transaksi (Tambahkan ke paling bawah / chronological)
-                                  _data.transactions.add(
-                                    StrukturTransaction(
-                                      id: DateTime.now()
-                                          .microsecondsSinceEpoch
-                                          .toString(),
-                                      title: keterangan,
-                                      type: 'pengeluaran',
-                                      sourceAccount: sourceAccount,
-                                      amount: nominal,
-                                      adminFee: 0,
-                                      note: keterangan,
-                                      kode: kodeCtrl.text.trim().isNotEmpty &&
-                                              kodeCtrl.text.trim() != '-'
-                                          ? kodeCtrl.text.trim()
-                                          : null,
-                                      timestamp: selectedDate,
-                                    ),
-                                  );
-                                });
+                          if (!isSaldoCukup) {
+                            setModalState(() => amountHasError = true);
+                            if (amountKey.currentContext != null) {
+                              Scrollable.ensureVisible(
+                                amountKey.currentContext!,
+                                duration: const Duration(milliseconds: 350),
+                                curve: Curves.easeInOut,
+                                alignment: 0.3,
+                              );
+                            }
+                            amountFocus.requestFocus();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('⚠️ Saldo $sourceName tidak mencukupi! (Saldo: Rp ${RupiahFormatter.format(sourceBalance)})'),
+                                backgroundColor: Colors.redAccent,
+                                behavior: SnackBarBehavior.floating,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                            return;
+                          }
 
-                                _saveData();
-                                Navigator.pop(ctx);
+                          if (noteCtrl.text.trim().isEmpty) {
+                            setModalState(() => noteHasError = true);
+                            if (noteKey.currentContext != null) {
+                              Scrollable.ensureVisible(
+                                noteKey.currentContext!,
+                                duration: const Duration(milliseconds: 350),
+                                curve: Curves.easeInOut,
+                                alignment: 0.3,
+                              );
+                            }
+                            noteFocus.requestFocus();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('⚠️ Keterangan Keperluan wajib diisi!'),
+                                backgroundColor: Colors.redAccent,
+                                behavior: SnackBarBehavior.floating,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                            return;
+                          }
 
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Pengeluaran Rp ${RupiahFormatter.format(nominal)} berhasil dicatat!',
-                                    ),
-                                    backgroundColor: const Color(0xFFE11D48),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            : null,
+                          final keterangan = noteCtrl.text.trim();
+                          final autoKode =
+                              StrukturTransaction.resolveKodeFromText(
+                                  keterangan,
+                                  customRules: _data.customKodeRules);
+
+                          setState(() {
+                            // 1. Kurangi Saldo Sumber
+                            if (sourceAccount == 'rekening') {
+                              _data.rekeningStruktur.balance -= nominal;
+                            } else if (sourceAccount == 'debit') {
+                              _data.onHandDebit.balance -= nominal;
+                            } else {
+                              _data.onHandCash.balance -= nominal;
+                            }
+
+                            // 2. Catat Transaksi (Tambahkan dan urutkan chronological berdasarkan tanggal)
+                            _data.transactions.add(
+                              StrukturTransaction(
+                                id: DateTime.now()
+                                    .microsecondsSinceEpoch
+                                    .toString(),
+                                title: keterangan,
+                                type: 'pengeluaran',
+                                sourceAccount: sourceAccount,
+                                amount: nominal,
+                                adminFee: 0,
+                                note: keterangan,
+                                kode: autoKode != '-' ? autoKode : null,
+                                timestamp: selectedDate,
+                              ),
+                            );
+                            _data.transactions.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+                          });
+
+                          _saveData();
+                          Navigator.pop(ctx);
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Pengeluaran Rp ${RupiahFormatter.format(nominal)} berhasil dicatat!',
+                              ),
+                              backgroundColor: const Color(0xFFE11D48),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFE11D48),
                           foregroundColor: Colors.white,
-                          disabledBackgroundColor: Colors.grey[300],
+                          elevation: 2,
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12)),
                         ),
@@ -1960,6 +2734,11 @@ class _StrukturPageState extends State<StrukturPage> {
 
     final amountCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
+
+    final amountKey = GlobalKey();
+    final amountFocus = FocusNode();
+
+    bool amountHasError = false;
 
     showModalBottomSheet(
       context: context,
@@ -2020,10 +2799,10 @@ class _StrukturPageState extends State<StrukturPage> {
                     targetAccount == 'debit') ||
                 (sourceAccount == 'debit' && targetAccount == 'rekening');
 
-            final isBankSama = _data.rekeningStruktur.bankName.toLowerCase() ==
-                _data.onHandDebit.bankName.toLowerCase();
+            final isBankSama = _data.rekeningStruktur.bankName.trim().toUpperCase() ==
+                _data.onHandDebit.bankName.trim().toUpperCase();
 
-            final adminFee = isInterBankTransfer ? (isBankSama ? 0 : 2500) : 0;
+            final adminFee = isInterBankTransfer && !isBankSama && nominal > 0 ? 2500 : 0;
             final totalPotongan = nominal + adminFee;
             final isSaldoCukup = sourceBalance >= totalPotongan && nominal > 0;
 
@@ -2031,19 +2810,19 @@ class _StrukturPageState extends State<StrukturPage> {
             String flowLabel = '';
 
             if (sourceAccount == 'rekening' && targetAccount == 'debit') {
-              flowLabel = 'Transfer Alokasi ke Debit';
+              flowLabel = 'Transfer Bank / Top-Up Debit';
             } else if (sourceAccount == 'rekening' && targetAccount == 'cash') {
-              flowLabel = 'Tarik Tunai ke Cash';
+              flowLabel = 'Tarik Tunai dari Rekening';
             } else if (sourceAccount == 'debit' &&
                 targetAccount == 'rekening') {
-              flowLabel = 'Transfer Balik ke Rekening Struktur';
+              flowLabel = 'Transfer Debit ke Rekening';
             } else if (sourceAccount == 'debit' && targetAccount == 'cash') {
-              flowLabel = 'Tarik Tunai ke Cash On Hand';
+              flowLabel = 'Tarik Tunai via ATM Debit';
             } else if (sourceAccount == 'cash' &&
                 targetAccount == 'rekening') {
-              flowLabel = 'Setor Tunai ke Rekening Struktur';
+              flowLabel = 'Setor Tunai ke Rekening';
             } else if (sourceAccount == 'cash' && targetAccount == 'debit') {
-              flowLabel = 'Setor Tunai ke On Hand Debit';
+              flowLabel = 'Setor Tunai / Top-up Debit';
             }
 
             return Container(
@@ -2082,7 +2861,7 @@ class _StrukturPageState extends State<StrukturPage> {
                             color: primaryPurple.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Icon(Icons.swap_horiz_rounded,
+                          child: const Icon(Icons.sync_alt_rounded,
                               color: primaryPurple, size: 22),
                         ),
                         const SizedBox(width: 10),
@@ -2091,7 +2870,7 @@ class _StrukturPageState extends State<StrukturPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Alokasi Dana Struktur',
+                                'Alokasi Antar-Wadah',
                                 style: TextStyle(
                                   fontSize: 17,
                                   fontWeight: FontWeight.bold,
@@ -2099,7 +2878,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                 ),
                               ),
                               Text(
-                                'Perputaran, transfer, atau setor antar akun struktur',
+                                'Pindahkan dana antar rekening, debit, dan cash',
                                 style: TextStyle(
                                     fontSize: 11.5, color: Color(0xFF64748B)),
                               ),
@@ -2112,7 +2891,7 @@ class _StrukturPageState extends State<StrukturPage> {
                     const SizedBox(height: 16),
 
                     // 1. Tanggal Alokasi
-                    const Text('1. Tanggal Alokasi:',
+                    const Text('1. Tanggal Transaksi:',
                         style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
@@ -2247,37 +3026,38 @@ class _StrukturPageState extends State<StrukturPage> {
                             color: Color(0xFF334155))),
                     const SizedBox(height: 8),
                     Row(
-                      children: availableTargets.map((targetKey) {
-                        String tTitle = '';
-                        String tSub = '';
-                        int tBal = 0;
-                        IconData tIcon = Icons.account_balance_rounded;
-                        Color tColor = primaryPurple;
+                      children: [
+                        for (int i = 0; i < availableTargets.length; i++) ...[
+                          if (i > 0) const SizedBox(width: 8),
+                          () {
+                            final targetKey = availableTargets[i];
+                            String tTitle = '';
+                            String tSub = '';
+                            int tBal = 0;
+                            IconData tIcon = Icons.account_balance_rounded;
+                            Color tColor = primaryPurple;
 
-                        if (targetKey == 'rekening') {
-                          tTitle = 'Rekening';
-                          tSub = _data.rekeningStruktur.bankName;
-                          tBal = _data.rekeningStruktur.balance;
-                          tIcon = Icons.account_balance_rounded;
-                          tColor = primaryPurple;
-                        } else if (targetKey == 'debit') {
-                          tTitle = 'Debit';
-                          tSub = _data.onHandDebit.bankName;
-                          tBal = _data.onHandDebit.balance;
-                          tIcon = Icons.credit_card_rounded;
-                          tColor = primaryTeal;
-                        } else {
-                          tTitle = 'Cash';
-                          tSub = 'Tunai';
-                          tBal = _data.onHandCash.balance;
-                          tIcon = Icons.payments_rounded;
-                          tColor = const Color(0xFF059669);
-                        }
+                            if (targetKey == 'rekening') {
+                              tTitle = 'Rekening';
+                              tSub = _data.rekeningStruktur.bankName;
+                              tBal = _data.rekeningStruktur.balance;
+                              tIcon = Icons.account_balance_rounded;
+                              tColor = primaryPurple;
+                            } else if (targetKey == 'debit') {
+                              tTitle = 'Debit';
+                              tSub = _data.onHandDebit.bankName;
+                              tBal = _data.onHandDebit.balance;
+                              tIcon = Icons.credit_card_rounded;
+                              tColor = primaryTeal;
+                            } else {
+                              tTitle = 'Cash';
+                              tSub = 'Tunai';
+                              tBal = _data.onHandCash.balance;
+                              tIcon = Icons.payments_rounded;
+                              tColor = const Color(0xFF059669);
+                            }
 
-                        return Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: _buildAccountSelectorCard(
+                            return _buildAccountSelectorCard(
                               title: tTitle,
                               subtitle: tSub,
                               balance: tBal,
@@ -2287,10 +3067,10 @@ class _StrukturPageState extends State<StrukturPage> {
                               onTap: () {
                                 setModalState(() => targetAccount = targetKey);
                               },
-                            ),
-                          ),
-                        );
-                      }).toList(),
+                            );
+                          }(),
+                        ],
+                      ],
                     ),
 
                     const SizedBox(height: 14),
@@ -2340,6 +3120,9 @@ class _StrukturPageState extends State<StrukturPage> {
                                 : 0;
                             amountCtrl.text =
                                 RupiahFormatter.format(maxNominal);
+                            if (amountHasError && maxNominal > 0) {
+                              amountHasError = false;
+                            }
                             setModalState(() {});
                           },
                           child: const Text(
@@ -2354,29 +3137,79 @@ class _StrukturPageState extends State<StrukturPage> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    TextField(
-                      controller: amountCtrl,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        RupiahInputFormatter(),
-                      ],
-                      style: const TextStyle(
-                          fontSize: 17, fontWeight: FontWeight.bold),
-                      decoration: InputDecoration(
-                        prefixText: 'Rp ',
-                        hintText: '0',
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
+                    Container(
+                      key: amountKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            controller: amountCtrl,
+                            focusNode: amountFocus,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              RupiahInputFormatter(),
+                            ],
+                            style: const TextStyle(
+                                fontSize: 17, fontWeight: FontWeight.bold),
+                            decoration: InputDecoration(
+                              prefixText: 'Rp ',
+                              hintText: '0',
+                              filled: true,
+                              fillColor: const Color(0xFFF8FAFC),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 12),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: amountHasError
+                                      ? Colors.redAccent
+                                      : const Color(0xFFE2E8F0),
+                                  width: amountHasError ? 1.6 : 1.0,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: amountHasError
+                                      ? Colors.redAccent
+                                      : const Color(0xFFE2E8F0),
+                                  width: amountHasError ? 1.6 : 1.0,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: amountHasError
+                                      ? Colors.redAccent
+                                      : primaryPurple,
+                                  width: 1.8,
+                                ),
+                              ),
+                            ),
+                            onChanged: (val) {
+                              if (amountHasError && nominal > 0 && isSaldoCukup) {
+                                amountHasError = false;
+                              }
+                              setModalState(() {});
+                            },
+                          ),
+                          if (amountHasError)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4, left: 4),
+                              child: Text(
+                                nominal <= 0
+                                    ? '⚠️ Nominal alokasi harus lebih dari 0'
+                                    : '⚠️ Saldo $sourceName tidak mencukupi (Saldo: Rp ${RupiahFormatter.format(sourceBalance)})',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: Colors.redAccent,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                      onChanged: (_) => setModalState(() {}),
                     ),
 
                     // Quick Chips
@@ -2397,6 +3230,9 @@ class _StrukturPageState extends State<StrukturPage> {
                           backgroundColor: const Color(0xFFF1F5F9),
                           onPressed: () {
                             amountCtrl.text = RupiahFormatter.format(amt);
+                            if (amountHasError && amt > 0) {
+                              amountHasError = false;
+                            }
                             setModalState(() {});
                           },
                         );
@@ -2409,12 +3245,12 @@ class _StrukturPageState extends State<StrukturPage> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isInterBankTransfer && !isBankSama
+                        color: isInterBankTransfer && !isBankSama && nominal > 0
                             ? Colors.amber.withValues(alpha: 0.1)
                             : const Color(0xFFF0FDF4),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: isInterBankTransfer && !isBankSama
+                          color: isInterBankTransfer && !isBankSama && nominal > 0
                               ? Colors.amber
                               : primaryTeal.withValues(alpha: 0.3),
                         ),
@@ -2516,7 +3352,7 @@ class _StrukturPageState extends State<StrukturPage> {
                       ),
                     ),
 
-                    if (!isSaldoCukup && nominal > 0)
+                    if (!isSaldoCukup && nominal > 0 && !amountHasError)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
@@ -2556,67 +3392,109 @@ class _StrukturPageState extends State<StrukturPage> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: (nominal > 0 && isSaldoCukup)
-                            ? () {
-                                setState(() {
-                                  // 1. Kurangi Saldo Sumber
-                                  if (sourceAccount == 'rekening') {
-                                    _data.rekeningStruktur.balance -=
-                                        totalPotongan;
-                                  } else if (sourceAccount == 'debit') {
-                                    _data.onHandDebit.balance -= totalPotongan;
-                                  } else {
-                                    _data.onHandCash.balance -= totalPotongan;
-                                  }
+                        onPressed: () {
+                          if (nominal <= 0) {
+                            setModalState(() => amountHasError = true);
+                            if (amountKey.currentContext != null) {
+                              Scrollable.ensureVisible(
+                                amountKey.currentContext!,
+                                duration: const Duration(milliseconds: 350),
+                                curve: Curves.easeInOut,
+                                alignment: 0.3,
+                              );
+                            }
+                            amountFocus.requestFocus();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('⚠️ Silakan masukkan Nominal Alokasi (Rp)!'),
+                                backgroundColor: Colors.redAccent,
+                                behavior: SnackBarBehavior.floating,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                            return;
+                          }
 
-                                  // 2. Tambah Saldo Tujuan
-                                  if (targetAccount == 'rekening') {
-                                    _data.rekeningStruktur.balance += nominal;
-                                  } else if (targetAccount == 'debit') {
-                                    _data.onHandDebit.balance += nominal;
-                                  } else {
-                                    _data.onHandCash.balance += nominal;
-                                  }
+                          if (!isSaldoCukup) {
+                            setModalState(() => amountHasError = true);
+                            if (amountKey.currentContext != null) {
+                              Scrollable.ensureVisible(
+                                amountKey.currentContext!,
+                                duration: const Duration(milliseconds: 350),
+                                curve: Curves.easeInOut,
+                                alignment: 0.3,
+                              );
+                            }
+                            amountFocus.requestFocus();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('⚠️ Saldo $sourceName tidak mencukupi untuk distribusi ini! (Saldo: Rp ${RupiahFormatter.format(sourceBalance)})'),
+                                backgroundColor: Colors.redAccent,
+                                behavior: SnackBarBehavior.floating,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                            return;
+                          }
 
-                                  // 3. Catat Pengeluaran untuk Admin Bank jika ada
-                                  if (adminFee > 0) {
-                                    _data.transactions.add(
-                                      StrukturTransaction(
-                                        id: DateTime.now()
-                                            .microsecondsSinceEpoch
-                                            .toString(),
-                                        title: 'Admin bank transfer beda bank',
-                                        type: 'pengeluaran',
-                                        sourceAccount: sourceAccount,
-                                        amount: adminFee,
-                                        adminFee: 0,
-                                        note: noteCtrl.text.trim().isNotEmpty
-                                            ? noteCtrl.text.trim()
-                                            : null,
-                                        timestamp: selectedDate,
-                                      ),
-                                    );
-                                  }
-                                });
+                          setState(() {
+                            // 1. Kurangi Saldo Sumber
+                            if (sourceAccount == 'rekening') {
+                              _data.rekeningStruktur.balance -= totalPotongan;
+                            } else if (sourceAccount == 'debit') {
+                              _data.onHandDebit.balance -= totalPotongan;
+                            } else {
+                              _data.onHandCash.balance -= totalPotongan;
+                            }
 
-                                _saveData();
-                                Navigator.pop(ctx);
+                            // 2. Tambah Saldo Tujuan
+                            if (targetAccount == 'rekening') {
+                              _data.rekeningStruktur.balance += nominal;
+                            } else if (targetAccount == 'debit') {
+                              _data.onHandDebit.balance += nominal;
+                            } else {
+                              _data.onHandCash.balance += nominal;
+                            }
 
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Alokasi dana berhasil ($flowLabel)!',
-                                    ),
-                                    backgroundColor: primaryPurple,
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            : null,
+                            // 3. Catat Pengeluaran untuk Admin Bank jika ada
+                            if (adminFee > 0) {
+                              _data.transactions.add(
+                                StrukturTransaction(
+                                  id: DateTime.now()
+                                      .microsecondsSinceEpoch
+                                      .toString(),
+                                  title: 'Admin bank transfer beda bank',
+                                  type: 'pengeluaran',
+                                  sourceAccount: sourceAccount,
+                                  amount: adminFee,
+                                  adminFee: 0,
+                                  note: noteCtrl.text.trim().isNotEmpty
+                                      ? noteCtrl.text.trim()
+                                      : null,
+                                  timestamp: selectedDate,
+                                ),
+                              );
+                              _data.transactions.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+                            }
+                          });
+
+                          _saveData();
+                          Navigator.pop(ctx);
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Alokasi dana berhasil ($flowLabel)!',
+                              ),
+                              backgroundColor: primaryPurple,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryPurple,
                           foregroundColor: Colors.white,
-                          disabledBackgroundColor: Colors.grey[300],
+                          elevation: 2,
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12)),
                         ),
@@ -2856,6 +3734,11 @@ class _StrukturPageState extends State<StrukturPage> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.style_rounded, color: Colors.white),
+            tooltip: 'Kustom Kode Transaksi',
+            onPressed: () => _showKelolaKustomKodeModal(),
+          ),
           IconButton(
             icon: const Icon(Icons.receipt_long_rounded, color: Colors.white),
             tooltip: 'Riwayat Mutasi & Distribusi',
@@ -3156,16 +4039,45 @@ class _StrukturPageState extends State<StrukturPage> {
                   color: Colors.white70, size: 22),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            'Rp ${RupiahFormatter.format(_data.totalDanaStruktur)}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
+          const SizedBox(height: 16),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  'Rp ${RupiahFormatter.format(_data.totalDanaStruktur)}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    height: 1.1,
+                  ),
+                ),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 10),
+                  width: 1.5,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(1),
+                  ),
+                ),
+                Text(
+                  'Rp ${RupiahFormatter.format(_data.totalDanaOperasional)}',
+                  style: const TextStyle(
+                    color: Color(0xFFFEF08A), // Kuning soft
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    height: 1.1,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
 
           // Monthly Inflow & Outflow Chips
           Container(
@@ -3664,8 +4576,10 @@ class _StrukturPageState extends State<StrukturPage> {
     final allMutasi = _data.transactions
         .where((tx) => tx.isPemasukan || tx.isPengeluaran)
         .toList()
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    final previewList = allMutasi.take(5).toList();
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    final previewList = allMutasi.length > 5
+        ? allMutasi.sublist(allMutasi.length - 5)
+        : allMutasi;
 
     return Container(
       width: double.infinity,
@@ -3870,6 +4784,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                     tx.note != itemTitle)
                                 ? tx.note
                                 : null;
+                            final itemNumber = allMutasi.indexOf(tx) + 1;
 
                             return DataRow(
                               color: WidgetStateProperty.all(
@@ -3882,7 +4797,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                 DataCell(
                                   Center(
                                     child: Text(
-                                      '${index + 1}',
+                                      '$itemNumber',
                                       style: const TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.bold,
@@ -3946,7 +4861,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: Text(
-                                      '${isDebit ? "+" : "-"}Rp ${RupiahFormatter.format(tx.amount)}',
+                                      'Rp ${RupiahFormatter.format(tx.amount)}',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 10.5,
@@ -4036,7 +4951,7 @@ class _StrukturPageState extends State<StrukturPage> {
 
   // --- MODAL DETAIL TABEL KEUANGAN LENGKAP & MENYELURUH (DENGAN SUB KOLOM NOMINAL DEBIT & KREDIT) ---
   void _showDetailTabelKeuanganModal() {
-    String selectedTab = 'pengeluaran'; // Hanya 'pengeluaran' atau 'pemasukan'
+    String selectedTab = 'semua'; // 'semua', 'pengeluaran', 'pemasukan'
     String searchQuery = '';
     final searchCtrl = TextEditingController();
 
@@ -4052,15 +4967,21 @@ class _StrukturPageState extends State<StrukturPage> {
             final allMutasi = _data.transactions
                 .where((tx) => tx.isPemasukan || tx.isPengeluaran)
                 .toList()
-              ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+              ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
             final pengeluaranList =
                 allMutasi.where((tx) => tx.isPengeluaran).toList();
             final pemasukanList =
                 allMutasi.where((tx) => tx.isPemasukan).toList();
 
-            List<StrukturTransaction> activeList =
-                selectedTab == 'pengeluaran' ? pengeluaranList : pemasukanList;
+            List<StrukturTransaction> activeList;
+            if (selectedTab == 'pengeluaran') {
+              activeList = pengeluaranList;
+            } else if (selectedTab == 'pemasukan') {
+              activeList = pemasukanList;
+            } else {
+              activeList = allMutasi;
+            }
 
             if (searchQuery.isNotEmpty) {
               final query = searchQuery.toLowerCase();
@@ -4210,9 +5131,19 @@ class _StrukturPageState extends State<StrukturPage> {
                         ),
                         const SizedBox(height: 10),
 
-                        // Filter Tabs (Hanya Pengeluaran dan Pemasukan)
+                        // Filter Tabs (Semua, Pengeluaran, Pemasukan)
                         Row(
                           children: [
+                            Expanded(
+                              child: _buildFilterChip(
+                                label: 'Semua (${allMutasi.length})',
+                                isSelected: selectedTab == 'semua',
+                                activeColor: const Color(0xFFB45309),
+                                onTap: () => setModalState(
+                                    () => selectedTab = 'semua'),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
                             Expanded(
                               child: _buildFilterChip(
                                 label:
@@ -4223,7 +5154,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                     () => selectedTab = 'pengeluaran'),
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             Expanded(
                               child: _buildFilterChip(
                                 label: 'Pemasukan (${pemasukanList.length})',
@@ -4257,7 +5188,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                   Text(
                                     searchQuery.isNotEmpty
                                         ? 'Tidak ditemukan data "$searchQuery"'
-                                        : 'Belum ada data ${selectedTab == "pengeluaran" ? "pengeluaran" : "pemasukan"}',
+                                        : 'Belum ada data ${selectedTab == "semua" ? "transaksi" : selectedTab == "pengeluaran" ? "pengeluaran" : "pemasukan"}',
                                     style: const TextStyle(
                                       fontSize: 13.5,
                                       fontWeight: FontWeight.bold,
@@ -4464,7 +5395,7 @@ class _StrukturPageState extends State<StrukturPage> {
 
                                       // --- DATA ROWS ---
                                       ...List.generate(
-                                        activeList.length,
+                                      activeList.length,
                                         (index) {
                                           final tx = activeList[index];
                                           final isEven = index % 2 == 0;
@@ -4472,7 +5403,9 @@ class _StrukturPageState extends State<StrukturPage> {
                                               DateFormat('dd/MM/yyyy')
                                                   .format(tx.timestamp);
                                           final String displayKode =
-                                              tx.displayKode;
+                                              tx.getDisplayKode(
+                                                  customRules:
+                                                      _data.customKodeRules);
                                           final bool isDebit = tx.isPemasukan;
                                           final bool isKredit =
                                               tx.isPengeluaran;
@@ -4790,9 +5723,11 @@ class _StrukturPageState extends State<StrukturPage> {
                               ),
                             ),
                             Text(
-                              selectedTab == 'pengeluaran'
-                                  ? 'Total Pengeluaran:'
-                                  : 'Total Pemasukan:',
+                              selectedTab == 'semua'
+                                  ? 'Total Akumulasi:'
+                                  : selectedTab == 'pengeluaran'
+                                      ? 'Total Pengeluaran:'
+                                      : 'Total Pemasukan:',
                               style: const TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.bold,
@@ -4805,14 +5740,18 @@ class _StrukturPageState extends State<StrukturPage> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
-                            color: selectedTab == 'pengeluaran'
-                                ? const Color(0xFFFFF1F2)
-                                : const Color(0xFFF0FDF4),
+                            color: selectedTab == 'semua'
+                                ? const Color(0xFFFEF3C7)
+                                : selectedTab == 'pengeluaran'
+                                    ? const Color(0xFFFFF1F2)
+                                    : const Color(0xFFF0FDF4),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: selectedTab == 'pengeluaran'
-                                  ? const Color(0xFFFECDD3)
-                                  : const Color(0xFFA7F3D0),
+                              color: selectedTab == 'semua'
+                                  ? const Color(0xFFFDE68A)
+                                  : selectedTab == 'pengeluaran'
+                                      ? const Color(0xFFFECDD3)
+                                      : const Color(0xFFA7F3D0),
                             ),
                           ),
                           child: Text(
@@ -4820,9 +5759,11 @@ class _StrukturPageState extends State<StrukturPage> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: selectedTab == 'pengeluaran'
-                                  ? const Color(0xFFE11D48)
-                                  : const Color(0xFF059669),
+                              color: selectedTab == 'semua'
+                                  ? const Color(0xFFB45309)
+                                  : selectedTab == 'pengeluaran'
+                                      ? const Color(0xFFE11D48)
+                                      : const Color(0xFF059669),
                             ),
                           ),
                         ),

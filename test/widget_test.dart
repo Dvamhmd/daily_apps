@@ -152,13 +152,13 @@ void main() {
       await tester.pumpAndSettle();
 
       // Memastikan ada Dana Aman (Keuangan Harian)
-      expect(find.text('Dana Aman :'), findsOneWidget);
+      expect(find.text('Dana Aman'), findsOneWidget);
 
       // Memastikan ada fitur Tabunganku tersendiri
       expect(find.text('Tabunganku'), findsOneWidget);
 
-      // Memastikan ada teks Kekurangan Dana
-      expect(find.text('Kekurangan Dana'), findsOneWidget);
+      // Memastikan ada teks Kekurangan Dana / Kekurangan
+      expect(find.text('Kekurangan'), findsOneWidget);
     });
 
     testWidgets(
@@ -253,7 +253,7 @@ void main() {
       expect(find.text('380.000'), findsOneWidget);
 
       // Buka dialog penyesuaian deadline
-      await tester.tap(find.text('Sesuaikan'));
+      await tester.tap(find.text('Filter'));
       await tester.pumpAndSettle();
 
       // Pilih hanya tagihan berdeadline
@@ -266,7 +266,7 @@ void main() {
 
       // Sekarang Dana Aman hanya terpotong tagihan berdeadline (500.000 - 20.000 = 480.000)
       expect(find.text('480.000'), findsOneWidget);
-      expect(find.text('Tagihan terhitung: 20.000 (1 tagihan)'), findsOneWidget);
+      expect(find.text('Hanya tagihan berdeadline'), findsOneWidget);
 
       // Cek tombol reset
       await tester.tap(find.text('Reset'));
@@ -634,14 +634,10 @@ void main() {
 
       // Filter Uangku on: Uangku terhitung hanya 300.000, Dana Aman = 300.000 - 200.000 = 100.000
       expect(find.text('100.000'), findsOneWidget);
-      expect(find.textContaining('Uangku terhitung: 300.000 (Hanya cair)'), findsOneWidget);
+      expect(find.textContaining('Uangku terhitung: 300.000 (Cair)'), findsOneWidget);
 
       // Matikan kembali filter Uangku
-      final uangkuFilterBtn = find.descendant(
-        of: find.byType(InfoCardUangku),
-        matching: find.byType(IconButton),
-      );
-      await tester.tap(uangkuFilterBtn);
+      await tester.tap(find.byIcon(Icons.filter_alt_rounded));
       await tester.pumpAndSettle();
 
       // Dana Aman kembali = 1.100.000 (semua dana dikurangi tagihan)
