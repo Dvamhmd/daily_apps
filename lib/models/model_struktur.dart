@@ -80,17 +80,20 @@ class CustomKodeRule {
   String id;
   String keyword;
   String kode;
+  String type; // 'ku' atau 'kategori'
 
   CustomKodeRule({
     String? id,
     required this.keyword,
     required this.kode,
+    this.type = 'kategori',
   }) : id = id ?? DateTime.now().microsecondsSinceEpoch.toString();
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'keyword': keyword,
         'kode': kode,
+        'type': type,
       };
 
   factory CustomKodeRule.fromJson(Map<String, dynamic> json) {
@@ -99,6 +102,7 @@ class CustomKodeRule {
           DateTime.now().microsecondsSinceEpoch.toString(),
       keyword: json['keyword'] as String? ?? '',
       kode: json['kode'] as String? ?? '',
+      type: json['type'] as String? ?? 'kategori',
     );
   }
 
@@ -116,7 +120,8 @@ class StrukturTransaction {
   final int adminFee;
   final DateTime timestamp;
   final String? note;
-  final String? kode;
+  final String? ku;
+  final String? kode; // Kategori
 
   StrukturTransaction({
     required this.id,
@@ -129,6 +134,7 @@ class StrukturTransaction {
     this.adminFee = 0,
     DateTime? timestamp,
     this.note,
+    this.ku,
     this.kode,
   }) : timestamp = timestamp ?? DateTime.now();
 
@@ -138,12 +144,12 @@ class StrukturTransaction {
   bool get isPengeluaran => type == 'pengeluaran';
   bool get isAlokasiInternal => !isPemasukan && !isPengeluaran;
 
-  /// Helper untuk auto-resolve kode transaksi berdasarkan kata kunci teks keterangan/judul dan daftar kustomisasi
-  static String resolveKodeFromText(String text,
+  /// Helper untuk auto-resolve KU transaksi berdasarkan kata kunci teks keterangan/judul dan daftar kustomisasi KU
+  static String resolveKuFromText(String text,
       {List<CustomKodeRule>? customRules}) {
     if (text.trim().isEmpty) return '-';
     final lower = text.toLowerCase();
-    final rules = customRules ?? [];
+    final rules = (customRules ?? []).where((r) => r.type == 'ku').toList();
     if (rules.isEmpty) return '-';
 
     // Urutkan aturan dari keyword terpanjang ke terpendek agar match spesifik didahulukan
@@ -159,7 +165,55 @@ class StrukturTransaction {
     return '-';
   }
 
-  /// Getter untuk mendapatkan kode transaksi baik yang disimpan atau auto-resolved
+  /// Helper untuk auto-resolve Kategori transaksi berdasarkan kata kunci teks keterangan/judul dan daftar kustomisasi Kategori
+  static String resolveKodeFromText(String text,
+      {List<CustomKodeRule>? customRules}) {
+    if (text.trim().isEmpty) return '-';
+    final lower = text.toLowerCase();
+    final rules = (customRules ?? []).where((r) => r.type != 'ku').toList();
+    if (rules.isEmpty) return '-';
+
+    // Urutkan aturan dari keyword terpanjang ke terpendek agar match spesifik didahulukan
+    final sortedRules = List<CustomKodeRule>.from(rules)
+      ..sort((a, b) => b.keyword.length.compareTo(a.keyword.length));
+
+    for (final rule in sortedRules) {
+      final key = rule.keyword.trim().toLowerCase();
+      if (key.isNotEmpty && lower.contains(key)) {
+        return rule.kode.trim();
+      }
+    }
+    return '-';
+  }
+
+  static String resolveKategoriFromText(String text,
+          {List<CustomKodeRule>? customRules}) =>
+      resolveKodeFromText(text, customRules: customRules);
+
+  /// Getter untuk mendapatkan KU transaksi baik yang disimpan atau auto-resolved
+  String getDisplayKu({List<CustomKodeRule>? customRules}) {
+    if (ku != null && ku!.trim().isNotEmpty && ku!.trim() != '-') {
+      return ku!.trim();
+    }
+    if (note != null && note!.trim().isNotEmpty) {
+      final autoFromNote =
+          resolveKuFromText(note!, customRules: customRules);
+      if (autoFromNote != '-') return autoFromNote;
+    }
+    final autoFromTitle =
+        resolveKuFromText(title, customRules: customRules);
+    if (autoFromTitle != '-') return autoFromTitle;
+    if (manualSource != null && manualSource!.trim().isNotEmpty) {
+      final autoFromSource =
+          resolveKuFromText(manualSource!, customRules: customRules);
+      if (autoFromSource != '-') return autoFromSource;
+    }
+    return '-';
+  }
+
+  String get displayKu => getDisplayKu();
+
+  /// Getter untuk mendapatkan Kategori transaksi baik yang disimpan atau auto-resolved
   String getDisplayKode({List<CustomKodeRule>? customRules}) {
     if (kode != null && kode!.trim().isNotEmpty && kode!.trim() != '-') {
       return kode!.trim();
@@ -181,8 +235,9 @@ class StrukturTransaction {
   }
 
   String get displayKode => getDisplayKode();
+  String get displayKategori => getDisplayKode();
 
-  /// Menandakan apakah transaksi ini merupakan transaksi DP (Kode mengandung 'DP')
+  /// Menandakan apakah transaksi ini merupakan transaksi DP (Kategori mengandung 'DP')
   bool isDPTransaction({List<CustomKodeRule>? customRules}) {
     final kd = getDisplayKode(customRules: customRules).toUpperCase();
     if (kd.contains('DP')) return true;
@@ -201,6 +256,7 @@ class StrukturTransaction {
         'adminFee': adminFee,
         'timestamp': timestamp.toIso8601String(),
         'note': note,
+        'ku': ku,
         'kode': kode,
       };
 
@@ -219,6 +275,7 @@ class StrukturTransaction {
           ? DateTime.parse(json['timestamp'] as String)
           : DateTime.now(),
       note: json['note'] as String?,
+      ku: json['ku'] as String?,
       kode: json['kode'] as String?,
     );
   }

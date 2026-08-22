@@ -319,7 +319,7 @@ class _StrukturPageState extends State<StrukturPage> {
             }
             return;
           } else {
-            // Untuk bulan baru, bawa metadata akun rekening & On Hand
+            // Untuk bulan baru, bawa metadata akun rekening, On Hand & aturan kustom (saldo awal 0)
             final templateData = StrukturData.fromJson(decoded);
             final newMonthData = StrukturData(
               rekeningStruktur: RekeningStruktur(
@@ -336,6 +336,7 @@ class _StrukturPageState extends State<StrukturPage> {
               ),
               onHandCash: OnHandCash(balance: 0),
               transactions: [],
+              customKodeRules: List.from(templateData.customKodeRules),
             );
             if (mounted) {
               setState(() {
@@ -350,7 +351,7 @@ class _StrukturPageState extends State<StrukturPage> {
       } catch (_) {}
     }
 
-    // Default initial values if newly opened without any history
+    // Default initial values jika belum ada data sama sekali
     final defaultData = StrukturData(
       rekeningStruktur: RekeningStruktur(
         bankName: 'BCA',
@@ -366,6 +367,7 @@ class _StrukturPageState extends State<StrukturPage> {
       ),
       onHandCash: OnHandCash(balance: 0),
       transactions: [],
+      customKodeRules: [],
     );
 
     if (mounted) {
@@ -385,8 +387,9 @@ class _StrukturPageState extends State<StrukturPage> {
     await prefs.setString('struktur_keuangan_data', jsonEncode(_data.toJson()));
   }
 
-  // --- MODAL KELOLA KUSTOM KODE TRANSAKSI ---
+  // --- MODAL KELOLA KUSTOM ATURAN TRANSAKSI (2 TAB: KU & KATEGORI) ---
   void _showKelolaKustomKodeModal() {
+    String selectedTab = 'ku'; // 'ku' atau 'kategori'
     String searchQuery = '';
     String testInput = '';
     final searchCtrl = TextEditingController();
@@ -400,13 +403,26 @@ class _StrukturPageState extends State<StrukturPage> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-            final rules = _data.customKodeRules.where((r) {
+            final kuRules = _data.customKodeRules
+                .where((r) => r.type == 'ku')
+                .toList();
+            final kategoriRules = _data.customKodeRules
+                .where((r) => r.type != 'ku')
+                .toList();
+
+            final currentTabRules = selectedTab == 'ku' ? kuRules : kategoriRules;
+
+            final rules = currentTabRules.where((r) {
               if (searchQuery.isEmpty) return true;
               return r.keyword.toLowerCase().contains(searchQuery.toLowerCase()) ||
                   r.kode.toLowerCase().contains(searchQuery.toLowerCase());
             }).toList();
 
-            final testResult = StrukturTransaction.resolveKodeFromText(
+            final testKuResult = StrukturTransaction.resolveKuFromText(
+              testInput,
+              customRules: _data.customKodeRules,
+            );
+            final testKategoriResult = StrukturTransaction.resolveKodeFromText(
               testInput,
               customRules: _data.customKodeRules,
             );
@@ -454,7 +470,7 @@ class _StrukturPageState extends State<StrukturPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Kustom Kode Transaksi',
+                              'Kustom Aturan Transaksi',
                               style: TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.bold,
@@ -462,7 +478,7 @@ class _StrukturPageState extends State<StrukturPage> {
                               ),
                             ),
                             Text(
-                              'Atur kata kunci pesan keterangan yang memicu auto-input kode',
+                              'Atur kata kunci keterangan yang memicu auto-input KU & Kategori',
                               style: TextStyle(
                                   fontSize: 11.5, color: Color(0xFF64748B)),
                             ),
@@ -471,33 +487,156 @@ class _StrukturPageState extends State<StrukturPage> {
                       ),
                       IconButton(
                         onPressed: () => Navigator.pop(bottomSheetCtx),
-                        icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                        icon: const Icon(Icons.close_rounded,
+                            color: Color(0xFF64748B)),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
+
+                  // 2-Tab Selector (KU & Kategori)
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        // Tab KU
+                        Expanded(
+                          child: InkWell(
+                            onTap: () {
+                              setModalState(() {
+                                selectedTab = 'ku';
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(9),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: selectedTab == 'ku'
+                                    ? Colors.white
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(9),
+                                boxShadow: selectedTab == 'ku'
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.06),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        )
+                                      ]
+                                    : [],
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.badge_outlined,
+                                    size: 15,
+                                    color: selectedTab == 'ku'
+                                        ? const Color(0xFF4F46E5)
+                                        : const Color(0xFF64748B),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'KU (${kuRules.length})',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: selectedTab == 'ku'
+                                          ? const Color(0xFF4F46E5)
+                                          : const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Tab Kategori
+                        Expanded(
+                          child: InkWell(
+                            onTap: () {
+                              setModalState(() {
+                                selectedTab = 'kategori';
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(9),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: selectedTab == 'kategori'
+                                    ? Colors.white
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(9),
+                                boxShadow: selectedTab == 'kategori'
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.06),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        )
+                                      ]
+                                    : [],
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.category_outlined,
+                                    size: 15,
+                                    color: selectedTab == 'kategori'
+                                        ? const Color(0xFF4F46E5)
+                                        : const Color(0xFF64748B),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Kategori (${kategoriRules.length})',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: selectedTab == 'kategori'
+                                          ? const Color(0xFF4F46E5)
+                                          : const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
 
                   // Info Box
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Icon(Icons.info_outline_rounded,
-                            size: 16, color: Color(0xFF6366F1)),
+                            size: 15, color: Color(0xFF6366F1)),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Saat Anda mengisi Keterangan saat Pemasukan atau Pengeluaran, kata kunci yang cocok otomatis menentukan Kode Transaksi pada tabel mutasi.',
+                            selectedTab == 'ku'
+                                ? 'Aturan KU otomatis mengisi kolom "KU" saat kata kunci cocok dengan keterangan transaksi.'
+                                : 'Aturan Kategori otomatis mengisi kolom "Kategori" saat kata kunci cocok dengan keterangan transaksi.',
                             style: TextStyle(
-                              fontSize: 11.5,
+                              fontSize: 11,
                               color: Colors.grey[700],
                               height: 1.35,
                             ),
@@ -506,7 +645,7 @@ class _StrukturPageState extends State<StrukturPage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
 
                   // Search Bar & Tambah Button Row
                   Row(
@@ -531,7 +670,9 @@ class _StrukturPageState extends State<StrukturPage> {
                             style: const TextStyle(fontSize: 12),
                             decoration: InputDecoration(
                               isDense: true,
-                              hintText: 'Cari kata kunci / kode...',
+                              hintText: selectedTab == 'ku'
+                                  ? 'Cari kata kunci / KU...'
+                                  : 'Cari kata kunci / Kategori...',
                               hintStyle: TextStyle(
                                   fontSize: 12, color: Colors.grey[400]),
                               prefixIcon: Icon(Icons.search_rounded,
@@ -558,13 +699,14 @@ class _StrukturPageState extends State<StrukturPage> {
                         onPressed: () {
                           _showFormKustomKodeDialog(
                             null,
+                            selectedTab,
                             () => setModalState(() {}),
                           );
                         },
                         icon: const Icon(Icons.add_rounded, size: 16),
-                        label: const Text(
-                          'Tambah',
-                          style: TextStyle(
+                        label: Text(
+                          selectedTab == 'ku' ? '+ Tambah KU' : '+ Tambah Kategori',
+                          style: const TextStyle(
                               fontSize: 12, fontWeight: FontWeight.bold),
                         ),
                         style: ElevatedButton.styleFrom(
@@ -580,7 +722,7 @@ class _StrukturPageState extends State<StrukturPage> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
 
                   // Interactive Live Test Box
                   Container(
@@ -600,7 +742,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                 size: 15, color: Color(0xFF059669)),
                             SizedBox(width: 4),
                             Text(
-                              'Uji Coba Auto-Kode Langsung:',
+                              'Uji Coba Auto-Input Langsung:',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
@@ -640,34 +782,33 @@ class _StrukturPageState extends State<StrukturPage> {
                           ),
                         ),
                         const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            const Text(
-                              'Kode Terdeteksi: ',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF047857),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: testResult != '-'
-                                    ? const Color(0xFF059669)
-                                    : const Color(0xFF94A3B8),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                testResult,
-                                style: const TextStyle(
-                                  fontSize: 10.5,
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              // Result KU
+                              const Text(
+                                'KU: ',
+                                style: TextStyle(
+                                  fontSize: 11,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  color: Color(0xFF047857),
                                 ),
                               ),
-                            ),
-                          ],
+                              _buildKuBadge(testKuResult, isLarge: false),
+                              const SizedBox(width: 12),
+                              // Result Kategori
+                              const Text(
+                                'Kategori: ',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF047857),
+                                ),
+                              ),
+                              _buildKodeBadge(testKategoriResult, isLarge: false),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -679,7 +820,7 @@ class _StrukturPageState extends State<StrukturPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Daftar Aturan (${rules.length}):',
+                        'Daftar Aturan ${selectedTab == 'ku' ? 'KU' : 'Kategori'} (${rules.length}):',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -690,14 +831,15 @@ class _StrukturPageState extends State<StrukturPage> {
                         TextButton.icon(
                           onPressed: () {
                             _confirmClearAllKodeRules(
+                              selectedTab,
                               () => setModalState(() {}),
                             );
                           },
                           icon: const Icon(Icons.delete_sweep_rounded,
                               size: 14, color: Color(0xFFE11D48)),
-                          label: const Text(
-                            'Kosongkan',
-                            style: TextStyle(
+                          label: Text(
+                            'Kosongkan ${selectedTab == 'ku' ? 'KU' : 'Kategori'}',
+                            style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                               color: Color(0xFFE11D48),
@@ -725,8 +867,8 @@ class _StrukturPageState extends State<StrukturPage> {
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF1F5F9),
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFF1F5F9),
                                       shape: BoxShape.circle,
                                     ),
                                     child: const Icon(Icons.rule_folder_outlined,
@@ -736,7 +878,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                   Text(
                                     searchQuery.isNotEmpty
                                         ? 'Tidak ditemukan aturan yang cocok'
-                                        : 'Daftar aturan masih kosong (0)',
+                                        : 'Daftar aturan ${selectedTab == 'ku' ? 'KU' : 'Kategori'} masih kosong (0)',
                                     style: const TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.bold,
@@ -746,7 +888,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                   Text(
                                     searchQuery.isNotEmpty
                                         ? 'Coba kata kunci lain atau bersihkan pencarian.'
-                                        : 'Tekan tombol "+ Tambah" di atas untuk menambahkan kata kunci keterangan dan kode transaksi pertama Anda.',
+                                        : 'Tekan tombol "+ Tambah ${selectedTab == 'ku' ? 'KU' : 'Kategori'}" di atas untuk menambahkan aturan pertama.',
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
                                         fontSize: 11, color: Color(0xFF64748B)),
@@ -762,6 +904,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                 const SizedBox(height: 6),
                             itemBuilder: (ctx, idx) {
                               final rule = rules[idx];
+                              final isKuRule = rule.type == 'ku';
                               return Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 12, vertical: 8),
@@ -829,32 +972,39 @@ class _StrukturPageState extends State<StrukturPage> {
                                                       horizontal: 6,
                                                       vertical: 2),
                                                   decoration: BoxDecoration(
-                                                    color: const Color(0xFFEEF2FF),
+                                                    color: isKuRule
+                                                        ? const Color(0xFFEFF6FF)
+                                                        : const Color(0xFFEEF2FF),
                                                     borderRadius:
                                                         BorderRadius.circular(6),
                                                     border: Border.all(
-                                                        color: const Color(
-                                                            0xFFC7D2FE)),
+                                                        color: isKuRule
+                                                            ? const Color(0xFFBFDBFE)
+                                                            : const Color(0xFFC7D2FE)),
                                                   ),
                                                   child: Row(
                                                     mainAxisSize:
                                                         MainAxisSize.min,
                                                     children: [
-                                                      const Icon(
-                                                          Icons.tag_rounded,
+                                                      Icon(
+                                                          isKuRule
+                                                              ? Icons.badge_outlined
+                                                              : Icons.tag_rounded,
                                                           size: 11,
-                                                          color:
-                                                              Color(0xFF4F46E5)),
+                                                          color: isKuRule
+                                                              ? const Color(0xFF1D4ED8)
+                                                              : const Color(0xFF4F46E5)),
                                                       const SizedBox(width: 3),
                                                       Flexible(
                                                         child: Text(
                                                           rule.kode,
-                                                          style: const TextStyle(
+                                                          style: TextStyle(
                                                             fontSize: 11,
                                                             fontWeight:
                                                                 FontWeight.bold,
-                                                            color:
-                                                                Color(0xFF3730A3),
+                                                            color: isKuRule
+                                                                ? const Color(0xFF1E40AF)
+                                                                : const Color(0xFF3730A3),
                                                           ),
                                                           overflow: TextOverflow
                                                               .ellipsis,
@@ -880,6 +1030,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                       onPressed: () {
                                         _showFormKustomKodeDialog(
                                           rule,
+                                          rule.type,
                                           () => setModalState(() {}),
                                         );
                                       },
@@ -927,15 +1078,19 @@ class _StrukturPageState extends State<StrukturPage> {
     );
   }
 
-  // --- DIALOG FORM TAMBAH / EDIT KUSTOM KODE TRANSAKSI ---
+  // --- DIALOG FORM TAMBAH / EDIT KUSTOM ATURAN (KU / KATEGORI) ---
   void _showFormKustomKodeDialog(
     CustomKodeRule? existingRule,
+    String targetType, // 'ku' atau 'kategori'
     VoidCallback onSaved,
   ) {
     final isEdit = existingRule != null;
+    final type = existingRule != null ? existingRule.type : targetType;
+    final isKu = type == 'ku';
+
     final keywordCtrl =
         TextEditingController(text: existingRule != null ? existingRule.keyword : '');
-    final kodeCtrl =
+    final valueCtrl =
         TextEditingController(text: existingRule != null ? existingRule.kode : '');
 
     showDialog(
@@ -962,7 +1117,9 @@ class _StrukturPageState extends State<StrukturPage> {
               ),
               const SizedBox(width: 8),
               Text(
-                isEdit ? 'Edit Aturan Kode' : 'Tambah Aturan Kode',
+                isEdit
+                    ? 'Edit Aturan ${isKu ? "KU" : "Kategori"}'
+                    : 'Tambah Aturan ${isKu ? "KU" : "Kategori"}',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -988,7 +1145,9 @@ class _StrukturPageState extends State<StrukturPage> {
                 TextField(
                   controller: keywordCtrl,
                   decoration: InputDecoration(
-                    hintText: 'Contoh: konsumsi, bensin, sewa tempat',
+                    hintText: isKu
+                        ? 'Contoh: operasional, konsumsi, bensin'
+                        : 'Contoh: konsumsi, bensin, sewa tempat',
                     hintStyle:
                         TextStyle(fontSize: 12, color: Colors.grey[400]),
                     filled: true,
@@ -1004,9 +1163,11 @@ class _StrukturPageState extends State<StrukturPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text(
-                  '2. Kode Transaksi yang Dihasilkan:',
-                  style: TextStyle(
+                Text(
+                  isKu
+                      ? '2. Nilai KU yang Dihasilkan:'
+                      : '2. Kategori yang Dihasilkan:',
+                  style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF334155),
@@ -1014,9 +1175,11 @@ class _StrukturPageState extends State<StrukturPage> {
                 ),
                 const SizedBox(height: 4),
                 TextField(
-                  controller: kodeCtrl,
+                  controller: valueCtrl,
                   decoration: InputDecoration(
-                    hintText: 'Contoh: Biaya Konsumsi Acara, Sewa Tempat',
+                    hintText: isKu
+                        ? 'Contoh: KU 01, KU 02, KU 1'
+                        : 'Contoh: Biaya Konsumsi Acara, Sewa Tempat, Biaya RTK',
                     hintStyle:
                         TextStyle(fontSize: 12, color: Colors.grey[400]),
                     filled: true,
@@ -1027,8 +1190,10 @@ class _StrukturPageState extends State<StrukturPage> {
                       borderRadius: BorderRadius.circular(10),
                       borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                     ),
-                    prefixIcon: const Icon(Icons.tag_rounded,
-                        size: 16, color: Color(0xFF4F46E5)),
+                    prefixIcon: Icon(
+                        isKu ? Icons.badge_outlined : Icons.tag_rounded,
+                        size: 16,
+                        color: const Color(0xFF4F46E5)),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -1047,7 +1212,7 @@ class _StrukturPageState extends State<StrukturPage> {
             ElevatedButton(
               onPressed: () {
                 final key = keywordCtrl.text.trim();
-                final kode = kodeCtrl.text.trim();
+                final val = valueCtrl.text.trim();
 
                 if (key.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -1060,10 +1225,11 @@ class _StrukturPageState extends State<StrukturPage> {
                   return;
                 }
 
-                if (kode.isEmpty) {
+                if (val.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('⚠️ Kode transaksi wajib diisi!'),
+                    SnackBar(
+                      content: Text(
+                          '⚠️ ${isKu ? "Nilai KU" : "Kategori"} wajib diisi!'),
                       backgroundColor: Colors.redAccent,
                       behavior: SnackBarBehavior.floating,
                     ),
@@ -1074,10 +1240,11 @@ class _StrukturPageState extends State<StrukturPage> {
                 setState(() {
                   if (isEdit) {
                     existingRule.keyword = key;
-                    existingRule.kode = kode;
+                    existingRule.kode = val;
+                    existingRule.type = type;
                   } else {
                     _data.customKodeRules.add(
-                      CustomKodeRule(keyword: key, kode: kode),
+                      CustomKodeRule(keyword: key, kode: val, type: type),
                     );
                   }
                 });
@@ -1090,8 +1257,8 @@ class _StrukturPageState extends State<StrukturPage> {
                   SnackBar(
                     content: Text(
                       isEdit
-                          ? 'Aturan "$key" -> "$kode" berhasil diperbarui!'
-                          : 'Aturan baru "$key" -> "$kode" berhasil ditambahkan!',
+                          ? 'Aturan "$key" -> "$val" berhasil diperbarui!'
+                          : 'Aturan baru "$key" -> "$val" berhasil ditambahkan!',
                     ),
                     backgroundColor: const Color(0xFF059669),
                     behavior: SnackBarBehavior.floating,
@@ -1113,27 +1280,28 @@ class _StrukturPageState extends State<StrukturPage> {
     );
   }
 
-  // --- DIALOG KONFIRMASI KOSONGKAN SEMUA ATURAN KODE ---
-  void _confirmClearAllKodeRules(VoidCallback onReset) {
+  // --- DIALOG KONFIRMASI KOSONGKAN ATURAN (SESUAI TAB) ---
+  void _confirmClearAllKodeRules(String tabType, VoidCallback onReset) {
+    final isKu = tabType == 'ku';
     showDialog(
       context: context,
       builder: (dialogCtx) {
         return AlertDialog(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Color(0xFFE11D48)),
-              SizedBox(width: 8),
+              const Icon(Icons.warning_amber_rounded, color: Color(0xFFE11D48)),
+              const SizedBox(width: 8),
               Text(
-                'Kosongkan Semua Aturan?',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                'Kosongkan Aturan ${isKu ? "KU" : "Kategori"}?',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ],
           ),
-          content: const Text(
-            'Semua aturan kustom kode transaksi akan dihapus dan daftar aturan menjadi kosong (0).',
-            style: TextStyle(fontSize: 13),
+          content: Text(
+            'Semua aturan ${isKu ? "KU" : "Kategori"} akan dihapus dan daftar menjadi kosong (0).',
+            style: const TextStyle(fontSize: 13),
           ),
           actions: [
             TextButton(
@@ -1143,16 +1311,17 @@ class _StrukturPageState extends State<StrukturPage> {
             ElevatedButton(
               onPressed: () {
                 setState(() {
-                  _data.customKodeRules = [];
+                  _data.customKodeRules.removeWhere((r) =>
+                      isKu ? r.type == 'ku' : r.type != 'ku');
                 });
                 _saveData();
                 onReset();
                 Navigator.pop(dialogCtx);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content:
-                        Text('Semua aturan kode transaksi berhasil dikosongkan!'),
-                    backgroundColor: Color(0xFF059669),
+                  SnackBar(
+                    content: Text(
+                        'Semua aturan ${isKu ? "KU" : "Kategori"} berhasil dikosongkan!'),
+                    backgroundColor: const Color(0xFF059669),
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
@@ -2022,6 +2191,10 @@ class _StrukturPageState extends State<StrukturPage> {
                           }
 
                           final noteText = noteCtrl.text.trim();
+                          final autoKu =
+                              StrukturTransaction.resolveKuFromText(
+                                  noteText.isNotEmpty ? noteText : 'Pemasukan',
+                                  customRules: _data.customKodeRules);
                           final autoKode =
                               StrukturTransaction.resolveKodeFromText(
                                   noteText.isNotEmpty ? noteText : 'Pemasukan',
@@ -2051,6 +2224,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                 amount: nominal,
                                 adminFee: 0,
                                 note: noteText.isNotEmpty ? noteText : null,
+                                ku: autoKu != '-' ? autoKu : null,
                                 kode: autoKode != '-' ? autoKode : null,
                                 timestamp: selectedDate,
                               ),
@@ -2633,6 +2807,10 @@ class _StrukturPageState extends State<StrukturPage> {
                           }
 
                           final keterangan = noteCtrl.text.trim();
+                          final autoKu =
+                              StrukturTransaction.resolveKuFromText(
+                                  keterangan,
+                                  customRules: _data.customKodeRules);
                           final autoKode =
                               StrukturTransaction.resolveKodeFromText(
                                   keterangan,
@@ -2660,6 +2838,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                 amount: nominal,
                                 adminFee: 0,
                                 note: keterangan,
+                                ku: autoKu != '-' ? autoKu : null,
                                 kode: autoKode != '-' ? autoKode : null,
                                 timestamp: selectedDate,
                               ),
@@ -3736,7 +3915,7 @@ class _StrukturPageState extends State<StrukturPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.style_rounded, color: Colors.white),
-            tooltip: 'Kustom Kode Transaksi',
+            tooltip: 'Kustom KU & Kategori',
             onPressed: () => _showKelolaKustomKodeModal(),
           ),
           IconButton(
@@ -4517,6 +4696,51 @@ class _StrukturPageState extends State<StrukturPage> {
     );
   }
 
+  Widget _buildKuBadge(String ku, {bool isLarge = false}) {
+    Color bg = const Color(0xFFEFF6FF); // Soft Blue 50
+    Color fg = const Color(0xFF1D4ED8); // Blue 700
+    Color border = const Color(0xFFBFDBFE); // Blue 200
+
+    final lower = ku.toLowerCase();
+    if (ku == '-' || ku.isEmpty) {
+      bg = const Color(0xFFF8FAFC);
+      fg = const Color(0xFF94A3B8);
+      border = const Color(0xFFE2E8F0);
+    } else if (lower.contains('1') || lower.contains('01')) {
+      bg = const Color(0xFFEEF2FF);
+      fg = const Color(0xFF4338CA);
+      border = const Color(0xFFC7D2FE);
+    } else if (lower.contains('2') || lower.contains('02')) {
+      bg = const Color(0xFFF0FDF4);
+      fg = const Color(0xFF15803D);
+      border = const Color(0xFFBBF7D0);
+    } else if (lower.contains('3') || lower.contains('03')) {
+      bg = const Color(0xFFFFFBEB);
+      fg = const Color(0xFFB45309);
+      border = const Color(0xFFFDE68A);
+    }
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isLarge ? 8 : 6,
+        vertical: isLarge ? 3 : 2,
+      ),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: border, width: 0.8),
+      ),
+      child: Text(
+        ku.isEmpty ? '-' : ku,
+        style: TextStyle(
+          fontSize: isLarge ? 10.5 : 9.5,
+          fontWeight: FontWeight.bold,
+          color: fg,
+        ),
+      ),
+    );
+  }
+
   Widget _buildKodeBadge(String kode, {bool isLarge = false}) {
     Color bg = const Color(0xFFF1F5F9);
     Color fg = const Color(0xFF475569);
@@ -4530,7 +4754,7 @@ class _StrukturPageState extends State<StrukturPage> {
     } else if (lower.contains('dp dtk') || lower.contains('terima dp')) {
       bg = const Color(0xFFD1FAE5);
       fg = const Color(0xFF047857);
-      border = const Color(0xFFA7F3D0);
+      border = const Color(0xFF059669).withValues(alpha: 0.3);
     } else if (lower.contains('konsumsi')) {
       bg = const Color(0xFFFEF3C7);
       fg = const Color(0xFFB45309);
@@ -4719,7 +4943,7 @@ class _StrukturPageState extends State<StrukturPage> {
             )
           else ...[
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
               child: Align(
                 alignment: Alignment.topCenter,
                 child: ClipRRect(
@@ -4913,36 +5137,6 @@ class _StrukturPageState extends State<StrukturPage> {
                 ),
               ),
             ),
-            // Tombol Buka Tabel Lengkap Seluruh Data
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-              child: SizedBox(
-                width: double.infinity,
-                height: 38,
-                child: ElevatedButton.icon(
-                  onPressed: () => _showDetailTabelKeuanganModal(),
-                  icon: const Icon(Icons.table_chart_rounded, size: 16),
-                  label: Text(
-                    allMutasi.length > 5
-                        ? 'Buka Tabel Lengkap (Lihat Semua ${allMutasi.length} Data)'
-                        : 'Buka Detail Tabel Menyeluruh',
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFEF3C7),
-                    foregroundColor: const Color(0xFFB45309),
-                    elevation: 0,
-                    side: const BorderSide(color: Color(0xFFFDE68A)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ),
-            ),
           ],
         ],
       ),
@@ -4988,12 +5182,18 @@ class _StrukturPageState extends State<StrukturPage> {
               activeList = activeList.where((tx) {
                 final title = tx.title.toLowerCase();
                 final note = (tx.note ?? '').toLowerCase();
-                final kode = tx.displayKode.toLowerCase();
+                final ku = tx
+                    .getDisplayKu(customRules: _data.customKodeRules)
+                    .toLowerCase();
+                final kategori = tx
+                    .getDisplayKode(customRules: _data.customKodeRules)
+                    .toLowerCase();
                 final amount = tx.amount.toString();
                 final dateStr = DateFormat('dd/MM/yyyy').format(tx.timestamp);
                 return title.contains(query) ||
                     note.contains(query) ||
-                    kode.contains(query) ||
+                    ku.contains(query) ||
+                    kategori.contains(query) ||
                     amount.contains(query) ||
                     dateStr.contains(query);
               }).toList();
@@ -5106,7 +5306,7 @@ class _StrukturPageState extends State<StrukturPage> {
                             style: const TextStyle(fontSize: 12),
                             decoration: InputDecoration(
                               hintText:
-                                  'Cari keterangan, kode (misal: Biaya RTK), nominal...',
+                                  'Cari keterangan, KU, Kategori, nominal...',
                               hintStyle: const TextStyle(
                                   fontSize: 11.5, color: Color(0xFF94A3B8)),
                               prefixIcon: const Icon(Icons.search_rounded,
@@ -5266,12 +5466,12 @@ class _StrukturPageState extends State<StrukturPage> {
                                                 width: 1,
                                                 height: 52,
                                                 color: const Color(0xFFFDE68A)),
-                                            // 3. Kode (145)
+                                            // 3. KU (80) [Baru - di samping kiri Kategori]
                                             const SizedBox(
-                                              width: 145,
+                                              width: 80,
                                               height: 52,
                                               child: Center(
-                                                child: Text('Kode',
+                                                child: Text('KU',
                                                     style: headerStyle),
                                               ),
                                             ),
@@ -5279,7 +5479,20 @@ class _StrukturPageState extends State<StrukturPage> {
                                                 width: 1,
                                                 height: 52,
                                                 color: const Color(0xFFFDE68A)),
-                                            // 4. Keterangan (220)
+                                            // 4. Kategori (145) [Ubah dari Kode -> Kategori]
+                                            const SizedBox(
+                                              width: 145,
+                                              height: 52,
+                                              child: Center(
+                                                child: Text('Kategori',
+                                                    style: headerStyle),
+                                              ),
+                                            ),
+                                            Container(
+                                                width: 1,
+                                                height: 52,
+                                                color: const Color(0xFFFDE68A)),
+                                            // 5. Keterangan (220)
                                             const SizedBox(
                                               width: 220,
                                               height: 52,
@@ -5292,7 +5505,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                 width: 1,
                                                 height: 52,
                                                 color: const Color(0xFFFDE68A)),
-                                            // 5. Jumlah (110)
+                                            // 6. Jumlah (110)
                                             const SizedBox(
                                               width: 110,
                                               height: 52,
@@ -5305,7 +5518,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                 width: 1,
                                                 height: 52,
                                                 color: const Color(0xFFFDE68A)),
-                                            // 6. Nominal (Merged 2-Cell Sub-Columns: Debit & Kredit)
+                                            // 7. Nominal (Merged 2-Cell Sub-Columns: Debit & Kredit)
                                             SizedBox(
                                               width: 236,
                                               height: 52,
@@ -5380,7 +5593,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                 width: 1,
                                                 height: 52,
                                                 color: const Color(0xFFFDE68A)),
-                                            // 7. Aksi (50)
+                                            // 8. Aksi (50)
                                             const SizedBox(
                                               width: 50,
                                               height: 52,
@@ -5395,14 +5608,18 @@ class _StrukturPageState extends State<StrukturPage> {
 
                                       // --- DATA ROWS ---
                                       ...List.generate(
-                                      activeList.length,
+                                        activeList.length,
                                         (index) {
                                           final tx = activeList[index];
                                           final isEven = index % 2 == 0;
                                           final dateFormatted =
                                               DateFormat('dd/MM/yyyy')
                                                   .format(tx.timestamp);
-                                          final String displayKode =
+                                          final String displayKu =
+                                              tx.getDisplayKu(
+                                                  customRules:
+                                                      _data.customKodeRules);
+                                          final String displayKategori =
                                               tx.getDisplayKode(
                                                   customRules:
                                                       _data.customKodeRules);
@@ -5482,16 +5699,16 @@ class _StrukturPageState extends State<StrukturPage> {
                                                     height: 48,
                                                     color: const Color(0xFFFDE68A)
                                                         .withValues(alpha: 0.6)),
-                                                // 3. Kode
+                                                // 3. KU (Di samping kiri Kategori)
                                                 Container(
-                                                  width: 145,
+                                                  width: 80,
                                                   height: 48,
                                                   padding:
                                                       const EdgeInsets.symmetric(
-                                                          horizontal: 6),
+                                                          horizontal: 4),
                                                   child: Center(
-                                                    child: _buildKodeBadge(
-                                                        displayKode,
+                                                    child: _buildKuBadge(
+                                                        displayKu,
                                                         isLarge: true),
                                                   ),
                                                 ),
@@ -5500,7 +5717,25 @@ class _StrukturPageState extends State<StrukturPage> {
                                                     height: 48,
                                                     color: const Color(0xFFFDE68A)
                                                         .withValues(alpha: 0.6)),
-                                                // 4. Keterangan
+                                                // 4. Kategori (Sebelumnya Kode)
+                                                Container(
+                                                  width: 145,
+                                                  height: 48,
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                          horizontal: 6),
+                                                  child: Center(
+                                                    child: _buildKodeBadge(
+                                                        displayKategori,
+                                                        isLarge: true),
+                                                  ),
+                                                ),
+                                                Container(
+                                                    width: 1,
+                                                    height: 48,
+                                                    color: const Color(0xFFFDE68A)
+                                                        .withValues(alpha: 0.6)),
+                                                // 5. Keterangan
                                                 Container(
                                                   width: 220,
                                                   height: 48,
