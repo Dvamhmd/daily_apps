@@ -664,14 +664,6 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                             ),
                             child: RadioListTile<int>(
                               value: idx,
-                              groupValue: selectedUangkuIndex,
-                              onChanged: (val) {
-                                if (val != null) {
-                                  setModalState(() {
-                                    selectedUangkuIndex = val;
-                                  });
-                                }
-                              },
                               activeColor: const Color(0xFF5E35B1),
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 0),
@@ -1233,11 +1225,8 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                         child: child,
                       );
                     },
-                    onReorder: (oldIndex, newIndex) {
+                    onReorderItem: (oldIndex, newIndex) {
                       setState(() {
-                        if (newIndex > oldIndex) {
-                          newIndex -= 1;
-                        }
                         final item = tagihanList.removeAt(oldIndex);
                         tagihanList.insert(newIndex, item);
                       });

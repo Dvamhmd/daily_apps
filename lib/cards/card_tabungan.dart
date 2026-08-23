@@ -537,11 +537,8 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                         child: child,
                       );
                     },
-                    onReorder: (oldIndex, newIndex) {
+                    onReorderItem: (oldIndex, newIndex) {
                       setState(() {
-                        if (newIndex > oldIndex) {
-                          newIndex -= 1;
-                        }
                         final item = tabunganList.removeAt(oldIndex);
                         tabunganList.insert(newIndex, item);
                       });

@@ -20,13 +20,13 @@ class Tabungan {
 
   factory Tabungan.fromJson(Map<String, dynamic> json) {
     return Tabungan(
-      json['nama'],
-      json['jumlah'],
+      json['nama']?.toString() ?? '',
+      (json['jumlah'] as num?)?.toInt() ?? 0,
       targetNominal: json['targetNominal'] != null
           ? (json['targetNominal'] as num).toInt()
           : null,
       targetDate: json['targetDate'] != null
-          ? DateTime.tryParse(json['targetDate'])
+          ? DateTime.tryParse(json['targetDate'].toString())
           : null,
     );
   }

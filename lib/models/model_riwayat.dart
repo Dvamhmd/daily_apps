@@ -26,14 +26,15 @@ class ModelRiwayat {
 
   factory ModelRiwayat.fromJson(Map<String, dynamic> json) {
     return ModelRiwayat(
-      id: json['id'] ?? DateTime.now().microsecondsSinceEpoch.toString(),
+      id: json['id']?.toString() ??
+          DateTime.now().microsecondsSinceEpoch.toString(),
       datetime: json['datetime'] != null
-          ? DateTime.parse(json['datetime'])
+          ? DateTime.tryParse(json['datetime'].toString()) ?? DateTime.now()
           : DateTime.now(),
-      kategori: json['kategori'] ?? '',
-      perubahan: json['perubahan'] ?? '',
-      tipe: json['tipe'] ?? 'info',
-      nominal: json['nominal'],
+      kategori: json['kategori']?.toString() ?? '',
+      perubahan: json['perubahan']?.toString() ?? '',
+      tipe: json['tipe']?.toString() ?? 'info',
+      nominal: (json['nominal'] as num?)?.toInt(),
     );
   }
 }

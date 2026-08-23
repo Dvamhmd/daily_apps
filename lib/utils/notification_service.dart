@@ -13,30 +13,27 @@ class NotificationService {
   static Future<void> initialize() async {
     if (_isInitialized) return;
 
-    // Run initialization asynchronously so it doesn't block the first frame
-    Future.microtask(() async {
-      try {
-        tz.initializeTimeZones();
+    try {
+      tz.initializeTimeZones();
 
-        const androidSettings =
-            AndroidInitializationSettings('@mipmap/launcher_icon');
-        const iosSettings = DarwinInitializationSettings(
-          requestAlertPermission: true,
-          requestBadgePermission: true,
-          requestSoundPermission: true,
-        );
+      const androidSettings =
+          AndroidInitializationSettings('@mipmap/launcher_icon');
+      const iosSettings = DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      );
 
-        const settings = InitializationSettings(
-          android: androidSettings,
-          iOS: iosSettings,
-        );
+      const settings = InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      );
 
-        await _notifications.initialize(settings: settings);
-        _isInitialized = true;
-      } catch (e) {
-        debugPrint('NotificationService initialize error: $e');
-      }
-    });
+      await _notifications.initialize(settings: settings);
+      _isInitialized = true;
+    } catch (e) {
+      debugPrint('NotificationService initialize error: $e');
+    }
   }
 
   /// Request permission explicitly for Android 13+ and iOS

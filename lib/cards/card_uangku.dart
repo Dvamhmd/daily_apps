@@ -1174,12 +1174,9 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                         child: child,
                       );
                     },
-                    onReorder: (oldIndex, newIndex) {
+                    onReorderItem: (oldIndex, newIndex) {
                       if (onlyCair) return;
                       setState(() {
-                        if (newIndex > oldIndex) {
-                          newIndex -= 1;
-                        }
                         final item = uangkuList.removeAt(oldIndex);
                         uangkuList.insert(newIndex, item);
                       });
