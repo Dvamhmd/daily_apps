@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:daily_apps/models/model_struktur.dart';
 import 'package:daily_apps/utils/custom_rule_import_helper.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
@@ -1411,7 +1410,7 @@ class _StrukturPageState extends State<StrukturPage> {
       barrierDismissible: false,
       builder: (dialogCtx) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (sbContext, setDialogState) {
             Future<void> handlePickFile() async {
               setDialogState(() => isLoading = true);
               try {
@@ -1490,11 +1489,12 @@ class _StrukturPageState extends State<StrukturPage> {
 
             Future<void> handlePasteClipboard() async {
               final data = await Clipboard.getData(Clipboard.kTextPlain);
+              if (!sbContext.mounted) return;
               if (data != null && data.text != null && data.text!.isNotEmpty) {
                 textCtrl.text = data.text!;
                 handleProcessText();
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(
+                ScaffoldMessenger.of(sbContext).showSnackBar(
                   const SnackBar(
                     content: Text('Clipboard masih kosong atau tidak berisi teks.'),
                     behavior: SnackBarBehavior.floating,
@@ -6133,11 +6133,15 @@ class _StrukturPageState extends State<StrukturPage> {
             final pemasukanList =
                 allMutasi.where((tx) => tx.isPemasukan).toList();
 
-            // Total pengeluaran & pemasukan
             final int totalPengeluaranNominal =
                 pengeluaranList.fold<int>(0, (sum, tx) => sum + tx.amount);
-            final int totalPemasukanNominal =
-                pemasukanList.fold<int>(0, (sum, tx) => sum + tx.amount);
+
+            final pemasukanDPList = pemasukanList
+                .where((tx) => tx.isDPTransaction(
+                    customRules: _data.customKodeRules))
+                .toList();
+            final int totalPemasukanDP = pemasukanDPList.fold<int>(
+                0, (sum, tx) => sum + tx.amount);
 
             // Filter data untuk Tab Laporan Keuangan
             List<StrukturTransaction> activeList;
@@ -7831,15 +7835,6 @@ class _StrukturPageState extends State<StrukturPage> {
                             .toList();
                         final int totalPemasukanNonDPNominal = pemasukanNonDPList
                             .fold<int>(0, (sum, tx) => sum + tx.amount);
-
-                        // Pemasukan Kategori DP
-                        final pemasukanDPList = pemasukanList
-                            .where((tx) => tx.isDPTransaction(
-                                customRules: _data.customKodeRules))
-                            .toList();
-                        final int totalPemasukanDP = pemasukanDPList.fold<int>(
-                            0, (sum, tx) => sum + tx.amount);
-                        final int countPemasukanDP = pemasukanDPList.length;
 
                         // Agregasi Berdasarkan Kategori Pemasukan (Non-DP) & Default Layout
                         int saldoAwalNominal = 0;

@@ -15,6 +15,13 @@ class NotificationService {
 
     try {
       tz.initializeTimeZones();
+      try {
+        tz.setLocalLocation(tz.getLocation('Asia/Jakarta'));
+      } catch (_) {
+        try {
+          tz.setLocalLocation(tz.getLocation('UTC'));
+        } catch (_) {}
+      }
 
       const androidSettings =
           AndroidInitializationSettings('@mipmap/launcher_icon');
@@ -102,7 +109,13 @@ class NotificationService {
     required DateTime scheduledDate,
   }) async {
     try {
-      final tzScheduled = tz.TZDateTime.from(scheduledDate, tz.local);
+      tz.Location loc;
+      try {
+        loc = tz.local;
+      } catch (_) {
+        loc = tz.UTC;
+      }
+      final tzScheduled = tz.TZDateTime.from(scheduledDate, loc);
 
       const androidDetails = AndroidNotificationDetails(
         'tagihan_deadline_channel',

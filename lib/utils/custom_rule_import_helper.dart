@@ -145,7 +145,7 @@ class CustomRuleImportHelper {
     return result;
   }
 
-  /// Helper utama untuk memproses baris-baris tabel menjadi List<CustomKodeRule>
+  /// Helper utama untuk memproses baris-baris tabel menjadi `List<CustomKodeRule>`
   static ImportResult parseTableRows(
     List<List<String>> rows, {
     String? defaultType,

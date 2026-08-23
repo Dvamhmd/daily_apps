@@ -1,7 +1,5 @@
-import 'dart:typed_data';
 import 'package:daily_apps/models/model_struktur.dart';
 import 'package:daily_apps/utils/custom_rule_import_helper.dart';
-import 'package:excel/excel.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
