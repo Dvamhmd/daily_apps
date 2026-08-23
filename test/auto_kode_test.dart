@@ -168,5 +168,235 @@ void main() {
       expect(data.totalPemasukanDP, equals(450000)); // 300.000 + 150.000
       expect(data.totalDanaOperasional, equals(1250000)); // 1.700.000 - 450.000
     });
+
+    test('Rincian Pemasukan calculation: Saldo Awal, Dana dari S3, Total Pemasukan Non-DP, Total Pengeluaran, Sisa Saldo, and Dana Kontribusi DP', () {
+      final customRules = [
+        CustomKodeRule(keyword: 'Saldo Awal', kode: 'Saldo Awal'),
+        CustomKodeRule(keyword: 'Dana S3', kode: 'Dana dari S3'),
+      ];
+
+      final transactions = [
+        StrukturTransaction(
+          id: '1',
+          title: 'Saldo Awal Bulan',
+          type: 'pemasukan',
+          amount: 500000,
+          note: 'Saldo Awal',
+        ),
+        StrukturTransaction(
+          id: '2',
+          title: 'Penerimaan Dana dari S3',
+          type: 'pemasukan',
+          amount: 1500000,
+          note: 'Transfer Dana S3',
+        ),
+        StrukturTransaction(
+          id: '3',
+          title: 'DP Peserta KK',
+          type: 'pemasukan',
+          amount: 750000,
+          kode: 'DP Angkatan',
+          note: 'DP Masuk',
+        ),
+        StrukturTransaction(
+          id: '4',
+          title: 'Beli Konsumsi Rapat',
+          type: 'pengeluaran',
+          amount: 300000,
+          note: 'Konsumsi',
+        ),
+        StrukturTransaction(
+          id: '5',
+          title: 'Beli ATK & Perlengkapan',
+          type: 'pengeluaran',
+          amount: 200000,
+          note: 'ATK',
+        ),
+      ];
+
+      final pemasukanList = transactions.where((tx) => tx.isPemasukan).toList();
+      final pengeluaranList = transactions.where((tx) => tx.isPengeluaran).toList();
+
+      final pemasukanNonDP = pemasukanList.where((tx) => !tx.isDPTransaction(customRules: customRules)).toList();
+      final pemasukanDP = pemasukanList.where((tx) => tx.isDPTransaction(customRules: customRules)).toList();
+
+      int saldoAwalNominal = 0;
+      int danaS3Nominal = 0;
+      final Map<String, int> pemasukanLainMap = {};
+
+      for (final tx in pemasukanNonDP) {
+        final rawKategori = tx.getDisplayKode(customRules: customRules).trim();
+        final kategoriLower = rawKategori.toLowerCase();
+        final isSaldoAwal = kategoriLower.contains('saldo awal');
+        final isDanaS3 = !isSaldoAwal &&
+            (kategoriLower.contains('dana dari s3') ||
+                kategoriLower.contains('dana s3') ||
+                kategoriLower == 's3');
+
+        if (isSaldoAwal) {
+          saldoAwalNominal += tx.amount;
+        } else if (isDanaS3) {
+          danaS3Nominal += tx.amount;
+        } else {
+          final name = rawKategori.isEmpty || rawKategori == '-' ? 'Lainnya' : rawKategori;
+          pemasukanLainMap[name] = (pemasukanLainMap[name] ?? 0) + tx.amount;
+        }
+      }
+
+      final totalPemasukanNonDP = pemasukanNonDP.fold<int>(0, (sum, tx) => sum + tx.amount);
+      final totalPemasukanDP = pemasukanDP.fold<int>(0, (sum, tx) => sum + tx.amount);
+      final totalPengeluaran = pengeluaranList.fold<int>(0, (sum, tx) => sum + tx.amount);
+      final sisaSaldo = totalPemasukanNonDP - totalPengeluaran;
+
+      expect(saldoAwalNominal, equals(500000));
+      expect(danaS3Nominal, equals(1500000));
+      expect(totalPemasukanNonDP, equals(2000000));
+      expect(totalPemasukanDP, equals(750000));
+      expect(totalPengeluaran, equals(500000));
+      expect(sisaSaldo, equals(1500000));
+    });
+
+    test('Pemasukan with unconfigured keyword goes to Lainnya and not Dana dari S3', () {
+      // Empty rules (no rule for "s3" or "dana turun dari s3")
+      final customRules = <CustomKodeRule>[];
+
+      final tx = StrukturTransaction(
+        id: '1',
+        title: 'Pemasukan',
+        type: 'pemasukan',
+        amount: 500000,
+        note: 'Dana turun dari S3',
+      );
+
+      final rawKategori = tx.getDisplayKode(customRules: customRules).trim();
+      expect(rawKategori, equals('-'));
+
+      final kategoriLower = rawKategori.toLowerCase();
+      final isSaldoAwal = kategoriLower.contains('saldo awal');
+      final isDanaS3 = !isSaldoAwal &&
+          (kategoriLower.contains('dana dari s3') ||
+              kategoriLower.contains('dana s3') ||
+              kategoriLower == 's3');
+
+      expect(isSaldoAwal, isFalse);
+      expect(isDanaS3, isFalse);
+    });
+
+    test('Tab Pengeluaran: Saldo Awal, Dana dari S3, and DP are excluded from Kategori Pengeluaran map and aggregation', () {
+      final customRules = [
+        CustomKodeRule(keyword: 'Saldo Awal', kode: 'Saldo Awal'),
+        CustomKodeRule(keyword: 'Dana S3', kode: 'Dana dari S3'),
+        CustomKodeRule(keyword: 'DP', kode: 'DP Angkatan'),
+        CustomKodeRule(keyword: 'Konsumsi', kode: 'Konsumsi'),
+        CustomKodeRule(keyword: 'ATK', kode: 'ATK'),
+      ];
+
+      final pengeluaranKategoriMap = <String, int>{};
+      final pengeluaranKategoriCountMap = <String, int>{};
+
+      // 1. Initial categories from customKodeRules (type != 'ku')
+      for (final r in customRules.where((r) => r.type != 'ku')) {
+        final name = r.kode.trim();
+        final nameLower = name.toLowerCase();
+        final bool isSaldoAwal = nameLower.contains('saldo awal');
+        final bool isDanaS3 = !isSaldoAwal &&
+            (nameLower.contains('dana dari s3') ||
+                nameLower.contains('dana s3') ||
+                nameLower == 's3');
+
+        if (name.isNotEmpty &&
+            !name.toUpperCase().contains('DP') &&
+            !isSaldoAwal &&
+            !isDanaS3 &&
+            !pengeluaranKategoriMap.containsKey(name)) {
+          pengeluaranKategoriMap[name] = 0;
+          pengeluaranKategoriCountMap[name] = 0;
+        }
+      }
+
+      expect(pengeluaranKategoriMap.containsKey('Saldo Awal'), isFalse);
+      expect(pengeluaranKategoriMap.containsKey('Dana dari S3'), isFalse);
+      expect(pengeluaranKategoriMap.containsKey('DP Angkatan'), isFalse);
+      expect(pengeluaranKategoriMap.containsKey('Konsumsi'), isTrue);
+      expect(pengeluaranKategoriMap.containsKey('ATK'), isTrue);
+
+      // 2. Transaction aggregation
+      final pengeluaranList = [
+        StrukturTransaction(
+          id: '1',
+          title: 'Konsumsi Rapat',
+          type: 'pengeluaran',
+          amount: 50000,
+          kode: 'Konsumsi',
+        ),
+        StrukturTransaction(
+          id: '2',
+          title: 'Beli ATK',
+          type: 'pengeluaran',
+          amount: 25000,
+          kode: 'ATK',
+        ),
+        StrukturTransaction(
+          id: '3',
+          title: 'Misc Saldo Awal',
+          type: 'pengeluaran',
+          amount: 10000,
+          kode: 'Saldo Awal',
+        ),
+        StrukturTransaction(
+          id: '4',
+          title: 'Misc Dana S3',
+          type: 'pengeluaran',
+          amount: 20000,
+          kode: 'Dana dari S3',
+        ),
+        StrukturTransaction(
+          id: '5',
+          title: 'DP Pengeluaran',
+          type: 'pengeluaran',
+          amount: 30000,
+          kode: 'DP Angkatan',
+        ),
+      ];
+
+      for (final tx in pengeluaranList) {
+        final rawKategori = tx.getDisplayKode(customRules: customRules).trim();
+        final kategori = rawKategori.isEmpty ? '-' : rawKategori;
+        final kategoriLower = kategori.toLowerCase();
+        final bool isSaldoAwal = kategoriLower.contains('saldo awal');
+        final bool isDanaS3 = !isSaldoAwal &&
+            (kategoriLower.contains('dana dari s3') ||
+                kategoriLower.contains('dana s3') ||
+                kategoriLower == 's3');
+
+        if (kategori.toUpperCase().contains('DP') ||
+            isSaldoAwal ||
+            isDanaS3 ||
+            tx.isDPTransaction(customRules: customRules)) {
+          continue;
+        }
+
+        String matchedKey = kategori;
+        for (final k in pengeluaranKategoriMap.keys) {
+          if (k.toLowerCase() == kategori.toLowerCase()) {
+            matchedKey = k;
+            break;
+          }
+        }
+        pengeluaranKategoriMap[matchedKey] =
+            (pengeluaranKategoriMap[matchedKey] ?? 0) + tx.amount;
+        pengeluaranKategoriCountMap[matchedKey] =
+            (pengeluaranKategoriCountMap[matchedKey] ?? 0) + 1;
+      }
+
+      expect(pengeluaranKategoriMap['Konsumsi'], equals(50000));
+      expect(pengeluaranKategoriCountMap['Konsumsi'], equals(1));
+      expect(pengeluaranKategoriMap['ATK'], equals(25000));
+      expect(pengeluaranKategoriCountMap['ATK'], equals(1));
+      expect(pengeluaranKategoriMap.containsKey('Saldo Awal'), isFalse);
+      expect(pengeluaranKategoriMap.containsKey('Dana dari S3'), isFalse);
+      expect(pengeluaranKategoriMap.containsKey('DP Angkatan'), isFalse);
+    });
   });
 }
+

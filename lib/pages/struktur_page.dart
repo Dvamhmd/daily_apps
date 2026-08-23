@@ -651,45 +651,46 @@ class _StrukturPageState extends State<StrukturPage> {
                   Row(
                     children: [
                       Expanded(
-                        child: Container(
-                          height: 40,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                          ),
-                          child: TextField(
-                            controller: searchCtrl,
-                            textAlignVertical: TextAlignVertical.center,
-                            onChanged: (val) {
-                              setModalState(() {
-                                searchQuery = val.trim();
-                              });
-                            },
-                            style: const TextStyle(fontSize: 12),
-                            decoration: InputDecoration(
-                              isDense: true,
-                              hintText: selectedTab == 'ku'
-                                  ? 'Cari kata kunci / KU...'
-                                  : 'Cari kata kunci / Kategori...',
-                              hintStyle: TextStyle(
-                                  fontSize: 12, color: Colors.grey[400]),
-                              prefixIcon: Icon(Icons.search_rounded,
-                                  size: 18, color: Colors.grey[400]),
-                              suffixIcon: searchQuery.isNotEmpty
-                                  ? IconButton(
-                                      icon: const Icon(Icons.clear_rounded,
-                                          size: 16),
-                                      onPressed: () {
-                                        searchCtrl.clear();
-                                        setModalState(() => searchQuery = '');
-                                      },
-                                    )
-                                  : null,
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 0),
+                        child: TextField(
+                          controller: searchCtrl,
+                          onChanged: (val) {
+                            setModalState(() {
+                              searchQuery = val.trim();
+                            });
+                          },
+                          style: const TextStyle(fontSize: 12),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            filled: true,
+                            fillColor: const Color(0xFFF8FAFC),
+                            hintText: selectedTab == 'ku'
+                                ? 'Cari kata kunci / KU...'
+                                : 'Cari kata kunci / Kategori...',
+                            hintStyle: TextStyle(
+                                fontSize: 12, color: Colors.grey[400]),
+                            prefixIcon: Icon(Icons.search_rounded,
+                                size: 18, color: Colors.grey[400]),
+                            suffixIcon: searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear_rounded,
+                                        size: 16),
+                                    onPressed: () {
+                                      searchCtrl.clear();
+                                      setModalState(() => searchQuery = '');
+                                    },
+                                  )
+                                : null,
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 10),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide:
+                                  const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFF6366F1), width: 1.2),
                             ),
                           ),
                         ),
@@ -752,32 +753,43 @@ class _StrukturPageState extends State<StrukturPage> {
                           ],
                         ),
                         const SizedBox(height: 6),
-                        Container(
-                          height: 38,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                                color: const Color(0xFF10B981)
-                                    .withValues(alpha: 0.4)),
+                        TextField(
+                          controller: testCtrl,
+                          onChanged: (val) {
+                            setModalState(() {
+                              testInput = val;
+                            });
+                          },
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF1E293B),
                           ),
-                          child: TextField(
-                            controller: testCtrl,
-                            textAlignVertical: TextAlignVertical.center,
-                            onChanged: (val) {
-                              setModalState(() {
-                                testInput = val;
-                              });
-                            },
-                            style: const TextStyle(fontSize: 12),
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              hintText: 'Ketik contoh keterangan di sini...',
-                              hintStyle: TextStyle(fontSize: 11.5),
-                              contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 0),
-                              border: InputBorder.none,
+                          decoration: InputDecoration(
+                            isDense: true,
+                            filled: true,
+                            fillColor: Colors.white,
+                            hintText: 'Ketik contoh keterangan di sini...',
+                            hintStyle: const TextStyle(
+                              fontSize: 11.5,
+                              color: Color(0xFF94A3B8),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 9,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                color: const Color(0xFF10B981)
+                                    .withValues(alpha: 0.4),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                color: Color(0xFF10B981),
+                                width: 1.2,
+                              ),
                             ),
                           ),
                         ),
@@ -1801,9 +1813,12 @@ class _StrukturPageState extends State<StrukturPage> {
     final noteCtrl = TextEditingController();
 
     final amountKey = GlobalKey();
+    final noteKey = GlobalKey();
     final amountFocus = FocusNode();
+    final noteFocus = FocusNode();
 
     bool amountHasError = false;
+    bool noteHasError = false;
 
     showModalBottomSheet(
       context: context,
@@ -2101,31 +2116,78 @@ class _StrukturPageState extends State<StrukturPage> {
 
                     const SizedBox(height: 14),
 
-                    // 4. Keterangan / Catatan Tambahan
-                    const Text('4. Keterangan (Opsional):',
+                    // 4. Keterangan / Catatan (Wajib)
+                    const Text('4. Keterangan Keperluan / Sumber (Wajib):',
                         style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF334155))),
                     const SizedBox(height: 6),
-                    TextField(
-                      controller: noteCtrl,
-                      decoration: InputDecoration(
-                        hintText: 'Catatan tambahan / rincian pemasukan (contoh: DP KK Barqi, Donasi)',
-                        hintStyle: const TextStyle(fontSize: 12),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
+                    Container(
+                      key: noteKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            controller: noteCtrl,
+                            focusNode: noteFocus,
+                            decoration: InputDecoration(
+                              hintText:
+                                  'Contoh: DP KK Barqi, Donasi Hamba Allah, Kas Masuk',
+                              hintStyle: const TextStyle(fontSize: 12),
+                              filled: true,
+                              fillColor: const Color(0xFFF8FAFC),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 12),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: noteHasError
+                                      ? Colors.redAccent
+                                      : const Color(0xFFE2E8F0),
+                                  width: noteHasError ? 1.6 : 1.0,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: noteHasError
+                                      ? Colors.redAccent
+                                      : const Color(0xFFE2E8F0),
+                                  width: noteHasError ? 1.6 : 1.0,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: noteHasError
+                                      ? Colors.redAccent
+                                      : const Color(0xFF059669),
+                                  width: 1.8,
+                                ),
+                              ),
+                            ),
+                            onChanged: (val) {
+                              if (noteHasError && val.trim().isNotEmpty) {
+                                noteHasError = false;
+                              }
+                              setModalState(() {});
+                            },
+                          ),
+                          if (noteHasError)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 4, left: 4),
+                              child: Text(
+                                '⚠️ Keterangan pemasukan wajib diisi',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: Colors.redAccent,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                      onChanged: (val) {
-                        setModalState(() {});
-                      },
                     ),
 
                     if (nominal > 0) ...[
@@ -2190,14 +2252,36 @@ class _StrukturPageState extends State<StrukturPage> {
                             return;
                           }
 
+                          if (noteCtrl.text.trim().isEmpty) {
+                            setModalState(() => noteHasError = true);
+                            if (noteKey.currentContext != null) {
+                              Scrollable.ensureVisible(
+                                noteKey.currentContext!,
+                                duration: const Duration(milliseconds: 350),
+                                curve: Curves.easeInOut,
+                                alignment: 0.3,
+                              );
+                            }
+                            noteFocus.requestFocus();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('⚠️ Keterangan pemasukan wajib diisi!'),
+                                backgroundColor: Colors.redAccent,
+                                behavior: SnackBarBehavior.floating,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                            return;
+                          }
+
                           final noteText = noteCtrl.text.trim();
                           final autoKu =
                               StrukturTransaction.resolveKuFromText(
-                                  noteText.isNotEmpty ? noteText : 'Pemasukan',
+                                  noteText,
                                   customRules: _data.customKodeRules);
                           final autoKode =
                               StrukturTransaction.resolveKodeFromText(
-                                  noteText.isNotEmpty ? noteText : 'Pemasukan',
+                                  noteText,
                                   customRules: _data.customKodeRules);
 
                           setState(() {
@@ -2216,14 +2300,12 @@ class _StrukturPageState extends State<StrukturPage> {
                                 id: DateTime.now()
                                     .microsecondsSinceEpoch
                                     .toString(),
-                                title: noteText.isNotEmpty
-                                    ? noteText
-                                    : 'Pemasukan Dana',
+                                title: noteText,
                                 type: 'pemasukan',
                                 targetAccount: targetWadah,
                                 amount: nominal,
                                 adminFee: 0,
-                                note: noteText.isNotEmpty ? noteText : null,
+                                note: noteText,
                                 ku: autoKu != '-' ? autoKu : null,
                                 kode: autoKode != '-' ? autoKode : null,
                                 timestamp: selectedDate,
@@ -2270,7 +2352,7 @@ class _StrukturPageState extends State<StrukturPage> {
   }
 
   // --- MODAL CATAT PENGELUARAN DANA ---
-  void _showPengeluaranDanaModal({String initialSource = 'cash'}) {
+  void _showPengeluaranDanaModal({String initialSource = 'rekening'}) {
     DateTime selectedDate = DateTime.now();
     if (_selectedMonth.year != DateTime.now().year ||
         _selectedMonth.month != DateTime.now().month) {
@@ -4767,6 +4849,14 @@ class _StrukturPageState extends State<StrukturPage> {
       bg = const Color(0xFFE0F2FE);
       fg = const Color(0xFF0369A1);
       border = const Color(0xFFBAE6FD);
+    } else if (lower.contains('saldo awal')) {
+      bg = const Color(0xFFE0F2FE);
+      fg = const Color(0xFF0369A1);
+      border = const Color(0xFFBAE6FD);
+    } else if (lower.contains('dana dari s3') || lower.contains('s3')) {
+      bg = const Color(0xFFF3E8FF);
+      fg = const Color(0xFF7E22CE);
+      border = const Color(0xFFE9D5FF);
     } else if (kode == '-' || kode.isEmpty) {
       bg = const Color(0xFFF8FAFC);
       fg = const Color(0xFF94A3B8);
@@ -5143,9 +5233,10 @@ class _StrukturPageState extends State<StrukturPage> {
     );
   }
 
-  // --- MODAL DETAIL TABEL KEUANGAN LENGKAP & MENYELURUH (DENGAN SUB KOLOM NOMINAL DEBIT & KREDIT) ---
+  // --- MODAL DETAIL TABEL KEUANGAN (3 TAB: LAPORAN KEUANGAN, RINCIAN PENGELUARAN, RINCIAN PEMASUKAN) ---
   void _showDetailTabelKeuanganModal() {
-    String selectedTab = 'semua'; // 'semua', 'pengeluaran', 'pemasukan'
+    String mainTab = 'laporan'; // 'laporan', 'pengeluaran', 'pemasukan'
+    String selectedSubTab = 'semua'; // 'semua', 'pengeluaran', 'pemasukan' (untuk Laporan Keuangan)
     String searchQuery = '';
     final searchCtrl = TextEditingController();
 
@@ -5168,10 +5259,17 @@ class _StrukturPageState extends State<StrukturPage> {
             final pemasukanList =
                 allMutasi.where((tx) => tx.isPemasukan).toList();
 
+            // Total pengeluaran & pemasukan
+            final int totalPengeluaranNominal =
+                pengeluaranList.fold<int>(0, (sum, tx) => sum + tx.amount);
+            final int totalPemasukanNominal =
+                pemasukanList.fold<int>(0, (sum, tx) => sum + tx.amount);
+
+            // Filter data untuk Tab Laporan Keuangan
             List<StrukturTransaction> activeList;
-            if (selectedTab == 'pengeluaran') {
+            if (selectedSubTab == 'pengeluaran') {
               activeList = pengeluaranList;
-            } else if (selectedTab == 'pemasukan') {
+            } else if (selectedSubTab == 'pemasukan') {
               activeList = pemasukanList;
             } else {
               activeList = allMutasi;
@@ -5199,28 +5297,333 @@ class _StrukturPageState extends State<StrukturPage> {
               }).toList();
             }
 
-            int totalNominal = 0;
+            int totalLaporanNominal = 0;
             for (final tx in activeList) {
-              totalNominal += tx.amount;
+              totalLaporanNominal += tx.amount;
             }
 
             const headerStyle = TextStyle(
-              fontSize: 11,
+              fontSize: 9.5,
               fontWeight: FontWeight.bold,
               color: Color(0xFF78350F),
             );
 
+            // --- TABEL SUMMARY BUILDER DUA KOLOM (KATEGORI / KU VS NOMINAL) ---
+            Widget buildSummaryTwoColumnTable({
+              required String tableTitle,
+              required String colHeaderLeft,
+              required String colHeaderRight,
+              required Map<String, int> dataMap,
+              required Map<String, int> countMap,
+              required int totalAmount,
+              required bool isPengeluaran,
+              required bool isKuType,
+            }) {
+              final entries = dataMap.entries.toList();
+
+              return Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: const Color(0xFFFDE68A),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF78350F).withValues(alpha: 0.04),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Header Card Judul Tabel
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFFFBEB),
+                        borderRadius:
+                            BorderRadius.vertical(top: Radius.circular(13)),
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Color(0xFFFDE68A),
+                            width: 1.2,
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFDE68A),
+                              borderRadius: BorderRadius.circular(7),
+                            ),
+                            child: Icon(
+                              isKuType
+                                  ? Icons.account_balance_wallet_rounded
+                                  : Icons.category_rounded,
+                              size: 15,
+                              color: const Color(0xFFB45309),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              tableTitle,
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF78350F),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Header Kolom (2 Kolom)
+                    Container(
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFEF3C7),
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Color(0xFFFDE68A),
+                            width: 1.2,
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 5,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
+                              child: Text(
+                                colHeaderLeft,
+                                style: headerStyle,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            width: 1,
+                            height: 36,
+                            color: const Color(0xFFFDE68A),
+                          ),
+                          Expanded(
+                            flex: 4,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                colHeaderRight,
+                                style: headerStyle,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Data Rows
+                    if (entries.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        child: Center(
+                          child: Text(
+                            'Belum ada data ${isPengeluaran ? "pengeluaran" : "pemasukan"}',
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              color: Color(0xFF94A3B8),
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      ...List.generate(entries.length, (index) {
+                        final entry = entries[index];
+                        final isEven = index % 2 == 0;
+                        final count = countMap[entry.key] ?? 0;
+                        final amount = entry.value;
+
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: isEven
+                                ? const Color(0xFFFFFDF5)
+                                : const Color(0xFFFFF7ED),
+                            border: Border(
+                              bottom: BorderSide(
+                                color: const Color(0xFFFDE68A)
+                                    .withValues(alpha: 0.6),
+                                width: 0.8,
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              // Kolom Kiri: Kategori / KU
+                              Expanded(
+                                flex: 5,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 9),
+                                  child: Row(
+                                    children: [
+                                      if (isKuType)
+                                        _buildKuBadge(entry.key, isLarge: false)
+                                      else
+                                        _buildKodeBadge(entry.key,
+                                            isLarge: false),
+                                      const SizedBox(width: 8),
+                                      if (count > 0)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 1.5),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF1F5F9),
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: const Color(0xFFE2E8F0),
+                                              width: 0.8,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            '$count tx',
+                                            style: const TextStyle(
+                                              fontSize: 9.5,
+                                              color: Color(0xFF64748B),
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                width: 1,
+                                height: 42,
+                                color: const Color(0xFFFDE68A)
+                                    .withValues(alpha: 0.6),
+                              ),
+                              // Kolom Kanan: Pengeluaran / Pemasukan Nominal
+                              Expanded(
+                                flex: 4,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 9),
+                                  child: Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      'Rp ${RupiahFormatter.format(amount)}',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: amount > 0
+                                            ? (isPengeluaran
+                                                ? const Color(0xFFE11D48)
+                                                : const Color(0xFF059669))
+                                            : const Color(0xFF94A3B8),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+
+                    // Baris Total
+                    Container(
+                      decoration: BoxDecoration(
+                        color: isPengeluaran
+                            ? const Color(0xFFFFF1F2)
+                            : const Color(0xFFF0FDF4),
+                        borderRadius: const BorderRadius.vertical(
+                            bottom: Radius.circular(13)),
+                        border: Border(
+                          top: BorderSide(
+                            color: isPengeluaran
+                                ? const Color(0xFFFECDD3)
+                                : const Color(0xFFA7F3D0),
+                            width: 1.2,
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 5,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
+                              child: Text(
+                                'Total',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: isPengeluaran
+                                      ? const Color(0xFF9F1239)
+                                      : const Color(0xFF065F46),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Container(
+                            width: 1,
+                            height: 38,
+                            color: isPengeluaran
+                                ? const Color(0xFFFECDD3)
+                                : const Color(0xFFA7F3D0),
+                          ),
+                          Expanded(
+                            flex: 4,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
+                              child: Align(
+                                alignment: Alignment.centerRight,
+                                child: Text(
+                                  'Rp ${RupiahFormatter.format(totalAmount)}',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: isPengeluaran
+                                        ? const Color(0xFFE11D48)
+                                        : const Color(0xFF059669),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
             return Container(
-              height: MediaQuery.of(context).size.height * 0.92,
+              height: MediaQuery.of(context).size.height * 0.93,
               decoration: const BoxDecoration(
                 color: Color(0xFFFFFDF5),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Column(
                 children: [
-                  // Top Drag Handle & Header
+                  // --- TOP DRAG HANDLE & HEADER MODAL ---
                   Container(
-                    padding: const EdgeInsets.fromLTRB(18, 12, 14, 12),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 14, 12),
                     decoration: const BoxDecoration(
                       color: Color(0xFFFFFBEB),
                       borderRadius:
@@ -5241,7 +5644,7 @@ class _StrukturPageState extends State<StrukturPage> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
                         Row(
                           children: [
                             Container(
@@ -5262,7 +5665,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Text(
-                                    'Tabel Lengkap Keuangan Struktur',
+                                    'Detail Tabel Keuangan Struktur',
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -5270,7 +5673,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                     ),
                                   ),
                                   Text(
-                                    'Periode: $monthName $year • Detail Kolom & Sub Kolom Nominal',
+                                    'Periode: $monthName $year • 3 Tab Laporan & Rincian',
                                     style: const TextStyle(
                                       fontSize: 11.5,
                                       color: Color(0xFF92400E),
@@ -5280,7 +5683,8 @@ class _StrukturPageState extends State<StrukturPage> {
                               ),
                             ),
                             IconButton(
-                              onPressed: () => Navigator.pop(bottomSheetContext),
+                              onPressed: () =>
+                                  Navigator.pop(bottomSheetContext),
                               icon: const Icon(Icons.close_rounded,
                                   color: Color(0xFF78350F)),
                             ),
@@ -5288,721 +5692,1988 @@ class _StrukturPageState extends State<StrukturPage> {
                         ),
                         const SizedBox(height: 12),
 
-                        // Search Bar
+                        // --- 3 TAB UTAMA (Laporan Keuangan, Rincian Pengeluaran, Rincian Pemasukan) ---
                         Container(
-                          height: 40,
+                          padding: const EdgeInsets.all(3.5),
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFFDE68A)),
-                          ),
-                          child: TextField(
-                            controller: searchCtrl,
-                            onChanged: (val) {
-                              setModalState(() {
-                                searchQuery = val.trim();
-                              });
-                            },
-                            style: const TextStyle(fontSize: 12),
-                            decoration: InputDecoration(
-                              hintText:
-                                  'Cari keterangan, KU, Kategori, nominal...',
-                              hintStyle: const TextStyle(
-                                  fontSize: 11.5, color: Color(0xFF94A3B8)),
-                              prefixIcon: const Icon(Icons.search_rounded,
-                                  size: 18, color: Color(0xFFB45309)),
-                              suffixIcon: searchQuery.isNotEmpty
-                                  ? IconButton(
-                                      icon: const Icon(Icons.clear_rounded,
-                                          size: 16, color: Color(0xFF94A3B8)),
-                                      onPressed: () {
-                                        searchCtrl.clear();
-                                        setModalState(() {
-                                          searchQuery = '';
-                                        });
-                                      },
-                                    )
-                                  : null,
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 10),
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFFFDE68A),
+                              width: 1,
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 10),
+                          child: Row(
+                            children: [
+                              // 1. Tab Laporan Keuangan
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () => setModalState(
+                                      () => mainTab = 'laporan'),
+                                  borderRadius: BorderRadius.circular(9),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: mainTab == 'laporan'
+                                          ? Colors.white
+                                          : Colors.transparent,
+                                      borderRadius:
+                                          BorderRadius.circular(9),
+                                      boxShadow: mainTab == 'laporan'
+                                          ? [
+                                              BoxShadow(
+                                                color: const Color(0xFF78350F)
+                                                    .withValues(alpha: 0.1),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 1),
+                                              ),
+                                            ]
+                                          : null,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'Laporan Keuangan',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: mainTab == 'laporan'
+                                              ? FontWeight.bold
+                                              : FontWeight.w600,
+                                          color: mainTab == 'laporan'
+                                              ? const Color(0xFF78350F)
+                                              : const Color(0xFF92400E),
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
 
-                        // Filter Tabs (Semua, Pengeluaran, Pemasukan)
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildFilterChip(
-                                label: 'Semua (${allMutasi.length})',
-                                isSelected: selectedTab == 'semua',
-                                activeColor: const Color(0xFFB45309),
-                                onTap: () => setModalState(
-                                    () => selectedTab = 'semua'),
+                              // 2. Tab Rincian Pengeluaran
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () => setModalState(
+                                      () => mainTab = 'pengeluaran'),
+                                  borderRadius: BorderRadius.circular(9),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: mainTab == 'pengeluaran'
+                                          ? Colors.white
+                                          : Colors.transparent,
+                                      borderRadius:
+                                          BorderRadius.circular(9),
+                                      boxShadow: mainTab == 'pengeluaran'
+                                          ? [
+                                              BoxShadow(
+                                                color: const Color(0xFFE11D48)
+                                                    .withValues(alpha: 0.12),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 1),
+                                              ),
+                                            ]
+                                          : null,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'Rincian Pengeluaran',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: mainTab == 'pengeluaran'
+                                              ? FontWeight.bold
+                                              : FontWeight.w600,
+                                          color: mainTab == 'pengeluaran'
+                                              ? const Color(0xFFBE123C)
+                                              : const Color(0xFF92400E),
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: _buildFilterChip(
-                                label:
-                                    'Pengeluaran (${pengeluaranList.length})',
-                                isSelected: selectedTab == 'pengeluaran',
-                                activeColor: const Color(0xFFE11D48),
-                                onTap: () => setModalState(
-                                    () => selectedTab = 'pengeluaran'),
+                              const SizedBox(width: 4),
+
+                              // 3. Tab Rincian Pemasukan
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () => setModalState(
+                                      () => mainTab = 'pemasukan'),
+                                  borderRadius: BorderRadius.circular(9),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: mainTab == 'pemasukan'
+                                          ? Colors.white
+                                          : Colors.transparent,
+                                      borderRadius:
+                                          BorderRadius.circular(9),
+                                      boxShadow: mainTab == 'pemasukan'
+                                          ? [
+                                              BoxShadow(
+                                                color: const Color(0xFF059669)
+                                                    .withValues(alpha: 0.12),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 1),
+                                              ),
+                                            ]
+                                          : null,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'Rincian Pemasukkan',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: mainTab == 'pemasukan'
+                                              ? FontWeight.bold
+                                              : FontWeight.w600,
+                                          color: mainTab == 'pemasukan'
+                                              ? const Color(0xFF047857)
+                                              : const Color(0xFF92400E),
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: _buildFilterChip(
-                                label: 'Pemasukan (${pemasukanList.length})',
-                                isSelected: selectedTab == 'pemasukan',
-                                activeColor: const Color(0xFF059669),
-                                onTap: () => setModalState(
-                                    () => selectedTab = 'pemasukan'),
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
 
-                  // Table Content with Excel-like merged Nominal sub-columns
+                  // ==========================================
+                  // KONTEN BODY MODAL BERDASARKAN MAIN TAB
+                  // ==========================================
                   Expanded(
-                    child: activeList.isEmpty
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(32),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.table_chart_outlined,
-                                    size: 48,
-                                    color: Color(0xFFD97706),
+                    child: Builder(
+                      builder: (context) {
+                        // ------------------------------------
+                        // TAB 1: LAPORAN KEUANGAN (EXCEL-STYLE)
+                        // ------------------------------------
+                        if (mainTab == 'laporan') {
+                          return Column(
+                            children: [
+                              // Filter & Search Header Tab Laporan Keuangan
+                              Container(
+                                padding: const EdgeInsets.fromLTRB(
+                                    16, 10, 16, 10),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFFFFBEB),
+                                  border: Border(
+                                    bottom: BorderSide(
+                                        color: Color(0xFFFDE68A)),
                                   ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    searchQuery.isNotEmpty
-                                        ? 'Tidak ditemukan data "$searchQuery"'
-                                        : 'Belum ada data ${selectedTab == "semua" ? "transaksi" : selectedTab == "pengeluaran" ? "pengeluaran" : "pemasukan"}',
-                                    style: const TextStyle(
-                                      fontSize: 13.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF78350F),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  const Text(
-                                    'Gunakan tombol pencatatan untuk menambah data keuangan.',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Color(0xFF92400E),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        : SingleChildScrollView(
-                            physics: const BouncingScrollPhysics(),
-                            padding: const EdgeInsets.all(12),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                      color: const Color(0xFFFDE68A),
-                                      width: 1.2),
                                 ),
-                                child: SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  physics: const BouncingScrollPhysics(),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      // --- EXCEL STYLE TWO-TIER HEADER ---
-                                      Container(
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFFFEF3C7),
-                                          border: Border(
-                                            bottom: BorderSide(
-                                                color: Color(0xFFFDE68A),
-                                                width: 1.2),
+                                child: Column(
+                                  children: [
+                                    // Search Bar
+                                    Container(
+                                      height: 38,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                        border: Border.all(
+                                            color: const Color(0xFFFDE68A)),
+                                      ),
+                                      child: TextField(
+                                        controller: searchCtrl,
+                                        onChanged: (val) {
+                                          setModalState(() {
+                                            searchQuery = val.trim();
+                                          });
+                                        },
+                                        style: const TextStyle(fontSize: 12),
+                                        decoration: InputDecoration(
+                                          hintText:
+                                              'Cari keterangan, KU, Kategori, nominal...',
+                                          hintStyle: const TextStyle(
+                                              fontSize: 11.5,
+                                              color: Color(0xFF94A3B8)),
+                                          prefixIcon: const Icon(
+                                              Icons.search_rounded,
+                                              size: 18,
+                                              color: Color(0xFFB45309)),
+                                          suffixIcon: searchQuery.isNotEmpty
+                                              ? IconButton(
+                                                  icon: const Icon(
+                                                      Icons.clear_rounded,
+                                                      size: 16,
+                                                      color: Color(0xFF94A3B8)),
+                                                  onPressed: () {
+                                                    searchCtrl.clear();
+                                                    setModalState(() {
+                                                      searchQuery = '';
+                                                    });
+                                                  },
+                                                )
+                                              : null,
+                                          border: InputBorder.none,
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                  horizontal: 10, vertical: 8),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+
+                                    // Filter Sub Chips (Semua, Pengeluaran, Pemasukan)
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: _buildFilterChip(
+                                            label: 'Semua (${allMutasi.length})',
+                                            isSelected:
+                                                selectedSubTab == 'semua',
+                                            activeColor:
+                                                const Color(0xFFB45309),
+                                            onTap: () => setModalState(
+                                                () => selectedSubTab = 'semua'),
                                           ),
                                         ),
-                                        child: Row(
-                                          children: [
-                                            // 1. No (44)
-                                            const SizedBox(
-                                              width: 44,
-                                              height: 52,
-                                              child: Center(
-                                                child: Text('No',
-                                                    style: headerStyle),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: _buildFilterChip(
+                                            label:
+                                                'Pengeluaran (${pengeluaranList.length})',
+                                            isSelected: selectedSubTab ==
+                                                'pengeluaran',
+                                            activeColor:
+                                                const Color(0xFFE11D48),
+                                            onTap: () => setModalState(() =>
+                                                selectedSubTab = 'pengeluaran'),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: _buildFilterChip(
+                                            label:
+                                                'Pemasukan (${pemasukanList.length})',
+                                            isSelected: selectedSubTab ==
+                                                'pemasukan',
+                                            activeColor:
+                                                const Color(0xFF059669),
+                                            onTap: () => setModalState(() =>
+                                                selectedSubTab = 'pemasukan'),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              // Tabel Content Laporan Keuangan
+                              Expanded(
+                                child: activeList.isEmpty
+                                    ? Center(
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(32),
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              const Icon(
+                                                Icons.table_chart_outlined,
+                                                size: 48,
+                                                color: Color(0xFFD97706),
                                               ),
-                                            ),
-                                            Container(
-                                                width: 1,
-                                                height: 52,
-                                                color: const Color(0xFFFDE68A)),
-                                            // 2. Tanggal (90)
-                                            const SizedBox(
-                                              width: 90,
-                                              height: 52,
-                                              child: Center(
-                                                child: Text('Tanggal',
-                                                    style: headerStyle),
+                                              const SizedBox(height: 12),
+                                              Text(
+                                                searchQuery.isNotEmpty
+                                                    ? 'Tidak ditemukan data "$searchQuery"'
+                                                    : 'Belum ada data ${selectedSubTab == "semua" ? "transaksi" : selectedSubTab == "pengeluaran" ? "pengeluaran" : "pemasukan"}',
+                                                style: const TextStyle(
+                                                  fontSize: 13.5,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF78350F),
+                                                ),
                                               ),
-                                            ),
-                                            Container(
-                                                width: 1,
-                                                height: 52,
-                                                color: const Color(0xFFFDE68A)),
-                                            // 3. KU (80) [Baru - di samping kiri Kategori]
-                                            const SizedBox(
-                                              width: 80,
-                                              height: 52,
-                                              child: Center(
-                                                child: Text('KU',
-                                                    style: headerStyle),
+                                              const SizedBox(height: 4),
+                                              const Text(
+                                                'Gunakan tombol pencatatan untuk menambah data keuangan.',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Color(0xFF92400E),
+                                                ),
                                               ),
+                                            ],
+                                          ),
+                                        ),
+                                      )
+                                    : SingleChildScrollView(
+                                        physics: const BouncingScrollPhysics(),
+                                        padding: const EdgeInsets.all(12),
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              border: Border.all(
+                                                  color:
+                                                      const Color(0xFFFDE68A),
+                                                  width: 1.2),
                                             ),
-                                            Container(
-                                                width: 1,
-                                                height: 52,
-                                                color: const Color(0xFFFDE68A)),
-                                            // 4. Kategori (145) [Ubah dari Kode -> Kategori]
-                                            const SizedBox(
-                                              width: 145,
-                                              height: 52,
-                                              child: Center(
-                                                child: Text('Kategori',
-                                                    style: headerStyle),
-                                              ),
-                                            ),
-                                            Container(
-                                                width: 1,
-                                                height: 52,
-                                                color: const Color(0xFFFDE68A)),
-                                            // 5. Keterangan (220)
-                                            const SizedBox(
-                                              width: 220,
-                                              height: 52,
-                                              child: Center(
-                                                child: Text('Keterangan',
-                                                    style: headerStyle),
-                                              ),
-                                            ),
-                                            Container(
-                                                width: 1,
-                                                height: 52,
-                                                color: const Color(0xFFFDE68A)),
-                                            // 6. Jumlah (110)
-                                            const SizedBox(
-                                              width: 110,
-                                              height: 52,
-                                              child: Center(
-                                                child: Text('Jumlah',
-                                                    style: headerStyle),
-                                              ),
-                                            ),
-                                            Container(
-                                                width: 1,
-                                                height: 52,
-                                                color: const Color(0xFFFDE68A)),
-                                            // 7. Nominal (Merged 2-Cell Sub-Columns: Debit & Kredit)
-                                            SizedBox(
-                                              width: 236,
-                                              height: 52,
+                                            child: SingleChildScrollView(
+                                              scrollDirection: Axis.horizontal,
+                                              physics:
+                                                  const BouncingScrollPhysics(),
                                               child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
                                                 children: [
+                                                  // --- EXCEL STYLE TWO-TIER HEADER ---
                                                   Container(
-                                                    height: 25,
-                                                    alignment: Alignment.center,
                                                     decoration:
                                                         const BoxDecoration(
+                                                      color: Color(0xFFFEF3C7),
                                                       border: Border(
                                                         bottom: BorderSide(
-                                                          color:
-                                                              Color(0xFFFDE68A),
-                                                          width: 1,
-                                                        ),
+                                                            color: Color(
+                                                                0xFFFDE68A),
+                                                            width: 1.2),
                                                       ),
                                                     ),
-                                                    child: const Text(
-                                                      'Nominal',
-                                                      style: headerStyle,
+                                                    child: Row(
+                                                      children: [
+                                                        // 1. No (32)
+                                                        const SizedBox(
+                                                          width: 32,
+                                                          height: 42,
+                                                          child: Center(
+                                                            child: Text('No',
+                                                                style:
+                                                                    headerStyle),
+                                                          ),
+                                                        ),
+                                                        Container(
+                                                            width: 1,
+                                                            height: 42,
+                                                            color: const Color(
+                                                                0xFFFDE68A)),
+                                                        // 2. Tanggal (84)
+                                                        const SizedBox(
+                                                          width: 84,
+                                                          height: 42,
+                                                          child: Center(
+                                                            child: Text(
+                                                                'Tanggal',
+                                                                style:
+                                                                    headerStyle),
+                                                          ),
+                                                        ),
+                                                        Container(
+                                                            width: 1,
+                                                            height: 42,
+                                                            color: const Color(
+                                                                0xFFFDE68A)),
+                                                        // 3. KU (95)
+                                                        const SizedBox(
+                                                          width: 95,
+                                                          height: 42,
+                                                          child: Center(
+                                                            child: Text('KU',
+                                                                style:
+                                                                    headerStyle),
+                                                          ),
+                                                        ),
+                                                        Container(
+                                                            width: 1,
+                                                            height: 42,
+                                                            color: const Color(
+                                                                0xFFFDE68A)),
+                                                        // 4. Kategori (135)
+                                                        const SizedBox(
+                                                          width: 135,
+                                                          height: 42,
+                                                          child: Center(
+                                                            child: Text(
+                                                                'Kategori',
+                                                                style:
+                                                                    headerStyle),
+                                                          ),
+                                                        ),
+                                                        Container(
+                                                            width: 1,
+                                                            height: 42,
+                                                            color: const Color(
+                                                                0xFFFDE68A)),
+                                                        // 5. Keterangan (200)
+                                                        const SizedBox(
+                                                          width: 200,
+                                                          height: 42,
+                                                          child: Center(
+                                                            child: Text(
+                                                                'Keterangan',
+                                                                style:
+                                                                    headerStyle),
+                                                          ),
+                                                        ),
+                                                        Container(
+                                                            width: 1,
+                                                            height: 42,
+                                                            color: const Color(
+                                                                0xFFFDE68A)),
+                                                        // 6. Jumlah (100)
+                                                        const SizedBox(
+                                                          width: 100,
+                                                          height: 42,
+                                                          child: Center(
+                                                            child: Text(
+                                                                'Jumlah',
+                                                                style:
+                                                                    headerStyle),
+                                                          ),
+                                                        ),
+                                                        Container(
+                                                            width: 1,
+                                                            height: 42,
+                                                            color: const Color(
+                                                                0xFFFDE68A)),
+                                                        // 7. Nominal (Merged Debit & Kredit) (205)
+                                                        SizedBox(
+                                                          width: 205,
+                                                          height: 42,
+                                                          child: Column(
+                                                            children: [
+                                                              Container(
+                                                                height: 20,
+                                                                alignment:
+                                                                    Alignment
+                                                                        .center,
+                                                                decoration:
+                                                                    const BoxDecoration(
+                                                                  border: Border(
+                                                                    bottom:
+                                                                        BorderSide(
+                                                                      color: Color(
+                                                                          0xFFFDE68A),
+                                                                      width: 1,
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                child:
+                                                                    const Text(
+                                                                  'Nominal',
+                                                                  style:
+                                                                      headerStyle,
+                                                                ),
+                                                              ),
+                                                              Row(
+                                                                children: [
+                                                                  const SizedBox(
+                                                                    width: 102,
+                                                                    height: 21,
+                                                                    child:
+                                                                        Center(
+                                                                      child:
+                                                                          Text(
+                                                                        'Debit',
+                                                                        style: TextStyle(
+                                                                          fontSize:
+                                                                              9.5,
+                                                                          fontWeight:
+                                                                              FontWeight.bold,
+                                                                          color: Color(
+                                                                              0xFF047857),
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                  Container(
+                                                                    width: 1,
+                                                                    height: 21,
+                                                                    color: const Color(
+                                                                        0xFFFDE68A),
+                                                                  ),
+                                                                  const SizedBox(
+                                                                    width: 102,
+                                                                    height: 21,
+                                                                    child:
+                                                                        Center(
+                                                                      child:
+                                                                          Text(
+                                                                        'Kredit',
+                                                                        style: TextStyle(
+                                                                          fontSize:
+                                                                              9.5,
+                                                                          fontWeight:
+                                                                              FontWeight.bold,
+                                                                          color: Color(
+                                                                              0xFFBE123C),
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                        Container(
+                                                            width: 1,
+                                                            height: 42,
+                                                            color: const Color(
+                                                                0xFFFDE68A)),
+                                                        // 8. Aksi (44)
+                                                        const SizedBox(
+                                                          width: 44,
+                                                          height: 42,
+                                                          child: Center(
+                                                            child: Text('Aksi',
+                                                                style:
+                                                                    headerStyle),
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
                                                   ),
-                                                  Row(
-                                                    children: [
-                                                      const SizedBox(
-                                                        width: 117,
-                                                        height: 26,
-                                                        child: Center(
-                                                          child: Text(
-                                                            'Debit',
-                                                            style: TextStyle(
-                                                              fontSize: 10.5,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold,
-                                                              color: Color(
-                                                                  0xFF047857),
+
+                                                  // --- DATA ROWS ---
+                                                  ...List.generate(
+                                                    activeList.length,
+                                                    (index) {
+                                                      final tx =
+                                                          activeList[index];
+                                                      final isEven =
+                                                          index % 2 == 0;
+                                                      final dateFormatted =
+                                                          DateFormat(
+                                                                  'dd/MM/yyyy')
+                                                              .format(
+                                                                  tx.timestamp);
+                                                      final String displayKu =
+                                                          tx.getDisplayKu(
+                                                              customRules: _data
+                                                                  .customKodeRules);
+                                                      final String
+                                                          displayKategori =
+                                                          tx.getDisplayKode(
+                                                              customRules: _data
+                                                                  .customKodeRules);
+                                                      final bool isDebit =
+                                                          tx.isPemasukan;
+                                                      final bool isKredit =
+                                                          tx.isPengeluaran;
+                                                      final String itemTitle =
+                                                          tx.title.replaceFirst(
+                                                              RegExp(r'^(Pemasukan|Pengeluaran):\s*',
+                                                                  caseSensitive:
+                                                                      false),
+                                                              '');
+                                                      final String? itemSubtitle =
+                                                          (tx.note != null &&
+                                                                  tx.note!
+                                                                      .isNotEmpty &&
+                                                                  tx.note !=
+                                                                      tx.title &&
+                                                                  tx.note !=
+                                                                      itemTitle)
+                                                              ? tx.note
+                                                              : null;
+
+                                                      return Container(
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: isEven
+                                                              ? const Color(
+                                                                  0xFFFFFDF5)
+                                                              : const Color(
+                                                                  0xFFFFF7ED),
+                                                          border: Border(
+                                                            bottom: BorderSide(
+                                                              color: const Color(
+                                                                      0xFFFDE68A)
+                                                                  .withValues(
+                                                                      alpha:
+                                                                          0.6),
+                                                              width: 0.8,
                                                             ),
                                                           ),
                                                         ),
-                                                      ),
-                                                      Container(
-                                                        width: 1,
-                                                        height: 26,
-                                                        color: const Color(
-                                                            0xFFFDE68A),
-                                                      ),
-                                                      const SizedBox(
-                                                        width: 117,
-                                                        height: 26,
-                                                        child: Center(
-                                                          child: Text(
-                                                            'Kredit',
-                                                            style: TextStyle(
-                                                              fontSize: 10.5,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold,
-                                                              color: Color(
-                                                                  0xFFBE123C),
+                                                        child: Row(
+                                                          children: [
+                                                            // 1. No
+                                                            SizedBox(
+                                                              width: 32,
+                                                              height: 38,
+                                                              child: Center(
+                                                                child: Text(
+                                                                  '${index + 1}',
+                                                                  style:
+                                                                      const TextStyle(
+                                                                    fontSize:
+                                                                        9.5,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .bold,
+                                                                    color: Color(
+                                                                        0xFF92400E),
+                                                                  ),
+                                                                ),
+                                                              ),
                                                             ),
-                                                          ),
+                                                            Container(
+                                                                width: 1,
+                                                                height: 38,
+                                                                color: const Color(
+                                                                        0xFFFDE68A)
+                                                                    .withValues(
+                                                                        alpha:
+                                                                            0.6)),
+                                                            // 2. Tanggal
+                                                            SizedBox(
+                                                              width: 84,
+                                                              height: 38,
+                                                              child: Center(
+                                                                child: Text(
+                                                                  dateFormatted,
+                                                                  style:
+                                                                      const TextStyle(
+                                                                    fontSize:
+                                                                        9,
+                                                                    color: Color(
+                                                                        0xFF78350F),
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w500,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                                width: 1,
+                                                                height: 38,
+                                                                color: const Color(
+                                                                        0xFFFDE68A)
+                                                                    .withValues(
+                                                                        alpha:
+                                                                            0.6)),
+                                                            // 3. KU
+                                                            Container(
+                                                              width: 95,
+                                                              height: 38,
+                                                              padding:
+                                                                  const EdgeInsets
+                                                                      .symmetric(
+                                                                      horizontal:
+                                                                          4),
+                                                              child: Center(
+                                                                child:
+                                                                    _buildKuBadge(
+                                                                        displayKu,
+                                                                        isLarge:
+                                                                            false),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                                width: 1,
+                                                                height: 38,
+                                                                color: const Color(
+                                                                        0xFFFDE68A)
+                                                                    .withValues(
+                                                                        alpha:
+                                                                            0.6)),
+                                                            // 4. Kategori
+                                                            Container(
+                                                              width: 135,
+                                                              height: 38,
+                                                              padding:
+                                                                  const EdgeInsets
+                                                                      .symmetric(
+                                                                      horizontal:
+                                                                          4),
+                                                              child: Center(
+                                                                child:
+                                                                    _buildKodeBadge(
+                                                                        displayKategori,
+                                                                        isLarge:
+                                                                            false),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                                width: 1,
+                                                                height: 38,
+                                                                color: const Color(
+                                                                        0xFFFDE68A)
+                                                                    .withValues(
+                                                                        alpha:
+                                                                            0.6)),
+                                                            // 5. Keterangan
+                                                            Container(
+                                                              width: 200,
+                                                              height: 38,
+                                                              padding:
+                                                                  const EdgeInsets
+                                                                      .symmetric(
+                                                                      horizontal:
+                                                                          6,
+                                                                      vertical:
+                                                                          2),
+                                                              child: Column(
+                                                                mainAxisAlignment:
+                                                                    MainAxisAlignment
+                                                                        .center,
+                                                                crossAxisAlignment:
+                                                                    CrossAxisAlignment
+                                                                        .start,
+                                                                children: [
+                                                                  Text(
+                                                                    itemTitle,
+                                                                    style:
+                                                                        const TextStyle(
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .bold,
+                                                                      fontSize:
+                                                                          9.5,
+                                                                      color: Color(
+                                                                          0xFF451A03),
+                                                                    ),
+                                                                    maxLines: 1,
+                                                                    overflow:
+                                                                        TextOverflow
+                                                                            .ellipsis,
+                                                                  ),
+                                                                  if (itemSubtitle !=
+                                                                          null &&
+                                                                      itemSubtitle
+                                                                          .isNotEmpty &&
+                                                                      !itemTitle
+                                                                          .contains(
+                                                                              itemSubtitle))
+                                                                    Text(
+                                                                      itemSubtitle,
+                                                                      style:
+                                                                          const TextStyle(
+                                                                        fontSize:
+                                                                            8.5,
+                                                                        fontStyle:
+                                                                            FontStyle.italic,
+                                                                        color: Color(
+                                                                            0xFF92400E),
+                                                                      ),
+                                                                      maxLines:
+                                                                          1,
+                                                                      overflow:
+                                                                          TextOverflow
+                                                                              .ellipsis,
+                                                                    ),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                                width: 1,
+                                                                height: 38,
+                                                                color: const Color(
+                                                                        0xFFFDE68A)
+                                                                    .withValues(
+                                                                        alpha:
+                                                                            0.6)),
+                                                            // 6. Jumlah
+                                                            Container(
+                                                              width: 100,
+                                                              height: 38,
+                                                              padding:
+                                                                  const EdgeInsets
+                                                                      .symmetric(
+                                                                      horizontal:
+                                                                          6),
+                                                              child: Align(
+                                                                alignment:
+                                                                    Alignment
+                                                                        .centerRight,
+                                                                child: Text(
+                                                                  'Rp ${RupiahFormatter.format(tx.amount)}',
+                                                                  style:
+                                                                      const TextStyle(
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .bold,
+                                                                    fontSize:
+                                                                        9.5,
+                                                                    color: Color(
+                                                                        0xFF451A03),
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                                width: 1,
+                                                                height: 38,
+                                                                color: const Color(
+                                                                        0xFFFDE68A)
+                                                                    .withValues(
+                                                                        alpha:
+                                                                            0.6)),
+                                                            // 7. Sub-Kolom Debit
+                                                            Container(
+                                                              width: 102,
+                                                              height: 38,
+                                                              padding:
+                                                                  const EdgeInsets
+                                                                      .symmetric(
+                                                                      horizontal:
+                                                                          6),
+                                                              child: Align(
+                                                                alignment:
+                                                                    Alignment
+                                                                        .centerRight,
+                                                                child: isDebit
+                                                                    ? Text(
+                                                                        'Rp ${RupiahFormatter.format(tx.amount)}',
+                                                                        style:
+                                                                            const TextStyle(
+                                                                          fontWeight:
+                                                                              FontWeight.bold,
+                                                                          fontSize:
+                                                                              9.5,
+                                                                          color: Color(
+                                                                              0xFF059669),
+                                                                        ),
+                                                                      )
+                                                                    : const Text(
+                                                                        '-',
+                                                                        style:
+                                                                            TextStyle(
+                                                                          color: Color(
+                                                                              0xFF94A3B8),
+                                                                          fontWeight:
+                                                                              FontWeight.bold,
+                                                                          fontSize:
+                                                                              9.5,
+                                                                        ),
+                                                                      ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                                width: 1,
+                                                                height: 38,
+                                                                color: const Color(
+                                                                        0xFFFDE68A)
+                                                                    .withValues(
+                                                                        alpha:
+                                                                            0.6)),
+                                                            // 8. Sub-Kolom Kredit
+                                                            Container(
+                                                              width: 102,
+                                                              height: 38,
+                                                              padding:
+                                                                  const EdgeInsets
+                                                                      .symmetric(
+                                                                      horizontal:
+                                                                          6),
+                                                              child: Align(
+                                                                alignment:
+                                                                    Alignment
+                                                                        .centerRight,
+                                                                child: isKredit
+                                                                    ? Text(
+                                                                        'Rp ${RupiahFormatter.format(tx.amount)}',
+                                                                        style:
+                                                                            const TextStyle(
+                                                                          fontWeight:
+                                                                              FontWeight.bold,
+                                                                          fontSize:
+                                                                              9.5,
+                                                                          color: Color(
+                                                                              0xFFE11D48),
+                                                                        ),
+                                                                      )
+                                                                    : const Text(
+                                                                        '-',
+                                                                        style:
+                                                                            TextStyle(
+                                                                          color: Color(
+                                                                              0xFF94A3B8),
+                                                                          fontWeight:
+                                                                              FontWeight.bold,
+                                                                          fontSize:
+                                                                              9.5,
+                                                                        ),
+                                                                      ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                                width: 1,
+                                                                height: 38,
+                                                                color: const Color(
+                                                                        0xFFFDE68A)
+                                                                    .withValues(
+                                                                        alpha:
+                                                                            0.6)),
+                                                            // 9. Aksi
+                                                            SizedBox(
+                                                              width: 44,
+                                                              height: 38,
+                                                              child: IconButton(
+                                                                padding:
+                                                                    EdgeInsets
+                                                                        .zero,
+                                                                icon: const Icon(
+                                                                  Icons
+                                                                      .delete_outline_rounded,
+                                                                  color: Colors
+                                                                      .redAccent,
+                                                                  size: 16,
+                                                                ),
+                                                                tooltip:
+                                                                    'Hapus Transaksi',
+                                                                onPressed: () {
+                                                                  _confirmDeleteTransaction(
+                                                                    tx,
+                                                                    () {
+                                                                      setModalState(
+                                                                          () {});
+                                                                    },
+                                                                  );
+                                                                },
+                                                              ),
+                                                            ),
+                                                          ],
                                                         ),
-                                                      ),
-                                                    ],
+                                                      );
+                                                    },
                                                   ),
                                                 ],
                                               ),
                                             ),
-                                            Container(
-                                                width: 1,
-                                                height: 52,
-                                                color: const Color(0xFFFDE68A)),
-                                            // 8. Aksi (50)
-                                            const SizedBox(
-                                              width: 50,
-                                              height: 52,
-                                              child: Center(
-                                                child: Text('Aksi',
-                                                    style: headerStyle),
+                                          ),
+                                        ),
+                                      ),
+                              ),
+
+                              // Bottom Total Summary Bar Tab Laporan
+                              Container(
+                                padding: const EdgeInsets.fromLTRB(
+                                    20, 10, 20, 12),
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  border: Border(
+                                    top: BorderSide(color: Color(0xFFFDE68A)),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Total ${activeList.length} Transaksi',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Color(0xFF92400E),
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        Text(
+                                          selectedSubTab == 'semua'
+                                              ? 'Total Akumulasi:'
+                                              : selectedSubTab == 'pengeluaran'
+                                                  ? 'Total Pengeluaran:'
+                                                  : 'Total Pemasukan:',
+                                          style: const TextStyle(
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF78350F),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 14, vertical: 7),
+                                      decoration: BoxDecoration(
+                                        color: selectedSubTab == 'semua'
+                                            ? const Color(0xFFFEF3C7)
+                                            : selectedSubTab == 'pengeluaran'
+                                                ? const Color(0xFFFFF1F2)
+                                                : const Color(0xFFF0FDF4),
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: selectedSubTab == 'semua'
+                                              ? const Color(0xFFFDE68A)
+                                              : selectedSubTab == 'pengeluaran'
+                                                  ? const Color(0xFFFECDD3)
+                                                  : const Color(0xFFA7F3D0),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'Rp ${RupiahFormatter.format(totalLaporanNominal)}',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: selectedSubTab == 'semua'
+                                              ? const Color(0xFFB45309)
+                                              : selectedSubTab == 'pengeluaran'
+                                                  ? const Color(0xFFE11D48)
+                                                  : const Color(0xFF059669),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        }
+
+                        // ------------------------------------
+                        // TAB 2: RINCIAN PENGELUARAN (2 TABEL)
+                        // ------------------------------------
+                        if (mainTab == 'pengeluaran') {
+                          // Tabel 1: Agregasi Berdasarkan Kategori Pengeluaran (Kategori mengandung "DP", "Saldo Awal", dan "Dana dari S3" tidak dimasukkan)
+                          final Map<String, int> pengeluaranKategoriMap = {};
+                          final Map<String, int> pengeluaranKategoriCountMap =
+                              {};
+
+                          // Tambahkan kategori yang sudah dikonfigurasi (kecuali mengandung "DP", "Saldo Awal", atau "Dana dari S3")
+                          for (final r in _data.customKodeRules
+                              .where((r) => r.type != 'ku')) {
+                            final name = r.kode.trim();
+                            final nameLower = name.toLowerCase();
+                            final bool isSaldoAwal =
+                                nameLower.contains('saldo awal');
+                            final bool isDanaS3 = !isSaldoAwal &&
+                                (nameLower.contains('dana dari s3') ||
+                                    nameLower.contains('dana s3') ||
+                                    nameLower == 's3');
+
+                            if (name.isNotEmpty &&
+                                !name.toUpperCase().contains('DP') &&
+                                !isSaldoAwal &&
+                                !isDanaS3 &&
+                                !pengeluaranKategoriMap.containsKey(name)) {
+                              pengeluaranKategoriMap[name] = 0;
+                              pengeluaranKategoriCountMap[name] = 0;
+                            }
+                          }
+
+                          // Agregasi dari transaksi pengeluaran (kecuali kategori yang mengandung "DP", "Saldo Awal", atau "Dana dari S3")
+                          for (final tx in pengeluaranList) {
+                            final rawKategori = tx
+                                .getDisplayKode(
+                                    customRules: _data.customKodeRules)
+                                .trim();
+                            final kategori =
+                                rawKategori.isEmpty ? '-' : rawKategori;
+                            final kategoriLower = kategori.toLowerCase();
+                            final bool isSaldoAwal =
+                                kategoriLower.contains('saldo awal');
+                            final bool isDanaS3 = !isSaldoAwal &&
+                                (kategoriLower.contains('dana dari s3') ||
+                                    kategoriLower.contains('dana s3') ||
+                                    kategoriLower == 's3');
+
+                            // Lewati jika kategori mengandung "DP", "Saldo Awal", "Dana dari S3", atau merupakan transaksi DP
+                            if (kategori.toUpperCase().contains('DP') ||
+                                isSaldoAwal ||
+                                isDanaS3 ||
+                                tx.isDPTransaction(
+                                    customRules: _data.customKodeRules)) {
+                              continue;
+                            }
+
+                            String matchedKey = kategori;
+                            for (final k in pengeluaranKategoriMap.keys) {
+                              if (k.toLowerCase() == kategori.toLowerCase()) {
+                                matchedKey = k;
+                                break;
+                              }
+                            }
+                            pengeluaranKategoriMap[matchedKey] =
+                                (pengeluaranKategoriMap[matchedKey] ?? 0) +
+                                    tx.amount;
+                            pengeluaranKategoriCountMap[matchedKey] =
+                                (pengeluaranKategoriCountMap[matchedKey] ?? 0) +
+                                    1;
+                          }
+
+                          final int totalPengeluaranKategoriNominal =
+                              pengeluaranKategoriMap.values
+                                  .fold<int>(0, (sum, v) => sum + v);
+
+                          // Tabel 2: Agregasi Berdasarkan Dana Kuasa Usaha (KU)
+                          final Map<String, int> pengeluaranKuMap = {};
+                          final Map<String, int> pengeluaranKuCountMap = {};
+
+                          // Tambahkan KU yang sudah dikonfigurasi
+                          for (final r in _data.customKodeRules
+                              .where((r) => r.type == 'ku')) {
+                            final name = r.kode.trim();
+                            if (name.isNotEmpty &&
+                                !pengeluaranKuMap.containsKey(name)) {
+                              pengeluaranKuMap[name] = 0;
+                              pengeluaranKuCountMap[name] = 0;
+                            }
+                          }
+
+                          // Agregasi dari transaksi pengeluaran
+                          for (final tx in pengeluaranList) {
+                            final rawKu = tx
+                                .getDisplayKu(
+                                    customRules: _data.customKodeRules)
+                                .trim();
+                            final ku = rawKu.isEmpty ? '-' : rawKu;
+
+                            String matchedKey = ku;
+                            for (final k in pengeluaranKuMap.keys) {
+                              if (k.toLowerCase() == ku.toLowerCase()) {
+                                matchedKey = k;
+                                break;
+                              }
+                            }
+                            pengeluaranKuMap[matchedKey] =
+                                (pengeluaranKuMap[matchedKey] ?? 0) +
+                                    tx.amount;
+                            pengeluaranKuCountMap[matchedKey] =
+                                (pengeluaranKuCountMap[matchedKey] ?? 0) + 1;
+                          }
+
+                          return SingleChildScrollView(
+                            physics: const BouncingScrollPhysics(),
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Info Banner Rincian Pengeluaran
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFF1F2),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: const Color(0xFFFECDD3),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFFE4E6),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: const Icon(
+                                          Icons.trending_down_rounded,
+                                          color: Color(0xFFE11D48),
+                                          size: 20,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              'Ringkasan Klasifikasi Pengeluaran',
+                                              style: TextStyle(
+                                                fontSize: 12.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF9F1239),
+                                              ),
+                                            ),
+                                            Text(
+                                              'Total ${pengeluaranList.length} transaksi kredit periode $monthName $year',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                color: Color(0xFFBE123C),
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
-
-                                      // --- DATA ROWS ---
-                                      ...List.generate(
-                                        activeList.length,
-                                        (index) {
-                                          final tx = activeList[index];
-                                          final isEven = index % 2 == 0;
-                                          final dateFormatted =
-                                              DateFormat('dd/MM/yyyy')
-                                                  .format(tx.timestamp);
-                                          final String displayKu =
-                                              tx.getDisplayKu(
-                                                  customRules:
-                                                      _data.customKodeRules);
-                                          final String displayKategori =
-                                              tx.getDisplayKode(
-                                                  customRules:
-                                                      _data.customKodeRules);
-                                          final bool isDebit = tx.isPemasukan;
-                                          final bool isKredit =
-                                              tx.isPengeluaran;
-                                          final String itemTitle = tx.title
-                                              .replaceFirst(
-                                                  RegExp(
-                                                      r'^(Pemasukan|Pengeluaran):\s*',
-                                                      caseSensitive: false),
-                                                  '');
-                                          final String? itemSubtitle =
-                                              (tx.note != null &&
-                                                      tx.note!.isNotEmpty &&
-                                                      tx.note != tx.title &&
-                                                      tx.note != itemTitle)
-                                                  ? tx.note
-                                                  : null;
-
-                                          return Container(
-                                            decoration: BoxDecoration(
-                                              color: isEven
-                                                  ? const Color(0xFFFFFDF5)
-                                                  : const Color(0xFFFFF7ED),
-                                              border: Border(
-                                                bottom: BorderSide(
-                                                  color: const Color(0xFFFDE68A)
-                                                      .withValues(alpha: 0.6),
-                                                  width: 0.8,
-                                                ),
-                                              ),
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                // 1. No
-                                                SizedBox(
-                                                  width: 44,
-                                                  height: 48,
-                                                  child: Center(
-                                                    child: Text(
-                                                      '${index + 1}',
-                                                      style: const TextStyle(
-                                                        fontSize: 10.5,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        color:
-                                                            Color(0xFF92400E),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                                Container(
-                                                    width: 1,
-                                                    height: 48,
-                                                    color: const Color(0xFFFDE68A)
-                                                        .withValues(alpha: 0.6)),
-                                                // 2. Tanggal
-                                                SizedBox(
-                                                  width: 90,
-                                                  height: 48,
-                                                  child: Center(
-                                                    child: Text(
-                                                      dateFormatted,
-                                                      style: const TextStyle(
-                                                        fontSize: 10,
-                                                        color:
-                                                            Color(0xFF78350F),
-                                                        fontWeight:
-                                                            FontWeight.w500,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                                Container(
-                                                    width: 1,
-                                                    height: 48,
-                                                    color: const Color(0xFFFDE68A)
-                                                        .withValues(alpha: 0.6)),
-                                                // 3. KU (Di samping kiri Kategori)
-                                                Container(
-                                                  width: 80,
-                                                  height: 48,
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                          horizontal: 4),
-                                                  child: Center(
-                                                    child: _buildKuBadge(
-                                                        displayKu,
-                                                        isLarge: true),
-                                                  ),
-                                                ),
-                                                Container(
-                                                    width: 1,
-                                                    height: 48,
-                                                    color: const Color(0xFFFDE68A)
-                                                        .withValues(alpha: 0.6)),
-                                                // 4. Kategori (Sebelumnya Kode)
-                                                Container(
-                                                  width: 145,
-                                                  height: 48,
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                          horizontal: 6),
-                                                  child: Center(
-                                                    child: _buildKodeBadge(
-                                                        displayKategori,
-                                                        isLarge: true),
-                                                  ),
-                                                ),
-                                                Container(
-                                                    width: 1,
-                                                    height: 48,
-                                                    color: const Color(0xFFFDE68A)
-                                                        .withValues(alpha: 0.6)),
-                                                // 5. Keterangan
-                                                Container(
-                                                  width: 220,
-                                                  height: 48,
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                          horizontal: 8,
-                                                          vertical: 4),
-                                                  child: Column(
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment
-                                                            .center,
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Text(
-                                                        itemTitle,
-                                                        style: const TextStyle(
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          fontSize: 10.5,
-                                                          color:
-                                                              Color(0xFF451A03),
-                                                        ),
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                      ),
-                                                      if (itemSubtitle != null &&
-                                                          itemSubtitle
-                                                              .isNotEmpty &&
-                                                          !itemTitle.contains(
-                                                              itemSubtitle))
-                                                        Text(
-                                                          itemSubtitle,
-                                                          style:
-                                                              const TextStyle(
-                                                            fontSize: 9,
-                                                            fontStyle: FontStyle
-                                                                .italic,
-                                                            color: Color(
-                                                                0xFF92400E),
-                                                          ),
-                                                          maxLines: 1,
-                                                          overflow:
-                                                              TextOverflow
-                                                                  .ellipsis,
-                                                        ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                Container(
-                                                    width: 1,
-                                                    height: 48,
-                                                    color: const Color(0xFFFDE68A)
-                                                        .withValues(alpha: 0.6)),
-                                                // 5. Jumlah
-                                                Container(
-                                                  width: 110,
-                                                  height: 48,
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                          horizontal: 8),
-                                                  child: Align(
-                                                    alignment:
-                                                        Alignment.centerRight,
-                                                    child: Text(
-                                                      'Rp ${RupiahFormatter.format(tx.amount)}',
-                                                      style: const TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 10.5,
-                                                        color:
-                                                            Color(0xFF451A03),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                                Container(
-                                                    width: 1,
-                                                    height: 48,
-                                                    color: const Color(0xFFFDE68A)
-                                                        .withValues(alpha: 0.6)),
-                                                // 6. Sub-Kolom Debit
-                                                Container(
-                                                  width: 117,
-                                                  height: 48,
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                          horizontal: 8),
-                                                  child: Align(
-                                                    alignment:
-                                                        Alignment.centerRight,
-                                                    child: isDebit
-                                                        ? Text(
-                                                            'Rp ${RupiahFormatter.format(tx.amount)}',
-                                                            style:
-                                                                const TextStyle(
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold,
-                                                              fontSize: 10.5,
-                                                              color: Color(
-                                                                  0xFF059669),
-                                                            ),
-                                                          )
-                                                        : const Text(
-                                                            '-',
-                                                            style: TextStyle(
-                                                              color: Color(
-                                                                  0xFF94A3B8),
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold,
-                                                            ),
-                                                          ),
-                                                  ),
-                                                ),
-                                                Container(
-                                                    width: 1,
-                                                    height: 48,
-                                                    color: const Color(0xFFFDE68A)
-                                                        .withValues(alpha: 0.6)),
-                                                // 7. Sub-Kolom Kredit
-                                                Container(
-                                                  width: 117,
-                                                  height: 48,
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                          horizontal: 8),
-                                                  child: Align(
-                                                    alignment:
-                                                        Alignment.centerRight,
-                                                    child: isKredit
-                                                        ? Text(
-                                                            'Rp ${RupiahFormatter.format(tx.amount)}',
-                                                            style:
-                                                                const TextStyle(
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold,
-                                                              fontSize: 10.5,
-                                                              color: Color(
-                                                                  0xFFE11D48),
-                                                            ),
-                                                          )
-                                                        : const Text(
-                                                            '-',
-                                                            style: TextStyle(
-                                                              color: Color(
-                                                                  0xFF94A3B8),
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold,
-                                                            ),
-                                                          ),
-                                                  ),
-                                                ),
-                                                Container(
-                                                    width: 1,
-                                                    height: 48,
-                                                    color: const Color(0xFFFDE68A)
-                                                        .withValues(alpha: 0.6)),
-                                                // 8. Aksi
-                                                SizedBox(
-                                                  width: 50,
-                                                  height: 48,
-                                                  child: IconButton(
-                                                    icon: const Icon(
-                                                      Icons
-                                                          .delete_outline_rounded,
-                                                      color: Colors.redAccent,
-                                                      size: 18,
-                                                    ),
-                                                    tooltip: 'Hapus Transaksi',
-                                                    onPressed: () {
-                                                      _confirmDeleteTransaction(
-                                                        tx,
-                                                        () {
-                                                          setModalState(() {});
-                                                        },
-                                                      );
-                                                    },
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
+                                      Text(
+                                        'Rp ${RupiahFormatter.format(totalPengeluaranNominal)}',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFFE11D48),
+                                        ),
                                       ),
                                     ],
                                   ),
                                 ),
-                              ),
-                            ),
-                          ),
-                  ),
 
-                  // Bottom Total Summary Bar
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      border: Border(
-                        top: BorderSide(color: Color(0xFFFDE68A)),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Total ${activeList.length} Transaksi',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF92400E),
-                                fontWeight: FontWeight.w500,
+                                const SizedBox(height: 16),
+
+                                // Kategori Pengeluaran (Kecuali Kategori DP)
+                                buildSummaryTwoColumnTable(
+                                  tableTitle: 'Klasifikasi Kategori Pengeluaran',
+                                  colHeaderLeft: 'Kategori Pengeluaran',
+                                  colHeaderRight: 'Pengeluaran',
+                                  dataMap: pengeluaranKategoriMap,
+                                  countMap: pengeluaranKategoriCountMap,
+                                  totalAmount: totalPengeluaranKategoriNominal,
+                                  isPengeluaran: true,
+                                  isKuType: false,
+                                ),
+
+                                const SizedBox(height: 20),
+
+                                // Dana Kuasa Usaha (KU)
+                                buildSummaryTwoColumnTable(
+                                  tableTitle: 'Klasifikasi Dana Kuasa Usaha (KU)',
+                                  colHeaderLeft: 'Dana Kuasa Usaha',
+                                  colHeaderRight: 'Pengeluaran',
+                                  dataMap: pengeluaranKuMap,
+                                  countMap: pengeluaranKuCountMap,
+                                  totalAmount: totalPengeluaranNominal,
+                                  isPengeluaran: true,
+                                  isKuType: true,
+                                ),
+
+                                const SizedBox(height: 16),
+                              ],
+                            ),
+                          );
+                        }
+
+                        // ------------------------------------
+                        // TAB 3: RINCIAN PEMASUKAN
+                        // ------------------------------------
+                        // Pemasukan Non-DP (DP dikecualikan dari Tabel Rincian Pemasukan)
+                        final pemasukanNonDPList = pemasukanList
+                            .where((tx) => !tx.isDPTransaction(
+                                customRules: _data.customKodeRules))
+                            .toList();
+                        final int totalPemasukanNonDPNominal = pemasukanNonDPList
+                            .fold<int>(0, (sum, tx) => sum + tx.amount);
+
+                        // Pemasukan Kategori DP
+                        final pemasukanDPList = pemasukanList
+                            .where((tx) => tx.isDPTransaction(
+                                customRules: _data.customKodeRules))
+                            .toList();
+                        final int totalPemasukanDP = pemasukanDPList.fold<int>(
+                            0, (sum, tx) => sum + tx.amount);
+                        final int countPemasukanDP = pemasukanDPList.length;
+
+                        // Agregasi Berdasarkan Kategori Pemasukan (Non-DP) & Default Layout
+                        int saldoAwalNominal = 0;
+                        int saldoAwalCount = 0;
+                        int danaS3Nominal = 0;
+                        int danaS3Count = 0;
+
+                        final Map<String, int> pemasukanLainMap = {};
+                        final Map<String, int> pemasukanLainCountMap = {};
+
+                        // Agregasi dari transaksi pemasukan non-DP
+                        for (final tx in pemasukanNonDPList) {
+                          final rawKategori = tx
+                              .getDisplayKode(
+                                  customRules: _data.customKodeRules)
+                              .trim();
+                          final kategoriLower = rawKategori.toLowerCase();
+
+                          final bool isSaldoAwal =
+                              kategoriLower.contains('saldo awal');
+
+                          final bool isDanaS3 = !isSaldoAwal &&
+                              (kategoriLower.contains('dana dari s3') ||
+                                  kategoriLower.contains('dana s3') ||
+                                  kategoriLower == 's3');
+
+                          if (isSaldoAwal) {
+                            saldoAwalNominal += tx.amount;
+                            saldoAwalCount++;
+                          } else if (isDanaS3) {
+                            danaS3Nominal += tx.amount;
+                            danaS3Count++;
+                          } else {
+                            final name = rawKategori.isEmpty || rawKategori == '-'
+                                ? 'Lainnya'
+                                : rawKategori;
+                            pemasukanLainMap[name] =
+                                (pemasukanLainMap[name] ?? 0) + tx.amount;
+                            pemasukanLainCountMap[name] =
+                                (pemasukanLainCountMap[name] ?? 0) + 1;
+                          }
+                        }
+
+                        // Sisa Saldo = Total Pemasukan (Non-DP) - Total Pengeluaran
+                        final int sisaSaldo = totalPemasukanNonDPNominal -
+                            totalPengeluaranNominal;
+
+                        Widget buildPemasukanItemRow({
+                          required String title,
+                          required int count,
+                          required int amount,
+                          required bool isEven,
+                          Color? customTextColor,
+                        }) {
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: isEven
+                                  ? const Color(0xFFFFFDF5)
+                                  : const Color(0xFFFFF7ED),
+                              border: Border(
+                                bottom: BorderSide(
+                                  color: const Color(0xFFFDE68A)
+                                      .withValues(alpha: 0.6),
+                                  width: 0.8,
+                                ),
                               ),
                             ),
-                            Text(
-                              selectedTab == 'semua'
-                                  ? 'Total Akumulasi:'
-                                  : selectedTab == 'pengeluaran'
-                                      ? 'Total Pengeluaran:'
-                                      : 'Total Pemasukan:',
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF78350F),
+                            child: Row(
+                              children: [
+                                // Kolom Kiri: Rincian Pemasukan
+                                Expanded(
+                                  flex: 5,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 9),
+                                    child: Row(
+                                      children: [
+                                        _buildKodeBadge(title, isLarge: false),
+                                        const SizedBox(width: 8),
+                                        if (count > 0)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 6, vertical: 1.5),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF1F5F9),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                              border: Border.all(
+                                                color: const Color(0xFFE2E8F0),
+                                                width: 0.8,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              '$count tx',
+                                              style: const TextStyle(
+                                                fontSize: 9.5,
+                                                color: Color(0xFF64748B),
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  width: 1,
+                                  height: 42,
+                                  color: const Color(0xFFFDE68A)
+                                      .withValues(alpha: 0.6),
+                                ),
+                                // Kolom Kanan: Total Nominal
+                                Expanded(
+                                  flex: 4,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 9),
+                                    child: Align(
+                                      alignment: Alignment.centerRight,
+                                      child: Text(
+                                        'Rp ${RupiahFormatter.format(amount)}',
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: customTextColor ??
+                                              (amount > 0
+                                                  ? const Color(0xFF059669)
+                                                  : const Color(0xFF94A3B8)),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        return SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Info Banner Rincian Pemasukan
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF0FDF4),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: const Color(0xFFA7F3D0),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFDCFCE7),
+                                        borderRadius:
+                                            BorderRadius.circular(8),
+                                      ),
+                                      child: const Icon(
+                                        Icons.trending_up_rounded,
+                                        color: Color(0xFF059669),
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Ringkasan Klasifikasi Pemasukan',
+                                            style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF065F46),
+                                            ),
+                                          ),
+                                          Text(
+                                            'Total ${pemasukanNonDPList.length} transaksi debit periode $monthName $year',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              color: Color(0xFF047857),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Text(
+                                      'Rp ${RupiahFormatter.format(totalPemasukanNonDPNominal)}',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF059669),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: selectedTab == 'semua'
-                                ? const Color(0xFFFEF3C7)
-                                : selectedTab == 'pengeluaran'
-                                    ? const Color(0xFFFFF1F2)
-                                    : const Color(0xFFF0FDF4),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: selectedTab == 'semua'
-                                  ? const Color(0xFFFDE68A)
-                                  : selectedTab == 'pengeluaran'
-                                      ? const Color(0xFFFECDD3)
-                                      : const Color(0xFFA7F3D0),
-                            ),
+
+                              const SizedBox(height: 16),
+
+                              // Tabel Rincian Pemasukan (Format Default: Saldo Awal, Dana dari S3, Total Pemasukkan, Total Pengeluaran, Sisa Saldo)
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: const Color(0xFFFDE68A),
+                                    width: 1.2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF78350F)
+                                          .withValues(alpha: 0.04),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    // Header Card Judul Tabel "Rincian Pemasukan"
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 14, vertical: 10),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFFFFBEB),
+                                        borderRadius: BorderRadius.vertical(
+                                            top: Radius.circular(13)),
+                                        border: Border(
+                                          bottom: BorderSide(
+                                            color: Color(0xFFFDE68A),
+                                            width: 1.2,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(5),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFFDE68A),
+                                              borderRadius:
+                                                  BorderRadius.circular(7),
+                                            ),
+                                            child: const Icon(
+                                              Icons
+                                                  .account_balance_wallet_rounded,
+                                              size: 15,
+                                              color: Color(0xFFB45309),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Expanded(
+                                            child: Text(
+                                              'Rincian Pemasukan',
+                                              style: TextStyle(
+                                                fontSize: 12.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF78350F),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Header Kolom (2 Kolom: Rincian Pemasukan | Total)
+                                    Container(
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFFEF3C7),
+                                        border: Border(
+                                          bottom: BorderSide(
+                                            color: Color(0xFFFDE68A),
+                                            width: 1.2,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            flex: 5,
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 10),
+                                              child: const Text(
+                                                'Rincian Pemasukan',
+                                                style: headerStyle,
+                                              ),
+                                            ),
+                                          ),
+                                          Container(
+                                            width: 1,
+                                            height: 36,
+                                            color: const Color(0xFFFDE68A),
+                                          ),
+                                          Expanded(
+                                            flex: 4,
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 10),
+                                              alignment: Alignment.centerRight,
+                                              child: const Text(
+                                                'Total',
+                                                style: headerStyle,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Row 1: Saldo Awal
+                                    buildPemasukanItemRow(
+                                      title: 'Saldo Awal',
+                                      count: saldoAwalCount,
+                                      amount: saldoAwalNominal,
+                                      isEven: true,
+                                    ),
+
+                                    // Row 2: Dana dari S3
+                                    buildPemasukanItemRow(
+                                      title: 'Dana dari S3',
+                                      count: danaS3Count,
+                                      amount: danaS3Nominal,
+                                      isEven: false,
+                                    ),
+
+                                    // Rows Kategori Lain (jika ada transaksi pemasukan non-DP selain Saldo Awal & Dana dari S3)
+                                    ...pemasukanLainMap.entries
+                                        .map((entry) {
+                                      final c =
+                                          pemasukanLainCountMap[entry.key] ?? 0;
+                                      return buildPemasukanItemRow(
+                                        title: entry.key,
+                                        count: c,
+                                        amount: entry.value,
+                                        isEven: true,
+                                      );
+                                    }),
+
+                                    // Row 3: Total Pemasukkan (Saldo Awal + Dana dari S3 + Lainnya Non-DP)
+                                    Container(
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFF0FDF4),
+                                        border: Border(
+                                          top: BorderSide(
+                                            color: Color(0xFFA7F3D0),
+                                            width: 1.2,
+                                          ),
+                                          bottom: BorderSide(
+                                            color: Color(0xFFA7F3D0),
+                                            width: 0.8,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            flex: 5,
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 9),
+                                              child: Row(
+                                                children: [
+                                                  const Icon(
+                                                      Icons
+                                                          .add_circle_outline_rounded,
+                                                      size: 14,
+                                                      color:
+                                                          Color(0xFF059669)),
+                                                  const SizedBox(width: 6),
+                                                  const Text(
+                                                    'Total Pemasukkan',
+                                                    style: TextStyle(
+                                                      fontSize: 11.5,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color:
+                                                          Color(0xFF065F46),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                          Container(
+                                            width: 1,
+                                            height: 38,
+                                            color: const Color(0xFFA7F3D0),
+                                          ),
+                                          Expanded(
+                                            flex: 4,
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 9),
+                                              child: Align(
+                                                alignment:
+                                                    Alignment.centerRight,
+                                                child: Text(
+                                                  'Rp ${RupiahFormatter.format(totalPemasukanNonDPNominal)}',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight:
+                                                        FontWeight.bold,
+                                                    color: Color(0xFF059669),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Row 4: Total Pengeluaran
+                                    Container(
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFFFF1F2),
+                                        border: Border(
+                                          bottom: BorderSide(
+                                            color: Color(0xFFFECDD3),
+                                            width: 1.2,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            flex: 5,
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 9),
+                                              child: Row(
+                                                children: [
+                                                  const Icon(
+                                                      Icons
+                                                          .remove_circle_outline_rounded,
+                                                      size: 14,
+                                                      color:
+                                                          Color(0xFFE11D48)),
+                                                  const SizedBox(width: 6),
+                                                  const Text(
+                                                    'Total Pengeluaran',
+                                                    style: TextStyle(
+                                                      fontSize: 11.5,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color:
+                                                          Color(0xFF9F1239),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                          Container(
+                                            width: 1,
+                                            height: 38,
+                                            color: const Color(0xFFFECDD3),
+                                          ),
+                                          Expanded(
+                                            flex: 4,
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 9),
+                                              child: Align(
+                                                alignment:
+                                                    Alignment.centerRight,
+                                                child: Text(
+                                                  'Rp ${RupiahFormatter.format(totalPengeluaranNominal)}',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight:
+                                                        FontWeight.bold,
+                                                    color: Color(0xFFE11D48),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Row 5: Sisa Saldo (Total Pemasukkan - Total Pengeluaran)
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: sisaSaldo >= 0
+                                            ? const Color(0xFFFEF3C7)
+                                            : const Color(0xFFFFE4E6),
+                                        borderRadius:
+                                            const BorderRadius.vertical(
+                                                bottom:
+                                                    Radius.circular(13)),
+                                        border: Border(
+                                          top: BorderSide(
+                                            color: sisaSaldo >= 0
+                                                ? const Color(0xFFFDE68A)
+                                                : const Color(0xFFFECDD3),
+                                            width: 1.4,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            flex: 5,
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 10),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                mainAxisSize:
+                                                    MainAxisSize.min,
+                                                children: [
+                                                  Text(
+                                                    'Sisa Saldo',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: sisaSaldo >= 0
+                                                          ? const Color(
+                                                              0xFF78350F)
+                                                          : const Color(
+                                                              0xFF9F1239),
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    'Total Pemasukkan - Total Pengeluaran',
+                                                    style: TextStyle(
+                                                      fontSize: 9,
+                                                      color: sisaSaldo >= 0
+                                                          ? const Color(
+                                                              0xFF92400E)
+                                                          : const Color(
+                                                              0xFFBE123C),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                          Container(
+                                            width: 1,
+                                            height: 44,
+                                            color: sisaSaldo >= 0
+                                                ? const Color(0xFFFDE68A)
+                                                : const Color(0xFFFECDD3),
+                                          ),
+                                          Expanded(
+                                            flex: 4,
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 10),
+                                              child: Align(
+                                                alignment:
+                                                    Alignment.centerRight,
+                                                child: Text(
+                                                  sisaSaldo < 0
+                                                      ? '-Rp ${RupiahFormatter.format(sisaSaldo.abs())}'
+                                                      : 'Rp ${RupiahFormatter.format(sisaSaldo)}',
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight:
+                                                        FontWeight.bold,
+                                                    color: sisaSaldo >= 0
+                                                        ? const Color(
+                                                            0xFF047857)
+                                                        : const Color(
+                                                            0xFFBE123C),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(height: 20),
+
+                              // Tabel Total Dana Kontribusi (1 Kolom, 2 Baris: Baris 1 Judul "Total Dana Kontribusi", Baris 2 Langsung Total Uang)
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: const Color(0xFFFDE68A),
+                                    width: 1.2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF78350F)
+                                          .withValues(alpha: 0.04),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    // Baris 1: Header / Judul "Total Dana Kontribusi"
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 14, vertical: 10),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFFFFBEB),
+                                        borderRadius: BorderRadius.vertical(
+                                            top: Radius.circular(13)),
+                                        border: Border(
+                                          bottom: BorderSide(
+                                            color: Color(0xFFFDE68A),
+                                            width: 1.2,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(5),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFFDE68A),
+                                              borderRadius:
+                                                  BorderRadius.circular(7),
+                                            ),
+                                            child: const Icon(
+                                              Icons.volunteer_activism_rounded,
+                                              size: 15,
+                                              color: Color(0xFFB45309),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Expanded(
+                                            child: Text(
+                                              'Total Dana Kontribusi',
+                                              style: TextStyle(
+                                                fontSize: 12.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF78350F),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Baris 2: Total Uang (1 Kolom Saja)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 14, vertical: 12),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFFFFDF5),
+                                        borderRadius: BorderRadius.vertical(
+                                            bottom: Radius.circular(13)),
+                                      ),
+                                      child: Text(
+                                        'Rp ${RupiahFormatter.format(totalPemasukanDP)}',
+                                        style: TextStyle(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: totalPemasukanDP > 0
+                                              ? const Color(0xFF059669)
+                                              : const Color(0xFF94A3B8),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(height: 16),
+                            ],
                           ),
-                          child: Text(
-                            'Rp ${RupiahFormatter.format(totalNominal)}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: selectedTab == 'semua'
-                                  ? const Color(0xFFB45309)
-                                  : selectedTab == 'pengeluaran'
-                                      ? const Color(0xFFE11D48)
-                                      : const Color(0xFF059669),
-                            ),
-                          ),
-                        ),
-                      ],
+                        );
+                      },
                     ),
                   ),
                 ],
