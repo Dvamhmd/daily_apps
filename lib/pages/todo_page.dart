@@ -1887,7 +1887,7 @@ class _TodoPageState extends State<TodoPage> {
             ),
             icon: const Icon(Icons.add_rounded, size: 18),
             label: const Text(
-              '+ Buat To-Do List Baru',
+              'Buat To-Do List Baru',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 13,

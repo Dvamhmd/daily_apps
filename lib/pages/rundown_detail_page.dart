@@ -2,7 +2,7 @@ import 'package:daily_apps/models/model_rundown.dart';
 import 'package:daily_apps/widgets/dialog_tambah_rundown.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 
 class RundownDetailPage extends StatefulWidget {
   final Rundown rundown;
@@ -71,13 +71,13 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
     if (_activePointers.length == 2 &&
         _initialPinchDistance != null &&
-        _initialPinchDistance! > 10.0) {
+        _initialPinchDistance! > 8.0) {
       final points = _activePointers.values.toList();
       final currentDistance = (points[0] - points[1]).distance;
       final scaleFactor = currentDistance / _initialPinchDistance!;
-      final newZoom = (_pinchStartZoom * scaleFactor).clamp(0.45, 2.0);
+      final newZoom = (_pinchStartZoom * scaleFactor).clamp(0.4, 2.2);
 
-      if ((newZoom - _currentZoom).abs() > 0.002) {
+      if ((newZoom - _currentZoom).abs() > 0.003) {
         setState(() {
           _currentZoom = newZoom;
         });
@@ -105,13 +105,13 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
   void _zoomIn() {
     setState(() {
-      _currentZoom = (_currentZoom + 0.1).clamp(0.45, 2.0);
+      _currentZoom = (_currentZoom + 0.1).clamp(0.4, 2.2);
     });
   }
 
   void _zoomOut() {
     setState(() {
-      _currentZoom = (_currentZoom - 0.1).clamp(0.45, 2.0);
+      _currentZoom = (_currentZoom - 0.1).clamp(0.4, 2.2);
     });
   }
 
@@ -1134,7 +1134,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
               label: Text(
                 _selectedRowIndices.isNotEmpty
                     ? '+ ${_selectedRowIndices.length} Baris'
-                    : '+ Baris',
+                    : 'Baris',
                 style: const TextStyle(
                     fontSize: 12, fontWeight: FontWeight.bold),
               ),
@@ -1199,11 +1199,11 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     );
   }
 
-  static const double _colNoWidth = 40.0;
-  static const double _colMulaiWidth = 80.0;
-  static const double _colSelesaiWidth = 80.0;
-  static const double _colDurasiWidth = 80.0;
-  static const double _colKegiatanWidth = 200.0;
+  static const double _colNoWidth = 36.0;
+  static const double _colMulaiWidth = 74.0;
+  static const double _colSelesaiWidth = 74.0;
+  static const double _colDurasiWidth = 72.0;
+  static const double _colKegiatanWidth = 240.0;
   static const double _colCustomWidth = 140.0;
 
   double _calculateBaseTableWidth(RundownDay activeDay) {
@@ -1217,11 +1217,11 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
   }
 
   double _calculateBaseTableHeight(RundownDay activeDay) {
-    const double headerHeight = 38.0;
+    const double headerHeight = 32.0;
     const double dividerHeight = 1.0;
-    const double rowHeight = 44.0;
+    const double rowHeight = 34.0;
     if (activeDay.rows.isEmpty) {
-      return headerHeight + dividerHeight + 60.0;
+      return headerHeight + dividerHeight + 50.0;
     }
     return headerHeight + dividerHeight + (activeDay.rows.length * rowHeight);
   }
@@ -1376,7 +1376,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                         if (activeDay.rows.isEmpty)
                           Container(
                             width: baseWidth,
-                            height: 60,
+                            height: 50,
                             alignment: Alignment.center,
                             child: const Text(
                               'Tidak ada baris di tabel. Klik "+ Baris" untuk menambah.',
@@ -1406,9 +1406,9 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
   Widget _buildTableHeader(RundownDay activeDay) {
     return Container(
-      height: 38.0,
+      height: 32.0,
       color: primaryTeal.withValues(alpha: 0.08),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -1420,7 +1420,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
               'No',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 11.5,
+                fontSize: 11.0,
                 fontWeight: FontWeight.bold,
                 color: primaryTeal,
               ),
@@ -1433,13 +1433,13 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.access_time_rounded, size: 13, color: primaryTeal),
+                Icon(Icons.access_time_rounded, size: 12, color: primaryTeal),
                 SizedBox(width: 3),
                 Flexible(
                   child: Text(
                     'Mulai',
                     style: TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 11.0,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF1E293B),
                     ),
@@ -1457,13 +1457,13 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.flag_rounded, size: 13, color: primaryTeal),
+                Icon(Icons.flag_rounded, size: 12, color: primaryTeal),
                 SizedBox(width: 3),
                 Flexible(
                   child: Text(
                     'Selesai',
                     style: TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 11.0,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF1E293B),
                     ),
@@ -1481,13 +1481,13 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.timer_outlined, size: 13, color: primaryTeal),
+                Icon(Icons.timer_outlined, size: 12, color: primaryTeal),
                 SizedBox(width: 3),
                 Flexible(
                   child: Text(
                     'Durasi',
                     style: TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 11.0,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF1E293B),
                     ),
@@ -1505,13 +1505,13 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.event_note_rounded, size: 13, color: primaryTeal),
+                Icon(Icons.event_note_rounded, size: 12, color: primaryTeal),
                 SizedBox(width: 3),
                 Flexible(
                   child: Text(
                     'Kegiatan',
                     style: TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 11.0,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF1E293B),
                     ),
@@ -1533,7 +1533,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                     child: Text(
                       colName,
                       style: const TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 11.0,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF1E293B),
                       ),
@@ -1547,7 +1547,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                     child: const Padding(
                       padding: EdgeInsets.all(2.0),
                       child: Icon(Icons.close_rounded,
-                          size: 13, color: Colors.redAccent),
+                          size: 12, color: Colors.redAccent),
                     ),
                   ),
                   const SizedBox(width: 4),
@@ -1568,7 +1568,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
   ) {
     final isEven = index % 2 == 0;
     return Container(
-      height: 44.0,
+      height: 34.0,
       decoration: BoxDecoration(
         color: isSelected
             ? primaryTeal.withValues(alpha: 0.12)
@@ -1577,7 +1577,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
           bottom: BorderSide(color: Color(0xFFF1F5F9), width: 1),
         ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -1602,14 +1602,14 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                     isSelected
                         ? Icons.check_box_rounded
                         : Icons.check_box_outline_blank_rounded,
-                    size: 16,
+                    size: 15,
                     color: isSelected ? primaryTeal : const Color(0xFFCBD5E1),
                   ),
-                  const SizedBox(width: 3),
+                  const SizedBox(width: 2),
                   Text(
                     '${index + 1}',
                     style: TextStyle(
-                      fontSize: 10.5,
+                      fontSize: 10.0,
                       fontWeight: FontWeight.bold,
                       color: isSelected
                           ? primaryTeal
@@ -1631,12 +1631,12 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 borderRadius: BorderRadius.circular(6),
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                   decoration: BoxDecoration(
                     color: row.startTime.isNotEmpty
                         ? primaryTeal.withValues(alpha: 0.1)
                         : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(5),
                     border: Border.all(
                       color: row.startTime.isNotEmpty
                           ? primaryTeal.withValues(alpha: 0.3)
@@ -1647,7 +1647,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.access_time_rounded,
-                          size: 12,
+                          size: 11,
                           color: row.startTime.isNotEmpty
                               ? primaryTeal
                               : const Color(0xFF94A3B8)),
@@ -1655,7 +1655,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                       Text(
                         row.startTime.isNotEmpty ? row.startTime : '--:--',
                         style: TextStyle(
-                          fontSize: 11.5,
+                          fontSize: 10.5,
                           fontWeight: FontWeight.bold,
                           color: row.startTime.isNotEmpty
                               ? primaryTeal
@@ -1676,12 +1676,12 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
               alignment: Alignment.centerLeft,
               child: Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                    const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 decoration: BoxDecoration(
                   color: row.endTime.isNotEmpty
                       ? const Color(0xFFF0FDF4)
                       : const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(5),
                   border: Border.all(
                     color: row.endTime.isNotEmpty
                         ? primaryTeal.withValues(alpha: 0.25)
@@ -1692,7 +1692,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.check_circle_outline_rounded,
-                        size: 11,
+                        size: 10.5,
                         color: row.endTime.isNotEmpty
                             ? primaryTeal
                             : const Color(0xFF94A3B8)),
@@ -1700,7 +1700,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                     Text(
                       row.endTime.isNotEmpty ? row.endTime : '--:--',
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 10.5,
                         fontWeight: FontWeight.bold,
                         color: row.endTime.isNotEmpty
                             ? const Color(0xFF004D40)
@@ -1723,10 +1723,10 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 borderRadius: BorderRadius.circular(6),
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(5),
                     border: Border.all(
                       color: const Color(0xFFE2E8F0),
                     ),
@@ -1737,14 +1737,14 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                       Text(
                         row.durationText,
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 10.5,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF0F172A),
                         ),
                       ),
                       const SizedBox(width: 1),
                       const Icon(Icons.arrow_drop_down_rounded,
-                          size: 14, color: primaryTeal),
+                          size: 13, color: primaryTeal),
                     ],
                   ),
                 ),
@@ -1762,20 +1762,20 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 initialValue: row.activity,
                 textCapitalization: TextCapitalization.sentences,
                 style: const TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF0F172A),
                 ),
                 decoration: const InputDecoration(
                   hintText: 'Nama kegiatan...',
                   hintStyle: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: 11.0,
                     color: Color(0xFFCBD5E1),
                     fontWeight: FontWeight.normal,
                   ),
                   isDense: true,
                   contentPadding:
-                      EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      EdgeInsets.symmetric(horizontal: 5, vertical: 3),
                   border: InputBorder.none,
                 ),
                 onChanged: (val) {
@@ -1798,18 +1798,18 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                   initialValue: val,
                   textCapitalization: TextCapitalization.sentences,
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 11.5,
                     color: Color(0xFF334155),
                   ),
                   decoration: InputDecoration(
                     hintText: '$colName...',
                     hintStyle: const TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 11.0,
                       color: Color(0xFFCBD5E1),
                     ),
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 4),
+                        horizontal: 5, vertical: 3),
                     border: InputBorder.none,
                   ),
                   onChanged: (newVal) {

@@ -1512,10 +1512,12 @@ class _StrukturPageState extends State<StrukturPage> {
                 importResult != null && importResult!.rules.isNotEmpty;
 
             return AlertDialog(
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20)),
-              titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
-              contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+              titlePadding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
+              contentPadding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
               title: Row(
                 children: [
                   Container(
@@ -1558,7 +1560,7 @@ class _StrukturPageState extends State<StrukturPage> {
                 ],
               ),
               content: SizedBox(
-                width: double.maxFinite,
+                width: MediaQuery.of(sbContext).size.width,
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -1583,7 +1585,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                 borderRadius: BorderRadius.circular(8),
                                 child: Container(
                                   padding:
-                                      const EdgeInsets.symmetric(vertical: 7),
+                                      const EdgeInsets.symmetric(vertical: 8),
                                   decoration: BoxDecoration(
                                     color: importMethod == 0
                                         ? Colors.white
@@ -1605,20 +1607,23 @@ class _StrukturPageState extends State<StrukturPage> {
                                     children: [
                                       Icon(
                                         Icons.file_present_rounded,
-                                        size: 14,
+                                        size: 15,
                                         color: importMethod == 0
                                             ? const Color(0xFF059669)
                                             : const Color(0xFF64748B),
                                       ),
-                                      const SizedBox(width: 5),
-                                      Text(
-                                        'File (.xlsx / .csv)',
-                                        style: TextStyle(
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: importMethod == 0
-                                              ? const Color(0xFF059669)
-                                              : const Color(0xFF64748B),
+                                      const SizedBox(width: 6),
+                                      Flexible(
+                                        child: Text(
+                                          'File (.xlsx / .csv)',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: importMethod == 0
+                                                ? const Color(0xFF059669)
+                                                : const Color(0xFF64748B),
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                     ],
@@ -1636,7 +1641,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                 borderRadius: BorderRadius.circular(8),
                                 child: Container(
                                   padding:
-                                      const EdgeInsets.symmetric(vertical: 7),
+                                      const EdgeInsets.symmetric(vertical: 8),
                                   decoration: BoxDecoration(
                                     color: importMethod == 1
                                         ? Colors.white
@@ -1658,20 +1663,23 @@ class _StrukturPageState extends State<StrukturPage> {
                                     children: [
                                       Icon(
                                         Icons.content_paste_rounded,
-                                        size: 14,
+                                        size: 15,
                                         color: importMethod == 1
                                             ? const Color(0xFF059669)
                                             : const Color(0xFF64748B),
                                       ),
-                                      const SizedBox(width: 5),
-                                      Text(
-                                        'Salin-Tempel (Paste)',
-                                        style: TextStyle(
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: importMethod == 1
-                                              ? const Color(0xFF059669)
-                                              : const Color(0xFF64748B),
+                                      const SizedBox(width: 6),
+                                      Flexible(
+                                        child: Text(
+                                          'Salin-Tempel (Paste)',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: importMethod == 1
+                                                ? const Color(0xFF059669)
+                                                : const Color(0xFF64748B),
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                     ],
@@ -1727,7 +1735,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                   Text(
                                     pickedFileName!,
                                     style: const TextStyle(
-                                      fontSize: 12,
+                                      fontSize: 12.5,
                                       fontWeight: FontWeight.bold,
                                       color: Color(0xFF065F46),
                                     ),
@@ -1799,23 +1807,26 @@ class _StrukturPageState extends State<StrukturPage> {
                               Container(
                                 width: double.infinity,
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4),
+                                    horizontal: 8, vertical: 5),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
                                       color: const Color(0xFFCBD5E1)),
                                 ),
-                                child: const Text(
-                                  'Jenis Aturan  |  Keterangan Pemicu  |  Hasil\n'
-                                  'KU            |  rapat              |  Sekretaris\n'
-                                  'KU            |  pengabaran         |  Publikasi\n'
-                                  'Kategori      |  Konsumsi           |  Konsumsi',
-                                  style: TextStyle(
-                                    fontFamily: 'monospace',
-                                    fontSize: 9.5,
-                                    color: Color(0xFF334155),
-                                    height: 1.3,
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: const Text(
+                                    'Jenis Aturan  |  Keterangan Pemicu  |  Hasil\n'
+                                    'KU            |  rapat              |  Sekretaris\n'
+                                    'KU            |  pengabaran         |  Publikasi\n'
+                                    'Kategori      |  Konsumsi           |  Konsumsi',
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 10,
+                                      color: Color(0xFF334155),
+                                      height: 1.35,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -2053,7 +2064,8 @@ class _StrukturPageState extends State<StrukturPage> {
                               },
                               borderRadius: BorderRadius.circular(8),
                               child: Container(
-                                padding: const EdgeInsets.all(8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 8),
                                 decoration: BoxDecoration(
                                   color: !replaceAll
                                       ? const Color(0xFFEFF6FF)
@@ -2096,7 +2108,8 @@ class _StrukturPageState extends State<StrukturPage> {
                                       'Pertahankan aturan lama & tambah baru',
                                       style: TextStyle(
                                           fontSize: 9.5,
-                                          color: Color(0xFF64748B)),
+                                          color: Color(0xFF64748B),
+                                          height: 1.2),
                                     ),
                                   ],
                                 ),
@@ -2111,7 +2124,8 @@ class _StrukturPageState extends State<StrukturPage> {
                               },
                               borderRadius: BorderRadius.circular(8),
                               child: Container(
-                                padding: const EdgeInsets.all(8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 8),
                                 decoration: BoxDecoration(
                                   color: replaceAll
                                       ? const Color(0xFFFEF2F2)
@@ -2154,7 +2168,8 @@ class _StrukturPageState extends State<StrukturPage> {
                                       'Ganti semua aturan dengan data ini',
                                       style: TextStyle(
                                           fontSize: 9.5,
-                                          color: Color(0xFF64748B)),
+                                          color: Color(0xFF64748B),
+                                          height: 1.2),
                                     ),
                                   ],
                                 ),
@@ -6583,7 +6598,7 @@ class _StrukturPageState extends State<StrukturPage> {
                           ),
                           child: Row(
                             children: [
-                              // 1. Tab Laporan Keuangan
+                              // 1. Tab Lap Keu
                               Expanded(
                                 child: InkWell(
                                   onTap: () => setModalState(
@@ -6611,9 +6626,9 @@ class _StrukturPageState extends State<StrukturPage> {
                                     ),
                                     child: Center(
                                       child: Text(
-                                        'Laporan Keuangan',
+                                        'Lap Keu',
                                         style: TextStyle(
-                                          fontSize: 11,
+                                          fontSize: 11.5,
                                           fontWeight: mainTab == 'laporan'
                                               ? FontWeight.bold
                                               : FontWeight.w600,
@@ -6629,7 +6644,7 @@ class _StrukturPageState extends State<StrukturPage> {
                               ),
                               const SizedBox(width: 4),
 
-                              // 2. Tab Rincian Pengeluaran
+                              // 2. Tab Dana Keluar
                               Expanded(
                                 child: InkWell(
                                   onTap: () => setModalState(
@@ -6657,9 +6672,9 @@ class _StrukturPageState extends State<StrukturPage> {
                                     ),
                                     child: Center(
                                       child: Text(
-                                        'Rincian Pengeluaran',
+                                        'Dana Keluar',
                                         style: TextStyle(
-                                          fontSize: 11,
+                                          fontSize: 11.5,
                                           fontWeight: mainTab == 'pengeluaran'
                                               ? FontWeight.bold
                                               : FontWeight.w600,
@@ -6675,7 +6690,7 @@ class _StrukturPageState extends State<StrukturPage> {
                               ),
                               const SizedBox(width: 4),
 
-                              // 3. Tab Rincian Pemasukan
+                              // 3. Tab Dana Masuk
                               Expanded(
                                 child: InkWell(
                                   onTap: () => setModalState(
@@ -6703,9 +6718,9 @@ class _StrukturPageState extends State<StrukturPage> {
                                     ),
                                     child: Center(
                                       child: Text(
-                                        'Rincian Pemasukkan',
+                                        'Dana Masuk',
                                         style: TextStyle(
-                                          fontSize: 11,
+                                          fontSize: 11.5,
                                           fontWeight: mainTab == 'pemasukan'
                                               ? FontWeight.bold
                                               : FontWeight.w600,
@@ -6812,11 +6827,14 @@ class _StrukturPageState extends State<StrukturPage> {
                                                 selectedSubTab == 'semua',
                                             activeColor:
                                                 const Color(0xFFB45309),
+                                            fontSize: 10,
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 4, vertical: 5),
                                             onTap: () => setModalState(
                                                 () => selectedSubTab = 'semua'),
                                           ),
                                         ),
-                                        const SizedBox(width: 6),
+                                        const SizedBox(width: 5),
                                         Expanded(
                                           child: _buildFilterChip(
                                             label:
@@ -6825,11 +6843,14 @@ class _StrukturPageState extends State<StrukturPage> {
                                                 'pengeluaran',
                                             activeColor:
                                                 const Color(0xFFE11D48),
+                                            fontSize: 10,
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 4, vertical: 5),
                                             onTap: () => setModalState(() =>
                                                 selectedSubTab = 'pengeluaran'),
                                           ),
                                         ),
-                                        const SizedBox(width: 6),
+                                        const SizedBox(width: 5),
                                         Expanded(
                                           child: _buildFilterChip(
                                             label:
@@ -6838,6 +6859,9 @@ class _StrukturPageState extends State<StrukturPage> {
                                                 'pemasukan',
                                             activeColor:
                                                 const Color(0xFF059669),
+                                            fontSize: 10,
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 4, vertical: 5),
                                             onTap: () => setModalState(() =>
                                                 selectedSubTab = 'pemasukan'),
                                           ),
@@ -8946,12 +8970,16 @@ class _StrukturPageState extends State<StrukturPage> {
     required bool isSelected,
     required Color activeColor,
     required VoidCallback onTap,
+    double fontSize = 12,
+    EdgeInsetsGeometry padding =
+        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
   }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: padding,
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: isSelected
               ? activeColor.withValues(alpha: 0.12)
@@ -8964,8 +8992,11 @@ class _StrukturPageState extends State<StrukturPage> {
         ),
         child: Text(
           label,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: fontSize,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             color: isSelected ? activeColor : const Color(0xFF64748B),
           ),
