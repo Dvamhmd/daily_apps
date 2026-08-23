@@ -5,6 +5,7 @@ import 'package:daily_apps/models/model_struktur.dart';
 import 'package:daily_apps/utils/custom_rule_import_helper.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -1414,28 +1415,30 @@ class _StrukturPageState extends State<StrukturPage> {
             Future<void> handlePickFile() async {
               setDialogState(() => isLoading = true);
               try {
-                final result = await FilePickerPlatform.instance.pickFiles(
+                final result = await FilePicker.platform.pickFiles(
                   type: FileType.custom,
                   allowedExtensions: ['xlsx', 'xls', 'csv'],
+                  withData: true,
                 );
 
-                if (result != null && result.isNotEmpty) {
-                  final file = result.first;
+                if (result != null && result.files.isNotEmpty) {
+                  final file = result.files.first;
                   pickedFileName = file.name;
+                  pickedFileSize = file.size;
 
-                  Uint8List? bytes;
-                  if (file.path != null) {
+                  Uint8List? bytes = file.bytes;
+                  if (bytes == null && !kIsWeb && file.path != null) {
                     try {
                       final ioFile = File(file.path!);
                       bytes = await ioFile.readAsBytes();
-                      pickedFileSize = bytes.length;
                     } catch (_) {}
                   }
 
                   if (bytes != null) {
-                    final ext = pickedFileName!.contains('.')
-                        ? pickedFileName!.split('.').last.toLowerCase()
-                        : '';
+                    final ext = file.extension?.toLowerCase() ??
+                        (pickedFileName!.contains('.')
+                            ? pickedFileName!.split('.').last.toLowerCase()
+                            : '');
                     if (ext == 'csv') {
                       try {
                         final text = utf8.decode(bytes);

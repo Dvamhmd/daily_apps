@@ -88,6 +88,42 @@ class _RundownPageState extends State<RundownPage> {
     }
   }
 
+  Future<void> _editRundown(int index) async {
+    final target = _rundownList[index];
+    final updated = await ModalTambahRundown.show(context, rundown: target);
+    if (updated != null) {
+      setState(() {
+        _rundownList[index] = updated;
+      });
+      await _saveRundowns();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded,
+                    color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Rundown "${updated.title}" berhasil diperbarui!',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: primaryTeal,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _deleteRundown(int index) async {
     final deleted = _rundownList[index];
     final confirm = await showDialog<bool>(
@@ -423,7 +459,9 @@ class _RundownPageState extends State<RundownPage> {
                               ),
                               const SizedBox(width: 5),
                               Text(
-                                '${_formatDateShort(rundown.startDate)} - ${_formatDateShort(rundown.endDate)}',
+                                rundown.totalDays == 1
+                                    ? _formatDateShort(rundown.startDate)
+                                    : '${_formatDateShort(rundown.startDate)} - ${_formatDateShort(rundown.endDate)}',
                                 style: const TextStyle(
                                   fontSize: 12,
                                   color: Color(0xFF64748B),
@@ -444,6 +482,8 @@ class _RundownPageState extends State<RundownPage> {
                       onSelected: (val) {
                         if (val == 'hapus') {
                           _deleteRundown(index);
+                        } else if (val == 'edit') {
+                          _editRundown(index);
                         } else if (val == 'detail') {
                           _navigateToDetail(rundown, index);
                         }
@@ -457,6 +497,17 @@ class _RundownPageState extends State<RundownPage> {
                                   size: 18, color: primaryTeal),
                               SizedBox(width: 8),
                               Text('Lihat Rincian'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_rounded,
+                                  size: 18, color: Color(0xFF0284C7)),
+                              SizedBox(width: 8),
+                              Text('Edit Rundown'),
                             ],
                           ),
                         ),

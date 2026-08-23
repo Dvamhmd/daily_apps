@@ -3,14 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 class ModalTambahRundown extends StatefulWidget {
-  const ModalTambahRundown({super.key});
+  final Rundown? rundown;
 
-  static Future<Rundown?> show(BuildContext context) {
+  const ModalTambahRundown({
+    super.key,
+    this.rundown,
+  });
+
+  static Future<Rundown?> show(BuildContext context, {Rundown? rundown}) {
     return showModalBottomSheet<Rundown>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const ModalTambahRundown(),
+      builder: (_) => ModalTambahRundown(rundown: rundown),
     );
   }
 
@@ -31,9 +36,24 @@ class _ModalTambahRundownState extends State<ModalTambahRundown> {
   // List of controllers for multi-day themes
   final List<TextEditingController> _dayThemeControllers = [];
 
+  bool get isEditing => widget.rundown != null;
+
   @override
   void initState() {
     super.initState();
+    if (isEditing) {
+      final r = widget.rundown!;
+      _titleController.text = r.title;
+      _startDate = r.startDate;
+      _totalDays = r.totalDays;
+      if (r.days.isNotEmpty) {
+        _singleThemeController.text = r.days.first.theme;
+        for (int i = 0; i < r.days.length; i++) {
+          final ctrl = TextEditingController(text: r.days[i].theme);
+          _dayThemeControllers.add(ctrl);
+        }
+      }
+    }
     _syncDayControllers();
   }
 
@@ -114,25 +134,48 @@ class _ModalTambahRundownState extends State<ModalTambahRundown> {
         theme = _dayThemeControllers[i].text.trim();
       }
 
-      days.add(
-        RundownDay.createWithDefaultRows(
-          dayNumber: i + 1,
-          date: dayDate,
-          theme: theme.isNotEmpty ? theme : 'Agenda Hari Ke-${i + 1}',
-          initialRowCount: 5,
-        ),
-      );
+      final fallbackTheme = 'Agenda Hari Ke-${i + 1}';
+      final finalTheme = theme.isNotEmpty ? theme : fallbackTheme;
+
+      if (isEditing && widget.rundown!.days.length > i) {
+        final existingDay = widget.rundown!.days[i];
+        days.add(
+          existingDay.copyWith(
+            dayNumber: i + 1,
+            date: dayDate,
+            theme: finalTheme,
+          ),
+        );
+      } else {
+        days.add(
+          RundownDay.createWithDefaultRows(
+            dayNumber: i + 1,
+            date: dayDate,
+            theme: finalTheme,
+            initialRowCount: 5,
+          ),
+        );
+      }
     }
 
-    final newRundown = Rundown(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      title: title,
-      startDate: _startDate,
-      totalDays: _totalDays,
-      days: days,
-    );
-
-    Navigator.of(context).pop(newRundown);
+    if (isEditing) {
+      final updatedRundown = widget.rundown!.copyWith(
+        title: title,
+        startDate: _startDate,
+        totalDays: _totalDays,
+        days: days,
+      );
+      Navigator.of(context).pop(updatedRundown);
+    } else {
+      final newRundown = Rundown(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        title: title,
+        startDate: _startDate,
+        totalDays: _totalDays,
+        days: days,
+      );
+      Navigator.of(context).pop(newRundown);
+    }
   }
 
   @override
@@ -190,29 +233,35 @@ class _ModalTambahRundownState extends State<ModalTambahRundown> {
                         color: primaryTeal.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: const Icon(
-                        Icons.add_task_rounded,
+                      child: Icon(
+                        isEditing
+                            ? Icons.edit_calendar_rounded
+                            : Icons.add_task_rounded,
                         color: primaryTeal,
                         size: 22,
                       ),
                     ),
                     const SizedBox(width: 14),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Buat Rundown Baru',
-                            style: TextStyle(
+                            isEditing
+                                ? 'Edit Informasi Rundown'
+                                : 'Buat Rundown Baru',
+                            style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: Color(0xFF0F172A),
                             ),
                           ),
-                          SizedBox(height: 2),
+                          const SizedBox(height: 2),
                           Text(
-                            'Tentukan tanggal, durasi, dan tema acara',
-                            style: TextStyle(
+                            isEditing
+                                ? 'Ubah judul, tanggal pelaksanaan, durasi hari, dan tema'
+                                : 'Tentukan tanggal, durasi, dan tema acara',
+                            style: const TextStyle(
                               fontSize: 12,
                               color: Color(0xFF64748B),
                             ),
@@ -446,51 +495,7 @@ class _ModalTambahRundownState extends State<ModalTambahRundown> {
                         ],
                       ),
 
-                      // Quick Day Chips
-                      const SizedBox(height: 10),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        child: Row(
-                          children: [1, 2, 3, 4, 5, 7].map((d) {
-                            final isSelected = _totalDays == d;
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: ChoiceChip(
-                                label: Text(
-                                  '$d Hari',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: isSelected
-                                        ? FontWeight.bold
-                                        : FontWeight.w500,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : const Color(0xFF475569),
-                                  ),
-                                ),
-                                selected: isSelected,
-                                selectedColor: primaryTeal,
-                                backgroundColor: const Color(0xFFF1F5F9),
-                                showCheckmark: false,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  side: BorderSide(
-                                    color: isSelected
-                                        ? primaryTeal
-                                        : Colors.transparent,
-                                  ),
-                                ),
-                                onSelected: (_) => _setTotalDays(d),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 0,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
+
 
                       const SizedBox(height: 22),
 
@@ -669,7 +674,7 @@ class _ModalTambahRundownState extends State<ModalTambahRundown> {
 
                       const SizedBox(height: 28),
 
-                      // Generate Button
+                      // Generate / Save Button
                       SizedBox(
                         width: double.infinity,
                         height: 52,
@@ -684,14 +689,21 @@ class _ModalTambahRundownState extends State<ModalTambahRundown> {
                             elevation: 2,
                             shadowColor: primaryTeal.withValues(alpha: 0.4),
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.auto_awesome_rounded, size: 20),
-                              SizedBox(width: 10),
+                              Icon(
+                                isEditing
+                                    ? Icons.check_circle_rounded
+                                    : Icons.auto_awesome_rounded,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 10),
                               Text(
-                                'Generate Rundown',
-                                style: TextStyle(
+                                isEditing
+                                    ? 'Simpan Perubahan'
+                                    : 'Generate Rundown',
+                                style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 0.3,

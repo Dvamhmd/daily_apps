@@ -1,4 +1,5 @@
 import 'package:daily_apps/models/model_rundown.dart';
+import 'package:daily_apps/widgets/dialog_tambah_rundown.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -29,14 +30,95 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
   // Set of selected row indices for the active day
   final Set<int> _selectedRowIndices = {};
 
-  // Auto cascade time: if true, editing a row's start time or duration automatically updates next rows' start times
-  bool _autoCascadeTime = true;
+  // Auto cascade time: always active so editing a row's start time or duration automatically updates next rows' start times
+  static const bool _autoCascadeTime = true;
+
+  // Horizontal scroll controller for table
+  final ScrollController _horizontalScrollController = ScrollController();
+  double _currentZoom = 1.0;
+
+  // Touch pointer tracking for highly responsive and accurate pinch-to-zoom
+  final Map<int, Offset> _activePointers = {};
+  double? _initialPinchDistance;
+  double _pinchStartZoom = 1.0;
 
   @override
   void initState() {
     super.initState();
     _rundown = widget.rundown;
     _ensureDefaultRows();
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    _activePointers.clear();
+    super.dispose();
+  }
+
+  void _handlePointerDown(PointerDownEvent event) {
+    _activePointers[event.pointer] = event.position;
+    if (_activePointers.length == 2) {
+      final points = _activePointers.values.toList();
+      _initialPinchDistance = (points[0] - points[1]).distance;
+      _pinchStartZoom = _currentZoom;
+    }
+  }
+
+  void _handlePointerMove(PointerMoveEvent event) {
+    if (!_activePointers.containsKey(event.pointer)) return;
+    _activePointers[event.pointer] = event.position;
+
+    if (_activePointers.length == 2 &&
+        _initialPinchDistance != null &&
+        _initialPinchDistance! > 10.0) {
+      final points = _activePointers.values.toList();
+      final currentDistance = (points[0] - points[1]).distance;
+      final scaleFactor = currentDistance / _initialPinchDistance!;
+      final newZoom = (_pinchStartZoom * scaleFactor).clamp(0.45, 2.0);
+
+      if ((newZoom - _currentZoom).abs() > 0.002) {
+        setState(() {
+          _currentZoom = newZoom;
+        });
+      }
+    }
+  }
+
+  void _handlePointerUp(PointerUpEvent event) {
+    _activePointers.remove(event.pointer);
+    if (_activePointers.length < 2) {
+      _initialPinchDistance = null;
+    } else if (_activePointers.length == 2) {
+      final points = _activePointers.values.toList();
+      _initialPinchDistance = (points[0] - points[1]).distance;
+      _pinchStartZoom = _currentZoom;
+    }
+  }
+
+  void _handlePointerCancel(PointerCancelEvent event) {
+    _activePointers.remove(event.pointer);
+    if (_activePointers.length < 2) {
+      _initialPinchDistance = null;
+    }
+  }
+
+  void _zoomIn() {
+    setState(() {
+      _currentZoom = (_currentZoom + 0.1).clamp(0.45, 2.0);
+    });
+  }
+
+  void _zoomOut() {
+    setState(() {
+      _currentZoom = (_currentZoom - 0.1).clamp(0.45, 2.0);
+    });
+  }
+
+  void _resetZoom() {
+    setState(() {
+      _currentZoom = 1.0;
+    });
   }
 
   void _ensureDefaultRows() {
@@ -176,21 +258,9 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
   }
 
   void _deleteSelectedRows() {
+    if (_selectedRowIndices.isEmpty) return;
+
     final activeDay = _rundown.days[_selectedDayIndex];
-    if (_selectedRowIndices.isEmpty) {
-      if (activeDay.rows.isEmpty) return;
-      final newRows = List<RundownTableRow>.from(activeDay.rows)..removeLast();
-      final updatedDay = activeDay.copyWith(rows: newRows);
-      final updatedDays = List<RundownDay>.from(_rundown.days);
-      updatedDays[_selectedDayIndex] = updatedDay;
-
-      setState(() {
-        _rundown = _rundown.copyWith(days: updatedDays);
-      });
-      _notifyChange();
-      return;
-    }
-
     final deleteCount = _selectedRowIndices.length;
     final sortedIndices = _selectedRowIndices.toList()
       ..sort((a, b) => b.compareTo(a));
@@ -225,6 +295,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
         backgroundColor: Colors.redAccent,
         duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -632,6 +703,44 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     }
   }
 
+  Future<void> _openEditRundownModal() async {
+    final updated = await ModalTambahRundown.show(context, rundown: _rundown);
+    if (updated != null) {
+      setState(() {
+        _rundown = updated;
+        if (_selectedDayIndex >= _rundown.days.length) {
+          _selectedDayIndex = (_rundown.days.length - 1).clamp(0, 9999);
+        }
+      });
+      _notifyChange();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded,
+                    color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Informasi rundown berhasil diperbarui!',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: primaryTeal,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final activeDay = (_selectedDayIndex < _rundown.days.length)
@@ -666,6 +775,11 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.edit_note_rounded, color: Colors.white, size: 24),
+            tooltip: 'Edit Informasi Rundown',
+            onPressed: _openEditRundownModal,
+          ),
+          IconButton(
             icon: const Icon(Icons.view_column_rounded, color: Colors.white),
             tooltip: 'Tambah Kolom',
             onPressed: _addNewColumn,
@@ -698,7 +812,12 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
               const SizedBox(height: 10),
 
-              // 5. Interactive Editable Table
+              // Zoom & Scale Control Bar
+              _buildZoomControlBar(),
+
+              const SizedBox(height: 10),
+
+              // 5. Interactive Editable Table (Zoomable)
               _buildInteractiveTable(activeDay),
             ],
 
@@ -732,25 +851,41 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'TABEL RUNDOWN OTOMATIS',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.8,
+              InkWell(
+                onTap: _openEditRundownModal,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.edit_rounded,
+                          color: Colors.white, size: 12),
+                      SizedBox(width: 4),
+                      Text(
+                        'Edit',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
+              const SizedBox(width: 6),
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -780,7 +915,9 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
           ),
           const SizedBox(height: 4),
           Text(
-            '${_formatDateShort(_rundown.startDate)} s/d ${_formatDateShort(_rundown.endDate)}',
+            _rundown.totalDays == 1
+                ? _formatDateShort(_rundown.startDate)
+                : '${_formatDateShort(_rundown.startDate)} s/d ${_formatDateShort(_rundown.endDate)}',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.9),
               fontSize: 12,
@@ -902,55 +1039,10 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          InkWell(
-            onTap: () {
-              setState(() {
-                _autoCascadeTime = !_autoCascadeTime;
-              });
-              if (_autoCascadeTime) {
-                _recalculateDayTimes(_selectedDayIndex);
-              }
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: _autoCascadeTime
-                    ? primaryTeal.withValues(alpha: 0.12)
-                    : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    _autoCascadeTime
-                        ? Icons.link_rounded
-                        : Icons.link_off_rounded,
-                    size: 14,
-                    color: _autoCascadeTime
-                        ? primaryTeal
-                        : const Color(0xFF94A3B8),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    _autoCascadeTime ? 'Auto Sambung' : 'Manual',
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.bold,
-                      color: _autoCascadeTime
-                          ? primaryTeal
-                          : const Color(0xFF64748B),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
-
   Widget _buildTableToolbar(RundownDay activeDay) {
     final allSelected = activeDay.rows.isNotEmpty &&
         _selectedRowIndices.length == activeDay.rows.length;
@@ -962,128 +1054,257 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
-      child: Row(
-        children: [
-          // Select All Checkbox
-          InkWell(
-            onTap: () {
-              setState(() {
-                if (allSelected) {
-                  _selectedRowIndices.clear();
-                } else {
-                  _selectedRowIndices.clear();
-                  for (int i = 0; i < activeDay.rows.length; i++) {
-                    _selectedRowIndices.add(i);
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          children: [
+            // Select All Checkbox
+            InkWell(
+              onTap: () {
+                setState(() {
+                  if (allSelected) {
+                    _selectedRowIndices.clear();
+                  } else {
+                    _selectedRowIndices.clear();
+                    for (int i = 0; i < activeDay.rows.length; i++) {
+                      _selectedRowIndices.add(i);
+                    }
                   }
-                }
-              });
-            },
-            borderRadius: BorderRadius.circular(6),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  allSelected
-                      ? Icons.check_box_rounded
-                      : _selectedRowIndices.isNotEmpty
-                          ? Icons.indeterminate_check_box_rounded
-                          : Icons.check_box_outline_blank_rounded,
-                  color: _selectedRowIndices.isNotEmpty
-                      ? primaryTeal
-                      : const Color(0xFF94A3B8),
-                  size: 20,
+                });
+              },
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      allSelected
+                          ? Icons.check_box_rounded
+                          : _selectedRowIndices.isNotEmpty
+                              ? Icons.indeterminate_check_box_rounded
+                              : Icons.check_box_outline_blank_rounded,
+                      color: _selectedRowIndices.isNotEmpty
+                          ? primaryTeal
+                          : const Color(0xFF94A3B8),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _selectedRowIndices.isNotEmpty
+                          ? 'Pilih Semua (${_selectedRowIndices.length})'
+                          : 'Pilih Semua',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: _selectedRowIndices.isNotEmpty
+                            ? primaryTeal
+                            : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 4),
-                Text(
-                  _selectedRowIndices.isNotEmpty
-                      ? '${_selectedRowIndices.length} dipilih'
-                      : 'Pilih',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: _selectedRowIndices.isNotEmpty
-                        ? primaryTeal
-                        : const Color(0xFF64748B),
+              ),
+            ),
+
+            const SizedBox(width: 12),
+            Container(
+              height: 20,
+              width: 1,
+              color: const Color(0xFFE2E8F0),
+            ),
+            const SizedBox(width: 12),
+
+            // Tambah Baris Button
+            ElevatedButton.icon(
+              onPressed: _addRow,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryTeal,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              icon: const Icon(Icons.add_rounded, size: 16),
+              label: Text(
+                _selectedRowIndices.isNotEmpty
+                    ? '+ ${_selectedRowIndices.length} Baris'
+                    : '+ Baris',
+                style: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ),
+
+            const SizedBox(width: 8),
+
+            // Hapus Baris Button (Active only when rows are checked!)
+            ElevatedButton.icon(
+              onPressed:
+                  _selectedRowIndices.isNotEmpty ? _deleteSelectedRows : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                disabledBackgroundColor: const Color(0xFFF1F5F9),
+                foregroundColor: Colors.white,
+                disabledForegroundColor: const Color(0xFF94A3B8),
+                elevation: 0,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              icon: Icon(
+                Icons.delete_outline_rounded,
+                size: 16,
+                color: _selectedRowIndices.isNotEmpty
+                    ? Colors.white
+                    : const Color(0xFF94A3B8),
+              ),
+              label: Text(
+                _selectedRowIndices.isNotEmpty
+                    ? 'Hapus (${_selectedRowIndices.length})'
+                    : 'Hapus',
+                style: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ),
+
+            const SizedBox(width: 8),
+            // Tambah Kolom Button
+            OutlinedButton.icon(
+              onPressed: _addNewColumn,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: primaryTeal,
+                side: const BorderSide(color: primaryTeal, width: 1.2),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              icon: const Icon(Icons.view_column_rounded, size: 16),
+              label: const Text(
+                '+ Kolom',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static const double _colNoWidth = 40.0;
+  static const double _colMulaiWidth = 80.0;
+  static const double _colSelesaiWidth = 80.0;
+  static const double _colDurasiWidth = 80.0;
+  static const double _colKegiatanWidth = 200.0;
+  static const double _colCustomWidth = 140.0;
+
+  double _calculateBaseTableWidth(RundownDay activeDay) {
+    return _colNoWidth +
+        _colMulaiWidth +
+        _colSelesaiWidth +
+        _colDurasiWidth +
+        _colKegiatanWidth +
+        (activeDay.customColumns.length * _colCustomWidth) +
+        12.0;
+  }
+
+  double _calculateBaseTableHeight(RundownDay activeDay) {
+    const double headerHeight = 38.0;
+    const double dividerHeight = 1.0;
+    const double rowHeight = 44.0;
+    if (activeDay.rows.isEmpty) {
+      return headerHeight + dividerHeight + 60.0;
+    }
+    return headerHeight + dividerHeight + (activeDay.rows.length * rowHeight);
+  }
+
+  Widget _buildZoomControlBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Expanded(
+            child: Row(
+              children: [
+                Icon(Icons.pinch_rounded, size: 18, color: primaryTeal),
+                SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    'Cubit tabel (Pinch) untuk Zoom in / out',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF475569),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
           ),
-
-          const Spacer(),
-
-          // Tambah Baris Button
-          ElevatedButton.icon(
-            onPressed: _addRow,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryTeal,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+          const SizedBox(width: 8),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Zoom Out Button
+              IconButton(
+                icon: const Icon(Icons.remove_circle_outline_rounded, size: 18),
+                color: primaryTeal,
+                tooltip: 'Perkecil Tabel (Zoom Out)',
+                padding: EdgeInsets.zero,
+                constraints:
+                    const BoxConstraints(minWidth: 28, minHeight: 28),
+                onPressed: _zoomOut,
               ),
-            ),
-            icon: const Icon(Icons.add_rounded, size: 16),
-            label: Text(
-              _selectedRowIndices.isNotEmpty
-                  ? '+ ${_selectedRowIndices.length} Baris'
-                  : '+ Baris',
-              style:
-                  const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-            ),
-          ),
-
-          const SizedBox(width: 6),
-
-          // Hapus Baris Button
-          ElevatedButton.icon(
-            onPressed:
-                activeDay.rows.isNotEmpty ? _deleteSelectedRows : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _selectedRowIndices.isNotEmpty
-                  ? Colors.redAccent
-                  : const Color(0xFFF1F5F9),
-              foregroundColor: _selectedRowIndices.isNotEmpty
-                  ? Colors.white
-                  : const Color(0xFF64748B),
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+              const SizedBox(width: 2),
+              // Scale indicator (tap to reset to 100%)
+              InkWell(
+                onTap: _resetZoom,
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '${(_currentZoom * 100).toInt()}%',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                ),
               ),
-            ),
-            icon: Icon(Icons.delete_outline_rounded,
-                size: 16,
-                color: _selectedRowIndices.isNotEmpty
-                    ? Colors.white
-                    : const Color(0xFF64748B)),
-            label: Text(
-              _selectedRowIndices.isNotEmpty
-                  ? 'Hapus (${_selectedRowIndices.length})'
-                  : 'Hapus',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-            ),
-          ),
-
-          const SizedBox(width: 6),
-
-          // Tambah Kolom Button
-          OutlinedButton.icon(
-            onPressed: _addNewColumn,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: primaryTeal,
-              side: const BorderSide(color: primaryTeal, width: 1.2),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+              const SizedBox(width: 2),
+              // Zoom In Button
+              IconButton(
+                icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
+                color: primaryTeal,
+                tooltip: 'Perbesar Tabel (Zoom In)',
+                padding: EdgeInsets.zero,
+                constraints:
+                    const BoxConstraints(minWidth: 28, minHeight: 28),
+                onPressed: _zoomIn,
               ),
-            ),
-            icon: const Icon(Icons.view_column_rounded, size: 16),
-            label: const Text(
-              '+ Kolom',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-            ),
+            ],
           ),
         ],
       ),
@@ -1091,6 +1312,11 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
   }
 
   Widget _buildInteractiveTable(RundownDay activeDay) {
+    final baseWidth = _calculateBaseTableWidth(activeDay);
+    final baseHeight = _calculateBaseTableHeight(activeDay);
+    final scaledWidth = baseWidth * _currentZoom;
+    final scaledHeight = baseHeight * _currentZoom;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1107,36 +1333,71 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 720),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // TABLE HEADER
-              _buildTableHeader(activeDay),
+      child: Scrollbar(
+        controller: _horizontalScrollController,
+        thumbVisibility: true,
+        trackVisibility: true,
+        child: SingleChildScrollView(
+          controller: _horizontalScrollController,
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: SizedBox(
+            width: scaledWidth,
+            height: scaledHeight,
+            child: Listener(
+              onPointerDown: _handlePointerDown,
+              onPointerMove: _handlePointerMove,
+              onPointerUp: _handlePointerUp,
+              onPointerCancel: _handlePointerCancel,
+              behavior: HitTestBehavior.translucent,
+              child: OverflowBox(
+                minWidth: baseWidth,
+                maxWidth: baseWidth,
+                minHeight: baseHeight,
+                maxHeight: baseHeight,
+                alignment: Alignment.topLeft,
+                child: Transform.scale(
+                  scale: _currentZoom,
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(
+                    width: baseWidth,
+                    height: baseHeight,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // TABLE HEADER
+                        _buildTableHeader(activeDay),
 
-              const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                        const Divider(
+                            height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
 
-              // TABLE BODY ROWS
-              if (activeDay.rows.isEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 30),
-                  alignment: Alignment.center,
-                  child: const Text(
-                    'Tidak ada baris di tabel. Klik "+ Baris" untuk menambah.',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                        // TABLE BODY ROWS
+                        if (activeDay.rows.isEmpty)
+                          Container(
+                            width: baseWidth,
+                            height: 60,
+                            alignment: Alignment.center,
+                            child: const Text(
+                              'Tidak ada baris di tabel. Klik "+ Baris" untuk menambah.',
+                              style: TextStyle(
+                                  fontSize: 12, color: Color(0xFF94A3B8)),
+                            ),
+                          )
+                        else
+                          ...List.generate(activeDay.rows.length, (index) {
+                            final row = activeDay.rows[index];
+                            final isSelected =
+                                _selectedRowIndices.contains(index);
+                            return _buildTableRow(
+                                activeDay, row, index, isSelected);
+                          }),
+                      ],
+                    ),
                   ),
-                )
-              else
-                ...List.generate(activeDay.rows.length, (index) {
-                  final row = activeDay.rows[index];
-                  final isSelected = _selectedRowIndices.contains(index);
-                  return _buildTableRow(activeDay, row, index, isSelected);
-                }),
-            ],
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -1145,56 +1406,45 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
   Widget _buildTableHeader(RundownDay activeDay) {
     return Container(
+      height: 38.0,
       color: primaryTeal.withValues(alpha: 0.08),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Select Checkbox / No column
-          const SizedBox(
-            width: 44,
-            child: Text(
+          // 1. Select Checkbox / No column
+          SizedBox(
+            width: _colNoWidth,
+            child: const Text(
               'No',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11.5,
                 fontWeight: FontWeight.bold,
                 color: primaryTeal,
               ),
             ),
           ),
 
-          // 1. WAKTU MULAI
+          // 2. WAKTU MULAI
           const SizedBox(
-            width: 95,
+            width: _colMulaiWidth,
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.access_time_rounded, size: 14, color: primaryTeal),
-                SizedBox(width: 4),
-                Text(
-                  'Mulai',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // 2. DURASI
-          const SizedBox(
-            width: 105,
-            child: Row(
-              children: [
-                Icon(Icons.timer_outlined, size: 14, color: primaryTeal),
-                SizedBox(width: 4),
-                Text(
-                  'Durasi',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
+                Icon(Icons.access_time_rounded, size: 13, color: primaryTeal),
+                SizedBox(width: 3),
+                Flexible(
+                  child: Text(
+                    'Mulai',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -1203,55 +1453,70 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
           // 3. WAKTU SELESAI (OTOMATIS)
           const SizedBox(
-            width: 105,
+            width: _colSelesaiWidth,
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.flag_rounded, size: 14, color: primaryTeal),
-                SizedBox(width: 4),
-                Text(
-                  'Selesai (Otomatis)',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
+                Icon(Icons.flag_rounded, size: 13, color: primaryTeal),
+                SizedBox(width: 3),
+                Flexible(
+                  child: Text(
+                    'Selesai',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
           ),
 
-          // 4. KEGIATAN
+          // 4. DURASI
           const SizedBox(
-            width: 200,
+            width: _colDurasiWidth,
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.event_note_rounded, size: 14, color: primaryTeal),
-                SizedBox(width: 4),
-                Text(
-                  'Kegiatan',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
+                Icon(Icons.timer_outlined, size: 13, color: primaryTeal),
+                SizedBox(width: 3),
+                Flexible(
+                  child: Text(
+                    'Durasi',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
           ),
 
-          // 5. LOKASI
+          // 5. KEGIATAN
           const SizedBox(
-            width: 150,
+            width: _colKegiatanWidth,
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.location_on_rounded, size: 14, color: primaryTeal),
-                SizedBox(width: 4),
-                Text(
-                  'Lokasi',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
+                Icon(Icons.event_note_rounded, size: 13, color: primaryTeal),
+                SizedBox(width: 3),
+                Flexible(
+                  child: Text(
+                    'Kegiatan',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -1261,14 +1526,14 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
           // 6. CUSTOM COLUMNS (e.g. Keterangan, etc.)
           ...activeDay.customColumns.map((colName) {
             return SizedBox(
-              width: 160,
+              width: _colCustomWidth,
               child: Row(
                 children: [
                   Expanded(
                     child: Text(
                       colName,
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 11.5,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF1E293B),
                       ),
@@ -1282,10 +1547,10 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                     child: const Padding(
                       padding: EdgeInsets.all(2.0),
                       child: Icon(Icons.close_rounded,
-                          size: 14, color: Colors.redAccent),
+                          size: 13, color: Colors.redAccent),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 4),
                 ],
               ),
             );
@@ -1303,6 +1568,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
   ) {
     final isEven = index % 2 == 0;
     return Container(
+      height: 44.0,
       decoration: BoxDecoration(
         color: isSelected
             ? primaryTeal.withValues(alpha: 0.12)
@@ -1311,12 +1577,14 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
           bottom: BorderSide(color: Color(0xFFF1F5F9), width: 1),
         ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Select Checkbox & Number
+          // 1. Select Checkbox & Number
           SizedBox(
-            width: 44,
+            width: _colNoWidth,
             child: InkWell(
               onTap: () {
                 setState(() {
@@ -1328,19 +1596,20 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 });
               },
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
                     isSelected
                         ? Icons.check_box_rounded
                         : Icons.check_box_outline_blank_rounded,
-                    size: 17,
+                    size: 16,
                     color: isSelected ? primaryTeal : const Color(0xFFCBD5E1),
                   ),
                   const SizedBox(width: 3),
                   Text(
                     '${index + 1}',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.bold,
                       color: isSelected
                           ? primaryTeal
@@ -1352,22 +1621,22 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             ),
           ),
 
-          // 1. WAKTU MULAI
+          // 2. WAKTU MULAI
           SizedBox(
-            width: 95,
+            width: _colMulaiWidth,
             child: Align(
               alignment: Alignment.centerLeft,
               child: InkWell(
                 onTap: () => _pickRowStartTime(index),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(6),
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
                   decoration: BoxDecoration(
                     color: row.startTime.isNotEmpty
                         ? primaryTeal.withValues(alpha: 0.1)
                         : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(6),
                     border: Border.all(
                       color: row.startTime.isNotEmpty
                           ? primaryTeal.withValues(alpha: 0.3)
@@ -1378,15 +1647,15 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.access_time_rounded,
-                          size: 13,
+                          size: 12,
                           color: row.startTime.isNotEmpty
                               ? primaryTeal
                               : const Color(0xFF94A3B8)),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 3),
                       Text(
                         row.startTime.isNotEmpty ? row.startTime : '--:--',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11.5,
                           fontWeight: FontWeight.bold,
                           color: row.startTime.isNotEmpty
                               ? primaryTeal
@@ -1400,58 +1669,19 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             ),
           ),
 
-          // 2. DURASI (Klik untuk atur durasi)
-          SizedBox(
-            width: 105,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: InkWell(
-                onTap: () => _editRowDuration(index),
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: const Color(0xFFE2E8F0),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        row.durationText,
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.arrow_drop_down_rounded,
-                          size: 16, color: primaryTeal),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
           // 3. WAKTU SELESAI (OTOMATIS)
           SizedBox(
-            width: 105,
+            width: _colSelesaiWidth,
             child: Align(
               alignment: Alignment.centerLeft,
               child: Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
                 decoration: BoxDecoration(
                   color: row.endTime.isNotEmpty
                       ? const Color(0xFFF0FDF4)
                       : const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                   border: Border.all(
                     color: row.endTime.isNotEmpty
                         ? primaryTeal.withValues(alpha: 0.25)
@@ -1462,15 +1692,15 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.check_circle_outline_rounded,
-                        size: 12,
+                        size: 11,
                         color: row.endTime.isNotEmpty
                             ? primaryTeal
                             : const Color(0xFF94A3B8)),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 3),
                     Text(
                       row.endTime.isNotEmpty ? row.endTime : '--:--',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 11.5,
                         fontWeight: FontWeight.bold,
                         color: row.endTime.isNotEmpty
                             ? const Color(0xFF004D40)
@@ -1483,29 +1713,69 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             ),
           ),
 
-          // 4. KEGIATAN (Inline Text Input)
+          // 4. DURASI (Klik untuk atur durasi)
           SizedBox(
-            width: 200,
+            width: _colDurasiWidth,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: InkWell(
+                onTap: () => _editRowDuration(index),
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        row.durationText,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(width: 1),
+                      const Icon(Icons.arrow_drop_down_rounded,
+                          size: 14, color: primaryTeal),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // 5. KEGIATAN (Inline Text Input)
+          SizedBox(
+            width: _colKegiatanWidth,
             child: Padding(
-              padding: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.only(right: 4),
               child: TextFormField(
+                key: ValueKey('${row.id}_activity'),
                 initialValue: row.activity,
                 textCapitalization: TextCapitalization.sentences,
                 style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 12.5,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF0F172A),
                 ),
                 decoration: const InputDecoration(
                   hintText: 'Nama kegiatan...',
                   hintStyle: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11.5,
                     color: Color(0xFFCBD5E1),
                     fontWeight: FontWeight.normal,
                   ),
                   isDense: true,
                   contentPadding:
-                      EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                   border: InputBorder.none,
                 ),
                 onChanged: (val) {
@@ -1516,61 +1786,30 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             ),
           ),
 
-          // 5. LOKASI (Inline Text Input)
-          SizedBox(
-            width: 150,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: TextFormField(
-                initialValue: row.location,
-                textCapitalization: TextCapitalization.sentences,
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF334155),
-                ),
-                decoration: const InputDecoration(
-                  hintText: 'Ruangan / Tempat...',
-                  hintStyle: TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFFCBD5E1),
-                  ),
-                  isDense: true,
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  border: InputBorder.none,
-                ),
-                onChanged: (val) {
-                  row.location = val;
-                  _notifyChange();
-                },
-              ),
-            ),
-          ),
-
           // 6. CUSTOM COLUMNS
           ...activeDay.customColumns.map((colName) {
             final val = row.customValues[colName] ?? '';
             return SizedBox(
-              width: 160,
+              width: _colCustomWidth,
               child: Padding(
-                padding: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.only(right: 4),
                 child: TextFormField(
+                  key: ValueKey('${row.id}_custom_$colName'),
                   initialValue: val,
                   textCapitalization: TextCapitalization.sentences,
                   style: const TextStyle(
-                    fontSize: 12.5,
+                    fontSize: 12,
                     color: Color(0xFF334155),
                   ),
                   decoration: InputDecoration(
                     hintText: '$colName...',
                     hintStyle: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 11.5,
                       color: Color(0xFFCBD5E1),
                     ),
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 6),
+                        horizontal: 6, vertical: 4),
                     border: InputBorder.none,
                   ),
                   onChanged: (newVal) {
