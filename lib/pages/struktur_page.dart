@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:daily_apps/models/model_sheets_config.dart';
 import 'package:daily_apps/models/model_struktur.dart';
 import 'package:daily_apps/utils/custom_rule_import_helper.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
+import 'package:daily_apps/utils/sheets_sync_service.dart';
+import 'package:daily_apps/widgets/google_sheets_config_modal.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -59,6 +62,7 @@ class _StrukturPageState extends State<StrukturPage> {
 
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
   StrukturData _data = StrukturData();
+  SheetsConfig _sheetsConfig = SheetsConfig();
   bool _isLoading = true;
 
   String get _monthKey =>
@@ -68,6 +72,16 @@ class _StrukturPageState extends State<StrukturPage> {
   void initState() {
     super.initState();
     _loadData();
+    _loadSheetsConfig();
+  }
+
+  Future<void> _loadSheetsConfig() async {
+    final cfg = await SheetsConfig.load();
+    if (mounted) {
+      setState(() {
+        _sheetsConfig = cfg;
+      });
+    }
   }
 
   void _prevMonth() {
@@ -389,6 +403,48 @@ class _StrukturPageState extends State<StrukturPage> {
     await prefs.setString(monthlyKey, jsonEncode(_data.toJson()));
     // Simpan juga versi terkini ke key legacy sebagai cadangan/template
     await prefs.setString('struktur_keuangan_data', jsonEncode(_data.toJson()));
+  }
+
+  void _triggerAutoSyncSheets() {
+    if (!_sheetsConfig.isConfigured || !_sheetsConfig.autoSyncOnInput) return;
+
+    final allMutasi = _data.transactions
+        .where((tx) => tx.isPemasukan || tx.isPengeluaran)
+        .toList()
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    SheetsSyncService.syncAllTransactions(
+      allMutasi,
+      _sheetsConfig,
+      customRules: _data.customKodeRules,
+    ).then((res) {
+      if (mounted) {
+        debugPrint('Auto-sync Sheets result: ${res.isSuccess} - ${res.message}');
+        setState(() {});
+      }
+    });
+  }
+
+  void _showGoogleSheetsConfigModal() {
+    final allMutasi = _data.transactions
+        .where((tx) => tx.isPemasukan || tx.isPengeluaran)
+        .toList()
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    GoogleSheetsConfigModal.show(
+      context: context,
+      config: _sheetsConfig,
+      transactions: allMutasi,
+      customRules: _data.customKodeRules,
+      onConfigSaved: (newCfg) {
+        setState(() {
+          _sheetsConfig = newCfg;
+        });
+      },
+      onSyncCompleted: () {
+        setState(() {});
+      },
+    );
   }
 
   // --- MODAL KELOLA KUSTOM ATURAN TRANSAKSI (2 TAB: KU & KATEGORI) ---
@@ -3173,6 +3229,21 @@ class _StrukturPageState extends State<StrukturPage> {
                                   noteText,
                                   customRules: _data.customKodeRules);
 
+                          final newTx = StrukturTransaction(
+                            id: DateTime.now()
+                                .microsecondsSinceEpoch
+                                .toString(),
+                            title: noteText,
+                            type: 'pemasukan',
+                            targetAccount: targetWadah,
+                            amount: nominal,
+                            adminFee: 0,
+                            note: noteText,
+                            ku: autoKu != '-' ? autoKu : null,
+                            kode: autoKode != '-' ? autoKode : null,
+                            timestamp: selectedDate,
+                          );
+
                           setState(() {
                             // 1. Tambah Saldo Wadah
                             if (targetWadah == 'rekening') {
@@ -3184,26 +3255,12 @@ class _StrukturPageState extends State<StrukturPage> {
                             }
 
                             // 2. Catat Transaksi (Tambahkan dan urutkan chronological berdasarkan tanggal)
-                            _data.transactions.add(
-                              StrukturTransaction(
-                                id: DateTime.now()
-                                    .microsecondsSinceEpoch
-                                    .toString(),
-                                title: noteText,
-                                type: 'pemasukan',
-                                targetAccount: targetWadah,
-                                amount: nominal,
-                                adminFee: 0,
-                                note: noteText,
-                                ku: autoKu != '-' ? autoKu : null,
-                                kode: autoKode != '-' ? autoKode : null,
-                                timestamp: selectedDate,
-                              ),
-                            );
+                            _data.transactions.add(newTx);
                             _data.transactions.sort((a, b) => a.timestamp.compareTo(b.timestamp));
                           });
 
                           _saveData();
+                          _triggerAutoSyncSheets();
                           Navigator.pop(ctx);
 
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -3787,6 +3844,21 @@ class _StrukturPageState extends State<StrukturPage> {
                                   keterangan,
                                   customRules: _data.customKodeRules);
 
+                          final newTx = StrukturTransaction(
+                            id: DateTime.now()
+                                .microsecondsSinceEpoch
+                                .toString(),
+                            title: keterangan,
+                            type: 'pengeluaran',
+                            sourceAccount: sourceAccount,
+                            amount: nominal,
+                            adminFee: 0,
+                            note: keterangan,
+                            ku: autoKu != '-' ? autoKu : null,
+                            kode: autoKode != '-' ? autoKode : null,
+                            timestamp: selectedDate,
+                          );
+
                           setState(() {
                             // 1. Kurangi Saldo Sumber
                             if (sourceAccount == 'rekening') {
@@ -3798,26 +3870,12 @@ class _StrukturPageState extends State<StrukturPage> {
                             }
 
                             // 2. Catat Transaksi (Tambahkan dan urutkan chronological berdasarkan tanggal)
-                            _data.transactions.add(
-                              StrukturTransaction(
-                                id: DateTime.now()
-                                    .microsecondsSinceEpoch
-                                    .toString(),
-                                title: keterangan,
-                                type: 'pengeluaran',
-                                sourceAccount: sourceAccount,
-                                amount: nominal,
-                                adminFee: 0,
-                                note: keterangan,
-                                ku: autoKu != '-' ? autoKu : null,
-                                kode: autoKode != '-' ? autoKode : null,
-                                timestamp: selectedDate,
-                              ),
-                            );
+                            _data.transactions.add(newTx);
                             _data.transactions.sort((a, b) => a.timestamp.compareTo(b.timestamp));
                           });
 
                           _saveData();
+                          _triggerAutoSyncSheets();
                           Navigator.pop(ctx);
 
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -4753,6 +4811,7 @@ class _StrukturPageState extends State<StrukturPage> {
                   _data.transactions.removeWhere((item) => item.id == tx.id);
                 });
                 _saveData();
+                _triggerAutoSyncSheets();
                 onDeleted?.call();
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -4770,6 +4829,137 @@ class _StrukturPageState extends State<StrukturPage> {
                     borderRadius: BorderRadius.circular(10)),
               ),
               child: const Text('Hapus & Rollback'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // --- DIALOG KONFIRMASI HAPUS & ROLLBACK SEMUA TRANSAKSI BULAN INI ---
+  void _confirmDeleteAllTransactions([VoidCallback? onDeleted]) {
+    final txList = _data.transactions
+        .where((tx) => tx.isPemasukan || tx.isPengeluaran)
+        .toList();
+
+    if (txList.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tidak ada data transaksi yang perlu dihapus pada bulan ini.'),
+          backgroundColor: Colors.blueGrey,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          contentPadding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+          title: const Row(
+            children: [
+              Icon(Icons.delete_forever_rounded,
+                  color: Colors.redAccent, size: 24),
+              SizedBox(width: 8),
+              Text(
+                'Hapus & Rollback Semua',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Apakah Anda yakin ingin menghapus dan membatalkan seluruh (${txList.length}) transaksi pada bulan ${_namaBulan[_selectedMonth.month - 1]} ${_selectedMonth.year}?',
+                style: const TextStyle(fontSize: 13, color: Color(0xFF334155)),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFFECACA)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded,
+                        size: 18, color: Color(0xFFDC2626)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Seluruh saldo wadah (Rekening, Debit, Cash) akan di-rollback ke kondisi sebelum transaksi, dan tabel Google Spreadsheet akan otomatis dikosongkan.',
+                        style: TextStyle(
+                            fontSize: 11, color: Color(0xFF991B1B)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child:
+                  const Text('Batal', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(ctx);
+                setState(() {
+                  // Rollback saldo semua transaksi
+                  for (final tx in _data.transactions) {
+                    if (tx.isPemasukan) {
+                      if (tx.targetAccount == 'rekening') {
+                        _data.rekeningStruktur.balance -= tx.amount;
+                      } else if (tx.targetAccount == 'debit') {
+                        _data.onHandDebit.balance -= tx.amount;
+                      } else if (tx.targetAccount == 'cash') {
+                        _data.onHandCash.balance -= tx.amount;
+                      }
+                    } else if (tx.isPengeluaran) {
+                      if (tx.sourceAccount == 'rekening') {
+                        _data.rekeningStruktur.balance += tx.totalDeduction;
+                      } else if (tx.sourceAccount == 'debit') {
+                        _data.onHandDebit.balance += tx.totalDeduction;
+                      } else if (tx.sourceAccount == 'cash') {
+                        _data.onHandCash.balance += tx.totalDeduction;
+                      }
+                    }
+                  }
+
+                  // Hapus semua transaksi
+                  _data.transactions.clear();
+                });
+                _saveData();
+                _triggerAutoSyncSheets();
+                onDeleted?.call();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                        '${txList.length} transaksi berhasil dihapus dan saldo telah dipulihkan.'),
+                    backgroundColor: const Color(0xFFDC2626),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+              icon: const Icon(Icons.delete_forever_rounded, size: 16),
+              label: const Text('Hapus & Rollback Semua'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
             ),
           ],
         );
@@ -5808,76 +5998,156 @@ class _StrukturPageState extends State<StrukturPage> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFDE68A),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.table_chart_rounded,
-                          size: 16,
-                          color: Color(0xFFB45309),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Tabel Keuangan ($monthName)',
-                            style: const TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF78350F),
-                            ),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFDE68A),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          const Text(
-                            '5 Transaksi terbaru • Ketuk untuk tabel lengkap',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Color(0xFF92400E),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  InkWell(
-                    onTap: () => _showDetailTabelKeuanganModal(),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEF3C7),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFFDE68A)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '${allMutasi.length} Data',
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFFB45309),
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(
-                            Icons.open_in_new_rounded,
-                            size: 12,
+                          child: const Icon(
+                            Icons.table_chart_rounded,
+                            size: 16,
                             color: Color(0xFFB45309),
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Tabel Keuangan ($monthName)',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF78350F),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const Text(
+                                '5 Transaksi terbaru • Ketuk detail',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  color: Color(0xFF92400E),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+                  const SizedBox(width: 4),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      InkWell(
+                        onTap: () => _showGoogleSheetsConfigModal(),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _sheetsConfig.isConfigured
+                                ? const Color(0xFFDCFCE7)
+                                : const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: _sheetsConfig.isConfigured
+                                  ? const Color(0xFF86EFAC)
+                                  : const Color(0xFFFDE68A),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.table_chart_rounded,
+                                size: 12,
+                                color: _sheetsConfig.isConfigured
+                                    ? const Color(0xFF15803D)
+                                    : const Color(0xFFB45309),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _sheetsConfig.isConfigured
+                                    ? 'Sheets'
+                                    : 'Sheets',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: _sheetsConfig.isConfigured
+                                      ? const Color(0xFF15803D)
+                                      : const Color(0xFFB45309),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      if (allMutasi.isNotEmpty) ...[
+                        InkWell(
+                          onTap: () => _confirmDeleteAllTransactions(),
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF2F2),
+                              borderRadius: BorderRadius.circular(10),
+                              border:
+                                  Border.all(color: const Color(0xFFFECACA)),
+                            ),
+                            child: const Icon(
+                              Icons.delete_sweep_rounded,
+                              size: 14,
+                              color: Color(0xFFDC2626),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      InkWell(
+                        onTap: () => _showDetailTabelKeuanganModal(),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFFDE68A)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${allMutasi.length} Data',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFB45309),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.open_in_new_rounded,
+                                size: 12,
+                                color: Color(0xFFB45309),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -6566,7 +6836,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                     ),
                                   ),
                                   Text(
-                                    'Periode: $monthName $year • 3 Tab Laporan & Rincian',
+                                    'Periode: $monthName $year',
                                     style: const TextStyle(
                                       fontSize: 11.5,
                                       color: Color(0xFF92400E),
@@ -6766,54 +7036,105 @@ class _StrukturPageState extends State<StrukturPage> {
                                 ),
                                 child: Column(
                                   children: [
-                                    // Search Bar
-                                    Container(
-                                      height: 38,
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius:
-                                            BorderRadius.circular(10),
-                                        border: Border.all(
-                                            color: const Color(0xFFFDE68A)),
-                                      ),
-                                      child: TextField(
-                                        controller: searchCtrl,
-                                        onChanged: (val) {
-                                          setModalState(() {
-                                            searchQuery = val.trim();
-                                          });
-                                        },
-                                        style: const TextStyle(fontSize: 12),
-                                        decoration: InputDecoration(
-                                          hintText:
-                                              'Cari keterangan, KU, Kategori, nominal...',
-                                          hintStyle: const TextStyle(
-                                              fontSize: 11.5,
-                                              color: Color(0xFF94A3B8)),
-                                          prefixIcon: const Icon(
-                                              Icons.search_rounded,
-                                              size: 18,
-                                              color: Color(0xFFB45309)),
-                                          suffixIcon: searchQuery.isNotEmpty
-                                              ? IconButton(
-                                                  icon: const Icon(
-                                                      Icons.clear_rounded,
-                                                      size: 16,
-                                                      color: Color(0xFF94A3B8)),
-                                                  onPressed: () {
-                                                    searchCtrl.clear();
-                                                    setModalState(() {
-                                                      searchQuery = '';
-                                                    });
-                                                  },
-                                                )
-                                              : null,
-                                          border: InputBorder.none,
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(
-                                                  horizontal: 10, vertical: 8),
+                                    // Search Bar & Spreadsheets Button
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Container(
+                                            height: 38,
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              border: Border.all(
+                                                  color: const Color(0xFFFDE68A)),
+                                            ),
+                                            child: TextField(
+                                              controller: searchCtrl,
+                                              onChanged: (val) {
+                                                setModalState(() {
+                                                  searchQuery = val.trim();
+                                                });
+                                              },
+                                              style: const TextStyle(fontSize: 12),
+                                              decoration: InputDecoration(
+                                                hintText:
+                                                    'Cari keterangan, KU, Kategori, nominal...',
+                                                hintStyle: const TextStyle(
+                                                    fontSize: 11.5,
+                                                    color: Color(0xFF94A3B8)),
+                                                prefixIcon: const Icon(
+                                                    Icons.search_rounded,
+                                                    size: 18,
+                                                    color: Color(0xFFB45309)),
+                                                suffixIcon: searchQuery.isNotEmpty
+                                                    ? IconButton(
+                                                        icon: const Icon(
+                                                            Icons.clear_rounded,
+                                                            size: 16,
+                                                            color: Color(0xFF94A3B8)),
+                                                        onPressed: () {
+                                                          searchCtrl.clear();
+                                                          setModalState(() {
+                                                            searchQuery = '';
+                                                          });
+                                                        },
+                                                      )
+                                                    : null,
+                                                border: InputBorder.none,
+                                                contentPadding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 10, vertical: 8),
+                                              ),
+                                            ),
+                                          ),
                                         ),
-                                      ),
+                                        const SizedBox(width: 8),
+                                        InkWell(
+                                          onTap: () {
+                                            _showGoogleSheetsConfigModal();
+                                          },
+                                          borderRadius: BorderRadius.circular(10),
+                                          child: Container(
+                                            height: 38,
+                                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                                            decoration: BoxDecoration(
+                                              color: _sheetsConfig.isConfigured
+                                                  ? const Color(0xFF107C41)
+                                                  : const Color(0xFFFEF3C7),
+                                              borderRadius: BorderRadius.circular(10),
+                                              border: Border.all(
+                                                color: _sheetsConfig.isConfigured
+                                                    ? const Color(0xFF0D6334)
+                                                    : const Color(0xFFFDE68A),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.table_chart_rounded,
+                                                  size: 16,
+                                                  color: _sheetsConfig.isConfigured
+                                                      ? Colors.white
+                                                      : const Color(0xFFB45309),
+                                                ),
+                                                const SizedBox(width: 5),
+                                                Text(
+                                                  'Spreadsheets',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: _sheetsConfig.isConfigured
+                                                        ? Colors.white
+                                                        : const Color(0xFFB45309),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                     const SizedBox(height: 8),
 
@@ -8330,10 +8651,63 @@ class _StrukturPageState extends State<StrukturPage> {
                                                           Color(0xFF9F1239),
                                                     ),
                                                   ),
+                                                  const Text(
+                                                    'Spreadsheets',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Color(0xFFB45309),
+                                                    ),
+                                                  ),
                                                 ],
                                               ),
                                             ),
                                           ),
+                                          if (allMutasi.isNotEmpty) ...[
+                                            const SizedBox(width: 6),
+                                            InkWell(
+                                              onTap: () {
+                                                _confirmDeleteAllTransactions(
+                                                    () => setModalState(() {}));
+                                              },
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              child: Container(
+                                                height: 38,
+                                                padding: const EdgeInsets
+                                                    .symmetric(
+                                                    horizontal: 8),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFFEF2F2),
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                  border: Border.all(
+                                                    color: const Color(0xFFFECACA),
+                                                  ),
+                                                ),
+                                                child: const Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      Icons.delete_sweep_rounded,
+                                                      size: 15,
+                                                      color: Color(0xFFDC2626),
+                                                    ),
+                                                    SizedBox(width: 4),
+                                                    Text(
+                                                      'Hapus Semua',
+                                                      style: TextStyle(
+                                                        fontSize: 10.5,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color: Color(0xFFDC2626),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                           Container(
                                             width: 1,
                                             height: 38,
