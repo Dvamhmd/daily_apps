@@ -1,6 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:daily_apps/models/model_struktur.dart';
+import 'package:daily_apps/utils/custom_rule_import_helper.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -472,19 +476,54 @@ class _StrukturPageState extends State<StrukturPage> {
                             Text(
                               'Kustom Aturan Transaksi',
                               style: TextStyle(
-                                fontSize: 17,
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF0F172A),
                               ),
                             ),
                             Text(
-                              'Atur kata kunci keterangan yang memicu auto-input KU & Kategori',
+                              'Atur kata kunci pemicu auto-input KU & Kategori',
                               style: TextStyle(
-                                  fontSize: 11.5, color: Color(0xFF64748B)),
+                                  fontSize: 11, color: Color(0xFF64748B)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
                       ),
+                      const SizedBox(width: 6),
+                      // Tombol Import di Header (Berlaku untuk KU & Kategori)
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          _showImportKustomKodeDialog(
+                            selectedTab,
+                            () => setModalState(() {}),
+                          );
+                        },
+                        icon: const Icon(Icons.file_download_outlined,
+                            size: 15, color: Color(0xFF059669)),
+                        label: const Text(
+                          'Import',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF059669),
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: const Color(0xFFECFDF5),
+                          side: const BorderSide(color: Color(0xFFA7F3D0)),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 7),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
                       IconButton(
                         onPressed: () => Navigator.pop(bottomSheetCtx),
                         icon: const Icon(Icons.close_rounded,
@@ -1348,6 +1387,838 @@ class _StrukturPageState extends State<StrukturPage> {
               child: const Text('Kosongkan'),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  // --- MODAL / DIALOG IMPORT KONFIGURASI ATURAN DARI EXCEL & PASTE ---
+  void _showImportKustomKodeDialog(
+    String defaultTab,
+    VoidCallback onImportSuccess,
+  ) {
+    int importMethod = 0; // 0 = File (.xlsx / .csv), 1 = Salin-Tempel (Paste)
+    bool replaceAll = false; // false = Gabung (Merge), true = Timpa (Replace)
+    String? pickedFileName;
+    int? pickedFileSize;
+    ImportResult? importResult;
+    bool isLoading = false;
+    final textCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> handlePickFile() async {
+              setDialogState(() => isLoading = true);
+              try {
+                final result = await FilePickerPlatform.instance.pickFiles(
+                  type: FileType.custom,
+                  allowedExtensions: ['xlsx', 'xls', 'csv'],
+                );
+
+                if (result != null && result.isNotEmpty) {
+                  final file = result.first;
+                  pickedFileName = file.name;
+
+                  Uint8List? bytes;
+                  if (file.path != null) {
+                    try {
+                      final ioFile = File(file.path!);
+                      bytes = await ioFile.readAsBytes();
+                      pickedFileSize = bytes.length;
+                    } catch (_) {}
+                  }
+
+                  if (bytes != null) {
+                    final ext = pickedFileName!.contains('.')
+                        ? pickedFileName!.split('.').last.toLowerCase()
+                        : '';
+                    if (ext == 'csv') {
+                      try {
+                        final text = utf8.decode(bytes);
+                        importResult = CustomRuleImportHelper.parseText(
+                          text,
+                          defaultType: defaultTab,
+                        );
+                      } catch (_) {
+                        importResult =
+                            CustomRuleImportHelper.parseExcelBytes(
+                          bytes,
+                          defaultType: defaultTab,
+                        );
+                      }
+                    } else {
+                      importResult =
+                          CustomRuleImportHelper.parseExcelBytes(
+                        bytes,
+                        defaultType: defaultTab,
+                      );
+                    }
+                  } else {
+                    importResult = ImportResult.error(
+                        'Tidak dapat membaca isi data file yang dipilih.');
+                  }
+                }
+              } catch (e) {
+                importResult = ImportResult.error('Gagal memilih file: $e');
+              } finally {
+                setDialogState(() => isLoading = false);
+              }
+            }
+
+            void handleProcessText() {
+              if (textCtrl.text.trim().isEmpty) {
+                setDialogState(() {
+                  importResult = ImportResult.error(
+                      'Teks masih kosong. Silakan tempel data dari Excel.');
+                });
+                return;
+              }
+              setDialogState(() {
+                importResult = CustomRuleImportHelper.parseText(
+                  textCtrl.text,
+                  defaultType: defaultTab,
+                );
+              });
+            }
+
+            Future<void> handlePasteClipboard() async {
+              final data = await Clipboard.getData(Clipboard.kTextPlain);
+              if (data != null && data.text != null && data.text!.isNotEmpty) {
+                textCtrl.text = data.text!;
+                handleProcessText();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Clipboard masih kosong atau tidak berisi teks.'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            }
+
+            void handleUseSampleFormat() {
+              textCtrl.text = CustomRuleImportHelper.getTemplateSampleText();
+              handleProcessText();
+            }
+
+            final hasValidRules =
+                importResult != null && importResult!.rules.isNotEmpty;
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+              titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+              contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.table_view_rounded,
+                        color: Color(0xFF059669), size: 22),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Import Konfigurasi Aturan',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        Text(
+                          'Masukkan aturan KU & Kategori sekaligus dari Excel',
+                          style: TextStyle(
+                              fontSize: 11, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(dialogCtx),
+                    icon: const Icon(Icons.close_rounded,
+                        color: Color(0xFF64748B), size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Toggle Pilihan Metode: File Excel vs Paste
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () {
+                                  setDialogState(() {
+                                    importMethod = 0;
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 7),
+                                  decoration: BoxDecoration(
+                                    color: importMethod == 0
+                                        ? Colors.white
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(8),
+                                    boxShadow: importMethod == 0
+                                        ? [
+                                            BoxShadow(
+                                              color: Colors.black
+                                                  .withValues(alpha: 0.05),
+                                              blurRadius: 4,
+                                              offset: const Offset(0, 1),
+                                            )
+                                          ]
+                                        : [],
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.file_present_rounded,
+                                        size: 14,
+                                        color: importMethod == 0
+                                            ? const Color(0xFF059669)
+                                            : const Color(0xFF64748B),
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        'File (.xlsx / .csv)',
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: importMethod == 0
+                                              ? const Color(0xFF059669)
+                                              : const Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () {
+                                  setDialogState(() {
+                                    importMethod = 1;
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 7),
+                                  decoration: BoxDecoration(
+                                    color: importMethod == 1
+                                        ? Colors.white
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(8),
+                                    boxShadow: importMethod == 1
+                                        ? [
+                                            BoxShadow(
+                                              color: Colors.black
+                                                  .withValues(alpha: 0.05),
+                                              blurRadius: 4,
+                                              offset: const Offset(0, 1),
+                                            )
+                                          ]
+                                        : [],
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.content_paste_rounded,
+                                        size: 14,
+                                        color: importMethod == 1
+                                            ? const Color(0xFF059669)
+                                            : const Color(0xFF64748B),
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        'Salin-Tempel (Paste)',
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: importMethod == 1
+                                              ? const Color(0xFF059669)
+                                              : const Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Body Berdasarkan Tab Pilihan
+                      if (importMethod == 0) ...[
+                        // METODE FILE
+                        InkWell(
+                          onTap: isLoading ? null : handlePickFile,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFF10B981)
+                                    .withValues(alpha: 0.5),
+                                style: BorderStyle.solid,
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                if (isLoading) ...[
+                                  const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: Color(0xFF059669),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Membaca file Excel...',
+                                    style: TextStyle(
+                                        fontSize: 12, color: Color(0xFF065F46)),
+                                  ),
+                                ] else if (pickedFileName != null) ...[
+                                  const Icon(Icons.check_circle_rounded,
+                                      size: 28, color: Color(0xFF059669)),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    pickedFileName!,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF065F46),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (pickedFileSize != null)
+                                    Text(
+                                      'Ukuran: ${(pickedFileSize! / 1024).toStringAsFixed(1)} KB • Klik untuk ganti file',
+                                      style: const TextStyle(
+                                          fontSize: 10.5,
+                                          color: Color(0xFF047857)),
+                                    ),
+                                ] else ...[
+                                  const Icon(Icons.file_download_outlined,
+                                      size: 32, color: Color(0xFF059669)),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'Pilih File Excel (.xlsx / .xls / .csv)',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF065F46),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  const Text(
+                                    'Klik di sini untuk membuka file dari perangkat',
+                                    style: TextStyle(
+                                        fontSize: 10.5,
+                                        color: Color(0xFF047857)),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ] else ...[
+                        // METODE PASTE TEXT
+                        // Format Panduan Ringkas (Hanya Tampil di Opsi Salin-Tempel/Paste)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.info_outline_rounded,
+                                      size: 14, color: Color(0xFF6366F1)),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'Format Kolom yang Dibutuhkan:',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF1E293B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                      color: const Color(0xFFCBD5E1)),
+                                ),
+                                child: const Text(
+                                  'Jenis Aturan  |  Keterangan Pemicu  |  Hasil\n'
+                                  'KU            |  rapat              |  Sekretaris\n'
+                                  'KU            |  pengabaran         |  Publikasi\n'
+                                  'Kategori      |  Konsumsi           |  Konsumsi',
+                                  style: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 9.5,
+                                    color: Color(0xFF334155),
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        TextField(
+                          controller: textCtrl,
+                          maxLines: 4,
+                          style: const TextStyle(
+                              fontSize: 11, fontFamily: 'monospace'),
+                          decoration: InputDecoration(
+                            hintText:
+                                'Tempel baris tabel dari Excel di sini...',
+                            hintStyle: const TextStyle(
+                                fontSize: 11, color: Color(0xFF94A3B8)),
+                            filled: true,
+                            fillColor: const Color(0xFFF8FAFC),
+                            contentPadding: const EdgeInsets.all(10),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide:
+                                  const BorderSide(color: Color(0xFFCBD5E1)),
+                            ),
+                          ),
+                          onChanged: (_) => handleProcessText(),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            TextButton.icon(
+                              onPressed: handlePasteClipboard,
+                              icon: const Icon(Icons.paste_rounded,
+                                  size: 13, color: Color(0xFF059669)),
+                              label: const Text(
+                                'Tempel Clipboard',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF059669)),
+                              ),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                            const Spacer(),
+                            TextButton.icon(
+                              onPressed: handleUseSampleFormat,
+                              icon: const Icon(Icons.format_quote_rounded,
+                                  size: 13, color: Color(0xFF6366F1)),
+                              label: const Text(
+                                'Gunakan Contoh Format',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF6366F1)),
+                              ),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+
+                      // Hasil Pratinjau / Error Box
+                      if (importResult != null) ...[
+                        if (importResult!.isSuccess) ...[
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0FDF4),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                  color: const Color(0xFF10B981)
+                                      .withValues(alpha: 0.3)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.check_circle_rounded,
+                                        size: 15, color: Color(0xFF059669)),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Berhasil Membaca ${importResult!.rules.length} Aturan:',
+                                      style: const TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF065F46),
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF10B981),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        '${importResult!.kuCount} KU • ${importResult!.kategoriCount} Kategori',
+                                        style: const TextStyle(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Container(
+                                  constraints:
+                                      const BoxConstraints(maxHeight: 90),
+                                  child: ListView.separated(
+                                    shrinkWrap: true,
+                                    itemCount: importResult!.rules.length > 5
+                                        ? 5
+                                        : importResult!.rules.length,
+                                    separatorBuilder: (_, __) =>
+                                        const Divider(height: 6, thickness: 0.5),
+                                    itemBuilder: (ctx, idx) {
+                                      final r = importResult!.rules[idx];
+                                      final isKu = r.type == 'ku';
+                                      return Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 5, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: isKu
+                                                  ? const Color(0xFFEFF6FF)
+                                                  : const Color(0xFFEEF2FF),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              isKu ? 'KU' : 'Kategori',
+                                              style: TextStyle(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                                color: isKu
+                                                    ? const Color(0xFF1D4ED8)
+                                                    : const Color(0xFF4F46E5),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
+                                              '"${r.keyword}" ➔ "${r.kode}"',
+                                              style: const TextStyle(
+                                                fontSize: 10.5,
+                                                color: Color(0xFF334155),
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  ),
+                                ),
+                                if (importResult!.rules.length > 5)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Text(
+                                      '... dan ${importResult!.rules.length - 5} aturan lainnya.',
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontStyle: FontStyle.italic,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ] else ...[
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF2F2),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                  color: const Color(0xFFEF4444)
+                                      .withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline_rounded,
+                                    size: 15, color: Color(0xFFDC2626)),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    importResult!.errorMessage ??
+                                        'Format data tidak sesuai.',
+                                    style: const TextStyle(
+                                        fontSize: 11, color: Color(0xFF991B1B)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                      ],
+
+                      // Pilihan Mode Simpan (Gabungkan vs Timpa)
+                      const Text(
+                        'Pilih Mode Penyimpanan:',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF334155),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: () {
+                                setDialogState(() => replaceAll = false);
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: !replaceAll
+                                      ? const Color(0xFFEFF6FF)
+                                      : const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: !replaceAll
+                                        ? const Color(0xFF3B82F6)
+                                        : const Color(0xFFE2E8F0),
+                                    width: !replaceAll ? 1.2 : 1.0,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          !replaceAll
+                                              ? Icons.radio_button_checked
+                                              : Icons.radio_button_off,
+                                          size: 13,
+                                          color: !replaceAll
+                                              ? const Color(0xFF2563EB)
+                                              : const Color(0xFF94A3B8),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        const Text(
+                                          'Gabungkan',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF1E293B),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    const Text(
+                                      'Pertahankan aturan lama & tambah baru',
+                                      style: TextStyle(
+                                          fontSize: 9.5,
+                                          color: Color(0xFF64748B)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () {
+                                setDialogState(() => replaceAll = true);
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: replaceAll
+                                      ? const Color(0xFFFEF2F2)
+                                      : const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: replaceAll
+                                        ? const Color(0xFFEF4444)
+                                        : const Color(0xFFE2E8F0),
+                                    width: replaceAll ? 1.2 : 1.0,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          replaceAll
+                                              ? Icons.radio_button_checked
+                                              : Icons.radio_button_off,
+                                          size: 13,
+                                          color: replaceAll
+                                              ? const Color(0xFFDC2626)
+                                              : const Color(0xFF94A3B8),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        const Text(
+                                          'Timpa Semua',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF1E293B),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    const Text(
+                                      'Ganti semua aturan dengan data ini',
+                                      style: TextStyle(
+                                          fontSize: 9.5,
+                                          color: Color(0xFF64748B)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: const Text('Batal'),
+                ),
+                ElevatedButton(
+                  onPressed: hasValidRules
+                      ? () {
+                          final updated = CustomRuleImportHelper.applyImport(
+                            currentRules: _data.customKodeRules,
+                            importedRules: importResult!.rules,
+                            replaceAll: replaceAll,
+                          );
+
+                          setState(() {
+                            _data.customKodeRules = updated;
+                          });
+
+                          _saveData();
+                          onImportSuccess();
+                          Navigator.pop(dialogCtx);
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                replaceAll
+                                    ? '✅ Berhasil menimpa seluruh aturan dengan ${importResult!.rules.length} aturan baru!'
+                                    : '✅ Berhasil mengimpor & menggabungkan ${importResult!.rules.length} aturan (${importResult!.kuCount} KU, ${importResult!.kategoriCount} Kategori)!',
+                              ),
+                              backgroundColor: const Color(0xFF059669),
+                              behavior: SnackBarBehavior.floating,
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF059669),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey[300],
+                    disabledForegroundColor: Colors.grey[500],
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(
+                    hasValidRules
+                        ? 'Simpan (${importResult!.rules.length} Aturan)'
+                        : 'Simpan',
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );
