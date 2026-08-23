@@ -6019,10 +6019,10 @@ class _StrukturPageState extends State<StrukturPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'Tabel Keuangan ($monthName)',
-                                style: const TextStyle(
-                                  fontSize: 13,
+                              const Text(
+                                'Tabel Keuangan',
+                                style: TextStyle(
+                                  fontSize: 13.5,
                                   fontWeight: FontWeight.bold,
                                   color: Color(0xFF78350F),
                                 ),
@@ -6044,55 +6044,10 @@ class _StrukturPageState extends State<StrukturPage> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 6),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      InkWell(
-                        onTap: () => _showGoogleSheetsConfigModal(),
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: _sheetsConfig.isConfigured
-                                ? const Color(0xFFDCFCE7)
-                                : const Color(0xFFFEF3C7),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: _sheetsConfig.isConfigured
-                                  ? const Color(0xFF86EFAC)
-                                  : const Color(0xFFFDE68A),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.table_chart_rounded,
-                                size: 12,
-                                color: _sheetsConfig.isConfigured
-                                    ? const Color(0xFF15803D)
-                                    : const Color(0xFFB45309),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                _sheetsConfig.isConfigured
-                                    ? 'Sheets'
-                                    : 'Sheets',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: _sheetsConfig.isConfigured
-                                      ? const Color(0xFF15803D)
-                                      : const Color(0xFFB45309),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
                       if (allMutasi.isNotEmpty) ...[
                         InkWell(
                           onTap: () => _confirmDeleteAllTransactions(),
@@ -7875,7 +7830,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                           ),
                                         ),
                                       ),
-                              ),
+                                    ),
 
                               // Bottom Total Summary Bar Tab Laporan
                               Container(
@@ -7996,12 +7951,17 @@ class _StrukturPageState extends State<StrukturPage> {
                             final kategori =
                                 rawKategori.isEmpty ? '-' : rawKategori;
                             final kategoriLower = kategori.toLowerCase();
+                            final noteOrTitle =
+                                '${tx.title} ${tx.note ?? ''}'.toLowerCase();
                             final bool isSaldoAwal =
-                                kategoriLower.contains('saldo awal');
+                                kategoriLower.contains('saldo awal') ||
+                                noteOrTitle.contains('saldo awal');
                             final bool isDanaS3 = !isSaldoAwal &&
                                 (kategoriLower.contains('dana dari s3') ||
                                     kategoriLower.contains('dana s3') ||
-                                    kategoriLower == 's3');
+                                    kategoriLower == 's3' ||
+                                    noteOrTitle.contains('dana dari s3') ||
+                                    noteOrTitle.contains('dana s3'));
 
                             // Lewati jika kategori mengandung "DP", "Saldo Awal", "Dana dari S3", atau merupakan transaksi DP
                             if (kategori.toUpperCase().contains('DP') ||
@@ -8197,14 +8157,19 @@ class _StrukturPageState extends State<StrukturPage> {
                                   customRules: _data.customKodeRules)
                               .trim();
                           final kategoriLower = rawKategori.toLowerCase();
+                          final noteOrTitle =
+                              '${tx.title} ${tx.note ?? ''}'.toLowerCase();
 
                           final bool isSaldoAwal =
-                              kategoriLower.contains('saldo awal');
+                              kategoriLower.contains('saldo awal') ||
+                              noteOrTitle.contains('saldo awal');
 
                           final bool isDanaS3 = !isSaldoAwal &&
                               (kategoriLower.contains('dana dari s3') ||
                                   kategoriLower.contains('dana s3') ||
-                                  kategoriLower == 's3');
+                                  kategoriLower == 's3' ||
+                                  noteOrTitle.contains('dana dari s3') ||
+                                  noteOrTitle.contains('dana s3'));
 
                           if (isSaldoAwal) {
                             saldoAwalNominal += tx.amount;
@@ -8651,63 +8616,10 @@ class _StrukturPageState extends State<StrukturPage> {
                                                           Color(0xFF9F1239),
                                                     ),
                                                   ),
-                                                  const Text(
-                                                    'Spreadsheets',
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: Color(0xFFB45309),
-                                                    ),
-                                                  ),
                                                 ],
                                               ),
                                             ),
                                           ),
-                                          if (allMutasi.isNotEmpty) ...[
-                                            const SizedBox(width: 6),
-                                            InkWell(
-                                              onTap: () {
-                                                _confirmDeleteAllTransactions(
-                                                    () => setModalState(() {}));
-                                              },
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                              child: Container(
-                                                height: 38,
-                                                padding: const EdgeInsets
-                                                    .symmetric(
-                                                    horizontal: 8),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFFFEF2F2),
-                                                  borderRadius:
-                                                      BorderRadius.circular(10),
-                                                  border: Border.all(
-                                                    color: const Color(0xFFFECACA),
-                                                  ),
-                                                ),
-                                                child: const Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    Icon(
-                                                      Icons.delete_sweep_rounded,
-                                                      size: 15,
-                                                      color: Color(0xFFDC2626),
-                                                    ),
-                                                    SizedBox(width: 4),
-                                                    Text(
-                                                      'Hapus Semua',
-                                                      style: TextStyle(
-                                                        fontSize: 10.5,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        color: Color(0xFFDC2626),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          ],
                                           Container(
                                             width: 1,
                                             height: 38,
