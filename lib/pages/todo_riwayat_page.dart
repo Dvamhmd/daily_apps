@@ -549,26 +549,26 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 3),
               itemCount: group.items.length,
               separatorBuilder: (ctx, idx) => Divider(
                 height: 1,
                 thickness: 0.6,
                 color: Colors.grey.withValues(alpha: 0.12),
-                indent: 52,
+                indent: 44,
               ),
               itemBuilder: (ctx, idx) {
                 final item = group.items[idx];
                 return Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
+                    horizontal: 12,
+                    vertical: 3.5,
                   ),
                   child: Row(
                     children: [
                       Container(
-                        width: 22,
-                        height: 22,
+                        width: 20,
+                        height: 20,
                         decoration: const BoxDecoration(
                           color: accentCompleted,
                           shape: BoxShape.circle,
@@ -576,15 +576,15 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                         child: const Icon(
                           Icons.check_rounded,
                           color: Colors.white,
-                          size: 14,
+                          size: 13,
                         ),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           item.title,
                           style: const TextStyle(
-                            fontSize: 13.5,
+                            fontSize: 12.5,
                             color: Color(0xFF64748B),
                             decoration: TextDecoration.lineThrough,
                             decorationColor: Color(0xFF94A3B8),
@@ -594,19 +594,19 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                       TextButton.icon(
                         onPressed: () => _uncompleteTask(group, item),
                         style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                         icon: const Icon(
                           Icons.undo_rounded,
-                          size: 14,
+                          size: 13,
                           color: primaryTerracotta,
                         ),
                         label: const Text(
                           'Aktifkan',
                           style: TextStyle(
-                            fontSize: 11.5,
+                            fontSize: 11,
                             color: primaryTerracotta,
                             fontWeight: FontWeight.bold,
                           ),

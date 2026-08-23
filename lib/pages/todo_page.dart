@@ -1658,13 +1658,13 @@ class _TodoPageState extends State<TodoPage> {
               ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.symmetric(vertical: 3),
                 itemCount: itemsToShow.length,
                 separatorBuilder: (ctx, idx) => Divider(
                   height: 1,
                   thickness: 0.6,
                   color: Colors.grey.withValues(alpha: 0.12),
-                  indent: 52,
+                  indent: 44,
                 ),
                 itemBuilder: (ctx, idx) {
                   final item = itemsToShow[idx];
@@ -1675,15 +1675,15 @@ class _TodoPageState extends State<TodoPage> {
             // Tombol + Tambah Kerjaan pada section ini
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
+              padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
               child: InkWell(
                 onTap: () => _showAddTaskDialog(group),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  padding: const EdgeInsets.symmetric(vertical: 7),
                   decoration: BoxDecoration(
                     color: primaryTerracotta.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: primaryTerracotta.withValues(alpha: 0.2),
                     ),
@@ -1693,16 +1693,16 @@ class _TodoPageState extends State<TodoPage> {
                     children: [
                       Icon(
                         Icons.add_circle_rounded,
-                        size: 18,
+                        size: 16,
                         color: primaryTerracotta,
                       ),
-                      SizedBox(width: 8),
+                      SizedBox(width: 6),
                       Text(
                         'Tambah Kerjaan',
                         style: TextStyle(
                           color: primaryTerracotta,
                           fontWeight: FontWeight.bold,
-                          fontSize: 13,
+                          fontSize: 12,
                         ),
                       ),
                     ],
@@ -1724,15 +1724,15 @@ class _TodoPageState extends State<TodoPage> {
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 18),
+        padding: const EdgeInsets.only(right: 16),
         color: Colors.red[600],
-        child: const Icon(Icons.delete_rounded, color: Colors.white, size: 20),
+        child: const Icon(Icons.delete_rounded, color: Colors.white, size: 18),
       ),
       onDismissed: (_) => _deleteTask(group, item),
       child: InkWell(
         onTap: () => _toggleTask(item),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3.5),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -1740,8 +1740,8 @@ class _TodoPageState extends State<TodoPage> {
                 onTap: () => _toggleTask(item),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  width: 26,
-                  height: 26,
+                  width: 22,
+                  height: 22,
                   decoration: BoxDecoration(
                     color: item.isCompleted ? accentCompleted : Colors.white,
                     shape: BoxShape.circle,
@@ -1749,14 +1749,14 @@ class _TodoPageState extends State<TodoPage> {
                       color: item.isCompleted
                           ? accentCompleted
                           : const Color(0xFFCBD5E1),
-                      width: 2.0,
+                      width: 1.8,
                     ),
                     boxShadow: item.isCompleted
                         ? [
                             BoxShadow(
-                              color: accentCompleted.withValues(alpha: 0.3),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
+                              color: accentCompleted.withValues(alpha: 0.25),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1.5),
                             ),
                           ]
                         : [],
@@ -1766,18 +1766,18 @@ class _TodoPageState extends State<TodoPage> {
                         ? const Icon(
                             Icons.check_rounded,
                             color: Colors.white,
-                            size: 16,
+                            size: 13,
                           )
                         : null,
                   ),
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   item.title,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 12.5,
                     color: item.isCompleted
                         ? const Color(0xFF94A3B8)
                         : const Color(0xFF1E293B),
@@ -1793,18 +1793,25 @@ class _TodoPageState extends State<TodoPage> {
               IconButton(
                 icon: const Icon(
                   Icons.edit_outlined,
-                  size: 17,
+                  size: 15,
                   color: Color(0xFF94A3B8),
                 ),
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
                 tooltip: 'Edit Tugas',
                 onPressed: () => _showEditTaskDialog(item),
               ),
+              const SizedBox(width: 4),
               IconButton(
                 icon: const Icon(
                   Icons.close_rounded,
-                  size: 17,
+                  size: 15,
                   color: Color(0xFFCBD5E1),
                 ),
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
                 tooltip: 'Hapus Tugas',
                 onPressed: () => _deleteTask(group, item),
               ),
