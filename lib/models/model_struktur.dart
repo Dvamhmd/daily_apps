@@ -128,7 +128,7 @@ class StrukturTransaction {
     required this.title,
     required this.type,
     this.sourceAccount,
-    this.targetAccount,
+     this.targetAccount,
     this.manualSource,
     required this.amount,
     this.adminFee = 0,
