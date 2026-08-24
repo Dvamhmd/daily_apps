@@ -154,6 +154,11 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
       'label': 'Bukti Mutasi Rekening 4',
       'desc': 'Foto Mutasi Rekening Halaman 4'
     },
+    {
+      'key': 'bukti_mutasi_5',
+      'label': 'Bukti Mutasi Rekening 5',
+      'desc': 'Foto Mutasi Rekening Halaman 5'
+    },
   ];
 
   List<Map<String, String>> get _fieldDefinitions => [

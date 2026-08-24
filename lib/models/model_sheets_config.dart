@@ -49,6 +49,7 @@ class SheetsConfig {
         'bukti_mutasi_2': 'L',
         'bukti_mutasi_3': 'M',
         'bukti_mutasi_4': 'N',
+        'bukti_mutasi_5': 'O',
       };
 
   static Map<String, int> defaultEvidenceRowMapping() => {
@@ -58,6 +59,7 @@ class SheetsConfig {
         'bukti_mutasi_2': 2,
         'bukti_mutasi_3': 2,
         'bukti_mutasi_4': 2,
+        'bukti_mutasi_5': 2,
       };
 
   int getEvidenceRow(String key, {int fallback = 2}) {

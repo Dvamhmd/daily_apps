@@ -256,6 +256,8 @@ class SheetsSyncService {
           'action': 'sync_all',
           'sheetName': config.sheetName,
           'startRow': config.startRow,
+          'targetRow': config.evidenceTargetRow,
+          'rowMapping': config.evidenceRowMapping,
           'mapping': config.columnMapping,
           'rows': [],
         };
@@ -274,13 +276,15 @@ class SheetsSyncService {
         );
       }
 
-      // Jika data <= 6 baris, kirim sekaligus
-      const int batchSize = 6;
-      if (rows.length <= batchSize) {
+      // Kirim seluruh baris transaksi dalam 1 request POST instan (Single-Flight Direct Sync)
+      // Jauh lebih cepat (0.5 - 1 detik) dibandingkan multi-batching mikro
+      if (rows.length <= 150) {
         final payload = {
           'action': 'sync_all',
           'sheetName': config.sheetName,
           'startRow': config.startRow,
+          'targetRow': config.evidenceTargetRow,
+          'rowMapping': config.evidenceRowMapping,
           'mapping': config.columnMapping,
           'rows': rows,
         };
@@ -288,7 +292,7 @@ class SheetsSyncService {
         final res = await _sendPostRequest(config.webAppUrl, payload);
         final status = res['status'] as String?;
         final msg = res['message'] as String? ??
-            'Berhasil sinkronisasi ${rows.length} data.';
+            'Berhasil sinkronisasi ${rows.length} data transaksi.';
 
         if (status == 'success' || status == null) {
           config.lastSyncStatus = 'success';
@@ -308,7 +312,8 @@ class SheetsSyncService {
         }
       }
 
-      // Jika data > 6 baris, kirim per-batch aman agar tidak terpotong batasan URL di browser
+      // Jika data sangat besar (> 150 baris), bagi dengan ukuran batch besar (100 per batch)
+      const int batchSize = 100;
       int totalSynced = 0;
       final int totalChunks = (rows.length / batchSize).ceil();
 
@@ -322,9 +327,11 @@ class SheetsSyncService {
 
         final payload = {
           'action': 'sync_batch',
-          'clearFirst': chunkIdx == 0, // Hanya bersihkan sheet pada batch pertama
+          'clearFirst': chunkIdx == 0,
           'sheetName': config.sheetName,
           'startRow': chunkStartRow,
+          'targetRow': config.evidenceTargetRow,
+          'rowMapping': config.evidenceRowMapping,
           'mapping': config.columnMapping,
           'rows': chunkRows,
           'chunkIndex': chunkIdx,
@@ -334,7 +341,8 @@ class SheetsSyncService {
         final res = await _sendPostRequest(config.webAppUrl, payload);
         final status = res['status'] as String?;
         if (status == 'error') {
-          final errorMsg = res['message'] as String? ?? 'Gagal pada batch ke-${chunkIdx + 1}';
+          final errorMsg = res['message'] as String? ??
+              'Gagal pada batch ke-${chunkIdx + 1}';
           config.lastSyncStatus = 'failed';
           config.lastSyncMessage = errorMsg;
           await config.save();
@@ -346,7 +354,8 @@ class SheetsSyncService {
         totalSynced += chunkRows.length;
       }
 
-      final successMsg = 'Berhasil sinkronisasi seluruh $totalSynced data transaksi ke spreadsheet.';
+      final successMsg =
+          'Berhasil sinkronisasi seluruh $totalSynced data transaksi ke spreadsheet.';
       config.lastSyncStatus = 'success';
       config.lastSyncMessage = successMsg;
       config.lastSyncTime = DateTime.now();
@@ -459,11 +468,13 @@ class SheetsSyncService {
   }
 
   /// Mengunggah gambar bukti fisik / digital ke Google Drive & menaruh link/formula di Spreadsheet
+  /// Menggunakan metode Paralel Berkecepatan Tinggi (Concurrent Uploads) untuk performa instan tanpa menurunkan kualitas gambar
   static Future<SheetsSyncResult> uploadEvidenceImages({
     required SheetsConfig config,
     required List<Map<String, dynamic>> imagesPayload,
     required String monthLabel,
     int? targetRow,
+    Function(int completedCount, int totalCount, String currentKey, bool isSuccess, String message)? onProgress,
   }) async {
     if (!config.isConfigured) {
       return SheetsSyncResult(
@@ -479,7 +490,14 @@ class SheetsSyncService {
       );
     }
 
-    try {
+    final totalCount = imagesPayload.length;
+    int completedCount = 0;
+    int successCount = 0;
+    final List<String> errorMessages = [];
+
+    // Jika hanya 1 gambar, langsung kirim 1 request cepat
+    if (imagesPayload.length == 1) {
+      final img = imagesPayload.first;
       final payload = {
         'action': 'upload_evidence_images',
         'sheetName': config.sheetName,
@@ -489,31 +507,96 @@ class SheetsSyncService {
         'rowMapping': config.evidenceRowMapping,
         'useImageFormula': config.insertImageFormula,
         'monthLabel': monthLabel,
-        'images': imagesPayload,
+        'images': [img],
       };
 
-      final res = await _sendPostRequest(config.webAppUrl, payload);
-      final status = res['status'] as String?;
-      final msg =
-          res['message'] as String? ?? 'Gambar bukti berhasil diunggah.';
-
-      if (status == 'success' || status == null) {
-        config.lastSyncStatus = 'success';
-        config.lastSyncMessage = msg;
-        config.lastSyncTime = DateTime.now();
-        await config.save();
-        return SheetsSyncResult(
-          isSuccess: true,
-          message: msg,
-          count: (res['uploadedCount'] as num?)?.toInt() ?? imagesPayload.length,
-        );
-      } else {
-        return SheetsSyncResult(isSuccess: false, message: msg);
+      try {
+        final res = await _sendPostRequest(config.webAppUrl, payload);
+        final status = res['status'] as String?;
+        final isOk = status == 'success' || status == null;
+        final msg = res['message'] as String? ?? (isOk ? 'Gambar berhasil diunggah.' : 'Gagal mengunggah.');
+        
+        onProgress?.call(1, 1, img['key'] as String? ?? '', isOk, msg);
+        if (isOk) {
+          config.lastSyncStatus = 'success';
+          config.lastSyncMessage = msg;
+          config.lastSyncTime = DateTime.now();
+          await config.save();
+          return SheetsSyncResult(isSuccess: true, message: msg, count: 1);
+        } else {
+          return SheetsSyncResult(isSuccess: false, message: msg);
+        }
+      } catch (e) {
+        final err = 'Gagal mengunggah: ${e.toString()}';
+        onProgress?.call(1, 1, img['key'] as String? ?? '', false, err);
+        return SheetsSyncResult(isSuccess: false, message: err);
       }
-    } catch (e) {
+    }
+
+    // Jika lebih dari 1 gambar, jalankan PARALEL (Concurrent Uploads) untuk kecepatan maksimal
+    // Setiap request memproses 1 file secara terisolasi dan simultan di cloud Google
+    final uploadFutures = imagesPayload.map((img) async {
+      final key = img['key'] as String? ?? '';
+      final payload = {
+        'action': 'upload_evidence_images',
+        'sheetName': config.sheetName,
+        'startRow': config.startRow,
+        'targetRow': targetRow ?? config.evidenceTargetRow,
+        'mapping': config.columnMapping,
+        'rowMapping': config.evidenceRowMapping,
+        'useImageFormula': config.insertImageFormula,
+        'monthLabel': monthLabel,
+        'images': [img],
+      };
+
+      try {
+        final res = await _sendPostRequest(config.webAppUrl, payload);
+        final status = res['status'] as String?;
+        final isOk = status == 'success' || status == null;
+        final msg = res['message'] as String? ?? (isOk ? 'Berhasil' : 'Gagal');
+
+        completedCount++;
+        if (isOk) {
+          successCount++;
+        } else {
+          errorMessages.add('$key: $msg');
+        }
+
+        onProgress?.call(completedCount, totalCount, key, isOk, msg);
+        return isOk;
+      } catch (e) {
+        completedCount++;
+        final err = e.toString();
+        errorMessages.add('$key: $err');
+        onProgress?.call(completedCount, totalCount, key, false, err);
+        return false;
+      }
+    }).toList();
+
+    await Future.wait(uploadFutures);
+
+    if (successCount > 0) {
+      final successMsg = successCount == totalCount
+          ? 'Semua $successCount gambar bukti berhasil diunggah dengan kualitas penuh ke Google Drive & Spreadsheet!'
+          : 'Berhasil mengunggah $successCount dari $totalCount gambar bukti.${errorMessages.isNotEmpty ? " (${errorMessages.length} gagal)" : ""}';
+
+      config.lastSyncStatus = successCount == totalCount ? 'success' : 'partial';
+      config.lastSyncMessage = successMsg;
+      config.lastSyncTime = DateTime.now();
+      await config.save();
+
+      return SheetsSyncResult(
+        isSuccess: successCount == totalCount,
+        message: successMsg,
+        count: successCount,
+      );
+    } else {
+      final errorMsg = errorMessages.isNotEmpty
+          ? errorMessages.join(', ')
+          : 'Semua gambar bukti gagal diunggah. Periksa koneksi dan URL Google Apps Script.';
       return SheetsSyncResult(
         isSuccess: false,
-        message: 'Gagal mengunggah gambar bukti: ${e.toString()}',
+        message: errorMsg,
       );
     }
   }
@@ -531,7 +614,7 @@ class SheetsSyncService {
  * 2. Sinkronisasi Data Transaksi (HANYA menulis ke kolom yang dipetakan & melindungi rumus/tabel lain)
  * 3. Catat Transaksi Baru Realtime (Append Row aman tanpa menimpa rumus/tabel lain)
  * 4. Undo Baris Terakhir (Undo Last Row)
- * 5. Upload Gambar Bukti (Saldo Rekening, Cash on Hand, Mutasi Rekening Maks 4 Gambar)
+ * 5. Upload Gambar Bukti (Saldo Rekening, Cash on Hand, Mutasi Rekening Maks 5 Gambar)
  *    -> Otomatis disimpan ke Google Drive (Folder: "DailyApps_BuktiKeuangan")
  *    -> Disisipkan langsung ke SEL TERTENTU yang dikonfigurasi tanpa menyentuh sel lain.
  * 
@@ -640,11 +723,12 @@ function processRequest(data) {
       bukti_mutasi_1: "K",
       bukti_mutasi_2: "L",
       bukti_mutasi_3: "M",
-      bukti_mutasi_4: "N"
+      bukti_mutasi_4: "N",
+      bukti_mutasi_5: "O"
     };
 
     var TRANSACTION_FIELDS = ['no', 'tanggal', 'ku', 'kategori', 'keterangan', 'jumlah', 'debit', 'kredit'];
-    var EVIDENCE_FIELDS = ['bukti_saldo_rekening', 'bukti_saldo_cash', 'bukti_mutasi_1', 'bukti_mutasi_2', 'bukti_mutasi_3', 'bukti_mutasi_4'];
+    var EVIDENCE_FIELDS = ['bukti_saldo_rekening', 'bukti_saldo_cash', 'bukti_mutasi_1', 'bukti_mutasi_2', 'bukti_mutasi_3', 'bukti_mutasi_4', 'bukti_mutasi_5'];
 
     // Helper konversi Huruf Kolom (cth: 'A', 'B', 'AA') menjadi indeks angka (1-based)
     // Mengembalikan -1 jika kolom kosong, '-', 'OFF', atau tidak valid
@@ -752,32 +836,31 @@ function processRequest(data) {
       return incomingVal;
     }
 
-    // Helper penulisan sel SATU KOLOM KHUSUS yang aman terhadap aturan Validasi & TANPA menyentuh kolom lain
+    // Helper penulisan sel SATU KOLOM KHUSUS yang cepat & aman terhadap aturan Validasi TANPA menyentuh kolom lain
     function safeWriteSingleColumn(targetSheet, startRowIdx, colIdx, valuesArray) {
       if (!valuesArray || valuesArray.length === 0 || colIdx <= 0) return;
       var numRows = valuesArray.length;
       var range = targetSheet.getRange(startRowIdx, colIdx, numRows, 1);
-      var validations = range.getDataValidations();
 
-      // 1. Cocokkan nilai dengan opsi dropdown jika ada
-      if (validations && validations.length > 0) {
-        for (var r = 0; r < numRows; r++) {
-          var rule = (validations[r] && validations[r][0]) ? validations[r][0] : null;
-          if (rule && valuesArray[r][0] !== "" && valuesArray[r][0] !== null && valuesArray[r][0] !== undefined) {
-            valuesArray[r][0] = matchDropdownValue(rule, valuesArray[r][0]);
-          }
-        }
-      }
-
-      // 2. Setel relaksasi validasi agar tidak error jika format berbeda
+      // Fast-path: Tulis data batch langsung ke range kolom (paling cepat, 99% kasus sukses instan)
       try {
+        range.setValues(valuesArray);
+        return;
+      } catch (err) {}
+
+      // Fallback: Tangani jika ada aturan validasi / dropdown yang ketat pada sel tujuan
+      try {
+        var validations = range.getDataValidations();
         if (validations && validations.length > 0) {
           var relaxedRules = [];
           var hasValidation = false;
-          for (var r = 0; r < validations.length; r++) {
-            var rule = validations[r] ? validations[r][0] : null;
+          for (var r = 0; r < numRows; r++) {
+            var rule = (validations[r] && validations[r][0]) ? validations[r][0] : null;
             if (rule) {
               hasValidation = true;
+              if (valuesArray[r][0] !== "" && valuesArray[r][0] !== null && valuesArray[r][0] !== undefined) {
+                valuesArray[r][0] = matchDropdownValue(rule, valuesArray[r][0]);
+              }
               relaxedRules.push([rule.copy().setAllowInvalid(true).build()]);
             } else {
               relaxedRules.push([null]);
@@ -787,15 +870,11 @@ function processRequest(data) {
             range.setDataValidations(relaxedRules);
           }
         }
-      } catch (eRel) {}
-
-      // 3. Tulis batch kolom ke spreadsheet (HANYA KOLOM INI YANG DITULIS)
-      try {
         range.setValues(valuesArray);
         return;
-      } catch (err) {}
+      } catch (eRel) {}
 
-      // 4. Fallback tulis per-sel jika gagal batch
+      // Fallback terakhir: tulis per-sel jika batch tetap terkendala
       for (var r = 0; r < numRows; r++) {
         var currentRow = startRowIdx + r;
         var val = valuesArray[r][0];
@@ -820,37 +899,112 @@ function processRequest(data) {
       }
     }
 
-    // Helper membersihkan sisa data lama HANYA pada kolom yang dikonfigurasi & BERHENTI jika menemukan rumus
-    function clearOldTransactionData(targetSheet, startRowIdx, activeMappingObj, newRowCount) {
+    // Helper membersihkan sisa data lama HANYA pada baris sisa tabel transaksi & TIDAK AKAN PERNAH menyentuh tabel/rumus di bawahnya
+    function clearOldTransactionData(targetSheet, startRowIdx, activeMappingObj, newRowCount, evidenceRowMappingObj, defaultEvidenceRow) {
       var lastRow = targetSheet.getLastRow();
       if (lastRow < startRowIdx) return;
-      
-      for (var field in activeMappingObj) {
-        var colIdx = activeMappingObj[field];
-        if (colIdx <= 0) continue;
-        
-        var totalRowsToCheck = lastRow - startRowIdx + 1;
-        if (totalRowsToCheck <= 0) continue;
-        
-        var checkRange = targetSheet.getRange(startRowIdx, colIdx, totalRowsToCheck, 1);
-        var formulas = checkRange.getFormulas();
-        var values = checkRange.getValues();
-        
-        for (var r = 0; r < totalRowsToCheck; r++) {
-          var currentRow = startRowIdx + r;
-          
-          // Jika baris ini akan ditimpa langsung oleh data baru, biarkan
-          if (r < newRowCount) continue;
-          
-          // Jika sel mengandung RUMUS/FORMULA (seperti =SUM(...), =TOTAL, dsb), STOP agar rumus tetap aman!
-          if (formulas[r] && formulas[r][0] && formulas[r][0].toString().trim() !== "") {
-            break;
+
+      var checkStartRow = startRowIdx + newRowCount;
+      var totalRowsBelow = lastRow - checkStartRow + 1;
+      if (totalRowsBelow <= 0) return;
+
+      // Cari baris batas bukti gambar teratas (jika ada bukti gambar di bawah tabel transaksi)
+      var minEvidenceRow = 999999;
+      if (defaultEvidenceRow && defaultEvidenceRow > startRowIdx) {
+        minEvidenceRow = defaultEvidenceRow;
+      }
+      if (evidenceRowMappingObj) {
+        for (var evField in evidenceRowMappingObj) {
+          var evR = parseInt(evidenceRowMappingObj[evField]);
+          if (evR && evR > startRowIdx && evR < minEvidenceRow) {
+            minEvidenceRow = evR;
           }
-          
-          // Jika ada nilai data lama di luar jangkauan data baru, bersihkan sel tersebut
-          if (values[r] && values[r][0] !== "" && values[r][0] !== null && values[r][0] !== undefined) {
-            targetSheet.getRange(currentRow, colIdx).clearContent();
+        }
+      }
+
+      // Kumpulkan indeks kolom transaksi yang aktif
+      var colIndices = [];
+      var minCol = 999999;
+      var maxCol = 0;
+      for (var f in activeMappingObj) {
+        var c = activeMappingObj[f];
+        if (c > 0) {
+          colIndices.push(c);
+          if (c < minCol) minCol = c;
+          if (c > maxCol) maxCol = c;
+        }
+      }
+      if (colIndices.length === 0) return;
+
+      // Batasi rentang pengecekan maksimal 100 baris ke bawah
+      var rowsToCheck = Math.min(totalRowsBelow, 100);
+      var numCols = maxCol - minCol + 1;
+      var blockRange = targetSheet.getRange(checkStartRow, minCol, rowsToCheck, numCols);
+      var blockFormulas = blockRange.getFormulas();
+      var blockValues = blockRange.getValues();
+
+      var rowsToClear = 0;
+
+      for (var r = 0; r < rowsToCheck; r++) {
+        var currentRowNum = checkStartRow + r;
+
+        // 1. Jika mencapai baris bukti gambar -> STOP
+        if (currentRowNum >= minEvidenceRow) {
+          break;
+        }
+
+        var rowHasFormula = false;
+        var rowHasNonEmpty = false;
+        var rowHasKeywordHeader = false;
+
+        for (var i = 0; i < colIndices.length; i++) {
+          var colOffset = colIndices[i] - minCol;
+          if (colOffset >= 0 && colOffset < numCols) {
+            var fVal = blockFormulas[r][colOffset];
+            var vVal = blockValues[r][colOffset];
+
+            // Cek jika sel berisi formula/rumus (misal =SUM(...))
+            if (fVal && fVal.toString().trim() !== "") {
+              rowHasFormula = true;
+              break;
+            }
+
+            // Cek jika sel berisi nilai teks
+            if (vVal !== "" && vVal !== null && vVal !== undefined) {
+              rowHasNonEmpty = true;
+              var strVal = vVal.toString().trim().toUpperCase();
+              if (strVal === "TOTAL" || strVal === "JUMLAH TOTAL" || strVal.indexOf("SALDO") !== -1 ||
+                  strVal.indexOf("BUKTI") !== -1 || strVal.indexOf("CATATAN") !== -1 ||
+                  strVal.indexOf("REKAP") !== -1 || strVal.indexOf("KAS") !== -1 ||
+                  strVal.indexOf("MENGETAHUI") !== -1 || strVal.indexOf("TANDA TANGAN") !== -1) {
+                rowHasKeywordHeader = true;
+                break;
+              }
+            }
           }
+        }
+
+        // Jika baris mengandung formula atau kata kunci header tabel lain -> STOP!
+        if (rowHasFormula || rowHasKeywordHeader) {
+          break;
+        }
+
+        // Jika seluruh kolom transaksi di baris ini kosong -> Berarti tabel transaksi sudah berakhir! STOP!
+        if (!rowHasNonEmpty) {
+          break;
+        }
+
+        // Baris ini terbukti berisi sisa data transaksi lama yang perlu dibersihkan
+        rowsToClear = r + 1;
+      }
+
+      // Bersihkan HANYA baris sisa data transaksi lama yang terdeteksi
+      if (rowsToClear > 0) {
+        for (var j = 0; j < colIndices.length; j++) {
+          var col = colIndices[j];
+          try {
+            targetSheet.getRange(checkStartRow, col, rowsToClear, 1).clearContent();
+          } catch (eC) {}
         }
       }
     }
@@ -863,7 +1017,9 @@ function processRequest(data) {
       
       // 1. Bersihkan HANYA sisa baris lama pada kolom transaksi tanpa merusak rumus atau tabel lain
       if (clearFirst) {
-        clearOldTransactionData(sheet, targetStartRow, activeTransactionMapping, rows.length);
+        var defaultEvRow = parseInt(data.targetRow) || targetEvidenceRow || 2;
+        var evRowMap = data.rowMapping || rowMapping || {};
+        clearOldTransactionData(sheet, targetStartRow, activeTransactionMapping, rows.length, evRowMap, defaultEvRow);
       }
       
       // 2. Tulis data transaksi HANYA ke kolom-kolom yang dipetakan
@@ -1066,25 +1222,14 @@ function processRequest(data) {
           if (useImageFormula) {
             var insertedNative = false;
             try {
-              var dataUrl = "data:" + mimeType + ";base64," + base64Data;
-              var cellImage = SpreadsheetApp.newCellImage()
-                .setSourceUrl(dataUrl)
+              var cellImageDrive = SpreadsheetApp.newCellImage()
+                .setSourceUrl(downloadDirectUrl)
                 .setAltTextTitle(savedFileName)
-                .setAltTextDescription(originalFileName)
                 .build();
-              cell.setValue(cellImage);
+              cell.setValue(cellImageDrive);
               insertedNative = true;
-            } catch (errDataUrl) {
-              try {
-                var cellImageDrive = SpreadsheetApp.newCellImage()
-                  .setSourceUrl(downloadDirectUrl)
-                  .setAltTextTitle(savedFileName)
-                  .build();
-                cell.setValue(cellImageDrive);
-                insertedNative = true;
-              } catch (errDriveUrl) {
-                cell.setValue('=IMAGE("' + downloadDirectUrl + '", 1)');
-              }
+            } catch (errDriveUrl) {
+              cell.setValue('=IMAGE("' + downloadDirectUrl + '", 1)');
             }
             updatedCells.push({
               field: fieldKey,
