@@ -712,6 +712,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
               controller: _urlCtrl,
               onChanged: (v) => _saveCurrentState(),
               style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              textAlignVertical: TextAlignVertical.center,
               maxLines: 2,
               minLines: 1,
               decoration: InputDecoration(
@@ -719,8 +720,9 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
                     'https://script.google.com/macros/s/AKfycb.../exec',
                 hintStyle:
                     const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                isDense: true,
                 contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 border: InputBorder.none,
                 suffixIcon: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -774,15 +776,19 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
               controller: _sheetNameCtrl,
               onChanged: (v) => _saveCurrentState(),
               style: const TextStyle(fontSize: 12.5),
+              textAlignVertical: TextAlignVertical.center,
               decoration: const InputDecoration(
                 hintText: 'Contoh: Lap Keu, Sheet1, Kas Struktur',
                 hintStyle:
                     TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
+                isDense: true,
                 contentPadding:
-                    EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 border: InputBorder.none,
                 prefixIcon: Icon(Icons.tab_rounded,
                     color: Color(0xFF64748B), size: 18),
+                prefixIconConstraints:
+                    BoxConstraints(minWidth: 40, minHeight: 40),
               ),
             ),
           ),
