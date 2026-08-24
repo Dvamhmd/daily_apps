@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/model_sheets_config.dart';
 import '../models/model_struktur.dart';
 import '../utils/sheets_sync_service.dart';
@@ -2110,6 +2113,44 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
     );
   }
 
+  Future<void> _shareScriptFile(String scriptCode) async {
+    final box = context.findRenderObject() as RenderBox?;
+    final origin =
+        box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/Code_AppsScript_DailyApps.txt');
+      await file.writeAsString(scriptCode);
+
+      final xFile = XFile(
+        file.path,
+        mimeType: 'text/plain',
+        name: 'Code_AppsScript_DailyApps.txt',
+      );
+
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [xFile],
+          text:
+              'Kode Google Apps Script Daily Apps (100% Utuh Tanpa Terpotong).\nBuka file ini di Laptop, salin isinya, dan tempelkan ke editor Google Apps Script.',
+          subject: 'Google Apps Script - Daily Apps',
+          sharePositionOrigin: origin,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal membagikan file script: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   // --- TAB 3: SCRIPT & PANDUAN ---
   Widget _buildScriptGuideTab() {
     final scriptCode = SheetsSyncService.getGoogleAppsScriptCode();
@@ -2120,7 +2161,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Tombol Salin Script Utama
+          // Banner Salin / Kirim Script Utama
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -2138,54 +2179,128 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
                 ),
               ],
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.integration_instructions_rounded,
-                    color: Colors.white, size: 28),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Google Apps Script Code',
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                Row(
+                  children: [
+                    const Icon(Icons.integration_instructions_rounded,
+                        color: Colors.white, size: 28),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Google Apps Script Code',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            'Kode siap pakai untuk ditempel di Apps Script Google Spreadsheet',
+                            style: TextStyle(
+                                fontSize: 10.5, color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Tombol Aksi: Kirim File (.txt) & Salin Teks
+                Row(
+                  children: [
+                    // Tombol 1: Kirim File Dokumen (Solusi anti-terpotong)
+                    Expanded(
+                      flex: 6,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _shareScriptFile(scriptCode),
+                        icon: const Icon(Icons.share_rounded, size: 15),
+                        label: const Text(
+                          'Kirim File (.txt)',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFF107C41),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 10),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
-                      Text(
-                        'Kode siap pakai untuk ditempel di Apps Script Google Spreadsheet',
-                        style: TextStyle(fontSize: 10.5, color: Colors.white70),
+                    ),
+                    const SizedBox(width: 8),
+                    // Tombol 2: Salin Teks Biasa
+                    Expanded(
+                      flex: 4,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: scriptCode));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Kode Google Apps Script berhasil disalin ke Clipboard!'),
+                              backgroundColor: Color(0xFF107C41),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.copy_rounded,
+                            size: 14, color: Colors.white),
+                        label: const Text(
+                          'Salin Teks',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.white70),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                // Hint Banner
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.lightbulb_outline_rounded,
+                          size: 14, color: Color(0xFFFFD54F)),
+                      SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Kirim via WhatsApp Dokumen / Email ke Laptop agar kode 100% utuh tidak terpotong.',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
                     ],
-                  ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: scriptCode));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                            'Kode Google Apps Script berhasil disalin ke Clipboard!'),
-                        backgroundColor: Color(0xFF107C41),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.copy_rounded, size: 14),
-                  label: const Text('Salin',
-                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF107C41),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
                   ),
                 ),
               ],
@@ -2217,7 +2332,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
           _buildStepItem(
             '3',
             'Tempelkan Kode Script & Simpan',
-            'Hapus kode lama di editor, tekan tombol "Salin" di atas dan Paste (Tempel) ke editor Google Apps Script, lalu klik ikon Simpan (Disk).',
+            'Buka file script yang dikirim ke Laptop (atau tekan tombol Salin), lalu Paste (Tempel) seluruh isinya ke editor Google Apps Script, lalu klik ikon Simpan (Disk).',
           ),
           _buildStepItem(
             '4',
