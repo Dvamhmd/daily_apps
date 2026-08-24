@@ -41,6 +41,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
   final Map<int, Offset> _activePointers = {};
   double? _initialPinchDistance;
   double _pinchStartZoom = 1.0;
+  bool _isPinching = false;
 
   @override
   void initState() {
@@ -58,10 +59,15 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
   void _handlePointerDown(PointerDownEvent event) {
     _activePointers[event.pointer] = event.position;
-    if (_activePointers.length == 2) {
+    if (_activePointers.length >= 2) {
       final points = _activePointers.values.toList();
       _initialPinchDistance = (points[0] - points[1]).distance;
       _pinchStartZoom = _currentZoom;
+      if (!_isPinching) {
+        setState(() {
+          _isPinching = true;
+        });
+      }
     }
   }
 
@@ -69,7 +75,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     if (!_activePointers.containsKey(event.pointer)) return;
     _activePointers[event.pointer] = event.position;
 
-    if (_activePointers.length == 2 &&
+    if (_activePointers.length >= 2 &&
         _initialPinchDistance != null &&
         _initialPinchDistance! > 8.0) {
       final points = _activePointers.values.toList();
@@ -89,6 +95,11 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     _activePointers.remove(event.pointer);
     if (_activePointers.length < 2) {
       _initialPinchDistance = null;
+      if (_isPinching) {
+        setState(() {
+          _isPinching = false;
+        });
+      }
     } else if (_activePointers.length == 2) {
       final points = _activePointers.values.toList();
       _initialPinchDistance = (points[0] - points[1]).distance;
@@ -100,6 +111,11 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     _activePointers.remove(event.pointer);
     if (_activePointers.length < 2) {
       _initialPinchDistance = null;
+      if (_isPinching) {
+        setState(() {
+          _isPinching = false;
+        });
+      }
     }
   }
 
@@ -787,7 +803,9 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
         ],
       ),
       body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
+        physics: _isPinching
+            ? const NeverScrollableScrollPhysics()
+            : const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1244,9 +1262,9 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 SizedBox(width: 6),
                 Flexible(
                   child: Text(
-                    'Cubit tabel (Pinch) untuk Zoom in / out',
+                    'Zoom',
                     style: TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 12.0,
                       fontWeight: FontWeight.w600,
                       color: Color(0xFF475569),
                     ),
@@ -1333,67 +1351,64 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Scrollbar(
+      child: SingleChildScrollView(
         controller: _horizontalScrollController,
-        thumbVisibility: true,
-        trackVisibility: true,
-        child: SingleChildScrollView(
-          controller: _horizontalScrollController,
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          child: SizedBox(
-            width: scaledWidth,
-            height: scaledHeight,
-            child: Listener(
-              onPointerDown: _handlePointerDown,
-              onPointerMove: _handlePointerMove,
-              onPointerUp: _handlePointerUp,
-              onPointerCancel: _handlePointerCancel,
-              behavior: HitTestBehavior.translucent,
-              child: OverflowBox(
-                minWidth: baseWidth,
-                maxWidth: baseWidth,
-                minHeight: baseHeight,
-                maxHeight: baseHeight,
+        scrollDirection: Axis.horizontal,
+        physics: _isPinching
+            ? const NeverScrollableScrollPhysics()
+            : const BouncingScrollPhysics(),
+        child: SizedBox(
+          width: scaledWidth,
+          height: scaledHeight,
+          child: Listener(
+            onPointerDown: _handlePointerDown,
+            onPointerMove: _handlePointerMove,
+            onPointerUp: _handlePointerUp,
+            onPointerCancel: _handlePointerCancel,
+            behavior: HitTestBehavior.translucent,
+            child: OverflowBox(
+              minWidth: baseWidth,
+              maxWidth: baseWidth,
+              minHeight: baseHeight,
+              maxHeight: baseHeight,
+              alignment: Alignment.topLeft,
+              child: Transform.scale(
+                scale: _currentZoom,
                 alignment: Alignment.topLeft,
-                child: Transform.scale(
-                  scale: _currentZoom,
-                  alignment: Alignment.topLeft,
-                  child: SizedBox(
-                    width: baseWidth,
-                    height: baseHeight,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // TABLE HEADER
-                        _buildTableHeader(activeDay),
+                child: SizedBox(
+                  width: baseWidth,
+                  height: baseHeight,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // TABLE HEADER
+                      _buildTableHeader(activeDay),
 
-                        const Divider(
-                            height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
+                      const Divider(
+                          height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
 
-                        // TABLE BODY ROWS
-                        if (activeDay.rows.isEmpty)
-                          Container(
-                            width: baseWidth,
-                            height: 50,
-                            alignment: Alignment.center,
-                            child: const Text(
-                              'Tidak ada baris di tabel. Klik "+ Baris" untuk menambah.',
-                              style: TextStyle(
-                                  fontSize: 12, color: Color(0xFF94A3B8)),
-                            ),
-                          )
-                        else
-                          ...List.generate(activeDay.rows.length, (index) {
-                            final row = activeDay.rows[index];
-                            final isSelected =
-                                _selectedRowIndices.contains(index);
-                            return _buildTableRow(
-                                activeDay, row, index, isSelected);
-                          }),
-                      ],
-                    ),
+                      // TABLE BODY ROWS
+                      if (activeDay.rows.isEmpty)
+                        Container(
+                          width: baseWidth,
+                          height: 50,
+                          alignment: Alignment.center,
+                          child: const Text(
+                            'Tidak ada baris di tabel. Klik "+ Baris" untuk menambah.',
+                            style: TextStyle(
+                                fontSize: 12, color: Color(0xFF94A3B8)),
+                          ),
+                        )
+                      else
+                        ...List.generate(activeDay.rows.length, (index) {
+                          final row = activeDay.rows[index];
+                          final isSelected =
+                              _selectedRowIndices.contains(index);
+                          return _buildTableRow(
+                              activeDay, row, index, isSelected);
+                        }),
+                    ],
                   ),
                 ),
               ),

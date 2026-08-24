@@ -45,28 +45,14 @@ class _TodoPageState extends State<TodoPage> {
         _dateGroups = decoded
             .map((item) => TodoDateGroup.fromJson(item as Map<String, dynamic>))
             .toList();
+        for (final group in _dateGroups) {
+          group.items = [
+            ...group.items.where((i) => !i.isCompleted),
+            ...group.items.where((i) => i.isCompleted),
+          ];
+        }
       } else {
-        // Data inisial jika baru pertama dibuka
-        final now = DateTime.now();
-        _dateGroups = [
-          TodoDateGroup(
-            id: 'init_today',
-            date: DateTime(now.year, now.month, now.day),
-            items: [
-              TodoItem(
-                id: 'init_task_1',
-                title: 'Review checklist & rencana kerja harian',
-                isCompleted: false,
-              ),
-              TodoItem(
-                id: 'init_task_2',
-                title: 'Selesaikan laporan harian',
-                isCompleted: true,
-              ),
-            ],
-          ),
-        ];
-        _saveTodoData();
+        _dateGroups = [];
       }
     } catch (e) {
       debugPrint('Error loading todos: $e');
@@ -415,6 +401,14 @@ class _TodoPageState extends State<TodoPage> {
                                         isCompleted: false,
                                       ),
                                     );
+                                    _dateGroups[existingIndex].items = [
+                                      ..._dateGroups[existingIndex]
+                                          .items
+                                          .where((i) => !i.isCompleted),
+                                      ..._dateGroups[existingIndex]
+                                          .items
+                                          .where((i) => i.isCompleted),
+                                    ];
                                   }
                                 } else {
                                   final newGroup = TodoDateGroup(
@@ -658,6 +652,10 @@ class _TodoPageState extends State<TodoPage> {
                                 isCompleted: false,
                               ),
                             );
+                            group.items = [
+                              ...group.items.where((i) => !i.isCompleted),
+                              ...group.items.where((i) => i.isCompleted),
+                            ];
                           });
 
                           _saveTodoData();
@@ -764,10 +762,14 @@ class _TodoPageState extends State<TodoPage> {
     );
   }
 
-  void _toggleTask(TodoItem item) {
+  void _toggleTask(TodoDateGroup group, TodoItem item) {
     HapticFeedback.selectionClick();
     setState(() {
       item.isCompleted = !item.isCompleted;
+      group.items = [
+        ...group.items.where((i) => !i.isCompleted),
+        ...group.items.where((i) => i.isCompleted),
+      ];
     });
     _saveTodoData();
   }
@@ -1730,14 +1732,19 @@ class _TodoPageState extends State<TodoPage> {
       ),
       onDismissed: (_) => _deleteTask(group, item),
       child: InkWell(
-        onTap: () => _toggleTask(item),
+        onTap: () => _toggleTask(group, item),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3.5),
+          padding: const EdgeInsets.only(
+            left: 12,
+            right: 4,
+            top: 3.5,
+            bottom: 3.5,
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               GestureDetector(
-                onTap: () => _toggleTask(item),
+                onTap: () => _toggleTask(group, item),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   width: 22,
@@ -1790,6 +1797,7 @@ class _TodoPageState extends State<TodoPage> {
                   ),
                 ),
               ),
+              const SizedBox(width: 4),
               IconButton(
                 icon: const Icon(
                   Icons.edit_outlined,
@@ -1797,12 +1805,11 @@ class _TodoPageState extends State<TodoPage> {
                   color: Color(0xFF94A3B8),
                 ),
                 visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.all(4),
+                padding: const EdgeInsets.all(2),
                 constraints: const BoxConstraints(),
                 tooltip: 'Edit Tugas',
                 onPressed: () => _showEditTaskDialog(item),
               ),
-              const SizedBox(width: 4),
               IconButton(
                 icon: const Icon(
                   Icons.close_rounded,
@@ -1810,7 +1817,7 @@ class _TodoPageState extends State<TodoPage> {
                   color: Color(0xFFCBD5E1),
                 ),
                 visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.all(4),
+                padding: const EdgeInsets.all(2),
                 constraints: const BoxConstraints(),
                 tooltip: 'Hapus Tugas',
                 onPressed: () => _deleteTask(group, item),
@@ -1894,7 +1901,7 @@ class _TodoPageState extends State<TodoPage> {
             ),
             icon: const Icon(Icons.add_rounded, size: 18),
             label: const Text(
-              'Buat To-Do List Baru',
+              'Buat Section / Tanggal Baru',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 13,

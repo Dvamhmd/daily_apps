@@ -90,6 +90,10 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
     HapticFeedback.selectionClick();
     setState(() {
       item.isCompleted = false;
+      group.items = [
+        ...group.items.where((i) => !i.isCompleted),
+        ...group.items.where((i) => i.isCompleted),
+      ];
     });
     _saveData();
 
@@ -105,6 +109,10 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
           onPressed: () {
             setState(() {
               item.isCompleted = true;
+              group.items = [
+                ...group.items.where((i) => !i.isCompleted),
+                ...group.items.where((i) => i.isCompleted),
+              ];
             });
             _saveData();
           },
