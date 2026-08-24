@@ -167,8 +167,17 @@ class SheetsSyncService {
     StrukturTransaction tx,
     int indexNumber, {
     List<CustomKodeRule>? customRules,
+    String? dateFormat,
   }) {
-    final dateFormatted = DateFormat('dd/MM/yyyy').format(tx.timestamp);
+    String dateFormatted;
+    try {
+      final pattern = (dateFormat != null && dateFormat.trim().isNotEmpty)
+          ? dateFormat.trim()
+          : 'dd/MM/yyyy';
+      dateFormatted = DateFormat(pattern).format(tx.timestamp);
+    } catch (_) {
+      dateFormatted = DateFormat('dd/MM/yyyy').format(tx.timestamp);
+    }
     final rawKu = tx.getDisplayKu(customRules: customRules).trim();
     final String ku = (rawKu == '-' || rawKu.isEmpty) ? '' : rawKu;
 
@@ -176,20 +185,24 @@ class SheetsSyncService {
     final String kategori =
         (rawKategori == '-' || rawKategori.isEmpty) ? '' : rawKategori;
 
-    final String itemTitle = tx.title.replaceFirst(
+    String itemTitle = tx.title.trim();
+    if (itemTitle.isEmpty && tx.note != null && tx.note!.trim().isNotEmpty) {
+      itemTitle = tx.note!.trim();
+    }
+    itemTitle = itemTitle.replaceFirst(
       RegExp(r'^(Pemasukan|Pengeluaran):\s*', caseSensitive: false),
       '',
     );
-    final String? itemSubtitle = (tx.note != null &&
-            tx.note!.isNotEmpty &&
-            tx.note != tx.title &&
-            tx.note != itemTitle)
-        ? tx.note
+    final String cleanNote = (tx.note ?? '').trim();
+    final String? itemSubtitle = (cleanNote.isNotEmpty &&
+            cleanNote != tx.title.trim() &&
+            cleanNote != itemTitle)
+        ? cleanNote
         : null;
 
     final String fullKeterangan = itemSubtitle != null
         ? '$itemTitle ($itemSubtitle)'
-        : itemTitle;
+        : (itemTitle.isNotEmpty ? itemTitle : '-');
 
     final dynamic debit =
         (tx.isPemasukan && tx.amount > 0) ? tx.amount : '';
@@ -209,6 +222,7 @@ class SheetsSyncService {
   }
 
   /// Melakukan sinkronisasi seluruh tabel transaksi bulan aktif ke Spreadsheet
+  /// Mendukung pengiriman bertahap (batching/chunking) otomatis untuk mencegah batas limit URL di browser/web
   static Future<SheetsSyncResult> syncAllTransactions(
     List<StrukturTransaction> transactions,
     SheetsConfig config, {
@@ -232,38 +246,117 @@ class SheetsSyncService {
           sortedList[i],
           i + 1,
           customRules: customRules,
+          dateFormat: config.dateFormat,
         ));
       }
 
-      final payload = {
-        'action': 'sync_all',
-        'sheetName': config.sheetName,
-        'startRow': config.startRow,
-        'mapping': config.columnMapping,
-        'rows': rows,
-      };
+      // Jika data kosong, kirim sync_all untuk mengosongkan spreadsheet
+      if (rows.isEmpty) {
+        final payload = {
+          'action': 'sync_all',
+          'sheetName': config.sheetName,
+          'startRow': config.startRow,
+          'mapping': config.columnMapping,
+          'rows': [],
+        };
+        final res = await _sendPostRequest(config.webAppUrl, payload);
+        final status = res['status'] as String?;
+        final msg = res['message'] as String? ?? 'Data spreadsheet berhasil dikosongkan.';
 
-      final res = await _sendPostRequest(config.webAppUrl, payload);
-      final status = res['status'] as String?;
-      final msg = res['message'] as String? ??
-          'Berhasil sinkronisasi ${rows.length} data.';
-
-      if (status == 'success' || status == null) {
-        config.lastSyncStatus = 'success';
+        config.lastSyncStatus = status == 'success' ? 'success' : 'failed';
         config.lastSyncMessage = msg;
         config.lastSyncTime = DateTime.now();
         await config.save();
         return SheetsSyncResult(
-          isSuccess: true,
+          isSuccess: status == 'success' || status == null,
           message: msg,
-          count: rows.length,
+          count: 0,
         );
-      } else {
-        config.lastSyncStatus = 'failed';
-        config.lastSyncMessage = msg;
-        await config.save();
-        return SheetsSyncResult(isSuccess: false, message: msg);
       }
+
+      // Jika data <= 6 baris, kirim sekaligus
+      const int batchSize = 6;
+      if (rows.length <= batchSize) {
+        final payload = {
+          'action': 'sync_all',
+          'sheetName': config.sheetName,
+          'startRow': config.startRow,
+          'mapping': config.columnMapping,
+          'rows': rows,
+        };
+
+        final res = await _sendPostRequest(config.webAppUrl, payload);
+        final status = res['status'] as String?;
+        final msg = res['message'] as String? ??
+            'Berhasil sinkronisasi ${rows.length} data.';
+
+        if (status == 'success' || status == null) {
+          config.lastSyncStatus = 'success';
+          config.lastSyncMessage = msg;
+          config.lastSyncTime = DateTime.now();
+          await config.save();
+          return SheetsSyncResult(
+            isSuccess: true,
+            message: msg,
+            count: rows.length,
+          );
+        } else {
+          config.lastSyncStatus = 'failed';
+          config.lastSyncMessage = msg;
+          await config.save();
+          return SheetsSyncResult(isSuccess: false, message: msg);
+        }
+      }
+
+      // Jika data > 6 baris, kirim per-batch aman agar tidak terpotong batasan URL di browser
+      int totalSynced = 0;
+      final int totalChunks = (rows.length / batchSize).ceil();
+
+      for (int chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
+        final int startIdx = chunkIdx * batchSize;
+        final int endIdx = (startIdx + batchSize < rows.length)
+            ? startIdx + batchSize
+            : rows.length;
+        final chunkRows = rows.sublist(startIdx, endIdx);
+        final int chunkStartRow = config.startRow + startIdx;
+
+        final payload = {
+          'action': 'sync_batch',
+          'clearFirst': chunkIdx == 0, // Hanya bersihkan sheet pada batch pertama
+          'sheetName': config.sheetName,
+          'startRow': chunkStartRow,
+          'mapping': config.columnMapping,
+          'rows': chunkRows,
+          'chunkIndex': chunkIdx,
+          'totalChunks': totalChunks,
+        };
+
+        final res = await _sendPostRequest(config.webAppUrl, payload);
+        final status = res['status'] as String?;
+        if (status == 'error') {
+          final errorMsg = res['message'] as String? ?? 'Gagal pada batch ke-${chunkIdx + 1}';
+          config.lastSyncStatus = 'failed';
+          config.lastSyncMessage = errorMsg;
+          await config.save();
+          return SheetsSyncResult(
+            isSuccess: false,
+            message: 'Gagal sinkronisasi data: $errorMsg',
+          );
+        }
+        totalSynced += chunkRows.length;
+      }
+
+      final successMsg = 'Berhasil sinkronisasi seluruh $totalSynced data transaksi ke spreadsheet.';
+      config.lastSyncStatus = 'success';
+      config.lastSyncMessage = successMsg;
+      config.lastSyncTime = DateTime.now();
+      await config.save();
+
+      return SheetsSyncResult(
+        isSuccess: true,
+        message: successMsg,
+        count: totalSynced,
+      );
     } catch (e) {
       config.lastSyncStatus = 'failed';
       config.lastSyncMessage = e.toString();
@@ -294,6 +387,7 @@ class SheetsSyncService {
         tx,
         rowNumber ?? 1,
         customRules: customRules,
+        dateFormat: config.dateFormat,
       );
 
       final payload = {
@@ -364,35 +458,111 @@ class SheetsSyncService {
     }
   }
 
+  /// Mengunggah gambar bukti fisik / digital ke Google Drive & menaruh link/formula di Spreadsheet
+  static Future<SheetsSyncResult> uploadEvidenceImages({
+    required SheetsConfig config,
+    required List<Map<String, dynamic>> imagesPayload,
+    required String monthLabel,
+    int? targetRow,
+  }) async {
+    if (!config.isConfigured) {
+      return SheetsSyncResult(
+        isSuccess: false,
+        message: 'URL Google Apps Script belum diatur.',
+      );
+    }
+
+    if (imagesPayload.isEmpty) {
+      return SheetsSyncResult(
+        isSuccess: false,
+        message: 'Tidak ada gambar bukti yang dipilih.',
+      );
+    }
+
+    try {
+      final payload = {
+        'action': 'upload_evidence_images',
+        'sheetName': config.sheetName,
+        'startRow': config.startRow,
+        'targetRow': targetRow ?? config.evidenceTargetRow,
+        'mapping': config.columnMapping,
+        'rowMapping': config.evidenceRowMapping,
+        'useImageFormula': config.insertImageFormula,
+        'monthLabel': monthLabel,
+        'images': imagesPayload,
+      };
+
+      final res = await _sendPostRequest(config.webAppUrl, payload);
+      final status = res['status'] as String?;
+      final msg =
+          res['message'] as String? ?? 'Gambar bukti berhasil diunggah.';
+
+      if (status == 'success' || status == null) {
+        config.lastSyncStatus = 'success';
+        config.lastSyncMessage = msg;
+        config.lastSyncTime = DateTime.now();
+        await config.save();
+        return SheetsSyncResult(
+          isSuccess: true,
+          message: msg,
+          count: (res['uploadedCount'] as num?)?.toInt() ?? imagesPayload.length,
+        );
+      } else {
+        return SheetsSyncResult(isSuccess: false, message: msg);
+      }
+    } catch (e) {
+      return SheetsSyncResult(
+        isSuccess: false,
+        message: 'Gagal mengunggah gambar bukti: ${e.toString()}',
+      );
+    }
+  }
+
   /// Mengembalikan script Google Apps Script siap salin (Copy-Paste)
   static String getGoogleAppsScriptCode() {
     return '''/**
  * =========================================================================
- * GOOGLE APPS SCRIPT - INTEGRASI TABEL LAP KEU KEUANGAN STRUKTUR
+ * GOOGLE APPS SCRIPT - INTEGRASI TABEL LAP KEU & BUKTI GAMBAR KEUANGAN
  * Aplikasi: Daily Apps
  * =========================================================================
+ * 
+ * FITUR DIDUKUNG:
+ * 1. Tes Koneksi
+ * 2. Sinkronisasi Data Transaksi (HANYA menulis ke kolom yang dipetakan & melindungi rumus/tabel lain)
+ * 3. Catat Transaksi Baru Realtime (Append Row aman tanpa menimpa rumus/tabel lain)
+ * 4. Undo Baris Terakhir (Undo Last Row)
+ * 5. Upload Gambar Bukti (Saldo Rekening, Cash on Hand, Mutasi Rekening Maks 4 Gambar)
+ *    -> Otomatis disimpan ke Google Drive (Folder: "DailyApps_BuktiKeuangan")
+ *    -> Disisipkan langsung ke SEL TERTENTU yang dikonfigurasi tanpa menyentuh sel lain.
+ * 
+ * PERLINDUNGAN FORMULA & TABEL LAIN:
+ * - Script HANYA mengubah sel/kolom yang secara eksplisit dikonfigurasi dalam aplikasi.
+ * - Kolom/sel yang tidak dipetakan (misal kolom rumus, catatan, atau tabel di sebelah kanan/bawah)
+ *   TIDAK AKAN PERNAH disentuh atau dihapus.
+ * - Sel yang mengandung rumus (cth: =SUM(...), =TOTAL, rumus saldo) otomatis dilindungi dan tidak akan ditimpa.
  * 
  * PETUNJUK PEMASANGAN LANGKAH DEMI LANGKAH:
  * 1. Buka Google Spreadsheet tujuan Anda.
  * 2. Di menu atas, pilih "Extensions" (Ekstensi) -> "Apps Script".
  * 3. Hapus seluruh kode default yang ada di editor, lalu tempel (Paste) kode ini.
  * 4. Klik ikon Simpan (Disk) di toolbar atas.
- * 5. Klik tombol "Deploy" (Terapkan) berwarna biru di kanan atas -> pilih "New deployment" (Penerapan baru).
- *    (Jika update kode: Klik "Deploy" -> "Manage deployments" -> klik ikon Pensil (Edit) -> Version: "New version" -> Deploy).
- * 6. Klik ikon Roda Gigi (Select type) -> pilih "Web app" (Aplikasi web).
- * 7. Masukkan konfigurasi berikut:
- *    - Description : Integrasi Keuangan Struktur Daily Apps
- *    - Execute as  : Me (email akun Google Anda)
- *    - Who has access : Anyone (Siapa saja)  <-- PENTING SEKALI!
- * 8. Klik "Deploy", lalu jika diminta izin:
- *    - Klik "Authorize access" (Beri akses)
- *    - Pilih akun Google Anda
- *    - Klik "Advanced" (Lanjutan) di kiri bawah
- *    - Klik "Go to ... (unsafe)"
- *    - Klik "Allow" (Izinkan)
- * 9. Salin "Web app URL" (URL yang berakhiran /exec).
- * 10. Buka Daily Apps -> Masuk ke Keuangan Struktur -> Buka Pengaturan Google Spreadsheets -> Tempelkan URL tersebut.
+ * 5. Klik tombol "Deploy" (Terapkan) berwarna biru di kanan atas -> pilih "Manage deployments".
+ *    -> Klik ikon Pensil (Edit) -> Version: pilih "New version" -> Klik "Deploy".
+ *    (Jika pertama kali: "Deploy" -> "New deployment" -> "Web app" -> Who has access: "Anyone").
+ * 6. Salin "Web app URL" (URL yang berakhiran /exec).
+ * 7. Buka Daily Apps -> Masuk ke Keuangan Struktur -> Pengaturan Google Spreadsheets -> Tempelkan URL tersebut.
  */
+
+/**
+ * Fungsi pembantu untuk memicu popup izin Google Drive & Spreadsheet secara instan.
+ * Jalankan fungsi ini (klik Run ▶️) jika Google meminta izin akses Google Drive.
+ */
+function authorizeDrive() {
+  var testFolder = DriveApp.createFolder("DailyApps_Temp_Auth");
+  testFolder.setTrashed(true);
+  SpreadsheetApp.getActiveSpreadsheet().toast("Izin Google Drive & Spreadsheet Berhasil!", "Daily Apps", 5);
+  Logger.log("Izin Google Drive & Spreadsheet berhasil diberikan!");
+}
 
 function doGet(e) {
   var data = {};
@@ -438,11 +608,20 @@ function processRequest(data) {
     
     // --- AKSI 1: TES KONEKSI ---
     if (action === "test_connection") {
+      var driveStatus = "TIDAK AKTIF";
+      try {
+        DriveApp.getRootFolder();
+        driveStatus = "AKTIF";
+      } catch (eDrive) {
+        driveStatus = "BELUM DIAKTIFKAN (" + eDrive.toString() + ")";
+      }
+
       return jsonResponse({
         status: "success",
-        message: "Koneksi Berhasil! Terhubung ke Spreadsheet: '" + ss.getName() + "' (Tab: '" + sheet.getName() + "')",
+        message: "Koneksi Berhasil! Terhubung ke: '" + ss.getName() + "' (Tab: '" + sheet.getName() + "') | Izin Drive: " + driveStatus,
         spreadsheetName: ss.getName(),
-        sheetName: sheet.getName()
+        sheetName: sheet.getName(),
+        driveStatus: driveStatus
       });
     }
     
@@ -455,8 +634,17 @@ function processRequest(data) {
       keterangan: "E",
       jumlah: "F",
       debit: "G",
-      kredit: "H"
+      kredit: "H",
+      bukti_saldo_rekening: "I",
+      bukti_saldo_cash: "J",
+      bukti_mutasi_1: "K",
+      bukti_mutasi_2: "L",
+      bukti_mutasi_3: "M",
+      bukti_mutasi_4: "N"
     };
+
+    var TRANSACTION_FIELDS = ['no', 'tanggal', 'ku', 'kategori', 'keterangan', 'jumlah', 'debit', 'kredit'];
+    var EVIDENCE_FIELDS = ['bukti_saldo_rekening', 'bukti_saldo_cash', 'bukti_mutasi_1', 'bukti_mutasi_2', 'bukti_mutasi_3', 'bukti_mutasi_4'];
 
     // Helper konversi Huruf Kolom (cth: 'A', 'B', 'AA') menjadi indeks angka (1-based)
     // Mengembalikan -1 jika kolom kosong, '-', 'OFF', atau tidak valid
@@ -477,14 +665,27 @@ function processRequest(data) {
       return result > 0 ? result : -1;
     }
 
-    // Ambil daftar mapping aktif yang valid
-    var maxCol = 1;
-    var activeMapping = {};
-    for (var key in mapping) {
-      var colIdx = colLetterToIndex(mapping[key]);
-      if (colIdx > 0) {
-        activeMapping[key] = colIdx;
-        if (colIdx > maxCol) maxCol = colIdx;
+    // Ambil pemetaan aktif KHUSUS untuk field transaksi (Kolom tabel keuangan)
+    var activeTransactionMapping = {};
+    for (var i = 0; i < TRANSACTION_FIELDS.length; i++) {
+      var field = TRANSACTION_FIELDS[i];
+      if (mapping[field]) {
+        var cIdx = colLetterToIndex(mapping[field]);
+        if (cIdx > 0) {
+          activeTransactionMapping[field] = cIdx;
+        }
+      }
+    }
+
+    // Ambil pemetaan aktif KHUSUS untuk bukti gambar
+    var activeEvidenceMapping = {};
+    for (var i = 0; i < EVIDENCE_FIELDS.length; i++) {
+      var field = EVIDENCE_FIELDS[i];
+      if (mapping[field]) {
+        var cIdx = colLetterToIndex(mapping[field]);
+        if (cIdx > 0) {
+          activeEvidenceMapping[field] = cIdx;
+        }
       }
     }
 
@@ -551,42 +752,36 @@ function processRequest(data) {
       return incomingVal;
     }
 
-    // Helper penulisan sel yang aman terhadap aturan Validasi Data / Dropdown Google Spreadsheet
-    function safeWriteMatrix(targetSheet, startRowIdx, matrixData, numCols) {
-      if (!matrixData || matrixData.length === 0) return;
-      var numRows = matrixData.length;
-      var range = targetSheet.getRange(startRowIdx, 1, numRows, numCols);
+    // Helper penulisan sel SATU KOLOM KHUSUS yang aman terhadap aturan Validasi & TANPA menyentuh kolom lain
+    function safeWriteSingleColumn(targetSheet, startRowIdx, colIdx, valuesArray) {
+      if (!valuesArray || valuesArray.length === 0 || colIdx <= 0) return;
+      var numRows = valuesArray.length;
+      var range = targetSheet.getRange(startRowIdx, colIdx, numRows, 1);
       var validations = range.getDataValidations();
 
-      // 1. Cocokkan nilai matrixData dengan opsi dropdown yang ada di sel
+      // 1. Cocokkan nilai dengan opsi dropdown jika ada
       if (validations && validations.length > 0) {
         for (var r = 0; r < numRows; r++) {
-          for (var c = 0; c < numCols; c++) {
-            var rule = (validations[r] && validations[r][c]) ? validations[r][c] : null;
-            if (rule && matrixData[r][c] !== "" && matrixData[r][c] !== null && matrixData[r][c] !== undefined) {
-              matrixData[r][c] = matchDropdownValue(rule, matrixData[r][c]);
-            }
+          var rule = (validations[r] && validations[r][0]) ? validations[r][0] : null;
+          if (rule && valuesArray[r][0] !== "" && valuesArray[r][0] !== null && valuesArray[r][0] !== undefined) {
+            valuesArray[r][0] = matchDropdownValue(rule, valuesArray[r][0]);
           }
         }
       }
 
-      // 2. Setel relaksasi validasi (setAllowInvalid: true) agar penulisan diizinkan penuh oleh Google Sheets
+      // 2. Setel relaksasi validasi agar tidak error jika format berbeda
       try {
         if (validations && validations.length > 0) {
           var relaxedRules = [];
           var hasValidation = false;
           for (var r = 0; r < validations.length; r++) {
-            var rowList = [];
-            for (var c = 0; c < validations[r].length; c++) {
-              var rule = validations[r][c];
-              if (rule) {
-                hasValidation = true;
-                rowList.push(rule.copy().setAllowInvalid(true).build());
-              } else {
-                rowList.push(null);
-              }
+            var rule = validations[r] ? validations[r][0] : null;
+            if (rule) {
+              hasValidation = true;
+              relaxedRules.push([rule.copy().setAllowInvalid(true).build()]);
+            } else {
+              relaxedRules.push([null]);
             }
-            relaxedRules.push(rowList);
           }
           if (hasValidation) {
             range.setDataValidations(relaxedRules);
@@ -594,136 +789,337 @@ function processRequest(data) {
         }
       } catch (eRel) {}
 
-      // 3. Tulis batch matrix data ke spreadsheet
+      // 3. Tulis batch kolom ke spreadsheet (HANYA KOLOM INI YANG DITULIS)
       try {
-        range.setValues(matrixData);
+        range.setValues(valuesArray);
         return;
       } catch (err) {}
 
-      // 4. Fallback per-sel jika ada kegagalan khusus
+      // 4. Fallback tulis per-sel jika gagal batch
       for (var r = 0; r < numRows; r++) {
         var currentRow = startRowIdx + r;
-        for (var c = 0; c < numCols; c++) {
-          var val = matrixData[r][c];
-          var cell = targetSheet.getRange(currentRow, c + 1);
-          if (val === "" || val === null || val === undefined || val === "-") {
-            try { cell.clearContent(); } catch (e) {}
-          } else {
+        var val = valuesArray[r][0];
+        var cell = targetSheet.getRange(currentRow, colIdx);
+        if (val === "" || val === null || val === undefined || val === "-") {
+          try { cell.clearContent(); } catch (e) {}
+        } else {
+          try {
+            cell.setValue(val);
+          } catch (cellErr) {
             try {
-              cell.setValue(val);
-            } catch (cellErr) {
-              try {
-                var cRule = cell.getDataValidation();
-                if (cRule) {
-                  cell.setDataValidation(cRule.copy().setAllowInvalid(true).build());
-                }
-                cell.setValue(val);
-              } catch (e3) {
-                cell.clearContent();
+              var cRule = cell.getDataValidation();
+              if (cRule) {
+                cell.setDataValidation(cRule.copy().setAllowInvalid(true).build());
               }
+              cell.setValue(val);
+            } catch (e3) {
+              cell.clearContent();
             }
           }
         }
       }
     }
 
-    // --- AKSI 2: SINKRONISASI SEMUA DATA (BATCH) ---
-    if (action === "sync_all") {
-      var rows = data.rows || [];
+    // Helper membersihkan sisa data lama HANYA pada kolom yang dikonfigurasi & BERHENTI jika menemukan rumus
+    function clearOldTransactionData(targetSheet, startRowIdx, activeMappingObj, newRowCount) {
+      var lastRow = targetSheet.getLastRow();
+      if (lastRow < startRowIdx) return;
       
-      // Bersihkan data lama dari startRow ke bawah
-      var lastRow = sheet.getLastRow();
-      if (lastRow >= startRow) {
-        var numRowsToClear = lastRow - startRow + 1;
-        sheet.getRange(startRow, 1, numRowsToClear, maxCol).clearContent();
+      for (var field in activeMappingObj) {
+        var colIdx = activeMappingObj[field];
+        if (colIdx <= 0) continue;
+        
+        var totalRowsToCheck = lastRow - startRowIdx + 1;
+        if (totalRowsToCheck <= 0) continue;
+        
+        var checkRange = targetSheet.getRange(startRowIdx, colIdx, totalRowsToCheck, 1);
+        var formulas = checkRange.getFormulas();
+        var values = checkRange.getValues();
+        
+        for (var r = 0; r < totalRowsToCheck; r++) {
+          var currentRow = startRowIdx + r;
+          
+          // Jika baris ini akan ditimpa langsung oleh data baru, biarkan
+          if (r < newRowCount) continue;
+          
+          // Jika sel mengandung RUMUS/FORMULA (seperti =SUM(...), =TOTAL, dsb), STOP agar rumus tetap aman!
+          if (formulas[r] && formulas[r][0] && formulas[r][0].toString().trim() !== "") {
+            break;
+          }
+          
+          // Jika ada nilai data lama di luar jangkauan data baru, bersihkan sel tersebut
+          if (values[r] && values[r][0] !== "" && values[r][0] !== null && values[r][0] !== undefined) {
+            targetSheet.getRange(currentRow, colIdx).clearContent();
+          }
+        }
+      }
+    }
+
+    // --- AKSI 2: SINKRONISASI SEMUA / BATCH DATA (BATCH SYNC) ---
+    if (action === "sync_all" || action === "sync_batch") {
+      var rows = data.rows || [];
+      var targetStartRow = parseInt(data.startRow) || startRow || 2;
+      var clearFirst = (data.clearFirst === true || String(data.clearFirst) === "true") || (action === "sync_all" && data.chunkIndex === undefined);
+      
+      // 1. Bersihkan HANYA sisa baris lama pada kolom transaksi tanpa merusak rumus atau tabel lain
+      if (clearFirst) {
+        clearOldTransactionData(sheet, targetStartRow, activeTransactionMapping, rows.length);
       }
       
+      // 2. Tulis data transaksi HANYA ke kolom-kolom yang dipetakan
       if (rows.length > 0) {
-        var matrix = [];
-        for (var r = 0; r < rows.length; r++) {
-          var item = rows[r];
-          var rowArr = new Array(maxCol).fill("");
-          
-          for (var field in activeMapping) {
-            var targetCol = activeMapping[field] - 1; // 0-based
-            if (targetCol >= 0 && targetCol < maxCol) {
-              rowArr[targetCol] = (item[field] !== undefined && item[field] !== null) ? item[field] : "";
-            }
+        for (var field in activeTransactionMapping) {
+          var colIdx = activeTransactionMapping[field];
+          var colArray = [];
+          for (var r = 0; r < rows.length; r++) {
+            var item = rows[r];
+            var val = (item[field] !== undefined && item[field] !== null) ? item[field] : "";
+            colArray.push([val]);
           }
-          matrix.push(rowArr);
+          safeWriteSingleColumn(sheet, targetStartRow, colIdx, colArray);
         }
-        
-        safeWriteMatrix(sheet, startRow, matrix, maxCol);
       }
       
       return jsonResponse({
         status: "success",
-        message: "Berhasil sinkronisasi " + rows.length + " baris data ke sheet '" + sheetName + "'",
-        count: rows.length
+        message: "Berhasil sinkronisasi " + rows.length + " baris data ke sheet '" + sheetName + "' pada kolom yang dikonfigurasi.",
+        count: rows.length,
+        startRow: targetStartRow
       });
-    }
-    
-    // Helper mencari baris kosong pertama berdasarkan kolom data yang dipetakan
-    function getFirstEmptyDataRow(targetSheet, startRowIdx, checkColIdx) {
-      var col = checkColIdx > 0 ? checkColIdx : 1;
-      var lastRow = targetSheet.getLastRow();
-      if (lastRow < startRowIdx) return startRowIdx;
-      
-      var range = targetSheet.getRange(startRowIdx, col, lastRow - startRowIdx + 1, 1);
-      var values = range.getValues();
-      for (var i = 0; i < values.length; i++) {
-        var val = values[i][0];
-        if (val === "" || val === null || val === undefined) {
-          return startRowIdx + i;
-        }
-      }
-      return lastRow + 1;
     }
 
     // --- AKSI 3: TAMBAH 1 BARIS REALTIME (ADD ROW) ---
     if (action === "add_row") {
       var item = data.row || {};
-      var checkCol = 1;
-      for (var k in activeMapping) {
-        checkCol = activeMapping[k];
+      
+      // Cari kolom acuan utama transaksi
+      var checkCol = activeTransactionMapping['tanggal'] || activeTransactionMapping['no'] || 1;
+      for (var f in activeTransactionMapping) {
+        checkCol = activeTransactionMapping[f];
         break;
       }
-      var nextRow = getFirstEmptyDataRow(sheet, startRow, checkCol);
-      var rowArr = new Array(maxCol).fill("");
       
-      for (var field in activeMapping) {
-        var targetCol = activeMapping[field] - 1; // 0-based
-        if (targetCol >= 0 && targetCol < maxCol) {
-          rowArr[targetCol] = (item[field] !== undefined && item[field] !== null) ? item[field] : "";
+      // Cari baris kosong pertama yang belum ada data dan bukan sel rumus
+      var lastRow = sheet.getLastRow();
+      var nextRow = startRow;
+      if (lastRow >= startRow) {
+        var totalToCheck = lastRow - startRow + 1;
+        var rRange = sheet.getRange(startRow, checkCol, totalToCheck, 1);
+        var rFormulas = rRange.getFormulas();
+        var rValues = rRange.getValues();
+        
+        var found = false;
+        for (var i = 0; i < totalToCheck; i++) {
+          // Jika menemukan rumus, berarti tabel transaksi berakhir di sini (ada total/footer)
+          if (rFormulas[i] && rFormulas[i][0] && rFormulas[i][0].toString().trim() !== "") {
+            nextRow = startRow + i;
+            found = true;
+            break;
+          }
+          if (rValues[i][0] === "" || rValues[i][0] === null || rValues[i][0] === undefined) {
+            nextRow = startRow + i;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          nextRow = lastRow + 1;
         }
       }
       
-      safeWriteMatrix(sheet, nextRow, [rowArr], maxCol);
+      // Tulis data HANYA pada kolom yang dikonfigurasi pada nextRow
+      for (var field in activeTransactionMapping) {
+        var colIdx = activeTransactionMapping[field];
+        var val = (item[field] !== undefined && item[field] !== null) ? item[field] : "";
+        safeWriteSingleColumn(sheet, nextRow, colIdx, [[val]]);
+      }
       
       return jsonResponse({
         status: "success",
-        message: "Berhasil menambahkan data ke baris " + nextRow,
+        message: "Berhasil menambahkan data ke baris " + nextRow + " pada kolom terkonfigurasi.",
         rowNumber: nextRow
       });
     }
 
     // --- AKSI 4: URUNGKAN (UNDO) BARIS TERAKHIR ---
     if (action === "undo_last" || action === "delete_last_row") {
+      var checkCol = activeTransactionMapping['tanggal'] || activeTransactionMapping['no'] || 1;
+      for (var f in activeTransactionMapping) {
+        checkCol = activeTransactionMapping[f];
+        break;
+      }
+      
       var lastRow = sheet.getLastRow();
       if (lastRow >= startRow) {
-        // Bersihkan baris terakhir
-        sheet.getRange(lastRow, 1, 1, maxCol).clearContent();
-        return jsonResponse({
-          status: "success",
-          message: "Berhasil mengurungkan (Undo) data pada baris ke-" + lastRow + " di sheet '" + sheetName + "'",
-          undoneRow: lastRow
-        });
-      } else {
+        var totalToCheck = lastRow - startRow + 1;
+        var rRange = sheet.getRange(startRow, checkCol, totalToCheck, 1);
+        var rFormulas = rRange.getFormulas();
+        var rValues = rRange.getValues();
+        
+        // Cari baris data transaksi terakhir dari bawah yang BUKAN sel rumus
+        var targetUndoRow = -1;
+        for (var i = totalToCheck - 1; i >= 0; i--) {
+          var hasFormula = (rFormulas[i] && rFormulas[i][0] && rFormulas[i][0].toString().trim() !== "");
+          var hasValue = (rValues[i][0] !== "" && rValues[i][0] !== null && rValues[i][0] !== undefined);
+          if (!hasFormula && hasValue) {
+            targetUndoRow = startRow + i;
+            break;
+          }
+        }
+        
+        if (targetUndoRow >= startRow) {
+          // Bersihkan HANYA kolom-kolom yang dipetakan pada baris tersebut
+          for (var field in activeTransactionMapping) {
+            var colIdx = activeTransactionMapping[field];
+            var cell = sheet.getRange(targetUndoRow, colIdx);
+            if (cell.getFormula() === "") {
+              cell.clearContent();
+            }
+          }
+          
+          return jsonResponse({
+            status: "success",
+            message: "Berhasil mengurungkan data pada baris ke-" + targetUndoRow,
+            undoneRow: targetUndoRow
+          });
+        }
+      }
+      
+      return jsonResponse({
+        status: "error",
+        message: "Tidak ada baris data transaksi untuk di-undo."
+      });
+    }
+
+    // --- AKSI 5: UPLOAD GAMBAR BUKTI (SALDO REKENING, CASH ON HAND, MUTASI REKENING 1-4) ---
+    if (action === "upload_evidence_images" || action === "upload_evidence_image" || action === "upload_evidence" || action === "upload_images" || action === "upload_image") {
+      var images = data.images || [];
+      var defaultTargetRow = parseInt(data.targetRow) || parseInt(data.startRow) || 2;
+      var customRowMapping = data.rowMapping || {};
+      var useImageFormula = data.useImageFormula === true;
+      var monthLabel = data.monthLabel || "";
+
+      if (!images || images.length === 0) {
         return jsonResponse({
           status: "error",
-          message: "Tidak ada baris data untuk di-undo (sudah mencapai batas baris awal)."
+          message: "Tidak ada gambar bukti yang dikirimkan."
         });
       }
+
+      // Dapatkan atau buat folder penyimpanan otomatis di Google Drive
+      var targetFolder = null;
+      try {
+        var folderName = "DailyApps_BuktiKeuangan";
+        var folders = DriveApp.getFoldersByName(folderName);
+        if (folders.hasNext()) {
+          targetFolder = folders.next();
+        } else {
+          targetFolder = DriveApp.createFolder(folderName);
+        }
+      } catch (errFolder) {
+        try {
+          targetFolder = DriveApp.getRootFolder();
+        } catch (errRoot) {
+          return jsonResponse({
+            status: "error",
+            message: "Izin Google Drive belum aktif pada URL Web App ini. Pastikan Anda membuat 'New deployment' dan menyalin URL /exec yang baru ke aplikasi: " + errRoot.toString()
+          });
+        }
+      }
+
+      var uploadedResults = [];
+      var updatedCells = [];
+
+      for (var idx = 0; idx < images.length; idx++) {
+        var imgItem = images[idx];
+        var fieldKey = imgItem.key;
+        var base64Data = imgItem.base64 || "";
+        var mimeType = imgItem.mimeType || "image/jpeg";
+        var originalFileName = imgItem.fileName || (fieldKey + ".jpg");
+        var itemTargetRow = parseInt(imgItem.targetRow) || parseInt(customRowMapping[fieldKey]) || defaultTargetRow;
+
+        if (!base64Data) continue;
+
+        if (base64Data.indexOf("base64,") !== -1) {
+          base64Data = base64Data.split("base64,")[1];
+        }
+
+        var decodedBytes = Utilities.base64Decode(base64Data);
+        var timeStampStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd_HHmmss");
+        var savedFileName = (monthLabel ? (monthLabel + "_") : "") + fieldKey + "_" + timeStampStr + "_" + originalFileName;
+
+        var blob = Utilities.newBlob(decodedBytes, mimeType, savedFileName);
+        var driveFile = targetFolder.createFile(blob);
+
+        try {
+          driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        } catch (eShare) {}
+
+        var fileUrl = driveFile.getUrl();
+        var downloadDirectUrl = "https://lh3.googleusercontent.com/d/" + driveFile.getId();
+
+        // Tulis HANYA ke SATU SEL TERTENTU yang dikonfigurasi
+        var colIndex = activeEvidenceMapping[fieldKey] || colLetterToIndex(mapping[fieldKey]);
+        if (colIndex > 0) {
+          var cell = sheet.getRange(itemTargetRow, colIndex);
+
+          if (useImageFormula) {
+            var insertedNative = false;
+            try {
+              var dataUrl = "data:" + mimeType + ";base64," + base64Data;
+              var cellImage = SpreadsheetApp.newCellImage()
+                .setSourceUrl(dataUrl)
+                .setAltTextTitle(savedFileName)
+                .setAltTextDescription(originalFileName)
+                .build();
+              cell.setValue(cellImage);
+              insertedNative = true;
+            } catch (errDataUrl) {
+              try {
+                var cellImageDrive = SpreadsheetApp.newCellImage()
+                  .setSourceUrl(downloadDirectUrl)
+                  .setAltTextTitle(savedFileName)
+                  .build();
+                cell.setValue(cellImageDrive);
+                insertedNative = true;
+              } catch (errDriveUrl) {
+                cell.setValue('=IMAGE("' + downloadDirectUrl + '", 1)');
+              }
+            }
+            updatedCells.push({
+              field: fieldKey,
+              col: colIndex,
+              row: itemTargetRow,
+              val: insertedNative ? "[InCellImage]" : ('=IMAGE("' + downloadDirectUrl + '")')
+            });
+          } else {
+            cell.setValue(fileUrl);
+            updatedCells.push({
+              field: fieldKey,
+              col: colIndex,
+              row: itemTargetRow,
+              val: fileUrl
+            });
+          }
+        }
+
+        uploadedResults.push({
+          key: fieldKey,
+          fileId: driveFile.getId(),
+          fileUrl: fileUrl,
+          downloadUrl: downloadDirectUrl,
+          fileName: savedFileName,
+          row: itemTargetRow
+        });
+      }
+
+      return jsonResponse({
+        status: "success",
+        message: "Berhasil mengunggah " + uploadedResults.length + " gambar bukti ke Google Drive & mencatat ke sel target Spreadsheet.",
+        uploadedCount: uploadedResults.length,
+        results: uploadedResults,
+        updatedCells: updatedCells
+      });
     }
 
     return jsonResponse({ status: "error", message: "Action tidak dikenal: " + action });

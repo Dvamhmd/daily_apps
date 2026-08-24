@@ -15,8 +15,8 @@ class GoogleSheetsConfigModal extends StatefulWidget {
   const GoogleSheetsConfigModal({
     super.key,
     required this.initialConfig,
-    required this.transactions,
-    required this.customRules,
+    this.transactions = const [],
+    this.customRules = const [],
     required this.onConfigSaved,
     this.onSyncCompleted,
   });
@@ -24,8 +24,8 @@ class GoogleSheetsConfigModal extends StatefulWidget {
   static Future<void> show({
     required BuildContext context,
     required SheetsConfig config,
-    required List<StrukturTransaction> transactions,
-    required List<CustomKodeRule> customRules,
+    List<StrukturTransaction> transactions = const [],
+    List<CustomKodeRule> customRules = const [],
     required Function(SheetsConfig) onConfigSaved,
     VoidCallback? onSyncCompleted,
   }) {
@@ -56,16 +56,65 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
   late TextEditingController _sheetNameCtrl;
   late TextEditingController _startRowCtrl;
 
+  static const List<Map<String, String>> dateFormatPresets = [
+    {
+      'pattern': 'dd/MM/yyyy',
+      'label': 'DD/MM/YYYY (Hari/Bulan/Tahun)',
+      'badge': 'Standar ID / UK',
+      'desc': 'Contoh: 01/08/2026 (1 Agustus)',
+    },
+    {
+      'pattern': 'MM/dd/yyyy',
+      'label': 'MM/DD/YYYY (Bulan/Hari/Tahun)',
+      'badge': 'Standar Sheets US',
+      'desc': 'Contoh: 08/01/2026 (Solusi 1 Agu terdeteksi 8 Jan)',
+    },
+    {
+      'pattern': 'yyyy-MM-dd',
+      'label': 'YYYY-MM-DD (Tahun-Bulan-Hari)',
+      'badge': 'Standar ISO Universal',
+      'desc': 'Contoh: 2026-08-01 (Aman di semua bahasa)',
+    },
+    {
+      'pattern': 'dd-MM-yyyy',
+      'label': 'DD-MM-YYYY (Hari-Bulan-Tahun)',
+      'badge': 'Pemisah Strip',
+      'desc': 'Contoh: 01-08-2026',
+    },
+    {
+      'pattern': 'yyyy/MM/dd',
+      'label': 'YYYY/MM/DD (Tahun/Bulan/Hari)',
+      'badge': 'Pemisah Garis Miring',
+      'desc': 'Contoh: 2026/08/01',
+    },
+    {
+      'pattern': 'dd MMM yyyy',
+      'label': 'DD MMM YYYY (Bulan Singkat)',
+      'badge': 'Teks Singkat',
+      'desc': 'Contoh: 01 Agu 2026 (Bebas ambiguitas)',
+    },
+    {
+      'pattern': 'dd MMMM yyyy',
+      'label': 'DD MMMM YYYY (Bulan Lengkap)',
+      'badge': 'Teks Lengkap',
+      'desc': 'Contoh: 01 Agustus 2026',
+    },
+  ];
+
+  late String _selectedDateFormat;
+  late TextEditingController _customDateFormatCtrl;
+
   final Map<String, TextEditingController> _colControllers = {};
+  final Map<String, bool> _fieldVisibility = {};
 
   bool _isTesting = false;
   bool _isSyncing = false;
   String? _testMessage;
   bool? _testSuccess;
 
-  final List<Map<String, String>> _fieldDefinitions = [
+  final List<Map<String, String>> _transactionFields = [
     {'key': 'no', 'label': 'Nomor Urut', 'desc': '1, 2, 3, ...'},
-    {'key': 'tanggal', 'label': 'Tanggal', 'desc': 'Format DD/MM/YYYY'},
+    {'key': 'tanggal', 'label': 'Tanggal', 'desc': 'Format Tanggal Transaksi'},
     {'key': 'ku', 'label': 'Kode Unit (KU)', 'desc': 'KU-01, KU-02, dsb.'},
     {'key': 'kategori', 'label': 'Kategori', 'desc': 'Kategori Transaksi'},
     {'key': 'keterangan', 'label': 'Keterangan', 'desc': 'Judul & Rincian'},
@@ -73,6 +122,57 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
     {'key': 'debit', 'label': 'Debit (Pemasukan)', 'desc': 'Nominal Masuk'},
     {'key': 'kredit', 'label': 'Kredit (Pengeluaran)', 'desc': 'Nominal Keluar'},
   ];
+
+  final List<Map<String, String>> _evidenceImageFields = [
+    {
+      'key': 'bukti_saldo_rekening',
+      'label': 'Bukti Saldo Rekening',
+      'desc': 'Screenshot Saldo Rekening Bank'
+    },
+    {
+      'key': 'bukti_saldo_cash',
+      'label': 'Bukti Saldo Cash On Hand',
+      'desc': 'Foto Fisik Uang Tunai di Tangan'
+    },
+    {
+      'key': 'bukti_mutasi_1',
+      'label': 'Bukti Mutasi Rekening 1',
+      'desc': 'Foto Mutasi Rekening Halaman 1'
+    },
+    {
+      'key': 'bukti_mutasi_2',
+      'label': 'Bukti Mutasi Rekening 2',
+      'desc': 'Foto Mutasi Rekening Halaman 2'
+    },
+    {
+      'key': 'bukti_mutasi_3',
+      'label': 'Bukti Mutasi Rekening 3',
+      'desc': 'Foto Mutasi Rekening Halaman 3'
+    },
+    {
+      'key': 'bukti_mutasi_4',
+      'label': 'Bukti Mutasi Rekening 4',
+      'desc': 'Foto Mutasi Rekening Halaman 4'
+    },
+  ];
+
+  List<Map<String, String>> get _fieldDefinitions => [
+        ..._transactionFields,
+        ..._evidenceImageFields,
+      ];
+
+  late TextEditingController _evidenceTargetRowCtrl;
+  late bool _insertImageFormula;
+  final Map<String, TextEditingController> _rowControllers = {};
+
+  String _formatPreviewSample(String pattern) {
+    try {
+      final sampleDate = DateTime(2026, 8, 1, 14, 30);
+      return DateFormat(pattern.trim()).format(sampleDate);
+    } catch (_) {
+      return 'Format tidak valid';
+    }
+  }
 
   @override
   void initState() {
@@ -82,13 +182,32 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
     _urlCtrl = TextEditingController(text: _config.webAppUrl);
     _sheetNameCtrl = TextEditingController(text: _config.sheetName);
     _startRowCtrl = TextEditingController(text: _config.startRow.toString());
+    _evidenceTargetRowCtrl =
+        TextEditingController(text: _config.evidenceTargetRow.toString());
+    _insertImageFormula = _config.insertImageFormula;
+
+    _selectedDateFormat = _config.dateFormat;
+    final isPreset = dateFormatPresets.any((p) => p['pattern'] == _selectedDateFormat);
+    _customDateFormatCtrl = TextEditingController(
+      text: isPreset ? '' : _selectedDateFormat,
+    );
 
     for (var f in _fieldDefinitions) {
       final key = f['key']!;
       final colVal = _config.columnMapping[key] ??
           SheetsConfig.defaultColumnMapping()[key] ??
           'A';
-      _colControllers[key] = TextEditingController(text: colVal);
+      final isExcluded = colVal == '-' || colVal.trim().isEmpty;
+      _fieldVisibility[key] = !isExcluded;
+      final defaultCol = SheetsConfig.defaultColumnMapping()[key] ?? 'A';
+      _colControllers[key] =
+          TextEditingController(text: isExcluded ? defaultCol : colVal);
+    }
+
+    for (var f in _evidenceImageFields) {
+      final key = f['key']!;
+      final rowVal = _config.getEvidenceRow(key);
+      _rowControllers[key] = TextEditingController(text: rowVal.toString());
     }
   }
 
@@ -97,10 +216,39 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
     _urlCtrl.dispose();
     _sheetNameCtrl.dispose();
     _startRowCtrl.dispose();
+    _evidenceTargetRowCtrl.dispose();
+    _customDateFormatCtrl.dispose();
     for (var c in _colControllers.values) {
       c.dispose();
     }
+    for (var c in _rowControllers.values) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  String? _getMappingValidationError() {
+    for (var f in _fieldDefinitions) {
+      final key = f['key']!;
+      final isVisible = _fieldVisibility[key] ?? true;
+      if (isVisible) {
+        final val = _colControllers[key]?.text.trim().toUpperCase() ?? '';
+        if (val.isEmpty || val == '-') {
+          return 'Kolom untuk "${f['label']}" wajib diisi. Masukkan huruf kolom (misal: A, B, C) atau matikan ikon mata.';
+        }
+      }
+    }
+    for (var f in _evidenceImageFields) {
+      final key = f['key']!;
+      final isVisible = _fieldVisibility[key] ?? true;
+      if (isVisible) {
+        final rowVal = int.tryParse(_rowControllers[key]?.text.trim() ?? '');
+        if (rowVal == null || rowVal <= 0) {
+          return 'Nomor baris untuk "${f['label']}" wajib diisi angka positif (misal: 2).';
+        }
+      }
+    }
+    return null;
   }
 
   void _saveCurrentState() {
@@ -109,11 +257,31 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
         ? 'Lap Keu'
         : _sheetNameCtrl.text.trim();
     _config.startRow = int.tryParse(_startRowCtrl.text.trim()) ?? 2;
+    _config.evidenceTargetRow =
+        int.tryParse(_evidenceTargetRowCtrl.text.trim()) ?? 2;
+    _config.insertImageFormula = _insertImageFormula;
+    _config.dateFormat = _selectedDateFormat.trim().isEmpty
+        ? 'dd/MM/yyyy'
+        : _selectedDateFormat.trim();
 
     for (var f in _fieldDefinitions) {
       final key = f['key']!;
-      final val = _colControllers[key]?.text.trim().toUpperCase() ?? '-';
-      _config.columnMapping[key] = (val.isEmpty || val == '-') ? '-' : val;
+      final isVisible = _fieldVisibility[key] ?? true;
+      if (!isVisible) {
+        _config.columnMapping[key] = '-';
+      } else {
+        final val = _colControllers[key]?.text.trim().toUpperCase() ?? '';
+        _config.columnMapping[key] = val.isEmpty
+            ? (SheetsConfig.defaultColumnMapping()[key] ?? 'A')
+            : val;
+      }
+    }
+
+    for (var f in _evidenceImageFields) {
+      final key = f['key']!;
+      final rowVal = int.tryParse(_rowControllers[key]?.text.trim() ?? '') ??
+          _config.evidenceTargetRow;
+      _config.evidenceRowMapping[key] = rowVal > 0 ? rowVal : 2;
     }
 
     _config.save();
@@ -121,11 +289,34 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
   }
 
   Future<void> _handleTestConnection() async {
+    final mappingError = _getMappingValidationError();
+    if (mappingError != null) {
+      setState(() {
+        _activeTab = 1;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded,
+                  color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: Text(mappingError)),
+            ],
+          ),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     _saveCurrentState();
     if (!_config.isConfigured) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Masukkan URL Web App Google Apps Script terlebih dahulu.'),
+          content:
+              Text('Masukkan URL Web App Google Apps Script terlebih dahulu.'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -150,11 +341,34 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
   }
 
   Future<void> _handleSyncAll() async {
+    final mappingError = _getMappingValidationError();
+    if (mappingError != null) {
+      setState(() {
+        _activeTab = 1;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded,
+                  color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: Text(mappingError)),
+            ],
+          ),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     _saveCurrentState();
     if (!_config.isConfigured) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Masukkan URL Web App Google Apps Script terlebih dahulu.'),
+          content:
+              Text('Masukkan URL Web App Google Apps Script terlebih dahulu.'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -201,58 +415,45 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
     }
   }
 
-
-
-  void _resetMappingToDefault() {
-    final def = SheetsConfig.defaultColumnMapping();
-    setState(() {
-      _startRowCtrl.text = '2';
-      for (var f in _fieldDefinitions) {
-        final key = f['key']!;
-        final val = def[key] ?? 'A';
-        _colControllers[key]?.text = val;
-      }
-    });
-    _saveCurrentState();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Pemetaan kolom dikembalikan ke standar (A-H, Baris 2).'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.88,
-      margin: EdgeInsets.only(bottom: bottomInset),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        children: [
-          // Drag handle & Header
-          _buildHeader(),
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          _saveCurrentState();
+        }
+      },
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.88,
+        margin: EdgeInsets.only(bottom: bottomInset),
+        decoration: const BoxDecoration(
+          color: Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            // Drag handle & Header
+            _buildHeader(),
 
-          // Tab Navigation Bar
-          _buildTabBar(),
+            // Tab Navigation Bar
+            _buildTabBar(),
 
-          // Body Content
-          Expanded(
-            child: IndexedStack(
-              index: _activeTab,
-              children: [
-                _buildConnectionTab(),
-                _buildCellMappingTab(),
-                _buildScriptGuideTab(),
-              ],
+            // Body Content
+            Expanded(
+              child: IndexedStack(
+                index: _activeTab,
+                children: [
+                  _buildConnectionTab(),
+                  _buildColumnMappingTab(),
+                  _buildScriptGuideTab(),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -756,15 +957,938 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
     );
   }
 
-  // --- TAB 2: PEMETAAN CELL & KOLOM ---
-  Widget _buildCellMappingTab() {
+  void _resetMappingToDefault() {
+    final def = SheetsConfig.defaultColumnMapping();
+    final defRows = SheetsConfig.defaultEvidenceRowMapping();
+    setState(() {
+      _startRowCtrl.text = '2';
+      _evidenceTargetRowCtrl.text = '2';
+      _insertImageFormula = false;
+      _selectedDateFormat = 'dd/MM/yyyy';
+      _customDateFormatCtrl.text = '';
+      for (var f in _fieldDefinitions) {
+        final key = f['key']!;
+        final val = def[key] ?? 'A';
+        _fieldVisibility[key] = true;
+        _colControllers[key]?.text = val;
+      }
+      for (var f in _evidenceImageFields) {
+        final key = f['key']!;
+        final val = defRows[key] ?? 2;
+        _rowControllers[key]?.text = val.toString();
+      }
+    });
+    _saveCurrentState();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Pemetaan kolom & baris dikembalikan ke pengaturan standar.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Widget _buildFieldRow(Map<String, String> f) {
+    final key = f['key']!;
+    final label = f['label']!;
+    final desc = key == 'tanggal'
+        ? 'Pola: $_selectedDateFormat (${_formatPreviewSample(_selectedDateFormat)})'
+        : f['desc']!;
+    final ctrl = _colControllers[key]!;
+    final isVisible = _fieldVisibility[key] ?? true;
+    final isExcluded = !isVisible;
+    final colText = ctrl.text.trim().toUpperCase();
+    final isMissingColumn = isVisible && (colText.isEmpty || colText == '-');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isExcluded
+            ? const Color(0xFFF8FAFC)
+            : (isMissingColumn ? const Color(0xFFFFF1F2) : Colors.white),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isExcluded
+              ? const Color(0xFFE2E8F0)
+              : (isMissingColumn
+                  ? const Color(0xFFF87171)
+                  : const Color(0xFFCBD5E1)),
+          width: 1.0,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Badge Kolom
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: isExcluded
+                  ? const Color(0xFFE2E8F0)
+                  : (isMissingColumn
+                      ? const Color(0xFFFEE2E2)
+                      : const Color(0xFF107C41).withValues(alpha: 0.1)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: isMissingColumn
+                  ? const Icon(
+                      Icons.priority_high_rounded,
+                      size: 18,
+                      color: Color(0xFFDC2626),
+                    )
+                  : Text(
+                      isExcluded ? '-' : (colText.isEmpty ? '?' : colText),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: isExcluded
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF107C41),
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Label & Keterangan
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isExcluded
+                              ? const Color(0xFF94A3B8)
+                              : (isMissingColumn
+                                  ? const Color(0xFF991B1B)
+                                  : const Color(0xFF1E293B)),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isExcluded)
+                      Container(
+                        margin: const EdgeInsets.only(left: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'Dikecualikan',
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      )
+                    else if (isMissingColumn)
+                      Container(
+                        margin: const EdgeInsets.only(left: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: const Text(
+                          'Wajib Diisi',
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: Color(0xFFDC2626),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                Text(
+                  isExcluded
+                      ? 'Tidak akan dimasukkan ke spreadsheet'
+                      : (isMissingColumn
+                          ? 'Wajib isi kolom (cth: A, B) atau matikan ikon mata'
+                          : desc),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: isExcluded
+                        ? const Color(0xFFCBD5E1)
+                        : (isMissingColumn
+                            ? const Color(0xFFDC2626)
+                            : const Color(0xFF94A3B8)),
+                    fontWeight:
+                        isMissingColumn ? FontWeight.w500 : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Tombol Saklar Kecualikan / Gunakan (Ikon Mata)
+          IconButton(
+            icon: Icon(
+              isExcluded
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              size: 20,
+              color: isExcluded
+                  ? const Color(0xFF94A3B8)
+                  : const Color(0xFF107C41),
+            ),
+            tooltip: isExcluded
+                ? 'Gunakan kolom ini'
+                : 'Kecualikan (Jangan gunakan kolom ini)',
+            onPressed: () {
+              setState(() {
+                final willBeVisible = isExcluded;
+                _fieldVisibility[key] = willBeVisible;
+                if (willBeVisible) {
+                  if (ctrl.text.trim().isEmpty || ctrl.text.trim() == '-') {
+                    final def =
+                        SheetsConfig.defaultColumnMapping()[key] ?? 'A';
+                    ctrl.text = def;
+                  }
+                }
+              });
+              _saveCurrentState();
+            },
+          ),
+          const SizedBox(width: 4),
+          // Input Huruf Kolom
+          SizedBox(
+            width: 48,
+            height: 34,
+            child: TextField(
+              controller: ctrl,
+              enabled: isVisible,
+              textCapitalization: TextCapitalization.characters,
+              textAlign: TextAlign.center,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z]')),
+                LengthLimitingTextInputFormatter(3),
+              ],
+              onChanged: (val) {
+                setState(() {});
+                _saveCurrentState();
+              },
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'monospace',
+                color: isExcluded
+                    ? const Color(0xFF94A3B8)
+                    : (isMissingColumn
+                        ? const Color(0xFFDC2626)
+                        : const Color(0xFF0F172A)),
+              ),
+              decoration: InputDecoration(
+                contentPadding: EdgeInsets.zero,
+                hintText: isExcluded ? '-' : 'A-Z',
+                hintStyle: TextStyle(
+                  fontSize: 10,
+                  color: isMissingColumn
+                      ? const Color(0xFFF87171)
+                      : const Color(0xFF94A3B8),
+                ),
+                filled: isExcluded || isMissingColumn,
+                fillColor: isExcluded
+                    ? const Color(0xFFF1F5F9)
+                    : (isMissingColumn
+                        ? const Color(0xFFFFF1F2)
+                        : Colors.white),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: isMissingColumn
+                        ? const Color(0xFFEF4444)
+                        : const Color(0xFFCBD5E1),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: isMissingColumn
+                        ? const Color(0xFFEF4444)
+                        : const Color(0xFFCBD5E1),
+                    width: 1.0,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: isMissingColumn
+                        ? const Color(0xFFDC2626)
+                        : const Color(0xFF107C41),
+                    width: 1.8,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEvidenceFieldRow(Map<String, String> field) {
+    final key = field['key']!;
+    final label = field['label']!;
+    final desc = field['desc']!;
+    final colCtrl = _colControllers[key]!;
+    final rowCtrl = _rowControllers[key]!;
+    final isVisible = _fieldVisibility[key] ?? true;
+    final isExcluded = !isVisible;
+    final colText = colCtrl.text.trim().toUpperCase();
+    final rowText = rowCtrl.text.trim();
+    final rowNum = int.tryParse(rowText);
+    final isMissingColumn = isVisible && (colText.isEmpty || colText == '-');
+    final isMissingRow =
+        isVisible && (rowText.isEmpty || rowNum == null || rowNum <= 0);
+    final hasError = isMissingColumn || isMissingRow;
+    final cellStr = isExcluded
+        ? '-'
+        : (hasError
+            ? (colText.isEmpty ? '?' : colText) +
+                (rowText.isEmpty ? '?' : rowText)
+            : '$colText$rowText');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: isExcluded
+            ? const Color(0xFFF8FAFC)
+            : (hasError ? const Color(0xFFFFF1F2) : Colors.white),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isExcluded
+              ? const Color(0xFFE2E8F0)
+              : (hasError
+                  ? const Color(0xFFF87171)
+                  : const Color(0xFFCBD5E1).withValues(alpha: 0.8)),
+          width: 1.0,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Target Cell Badge (e.g. I2, J5)
+          Container(
+            width: 46,
+            height: 36,
+            decoration: BoxDecoration(
+              color: isExcluded
+                  ? const Color(0xFFE2E8F0)
+                  : (hasError
+                      ? const Color(0xFFFEE2E2)
+                      : const Color(0xFF107C41).withValues(alpha: 0.1)),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isExcluded
+                    ? Colors.transparent
+                    : (hasError
+                        ? const Color(0xFFFCA5A5)
+                        : const Color(0xFF107C41).withValues(alpha: 0.25)),
+              ),
+            ),
+            child: Center(
+              child: hasError
+                  ? const Icon(
+                      Icons.priority_high_rounded,
+                      size: 18,
+                      color: Color(0xFFDC2626),
+                    )
+                  : Text(
+                      cellStr,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isExcluded
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF107C41),
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Label & Keterangan
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isExcluded
+                              ? const Color(0xFF94A3B8)
+                              : (hasError
+                                  ? const Color(0xFF991B1B)
+                                  : const Color(0xFF1E293B)),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isExcluded)
+                      Container(
+                        margin: const EdgeInsets.only(left: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'Dikecualikan',
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      )
+                    else if (hasError)
+                      Container(
+                        margin: const EdgeInsets.only(left: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: Text(
+                          isMissingColumn && isMissingRow
+                              ? 'Kolom & Baris Kosong'
+                              : (isMissingColumn
+                                  ? 'Kolom Wajib Diisi'
+                                  : 'Baris Wajib Diisi'),
+                          style: const TextStyle(
+                            fontSize: 8.5,
+                            color: Color(0xFFDC2626),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                Text(
+                  isExcluded
+                      ? 'Tidak akan dimasukkan ke spreadsheet'
+                      : (hasError
+                          ? 'Wajib isi kolom & baris atau matikan ikon mata'
+                          : desc),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: isExcluded
+                        ? const Color(0xFFCBD5E1)
+                        : (hasError
+                            ? const Color(0xFFDC2626)
+                            : const Color(0xFF94A3B8)),
+                    fontWeight: hasError ? FontWeight.w500 : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Tombol Saklar Kecualikan / Gunakan (Ikon Mata)
+          IconButton(
+            icon: Icon(
+              isExcluded
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              size: 18,
+              color: isExcluded
+                  ? const Color(0xFF94A3B8)
+                  : const Color(0xFF107C41),
+            ),
+            tooltip: isExcluded
+                ? 'Gunakan kolom ini'
+                : 'Kecualikan (Jangan gunakan)',
+            onPressed: () {
+              setState(() {
+                final willBeVisible = isExcluded;
+                _fieldVisibility[key] = willBeVisible;
+                if (willBeVisible) {
+                  if (colCtrl.text.trim().isEmpty ||
+                      colCtrl.text.trim() == '-') {
+                    final def =
+                        SheetsConfig.defaultColumnMapping()[key] ?? 'A';
+                    colCtrl.text = def;
+                  }
+                  if (rowCtrl.text.trim().isEmpty ||
+                      (int.tryParse(rowCtrl.text.trim()) ?? 0) <= 0) {
+                    final defRow =
+                        SheetsConfig.defaultEvidenceRowMapping()[key] ?? 2;
+                    rowCtrl.text = defRow.toString();
+                  }
+                }
+              });
+              _saveCurrentState();
+            },
+          ),
+          const SizedBox(width: 4),
+          // Input Huruf Kolom (e.g. I)
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Kolom',
+                style: TextStyle(
+                  fontSize: 8.5,
+                  color: isMissingColumn
+                      ? const Color(0xFFDC2626)
+                      : const Color(0xFF64748B),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 1),
+              SizedBox(
+                width: 38,
+                height: 32,
+                child: TextField(
+                  controller: colCtrl,
+                  enabled: isVisible,
+                  textCapitalization: TextCapitalization.characters,
+                  textAlign: TextAlign.center,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z]')),
+                    LengthLimitingTextInputFormatter(3),
+                  ],
+                  onChanged: (val) {
+                    setState(() {});
+                    _saveCurrentState();
+                  },
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'monospace',
+                    color: isExcluded
+                        ? const Color(0xFF94A3B8)
+                        : (isMissingColumn
+                            ? const Color(0xFFDC2626)
+                            : const Color(0xFF0F172A)),
+                  ),
+                  decoration: InputDecoration(
+                    contentPadding: EdgeInsets.zero,
+                    hintText: isExcluded ? '-' : 'A-Z',
+                    hintStyle: TextStyle(
+                      fontSize: 9.5,
+                      color: isMissingColumn
+                          ? const Color(0xFFF87171)
+                          : const Color(0xFF94A3B8),
+                    ),
+                    filled: isExcluded || isMissingColumn,
+                    fillColor: isExcluded
+                        ? const Color(0xFFF1F5F9)
+                        : (isMissingColumn
+                            ? const Color(0xFFFFF1F2)
+                            : Colors.white),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(
+                        color: isMissingColumn
+                            ? const Color(0xFFEF4444)
+                            : const Color(0xFFCBD5E1),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(
+                        color: isMissingColumn
+                            ? const Color(0xFFEF4444)
+                            : const Color(0xFFCBD5E1),
+                        width: isMissingColumn ? 1.5 : 1.0,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(
+                        color: isMissingColumn
+                            ? const Color(0xFFDC2626)
+                            : const Color(0xFF107C41),
+                        width: 1.8,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 6),
+          // Input Nomor Baris (e.g. 2, 5, 10)
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Baris',
+                style: TextStyle(
+                  fontSize: 8.5,
+                  color: isMissingRow
+                      ? const Color(0xFFDC2626)
+                      : const Color(0xFF64748B),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 1),
+              SizedBox(
+                width: 44,
+                height: 32,
+                child: TextField(
+                  controller: rowCtrl,
+                  enabled: isVisible,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(4),
+                  ],
+                  onChanged: (val) {
+                    setState(() {});
+                    _saveCurrentState();
+                  },
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'monospace',
+                    color: isExcluded
+                        ? const Color(0xFF94A3B8)
+                        : (isMissingRow
+                            ? const Color(0xFFDC2626)
+                            : const Color(0xFF0F172A)),
+                  ),
+                  decoration: InputDecoration(
+                    contentPadding: EdgeInsets.zero,
+                    hintText: isExcluded ? '-' : '2',
+                    hintStyle: TextStyle(
+                      fontSize: 10,
+                      color: isMissingRow
+                          ? const Color(0xFFF87171)
+                          : const Color(0xFF94A3B8),
+                    ),
+                    filled: isExcluded || isMissingRow,
+                    fillColor: isExcluded
+                        ? const Color(0xFFF1F5F9)
+                        : (isMissingRow
+                            ? const Color(0xFFFFF1F2)
+                            : Colors.white),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(
+                        color: isMissingRow
+                            ? const Color(0xFFEF4444)
+                            : const Color(0xFFCBD5E1),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(
+                        color: isMissingRow
+                            ? const Color(0xFFEF4444)
+                            : const Color(0xFFCBD5E1),
+                        width: isMissingRow ? 1.5 : 1.0,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(
+                        color: isMissingRow
+                            ? const Color(0xFFDC2626)
+                            : const Color(0xFF107C41),
+                        width: 1.8,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateFormatSection() {
+    final previewText = _formatPreviewSample(_selectedDateFormat);
+    final isCustom = !dateFormatPresets.any((p) => p['pattern'] == _selectedDateFormat);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Section
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0284C7).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.calendar_month_rounded,
+                  color: Color(0xFF0284C7),
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Format & Urutan Tanggal Spreadsheet',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    Text(
+                      'Atur urutan Hari, Bulan, dan Tahun saat data dikirim',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Dropdown Opsi Format Tanggal
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFCBD5E1)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: isCustom ? '__custom__' : _selectedDateFormat,
+                isExpanded: true,
+                icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
+                style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A)),
+                items: [
+                  ...dateFormatPresets.map((preset) {
+                    final pattern = preset['pattern']!;
+                    final label = preset['label']!;
+                    final badge = preset['badge']!;
+                    return DropdownMenuItem<String>(
+                      value: pattern,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              label,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1E293B),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE2E8F0),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              badge,
+                              style: const TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF475569),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                  const DropdownMenuItem<String>(
+                    value: '__custom__',
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Kustom (Ketik Pola DateFormat Sendiri)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0369A1),
+                            ),
+                          ),
+                        ),
+                        Icon(Icons.edit_note_rounded, size: 16, color: Color(0xFF0369A1)),
+                      ],
+                    ),
+                  ),
+                ],
+                onChanged: (newVal) {
+                  if (newVal == null) return;
+                  setState(() {
+                    if (newVal == '__custom__') {
+                      if (_customDateFormatCtrl.text.isEmpty) {
+                        _customDateFormatCtrl.text = _selectedDateFormat;
+                      }
+                    } else {
+                      _selectedDateFormat = newVal;
+                    }
+                  });
+                  _saveCurrentState();
+                },
+              ),
+            ),
+          ),
+
+          // Jika Kustom dipilih, tampilkan input pola
+          if (isCustom) ...[
+            const SizedBox(height: 8),
+            TextField(
+              controller: _customDateFormatCtrl,
+              style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              decoration: InputDecoration(
+                hintText: 'Contoh: dd/MM/yyyy atau yyyy-MM-dd',
+                hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                labelText: 'Pola DateFormat Kustom',
+                labelStyle: const TextStyle(fontSize: 11.5),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                ),
+              ),
+              onChanged: (val) {
+                setState(() {
+                  _selectedDateFormat = val.trim().isEmpty ? 'dd/MM/yyyy' : val.trim();
+                });
+                _saveCurrentState();
+              },
+            ),
+          ],
+
+          const SizedBox(height: 10),
+
+          // Live Preview Box
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFBBF7D0)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.visibility_rounded,
+                  color: Color(0xFF16A34A),
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: RichText(
+                    text: TextSpan(
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF166534)),
+                      children: [
+                        const TextSpan(text: 'Contoh 1 Agustus 2026 dikirim sebagai: '),
+                        TextSpan(
+                          text: previewText,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF14532D),
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          // Tips Box Penjelasan Masalah Tanggal Terbalik di Spreadsheet US
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEFCE8),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFFEF08A)),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.lightbulb_outline_rounded,
+                  color: Color(0xFFCA8A04),
+                  size: 16,
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Tips Masalah Tanggal: Jika di Google Sheets Anda 01/08/2026 terbaca sebagai 8 Januari (karena lokal US), pilih format MM/DD/YYYY atau YYYY-MM-DD.',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: Color(0xFF854D0E),
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- TAB 2: PEMETAAN KOLOM ---
+  Widget _buildColumnMappingTab() {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Banner Penjelasan
+          // Info Box
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -779,7 +1903,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Atur posisi kolom Google Spreadsheet untuk tiap data Tabel Lap Keu sesuai format yang Anda inginkan (misal: Kolom A, B, C, dst).',
+                    'Atur posisi kolom Google Spreadsheet untuk data transaksi & bukti gambar sesuai format yang Anda inginkan (misal: Kolom A, B, C, dst).',
                     style: TextStyle(fontSize: 11.5, color: Color(0xFF1E40AF)),
                   ),
                 ),
@@ -788,8 +1912,36 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
           ),
           const SizedBox(height: 16),
 
+          // Header List Mapping Transaksi
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '1. Kolom Data Transaksi',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _resetMappingToDefault,
+                icon: const Icon(Icons.refresh_rounded, size: 14),
+                label: const Text('Reset Standar',
+                    style: TextStyle(fontSize: 11.5)),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF64748B),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
           // Baris Mulai Data
           Container(
+            margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.white,
@@ -799,13 +1951,25 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
             child: Row(
               children: [
                 const Expanded(
-                  child: Text(
-                    'Baris Mulai Data (Start Row)',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Baris Mulai Data Transaksi (Start Row)',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                      Text(
+                        'Posisi awal baris penulisan data transaksi',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -831,199 +1995,104 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
               ],
             ),
           ),
-          const SizedBox(height: 16),
 
-          // Header List Mapping
+          // Pengaturan Format & Urutan Tanggal Spreadsheet
+          _buildDateFormatSection(),
+
+          // Daftar Kolom Field Transaksi
+          ..._transactionFields.map((f) => _buildFieldRow(f)),
+
+          const SizedBox(height: 20),
+
+          // Section 2: Pemetaan Kolom & Baris Bukti Gambar
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Pemetaan Kolom Spreadsheet',
+                '2. Kolom & Baris Gambar Bukti',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF1E293B),
                 ),
               ),
-              TextButton.icon(
-                onPressed: _resetMappingToDefault,
-                icon: const Icon(Icons.refresh_rounded, size: 14),
-                label: const Text('Reset Standar',
-                    style: TextStyle(fontSize: 11.5)),
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF64748B),
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'Bisa Beda Baris Per-Slot',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF15803D),
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 8),
 
-          // Daftar Kolom Field
-          ..._fieldDefinitions.map((f) {
-            final key = f['key']!;
-            final label = f['label']!;
-            final desc = f['desc']!;
-            final ctrl = _colControllers[key]!;
-            final isExcluded =
-                ctrl.text.trim().isEmpty || ctrl.text.trim() == '-';
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: isExcluded ? const Color(0xFFF8FAFC) : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isExcluded
-                      ? const Color(0xFFE2E8F0)
-                      : const Color(0xFFCBD5E1),
-                ),
+          // Switch / Toggle Sisipkan Gambar di Sel (Native In-Cell Image)
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _insertImageFormula
+                  ? const Color(0xFFF0FDF4)
+                  : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _insertImageFormula
+                    ? const Color(0xFFA7F3D0)
+                    : const Color(0xFFE2E8F0),
               ),
-              child: Row(
-                children: [
-                  // Badge Kolom
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: isExcluded
-                          ? const Color(0xFFE2E8F0)
-                          : const Color(0xFF107C41).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Center(
-                      child: Text(
-                        isExcluded ? '-' : ctrl.text.trim().toUpperCase(),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Sisipkan Gambar di dalam Sel (Kualitas Tajam / HD)',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: isExcluded
-                              ? const Color(0xFF94A3B8)
-                              : const Color(0xFF107C41),
+                          color: Color(0xFF1E293B),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // Label & Keterangan
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              label,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: isExcluded
-                                    ? const Color(0xFF94A3B8)
-                                    : const Color(0xFF1E293B),
-                              ),
-                            ),
-                            if (isExcluded)
-                              Container(
-                                margin: const EdgeInsets.only(left: 6),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 5, vertical: 1.5),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF1F5F9),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text(
-                                  'Dikecualikan',
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    color: Color(0xFF64748B),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        Text(
-                          isExcluded
-                              ? 'Tidak akan dimasukkan ke spreadsheet'
-                              : desc,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: isExcluded
-                                ? const Color(0xFFCBD5E1)
-                                : const Color(0xFF94A3B8),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Tombol Saklar Kecualikan / Gunakan
-                  IconButton(
-                    icon: Icon(
-                      isExcluded
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                      size: 20,
-                      color: isExcluded
-                          ? const Color(0xFF94A3B8)
-                          : const Color(0xFF107C41),
-                    ),
-                    tooltip: isExcluded
-                        ? 'Gunakan kolom ini'
-                        : 'Kecualikan (Jangan gunakan kolom ini)',
-                    onPressed: () {
-                      setState(() {
-                        if (isExcluded) {
-                          final def =
-                              SheetsConfig.defaultColumnMapping()[key] ?? 'A';
-                          ctrl.text = def;
-                        } else {
-                          ctrl.text = '-';
-                        }
-                      });
-                      _saveCurrentState();
-                    },
-                  ),
-                  const SizedBox(width: 4),
-                  // Input Huruf Kolom
-                  SizedBox(
-                    width: 48,
-                    height: 34,
-                    child: TextField(
-                      controller: ctrl,
-                      enabled: !isExcluded,
-                      textCapitalization: TextCapitalization.characters,
-                      textAlign: TextAlign.center,
-                      onChanged: (val) {
-                        setState(() {});
-                        _saveCurrentState();
-                      },
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'monospace',
-                        color: isExcluded
-                            ? const Color(0xFF94A3B8)
-                            : const Color(0xFF0F172A),
-                      ),
-                      decoration: InputDecoration(
-                        contentPadding: EdgeInsets.zero,
-                        hintText: '-',
-                        filled: isExcluded,
-                        fillColor: const Color(0xFFF1F5F9),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide:
-                              const BorderSide(color: Color(0xFFCBD5E1)),
+                      Text(
+                        _insertImageFormula
+                            ? 'Foto disisipkan langsung ke dalam sel (seperti menu Sisipkan > Gambar > Di dalam Sel), kualitas asli jernih & tidak blur.'
+                            : 'Spreadsheet akan menaruh Link URL Google Drive (bisa diklik).',
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          color: Color(0xFF64748B),
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
-            );
-          }),
+                ),
+                Switch(
+                  value: _insertImageFormula,
+                  activeThumbColor: const Color(0xFF107C41),
+                  onChanged: (val) {
+                    setState(() {
+                      _insertImageFormula = val;
+                    });
+                    _saveCurrentState();
+                  },
+                ),
+              ],
+            ),
+          ),
+
+          // Daftar Kolom & Baris Field Gambar Bukti
+          ..._evidenceImageFields.map((f) => _buildEvidenceFieldRow(f)),
+
           const SizedBox(height: 20),
         ],
       ),
@@ -1136,17 +2205,22 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
           ),
           _buildStepItem(
             '3',
-            'Tempelkan Kode Script',
-            'Hapus kode default di editor, lalu tekan tombol "Salin" di atas dan Paste (Tempel) ke editor Google Apps Script.',
+            'Tempelkan Kode Script & Simpan',
+            'Hapus kode lama di editor, tekan tombol "Salin" di atas dan Paste (Tempel) ke editor Google Apps Script, lalu klik ikon Simpan (Disk).',
           ),
           _buildStepItem(
             '4',
-            'Deploy Sebagai Web App',
-            'Klik tombol "Deploy" (Terapkan) -> "New deployment" -> pilih type "Web app".\nAtur "Who has access" ke "Anyone" (Siapa saja), lalu klik Deploy & Izinkan Akses (Authorize).',
+            'Beri Izin Akses (Authorize)',
+            'Pilih fungsi "authorizeDrive" di dropdown toolbar atas -> klik tombol "Run" (▶️ Jalankan) -> klik "Review Permissions / Tinjau Izin" -> pilih Akun Google -> klik "Advanced / Lanjutan" -> klik "Go to ... (unsafe)" -> klik "Allow / Izinkan".',
             isHighlight: true,
           ),
           _buildStepItem(
             '5',
+            'Deploy Sebagai Web App',
+            'Klik tombol "Deploy" (Terapkan) -> "Manage deployments" -> klik ikon Pensil (Edit) -> Version: "New version" -> Deploy.\n(Jika baru pertama: Deploy -> "New deployment" -> type "Web app" -> "Who has access": "Anyone" -> Deploy).',
+          ),
+          _buildStepItem(
+            '6',
             'Salin Web App URL ke Aplikasi',
             'Salin "Web app URL" yang muncul (berakhiran /exec), lalu buka Tab "Koneksi" di modal ini dan Paste pada kolom URL.',
           ),

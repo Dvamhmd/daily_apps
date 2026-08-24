@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:daily_apps/models/model_sheets_config.dart';
@@ -6,6 +7,7 @@ import 'package:daily_apps/utils/custom_rule_import_helper.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:daily_apps/utils/sheets_sync_service.dart';
 import 'package:daily_apps/widgets/google_sheets_config_modal.dart';
+import 'package:daily_apps/widgets/upload_evidence_modal.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -397,6 +399,14 @@ class _StrukturPageState extends State<StrukturPage> {
     await _saveData();
   }
 
+  Timer? _autoSyncDebounceTimer;
+
+  @override
+  void dispose() {
+    _autoSyncDebounceTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _saveData() async {
     final prefs = await SharedPreferences.getInstance();
     final monthlyKey = 'struktur_keuangan_data_$_monthKey';
@@ -408,24 +418,33 @@ class _StrukturPageState extends State<StrukturPage> {
   void _triggerAutoSyncSheets() {
     if (!_sheetsConfig.isConfigured || !_sheetsConfig.autoSyncOnInput) return;
 
-    final allMutasi = _data.transactions
-        .where((tx) => tx.isPemasukan || tx.isPengeluaran)
-        .toList()
-      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    _autoSyncDebounceTimer?.cancel();
+    _autoSyncDebounceTimer = Timer(const Duration(milliseconds: 500), () {
+      final allMutasi = _data.transactions
+          .where((tx) => tx.isPemasukan || tx.isPengeluaran)
+          .toList()
+        ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
-    SheetsSyncService.syncAllTransactions(
-      allMutasi,
-      _sheetsConfig,
-      customRules: _data.customKodeRules,
-    ).then((res) {
-      if (mounted) {
-        debugPrint('Auto-sync Sheets result: ${res.isSuccess} - ${res.message}');
-        setState(() {});
-      }
+      SheetsSyncService.syncAllTransactions(
+        allMutasi,
+        _sheetsConfig,
+        customRules: _data.customKodeRules,
+      ).then((res) {
+        if (mounted) {
+          debugPrint('Auto-sync Sheets result: ${res.isSuccess} - ${res.message}');
+          setState(() {});
+        }
+      });
     });
   }
 
-  void _showGoogleSheetsConfigModal() {
+  Future<void> _showGoogleSheetsConfigModal() async {
+    final freshCfg = await SheetsConfig.load();
+    if (!mounted) return;
+    setState(() {
+      _sheetsConfig = freshCfg;
+    });
+
     final allMutasi = _data.transactions
         .where((tx) => tx.isPemasukan || tx.isPengeluaran)
         .toList()
@@ -442,6 +461,28 @@ class _StrukturPageState extends State<StrukturPage> {
         });
       },
       onSyncCompleted: () {
+        setState(() {});
+      },
+    );
+  }
+
+  Future<void> _showUploadEvidenceModal() async {
+    final freshCfg = await SheetsConfig.load();
+    if (!mounted) return;
+    setState(() {
+      _sheetsConfig = freshCfg;
+    });
+
+    UploadEvidenceModal.show(
+      context,
+      sheetsConfig: _sheetsConfig,
+      monthLabel: '${_namaBulan[_selectedMonth.month - 1]} ${_selectedMonth.year}',
+      onConfigChanged: (newCfg) {
+        setState(() {
+          _sheetsConfig = newCfg;
+        });
+      },
+      onUploaded: () {
         setState(() {});
       },
     );
@@ -4687,6 +4728,9 @@ class _StrukturPageState extends State<StrukturPage> {
                           });
 
                           _saveData();
+                          if (adminFee > 0) {
+                            _triggerAutoSyncSheets();
+                          }
                           Navigator.pop(ctx);
 
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -7046,6 +7090,41 @@ class _StrukturPageState extends State<StrukturPage> {
                                         ),
                                         const SizedBox(width: 8),
                                         InkWell(
+                                          onTap: () => _showUploadEvidenceModal(),
+                                          borderRadius: BorderRadius.circular(10),
+                                          child: Container(
+                                            height: 38,
+                                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF107C41),
+                                              borderRadius: BorderRadius.circular(10),
+                                              border: Border.all(
+                                                color: const Color(0xFF0D6334),
+                                              ),
+                                            ),
+                                            child: const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.cloud_upload_rounded,
+                                                  size: 16,
+                                                  color: Colors.white,
+                                                ),
+                                                SizedBox(width: 5),
+                                                Text(
+                                                  'Upload Bukti',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        InkWell(
                                           onTap: () {
                                             _showGoogleSheetsConfigModal();
                                           },
@@ -7054,35 +7133,27 @@ class _StrukturPageState extends State<StrukturPage> {
                                             height: 38,
                                             padding: const EdgeInsets.symmetric(horizontal: 10),
                                             decoration: BoxDecoration(
-                                              color: _sheetsConfig.isConfigured
-                                                  ? const Color(0xFF107C41)
-                                                  : const Color(0xFFFEF3C7),
+                                              color: Colors.white,
                                               borderRadius: BorderRadius.circular(10),
                                               border: Border.all(
-                                                color: _sheetsConfig.isConfigured
-                                                    ? const Color(0xFF0D6334)
-                                                    : const Color(0xFFFDE68A),
+                                                color: const Color(0xFF107C41),
                                               ),
                                             ),
-                                            child: Row(
+                                            child: const Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 Icon(
-                                                  Icons.table_chart_rounded,
+                                                  Icons.settings_rounded,
                                                   size: 16,
-                                                  color: _sheetsConfig.isConfigured
-                                                      ? Colors.white
-                                                      : const Color(0xFFB45309),
+                                                  color: Color(0xFF107C41),
                                                 ),
-                                                const SizedBox(width: 5),
+                                                SizedBox(width: 5),
                                                 Text(
-                                                  'Spreadsheets',
+                                                  'Atur Sheets',
                                                   style: TextStyle(
                                                     fontSize: 11,
                                                     fontWeight: FontWeight.bold,
-                                                    color: _sheetsConfig.isConfigured
-                                                        ? Colors.white
-                                                        : const Color(0xFFB45309),
+                                                    color: Color(0xFF107C41),
                                                   ),
                                                 ),
                                               ],
@@ -7458,10 +7529,11 @@ class _StrukturPageState extends State<StrukturPage> {
                                                                       tx.title &&
                                                                   tx.note !=
                                                                       itemTitle)
-                                                              ? tx.note
-                                                              : null;
+                                                          ? tx.note
+                                                          : null;
 
                                                       return Container(
+                                                        height: 38,
                                                         decoration:
                                                             BoxDecoration(
                                                           color: isEven
@@ -7497,7 +7569,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                                         FontWeight
                                                                             .bold,
                                                                     color: Color(
-                                                                        0xFF92400E),
+                                                                        0xFF78350F),
                                                                   ),
                                                                 ),
                                                               ),
@@ -7520,12 +7592,9 @@ class _StrukturPageState extends State<StrukturPage> {
                                                                   style:
                                                                       const TextStyle(
                                                                     fontSize:
-                                                                        9,
+                                                                        9.5,
                                                                     color: Color(
-                                                                        0xFF78350F),
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w500,
+                                                                        0xFF451A03),
                                                                   ),
                                                                 ),
                                                               ),
@@ -7835,74 +7904,79 @@ class _StrukturPageState extends State<StrukturPage> {
                               // Bottom Total Summary Bar Tab Laporan
                               Container(
                                 padding: const EdgeInsets.fromLTRB(
-                                    20, 10, 20, 12),
+                                    16, 10, 16, 12),
                                 decoration: const BoxDecoration(
                                   color: Colors.white,
                                   border: Border(
                                     top: BorderSide(color: Color(0xFFFDE68A)),
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text(
-                                          'Total ${activeList.length} Transaksi',
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            color: Color(0xFF92400E),
-                                            fontWeight: FontWeight.w500,
-                                          ),
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Total ${activeList.length} Transaksi',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                color: Color(0xFF92400E),
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            Text(
+                                              selectedSubTab == 'semua'
+                                                  ? 'Total Akumulasi:'
+                                                  : selectedSubTab == 'pengeluaran'
+                                                      ? 'Total Pengeluaran:'
+                                                      : 'Total Pemasukan:',
+                                              style: const TextStyle(
+                                                fontSize: 12.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF78350F),
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        Text(
-                                          selectedSubTab == 'semua'
-                                              ? 'Total Akumulasi:'
-                                              : selectedSubTab == 'pengeluaran'
-                                                  ? 'Total Pengeluaran:'
-                                                  : 'Total Pemasukan:',
-                                          style: const TextStyle(
-                                            fontSize: 12.5,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xFF78350F),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 14, vertical: 7),
+                                          decoration: BoxDecoration(
+                                            color: selectedSubTab == 'semua'
+                                                ? const Color(0xFFFEF3C7)
+                                                : selectedSubTab == 'pengeluaran'
+                                                    ? const Color(0xFFFFF1F2)
+                                                    : const Color(0xFFF0FDF4),
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                            border: Border.all(
+                                              color: selectedSubTab == 'semua'
+                                                  ? const Color(0xFFFDE68A)
+                                                  : selectedSubTab == 'pengeluaran'
+                                                      ? const Color(0xFFFECDD3)
+                                                      : const Color(0xFFA7F3D0),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            'Rp ${RupiahFormatter.format(totalLaporanNominal)}',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: selectedSubTab == 'semua'
+                                                  ? const Color(0xFFB45309)
+                                                  : selectedSubTab == 'pengeluaran'
+                                                      ? const Color(0xFFE11D48)
+                                                      : const Color(0xFF059669),
+                                            ),
                                           ),
                                         ),
                                       ],
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 14, vertical: 7),
-                                      decoration: BoxDecoration(
-                                        color: selectedSubTab == 'semua'
-                                            ? const Color(0xFFFEF3C7)
-                                            : selectedSubTab == 'pengeluaran'
-                                                ? const Color(0xFFFFF1F2)
-                                                : const Color(0xFFF0FDF4),
-                                        borderRadius:
-                                            BorderRadius.circular(10),
-                                        border: Border.all(
-                                          color: selectedSubTab == 'semua'
-                                              ? const Color(0xFFFDE68A)
-                                              : selectedSubTab == 'pengeluaran'
-                                                  ? const Color(0xFFFECDD3)
-                                                  : const Color(0xFFA7F3D0),
-                                        ),
-                                      ),
-                                      child: Text(
-                                        'Rp ${RupiahFormatter.format(totalLaporanNominal)}',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: selectedSubTab == 'semua'
-                                              ? const Color(0xFFB45309)
-                                              : selectedSubTab == 'pengeluaran'
-                                                  ? const Color(0xFFE11D48)
-                                                  : const Color(0xFF059669),
-                                        ),
-                                      ),
                                     ),
                                   ],
                                 ),
@@ -8823,7 +8897,6 @@ class _StrukturPageState extends State<StrukturPage> {
                                         ],
                                       ),
                                     ),
-
                                     // Baris 2: Total Uang (1 Kolom Saja)
                                     Container(
                                       padding: const EdgeInsets.symmetric(
