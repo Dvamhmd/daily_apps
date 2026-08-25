@@ -2682,8 +2682,9 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
                   return;
                 }
                 _saveCurrentState(markCellsConfigured: true);
-                setState(() {});
-                ScaffoldMessenger.of(context).showSnackBar(
+                final messenger = ScaffoldMessenger.of(context);
+                Navigator.pop(context);
+                messenger.showSnackBar(
                   const SnackBar(
                     content: Row(
                       children: [
@@ -2692,7 +2693,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Pemetaan cell berhasil disimpan!',
+                            'Konfigurasi cell berhasil',
                             style: TextStyle(fontWeight: FontWeight.w600),
                           ),
                         ),

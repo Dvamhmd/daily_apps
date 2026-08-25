@@ -106,7 +106,9 @@ class CustomKodeRule {
     );
   }
 
-  static List<CustomKodeRule> defaultRules() => [
+  static List<CustomKodeRule> defaultRules() => generalRules();
+
+  static List<CustomKodeRule> generalRules() => [
         // Aturan KU (26 aturan)
         CustomKodeRule(keyword: 'rapat', kode: 'Sekretaris', type: 'ku'),
         CustomKodeRule(keyword: 'rakor', kode: 'Sekretaris', type: 'ku'),
@@ -150,6 +152,34 @@ class CustomKodeRule {
         CustomKodeRule(keyword: 'internet', kode: 'Komunikasi & Internet', type: 'kategori'),
         CustomKodeRule(keyword: 'kuota', kode: 'Komunikasi & Internet', type: 'kategori'),
         CustomKodeRule(keyword: 'bunga', kode: 'Bunga Bank', type: 'kategori'),
+      ];
+
+  static List<CustomKodeRule> k12Rules() => [
+        CustomKodeRule(keyword: 'DP KK', kode: 'Terima DP DTK', type: 'kategori'),
+        CustomKodeRule(keyword: 'Kirim DP ke S3', kode: 'Kirim DP DTK ke S3', type: 'kategori'),
+        CustomKodeRule(keyword: 'Dana kontribusi DP dari S3', kode: 'Kontribusi DP S4', type: 'kategori'),
+        CustomKodeRule(keyword: 'Motor', kode: 'Motor, Peralatan & Elektronik', type: 'kategori'),
+        CustomKodeRule(keyword: 'Sewa tempat', kode: 'Sewa Tempat', type: 'kategori'),
+        CustomKodeRule(keyword: 'Bensin', kode: 'Biaya Transportasi Lokal', type: 'kategori'),
+        CustomKodeRule(keyword: 'Konsumsi', kode: 'Biaya Konsumsi Acara', type: 'kategori'),
+        CustomKodeRule(keyword: 'Internet', kode: 'Biaya Komunikasi dan Internet', type: 'kategori'),
+        CustomKodeRule(keyword: 'Kuota', kode: 'Biaya Komunikasi dan Internet', type: 'kategori'),
+        CustomKodeRule(keyword: 'Pulsa', kode: 'Biaya Komunikasi dan Internet', type: 'kategori'),
+        CustomKodeRule(keyword: 'Air', kode: 'Biaya Listrik dan Air', type: 'kategori'),
+        CustomKodeRule(keyword: 'Listrik', kode: 'Biaya Listrik dan Air', type: 'kategori'),
+        CustomKodeRule(keyword: 'Spidol', kode: 'Biaya ATK', type: 'kategori'),
+        CustomKodeRule(keyword: 'Bolpoin', kode: 'Biaya ATK', type: 'kategori'),
+        CustomKodeRule(keyword: 'Pulpen', kode: 'Biaya ATK', type: 'kategori'),
+        CustomKodeRule(keyword: 'Buku', kode: 'Biaya ATK', type: 'kategori'),
+        CustomKodeRule(keyword: 'Kertas', kode: 'Biaya ATK', type: 'kategori'),
+        CustomKodeRule(keyword: 'Print', kode: 'Biaya ATK', type: 'kategori'),
+        CustomKodeRule(keyword: 'Pensil', kode: 'Biaya ATK', type: 'kategori'),
+        CustomKodeRule(keyword: 'ATK', kode: 'Biaya ATK', type: 'kategori'),
+        CustomKodeRule(keyword: 'Admin', kode: 'Biaya RTK', type: 'kategori'),
+        CustomKodeRule(keyword: 'Bi Fast', kode: 'Biaya RTK', type: 'kategori'),
+        CustomKodeRule(keyword: 'RTK', kode: 'Biaya RTK', type: 'kategori'),
+        CustomKodeRule(keyword: 'Peralatan', kode: 'Pemeliharaan Bangunan, Peralatan', type: 'kategori'),
+        CustomKodeRule(keyword: 'Bangunan', kode: 'Pemeliharaan Bangunan, Peralatan', type: 'kategori'),
       ];
 }
 
@@ -331,6 +361,7 @@ class StrukturData {
   OnHandCash onHandCash;
   List<StrukturTransaction> transactions;
   List<CustomKodeRule> customKodeRules;
+  bool isSaldoRekeningUnlocked;
 
   StrukturData({
     RekeningStruktur? rekeningStruktur,
@@ -338,12 +369,14 @@ class StrukturData {
     OnHandCash? onHandCash,
     List<StrukturTransaction>? transactions,
     List<CustomKodeRule>? customKodeRules,
+    bool? isSaldoRekeningUnlocked,
   })  : rekeningStruktur = rekeningStruktur ?? RekeningStruktur(),
         onHandDebit = onHandDebit ?? OnHandDebit(),
         onHandCash = onHandCash ?? OnHandCash(),
         transactions = (transactions ?? [])
           ..sort((a, b) => a.timestamp.compareTo(b.timestamp)),
-        customKodeRules = customKodeRules ?? [];
+        customKodeRules = customKodeRules ?? [],
+        isSaldoRekeningUnlocked = isSaldoRekeningUnlocked ?? false;
 
   int get totalOnHand => onHandDebit.balance + onHandCash.balance;
   int get totalDanaStruktur =>
@@ -398,6 +431,7 @@ class StrukturData {
         'onHandCash': onHandCash.toJson(),
         'transactions': transactions.map((e) => e.toJson()).toList(),
         'customKodeRules': customKodeRules.map((e) => e.toJson()).toList(),
+        'isSaldoRekeningUnlocked': isSaldoRekeningUnlocked,
       };
 
   factory StrukturData.fromJson(Map<String, dynamic> json) {
@@ -424,6 +458,8 @@ class StrukturData {
                   (e) => CustomKodeRule.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+      isSaldoRekeningUnlocked:
+          json['isSaldoRekeningUnlocked'] as bool? ?? false,
     );
   }
 }

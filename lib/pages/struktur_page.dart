@@ -1544,12 +1544,153 @@ class _StrukturPageState extends State<StrukturPage> {
     );
   }
 
+  // --- HELPER DIALOG VERIFIKASI SANDI (UNTUK IMPORT K12 DLL) ---
+  Future<bool?> _showPasswordVerificationDialog({
+    required BuildContext context,
+    required String targetPassword,
+    required String title,
+    required String description,
+  }) {
+    final pwdCtrl = TextEditingController();
+    bool isObscured = true;
+    String? errorText;
+
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (pwdDialogCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setPwdState) {
+            void verifyAndSubmit() {
+              if (pwdCtrl.text.trim() == targetPassword) {
+                Navigator.pop(pwdDialogCtx, true);
+              } else {
+                setPwdState(() {
+                  errorText = 'Kata sandi salah. Akses ditolak!';
+                });
+              }
+            }
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+              contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+              actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEC4899).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.lock_rounded,
+                      color: Color(0xFFDB2777),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    description,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF64748B),
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: pwdCtrl,
+                    obscureText: isObscured,
+                    autofocus: true,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'Masukkan kata sandi...',
+                      hintStyle: const TextStyle(
+                          fontSize: 12, color: Color(0xFF94A3B8)),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(
+                            color: Color(0xFFDB2777), width: 1.5),
+                      ),
+                      errorText: errorText,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          isObscured
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          size: 18,
+                          color: const Color(0xFF64748B),
+                        ),
+                        onPressed: () {
+                          setPwdState(() {
+                            isObscured = !isObscured;
+                          });
+                        },
+                      ),
+                    ),
+                    onSubmitted: (_) => verifyAndSubmit(),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(pwdDialogCtx, false),
+                  child: const Text('Batal'),
+                ),
+                ElevatedButton(
+                  onPressed: verifyAndSubmit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFDB2777),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text('Konfirmasi'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   // --- MODAL / DIALOG IMPORT KONFIGURASI ATURAN DARI EXCEL & PASTE ---
   void _showImportKustomKodeDialog(
     String defaultTab,
     VoidCallback onImportSuccess,
   ) {
-    int importMethod = 0; // 0 = File (.xlsx / .csv), 1 = Salin-Tempel (Paste)
+    int importMethod = 0; // 0 = File (.xlsx / .csv), 1 = Salin-Tempel (Paste), 2 = Default
+    String defaultPreset = 'general'; // 'general' atau 'k12'
     bool replaceAll = false; // false = Gabung (Merge), true = Timpa (Replace)
     String? pickedFileName;
     int? pickedFileSize;
@@ -1856,7 +1997,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                   setDialogState(() {
                                     importMethod = 2;
                                     importResult = CustomRuleImportHelper
-                                        .getDefaultImportResult();
+                                        .getDefaultImportResult(preset: defaultPreset);
                                   });
                                 },
                                 borderRadius: BorderRadius.circular(8),
@@ -2070,7 +2211,7 @@ class _StrukturPageState extends State<StrukturPage> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
                               borderSide:
-                                   const BorderSide(color: Color(0xFFCBD5E1)),
+                                  const BorderSide(color: Color(0xFFCBD5E1)),
                             ),
                           ),
                           onChanged: (_) => handleProcessText(),
@@ -2118,62 +2259,206 @@ class _StrukturPageState extends State<StrukturPage> {
                           ],
                         ),
                       ] else ...[
-                        // METODE DEFAULT (importMethod == 2)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFECFDF5),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: const Color(0xFF10B981)
-                                  .withValues(alpha: 0.4),
+                        // METODE DEFAULT (importMethod == 2) -> 2 Tombol Preset: General & K12
+                        const Text(
+                          'Pilih Preset Profil Aturan Default:',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF334155),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            // Tombol Preset 1: General
+                            Expanded(
+                              child: InkWell(
+                                onTap: () {
+                                  setDialogState(() {
+                                    defaultPreset = 'general';
+                                    importResult = CustomRuleImportHelper
+                                        .getGeneralImportResult();
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: defaultPreset == 'general'
+                                        ? const Color(0xFFEFF6FF)
+                                        : const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: defaultPreset == 'general'
+                                          ? const Color(0xFF3B82F6)
+                                          : const Color(0xFFE2E8F0),
+                                      width: defaultPreset == 'general'
+                                          ? 1.5
+                                          : 1.0,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            defaultPreset == 'general'
+                                                ? Icons.radio_button_checked_rounded
+                                                : Icons.radio_button_off_rounded,
+                                            size: 15,
+                                            color: defaultPreset == 'general'
+                                                ? const Color(0xFF2563EB)
+                                                : const Color(0xFF94A3B8),
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            'General',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: defaultPreset == 'general'
+                                                  ? const Color(0xFF1E40AF)
+                                                  : const Color(0xFF334155),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      const Text(
+                                        '40 aturan (26 KU & 14 Kat) • Saldo Terkunci',
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          color: Color(0xFF64748B),
+                                          height: 1.25,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF059669)
-                                      .withValues(alpha: 0.12),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.auto_awesome_rounded,
-                                  size: 20,
-                                  color: Color(0xFF059669),
+                            const SizedBox(width: 8),
+                            // Tombol Preset 2: K12 (Protected)
+                            Expanded(
+                              child: InkWell(
+                                onTap: () async {
+                                  if (defaultPreset == 'k12') return;
+                                  final bool? isVerified =
+                                      await _showPasswordVerificationDialog(
+                                    context: sbContext,
+                                    targetPassword:
+                                        CustomRuleImportHelper.k12Password,
+                                    title: 'Verifikasi Sandi K12',
+                                    description:
+                                        'Masukkan kata sandi untuk mengimpor aturan khusus profil Sheet K12.',
+                                  );
+
+                                  if (isVerified == true) {
+                                    setDialogState(() {
+                                      defaultPreset = 'k12';
+                                      importResult = CustomRuleImportHelper
+                                          .getK12ImportResult();
+                                    });
+                                    if (sbContext.mounted) {
+                                      ScaffoldMessenger.of(sbContext)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              '✅ Sandi terverifikasi! Profil aturan K12 dipilih.'),
+                                          backgroundColor: Color(0xFF059669),
+                                          behavior: SnackBarBehavior.floating,
+                                          duration: Duration(seconds: 2),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: defaultPreset == 'k12'
+                                        ? const Color(0xFFFDF2F8)
+                                        : const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: defaultPreset == 'k12'
+                                          ? const Color(0xFFEC4899)
+                                          : const Color(0xFFE2E8F0),
+                                      width:
+                                          defaultPreset == 'k12' ? 1.5 : 1.0,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            defaultPreset == 'k12'
+                                                ? Icons.radio_button_checked_rounded
+                                                : Icons.lock_outline_rounded,
+                                            size: 15,
+                                            color: defaultPreset == 'k12'
+                                                ? const Color(0xFFDB2777)
+                                                : const Color(0xFF94A3B8),
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            'K12',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: defaultPreset == 'k12'
+                                                  ? const Color(0xFF9D174D)
+                                                  : const Color(0xFF334155),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 4, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: defaultPreset == 'k12'
+                                                  ? const Color(0xFFFCE7F3)
+                                                  : const Color(0xFFF1F5F9),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              'Protected',
+                                              style: TextStyle(
+                                                fontSize: 8.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: defaultPreset == 'k12'
+                                                    ? const Color(0xFFBE185D)
+                                                    : const Color(0xFF64748B),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      const Text(
+                                        '25 aturan Kat K12 • Saldo Fleksibel',
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          color: Color(0xFF64748B),
+                                          height: 1.25,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                              const SizedBox(width: 12),
-                              const Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Konfigurasi Aturan Bawaan (Default)',
-                                      style: TextStyle(
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF065F46),
-                                      ),
-                                    ),
-                                    SizedBox(height: 3),
-                                    Text(
-                                      '40 aturan standar (26 KU & 14 Kategori) siap diimpor. Silakan periksa pratinjau di bawah, pilih mode penyimpanan, lalu klik Simpan.',
-                                      style: TextStyle(
-                                        fontSize: 10.5,
-                                        color: Color(0xFF047857),
-                                        height: 1.35,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ],
                       const SizedBox(height: 10),
@@ -2199,7 +2484,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                         size: 15, color: Color(0xFF059669)),
                                     const SizedBox(width: 6),
                                     Text(
-                                      'Berhasil Membaca ${importResult!.rules.length} Aturan:',
+                                      'Pratinjau (${importResult!.rules.length} Aturan):',
                                       style: const TextStyle(
                                         fontSize: 11.5,
                                         fontWeight: FontWeight.bold,
@@ -2478,19 +2763,40 @@ class _StrukturPageState extends State<StrukturPage> {
 
                           setState(() {
                             _data.customKodeRules = updated;
+                            if (importMethod == 2) {
+                              if (defaultPreset == 'k12') {
+                                _data.isSaldoRekeningUnlocked = true;
+                              } else {
+                                _data.isSaldoRekeningUnlocked = false;
+                              }
+                            }
                           });
 
                           _saveData();
                           onImportSuccess();
                           Navigator.pop(dialogCtx);
 
+                          String successMsg;
+                          if (replaceAll) {
+                            successMsg =
+                                '✅ Berhasil menimpa seluruh aturan dengan ${importResult!.rules.length} aturan baru!';
+                          } else {
+                            successMsg =
+                                '✅ Berhasil mengimpor & menggabungkan ${importResult!.rules.length} aturan (${importResult!.kuCount} KU, ${importResult!.kategoriCount} Kategori)!';
+                          }
+
+                          if (importMethod == 2 && defaultPreset == 'k12') {
+                            successMsg +=
+                                '\n🔓 Mode K12 diterapkan: Saldo rekening saat ini fleksibel (dapat diedit).';
+                          } else if (importMethod == 2 &&
+                              defaultPreset == 'general') {
+                            successMsg +=
+                                '\n🔒 Mode General diterapkan: Saldo rekening terkunci otomatis.';
+                          }
+
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(
-                                replaceAll
-                                    ? '✅ Berhasil menimpa seluruh aturan dengan ${importResult!.rules.length} aturan baru!'
-                                    : '✅ Berhasil mengimpor & menggabungkan ${importResult!.rules.length} aturan (${importResult!.kuCount} KU, ${importResult!.kategoriCount} Kategori)!',
-                              ),
+                              content: Text(successMsg),
                               backgroundColor: const Color(0xFF059669),
                               behavior: SnackBarBehavior.floating,
                               duration: const Duration(seconds: 3),
@@ -2528,6 +2834,11 @@ class _StrukturPageState extends State<StrukturPage> {
         TextEditingController(text: _data.rekeningStruktur.accountNumber);
     final holderCtrl =
         TextEditingController(text: _data.rekeningStruktur.accountHolder);
+    final saldoRekCtrl = TextEditingController(
+      text: _data.rekeningStruktur.balance > 0
+          ? RupiahFormatter.format(_data.rekeningStruktur.balance)
+          : '0',
+    );
 
     showModalBottomSheet(
       context: context,
@@ -2605,8 +2916,10 @@ class _StrukturPageState extends State<StrukturPage> {
                               value: b,
                               child: Row(
                                 children: [
-                                  const Icon(Icons.account_balance_wallet_outlined,
-                                      size: 18, color: primaryPurple),
+                                  const Icon(
+                                      Icons.account_balance_wallet_outlined,
+                                      size: 18,
+                                      color: primaryPurple),
                                   const SizedBox(width: 8),
                                   Text(b,
                                       style: const TextStyle(
@@ -2626,75 +2939,193 @@ class _StrukturPageState extends State<StrukturPage> {
 
                     const SizedBox(height: 14),
 
-                    // Saldo Rekening (Read-Only)
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Saldo Rekening Saat Ini',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF64748B),
+                    // Saldo Rekening (Fleksibel jika K12 aktif, Terkunci jika General)
+                    if (_data.isSaldoRekeningUnlocked) ...[
+                      // MODE K12: Fleksibel & Dapat Diedit
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Saldo Rekening Saat Ini',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF065F46),
+                                  ),
                                 ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: primaryPurple.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.lock_outline_rounded,
-                                        size: 12, color: primaryPurple),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      'Otomatis',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: primaryPurple,
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981)
+                                        .withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.lock_open_rounded,
+                                          size: 12, color: Color(0xFF059669)),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Fleksibel (K12)',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF059669),
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: saldoRekCtrl,
+                              keyboardType: TextInputType.number,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF065F46),
+                              ),
+                              decoration: InputDecoration(
+                                prefixText: 'Rp ',
+                                prefixStyle: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF059669),
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xFFA7F3D0)),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xFF059669), width: 1.5),
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Rp ${RupiahFormatter.format(_data.rekeningStruktur.balance)}',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: primaryPurple,
+                              onChanged: (v) {
+                                final raw =
+                                    v.replaceAll(RegExp(r'[^0-9]'), '');
+                                final numVal = int.tryParse(raw) ?? 0;
+                                final formatted =
+                                    RupiahFormatter.format(numVal);
+                                if (formatted != v && raw.isNotEmpty) {
+                                  saldoRekCtrl.value = TextEditingValue(
+                                    text: formatted,
+                                    selection: TextSelection.collapsed(
+                                        offset: formatted.length),
+                                  );
+                                }
+                                setModalState(() {});
+                              },
                             ),
-                          ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            'Saldo rekening struktur diperbarui otomatis dari transaksi pemasukan dan pengeluaran.',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF94A3B8),
-                              height: 1.3,
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Mode aturan K12 aktif: Saldo rekening dapat diedit secara manual dan fleksibel.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF047857),
+                                height: 1.3,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
+                    ] else ...[
+                      // MODE GENERAL: Terkunci & Diperbarui Otomatis
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(14),
+                          border:
+                              Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Saldo Rekening Saat Ini',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        primaryPurple.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.lock_outline_rounded,
+                                          size: 12, color: primaryPurple),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Otomatis (Terkunci)',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: primaryPurple,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Rp ${RupiahFormatter.format(_data.rekeningStruktur.balance)}',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: primaryPurple,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Saldo rekening struktur diperbarui otomatis dari transaksi pemasukan dan pengeluaran.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF94A3B8),
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
 
                     const SizedBox(height: 14),
 
@@ -2732,13 +3163,16 @@ class _StrukturPageState extends State<StrukturPage> {
                                   final copyText = holder.isNotEmpty
                                       ? '$bank - $noRek\nA.N $holder'
                                       : '$bank - $noRek';
-                                  Clipboard.setData(ClipboardData(text: copyText));
+                                  Clipboard.setData(
+                                      ClipboardData(text: copyText));
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Row(
                                         children: [
-                                          const Icon(Icons.check_circle_rounded,
-                                              color: Colors.white, size: 18),
+                                          const Icon(
+                                              Icons.check_circle_rounded,
+                                              color: Colors.white,
+                                              size: 18),
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: Text(
@@ -2764,7 +3198,8 @@ class _StrukturPageState extends State<StrukturPage> {
                       textCapitalization: TextCapitalization.words,
                       onChanged: (v) => setModalState(() {}),
                       decoration: InputDecoration(
-                        hintText: 'Nama Pemilik / Atas Nama (contoh: Dwinda Setyani)',
+                        hintText:
+                            'Nama Pemilik / Atas Nama (contoh: Dwinda Setyani)',
                         filled: true,
                         fillColor: const Color(0xFFF8FAFC),
                         contentPadding: const EdgeInsets.symmetric(
@@ -2813,6 +3248,13 @@ class _StrukturPageState extends State<StrukturPage> {
                             _data.rekeningStruktur.bankName = selectedBank;
                             _data.rekeningStruktur.accountNumber = noRek;
                             _data.rekeningStruktur.accountHolder = holder;
+                            if (_data.isSaldoRekeningUnlocked) {
+                              final cleanSaldo = saldoRekCtrl.text
+                                  .replaceAll(RegExp(r'[^0-9]'), '');
+                              final newBalance = int.tryParse(cleanSaldo) ??
+                                  _data.rekeningStruktur.balance;
+                              _data.rekeningStruktur.balance = newBalance;
+                            }
                           });
                           _saveData();
                           Navigator.pop(ctx);
@@ -10105,43 +10547,21 @@ class _StrukturPageState extends State<StrukturPage> {
                                                   const EdgeInsets.symmetric(
                                                       horizontal: 12,
                                                       vertical: 10),
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                mainAxisSize:
-                                                    MainAxisSize.min,
-                                                children: [
-                                                  Text(
-                                                    'Sisa Saldo',
-                                                    style: TextStyle(
-                                                      fontSize: 13.5,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color: sisaSaldo >= 0
-                                                          ? const Color(
-                                                              0xFF78350F)
-                                                          : const Color(
-                                                              0xFF9F1239),
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    'Total Pemasukkan - Total Pengeluaran',
-                                                    style: TextStyle(
-                                                      fontSize: 10.5,
-                                                      color: sisaSaldo >= 0
-                                                          ? const Color(
-                                                              0xFF92400E)
-                                                          : const Color(
-                                                              0xFFBE123C),
-                                                    ),
-                                                  ),
-                                                ],
+                                              child: Text(
+                                                'Sisa Saldo',
+                                                style: TextStyle(
+                                                  fontSize: 13.5,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: sisaSaldo >= 0
+                                                      ? const Color(0xFF78350F)
+                                                      : const Color(0xFF9F1239),
+                                                ),
                                               ),
                                             ),
                                           ),
                                           Container(
                                             width: 1,
-                                            height: 44,
+                                            height: 38,
                                             color: sisaSaldo >= 0
                                                 ? const Color(0xFFFDE68A)
                                                 : const Color(0xFFFECDD3),

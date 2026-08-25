@@ -8,6 +8,7 @@ import 'package:daily_apps/pages/riwayat_page.dart';
 import 'package:daily_apps/pages/rundown_page.dart';
 import 'package:daily_apps/pages/todo_page.dart';
 import 'package:daily_apps/utils/notification_service.dart';
+import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:daily_apps/widgets/app_drawer.dart';
 import 'package:daily_apps/widgets/gta_switch_wheel.dart';
@@ -46,6 +47,15 @@ class MyApp extends StatelessWidget {
           surface: const Color(0xFFF7F9FC),
         ),
       ),
+      builder: (context, child) {
+        final mediaQuery = MediaQuery.of(context);
+        return MediaQuery(
+          data: mediaQuery.copyWith(
+            textScaler: ResponsiveText.getEffectiveTextScaler(context),
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: const MainScreenWrapper(),
     );
   }

@@ -212,11 +212,12 @@ class AppDrawer extends StatelessWidget {
                       const Divider(height: 18),
                       // Mini Stats Row
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildMiniStat('Uangku', totalUangku, const Color(0xFF1976D2)),
-                          _buildMiniStat('Tagihan', totalTagihan, const Color(0xFFD46A6A)),
-                          _buildMiniStat('Dana Aman', danaAman, statusColor),
+                          Expanded(child: _buildMiniStat('Uangku', totalUangku, const Color(0xFF1976D2))),
+                          const SizedBox(width: 6),
+                          Expanded(child: _buildMiniStat('Tagihan', totalTagihan, const Color(0xFFD46A6A))),
+                          const SizedBox(width: 6),
+                          Expanded(child: _buildMiniStat('Dana Aman', danaAman, statusColor)),
                         ],
                       ),
                     ],
@@ -254,7 +255,7 @@ class AppDrawer extends StatelessWidget {
                 _buildMenuItem(
                   context: context,
                   icon: Icons.history_rounded,
-                  iconColor: const Color(0xFF5E35B1),
+                  iconColor: const Color(0xFF1976D2),
                   title: 'Riwayat Keuangan',
                   subtitle: 'Catatan seluruh transaksi & perubahan',
                   onTap: () {
@@ -269,7 +270,7 @@ class AppDrawer extends StatelessWidget {
                 _buildMenuItem(
                   context: context,
                   icon: Icons.check_circle_outline_rounded,
-                  iconColor: const Color(0xFF2E7D32),
+                  iconColor: const Color(0xFF43A047),
                   title: 'Arsip Tagihan Lunas',
                   subtitle: 'Lihat daftar tagihan yang telah dibayar',
                   onTap: () {
@@ -304,14 +305,21 @@ class AppDrawer extends StatelessWidget {
       children: [
         Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(fontSize: 10, color: Colors.grey[500]),
         ),
-        Text(
-          RupiahFormatter.format(amount),
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: color,
+        const SizedBox(height: 2),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            RupiahFormatter.format(amount),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
           ),
         ),
       ],

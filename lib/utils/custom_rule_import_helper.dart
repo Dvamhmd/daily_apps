@@ -350,12 +350,21 @@ class CustomRuleImportHelper {
     }
   }
 
-  /// Mengembalikan list aturan default bawaan sistem (26 KU + 14 Kategori)
-  static List<CustomKodeRule> getDefaultRules() => CustomKodeRule.defaultRules();
+  /// Password khusus untuk mengimpor aturan K12
+  static const String k12Password = 'Yu5uf1253';
 
-  /// Mengembalikan ImportResult dari aturan default bawaan sistem
-  static ImportResult getDefaultImportResult() {
-    final rules = getDefaultRules();
+  /// Mengembalikan list aturan General (26 KU + 14 Kategori)
+  static List<CustomKodeRule> getGeneralRules() => CustomKodeRule.generalRules();
+
+  /// Mengembalikan list aturan K12 (25 Kategori)
+  static List<CustomKodeRule> getK12Rules() => CustomKodeRule.k12Rules();
+
+  /// Mengembalikan list aturan default bawaan sistem (alias ke General)
+  static List<CustomKodeRule> getDefaultRules() => getGeneralRules();
+
+  /// Mengembalikan ImportResult dari aturan General bawaan sistem (40 aturan)
+  static ImportResult getGeneralImportResult() {
+    final rules = getGeneralRules();
     final kuCount = rules.where((r) => r.type == 'ku').length;
     final kategoriCount = rules.where((r) => r.type != 'ku').length;
     return ImportResult(
@@ -366,6 +375,29 @@ class CustomRuleImportHelper {
       warnings: const [],
       isSuccess: true,
     );
+  }
+
+  /// Mengembalikan ImportResult dari aturan K12 (25 aturan)
+  static ImportResult getK12ImportResult() {
+    final rules = getK12Rules();
+    final kuCount = rules.where((r) => r.type == 'ku').length;
+    final kategoriCount = rules.where((r) => r.type != 'ku').length;
+    return ImportResult(
+      rules: rules,
+      totalRowsRead: rules.length,
+      kuCount: kuCount,
+      kategoriCount: kategoriCount,
+      warnings: const [],
+      isSuccess: true,
+    );
+  }
+
+  /// Mengembalikan ImportResult berdasarkan preset ('general' atau 'k12')
+  static ImportResult getDefaultImportResult({String preset = 'general'}) {
+    if (preset == 'k12') {
+      return getK12ImportResult();
+    }
+    return getGeneralImportResult();
   }
 
   /// Menghasilkan file Excel template (.xlsx) berisi contoh format

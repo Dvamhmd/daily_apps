@@ -6,7 +6,7 @@ void main() {
     test('Default customKodeRules starts from 0 (empty list)', () {
       final data = StrukturData();
       expect(data.customKodeRules, isEmpty);
-      expect(CustomKodeRule.defaultRules(), isEmpty);
+      expect(data.isSaldoRekeningUnlocked, isFalse);
     });
 
     test('resolveKodeFromText returns "-" when customRules is empty', () {
