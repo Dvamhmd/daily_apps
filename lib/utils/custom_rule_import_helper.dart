@@ -350,6 +350,24 @@ class CustomRuleImportHelper {
     }
   }
 
+  /// Mengembalikan list aturan default bawaan sistem (26 KU + 14 Kategori)
+  static List<CustomKodeRule> getDefaultRules() => CustomKodeRule.defaultRules();
+
+  /// Mengembalikan ImportResult dari aturan default bawaan sistem
+  static ImportResult getDefaultImportResult() {
+    final rules = getDefaultRules();
+    final kuCount = rules.where((r) => r.type == 'ku').length;
+    final kategoriCount = rules.where((r) => r.type != 'ku').length;
+    return ImportResult(
+      rules: rules,
+      totalRowsRead: rules.length,
+      kuCount: kuCount,
+      kategoriCount: kategoriCount,
+      warnings: const [],
+      isSuccess: true,
+    );
+  }
+
   /// Menghasilkan file Excel template (.xlsx) berisi contoh format
   static Uint8List generateTemplateExcelBytes() {
     final excel = Excel.createExcel();

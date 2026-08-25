@@ -12,6 +12,7 @@ class GoogleSheetsConfigModal extends StatefulWidget {
   final SheetsConfig initialConfig;
   final List<StrukturTransaction> transactions;
   final List<CustomKodeRule> customRules;
+  final int initialTab;
   final Function(SheetsConfig) onConfigSaved;
   final VoidCallback? onSyncCompleted;
 
@@ -20,6 +21,7 @@ class GoogleSheetsConfigModal extends StatefulWidget {
     required this.initialConfig,
     this.transactions = const [],
     this.customRules = const [],
+    this.initialTab = 0,
     required this.onConfigSaved,
     this.onSyncCompleted,
   });
@@ -29,6 +31,7 @@ class GoogleSheetsConfigModal extends StatefulWidget {
     required SheetsConfig config,
     List<StrukturTransaction> transactions = const [],
     List<CustomKodeRule> customRules = const [],
+    int initialTab = 0,
     required Function(SheetsConfig) onConfigSaved,
     VoidCallback? onSyncCompleted,
   }) {
@@ -40,6 +43,7 @@ class GoogleSheetsConfigModal extends StatefulWidget {
         initialConfig: config,
         transactions: transactions,
         customRules: customRules,
+        initialTab: initialTab,
         onConfigSaved: onConfigSaved,
         onSyncCompleted: onSyncCompleted,
       ),
@@ -185,6 +189,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
   @override
   void initState() {
     super.initState();
+    _activeTab = widget.initialTab.clamp(0, 2);
     _config = SheetsConfig.fromJson(widget.initialConfig.toJson());
 
     _urlCtrl = TextEditingController(text: _config.webAppUrl);
@@ -204,12 +209,12 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
       final key = f['key']!;
       final colVal = _config.columnMapping[key] ??
           SheetsConfig.defaultColumnMapping()[key] ??
-          'A';
+          '-';
       final isExcluded = colVal == '-' || colVal.trim().isEmpty;
       _fieldVisibility[key] = !isExcluded;
-      final defaultCol = SheetsConfig.defaultColumnMapping()[key] ?? 'A';
+      final suggested = SheetsConfig.suggestedColumn(key);
       _colControllers[key] =
-          TextEditingController(text: isExcluded ? defaultCol : colVal);
+          TextEditingController(text: isExcluded ? suggested : colVal);
     }
 
     for (var f in _evidenceImageFields) {
@@ -252,25 +257,26 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
       if (isVisible) {
         final rowVal = int.tryParse(_rowControllers[key]?.text.trim() ?? '');
         if (rowVal == null || rowVal <= 0) {
-          return 'Nomor baris untuk "${f['label']}" wajib diisi angka positif (misal: 2).';
+          return 'Nomor baris untuk "${f['label']}" wajib diisi angka positif (misal: 60, 82).';
         }
       }
     }
     return null;
   }
 
-  void _saveCurrentState() {
+  void _saveCurrentState({bool markCellsConfigured = false}) {
     _config.webAppUrl = _urlCtrl.text.trim();
-    _config.sheetName = _sheetNameCtrl.text.trim().isEmpty
-        ? 'Lap Keu'
-        : _sheetNameCtrl.text.trim();
+    _config.sheetName = _sheetNameCtrl.text.trim();
     _config.startRow = int.tryParse(_startRowCtrl.text.trim()) ?? 2;
     _config.evidenceTargetRow =
-        int.tryParse(_evidenceTargetRowCtrl.text.trim()) ?? 2;
+        int.tryParse(_evidenceTargetRowCtrl.text.trim()) ?? 60;
     _config.insertImageFormula = _insertImageFormula;
     _config.dateFormat = _selectedDateFormat.trim().isEmpty
         ? 'dd/MM/yyyy'
         : _selectedDateFormat.trim();
+    if (markCellsConfigured) {
+      _config.hasConfiguredCells = true;
+    }
 
     for (var f in _fieldDefinitions) {
       final key = f['key']!;
@@ -288,8 +294,11 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
     for (var f in _evidenceImageFields) {
       final key = f['key']!;
       final rowVal = int.tryParse(_rowControllers[key]?.text.trim() ?? '') ??
-          _config.evidenceTargetRow;
-      _config.evidenceRowMapping[key] = rowVal > 0 ? rowVal : 2;
+          SheetsConfig.defaultEvidenceRowMapping()[key] ??
+          60;
+      _config.evidenceRowMapping[key] = rowVal > 0
+          ? rowVal
+          : (SheetsConfig.defaultEvidenceRowMapping()[key] ?? 60);
     }
 
     _config.save();
@@ -331,6 +340,23 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
       return;
     }
 
+    if (_sheetNameCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Expanded(child: Text('Nama Tab Sheet belum di isi')),
+            ],
+          ),
+          backgroundColor: Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isTesting = true;
       _testMessage = null;
@@ -341,6 +367,9 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
 
     if (mounted) {
       setState(() {
+        if (_config.sheetName.isNotEmpty) {
+          _sheetNameCtrl.text = _config.sheetName;
+        }
         _isTesting = false;
         _testSuccess = res.isSuccess;
         _testMessage = res.message;
@@ -383,6 +412,470 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
       return;
     }
 
+    if (_sheetNameCtrl.text.trim().isEmpty) {
+      setState(() {
+        _activeTab = 0;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Expanded(child: Text('Nama Tab Sheet belum di isi')),
+            ],
+          ),
+          backgroundColor: Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!_config.hasConfiguredCells) {
+      setState(() {
+        _activeTab = 1;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.info_outline_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Pemetaan cell belum pernah dikonfigurasi. Silakan periksa dan simpan pemetaan cell terlebih dahulu.',
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Color(0xFFD97706),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    _showMappingConfirmationDialog();
+  }
+
+  Future<void> _showMappingConfirmationDialog() async {
+    final startRow = _config.startRow;
+    final sheetName = _config.sheetName;
+    final dateFormat = _config.dateFormat;
+    final dateSample = _formatPreviewSample(dateFormat);
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF107C41).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.fact_check_rounded,
+                  color: Color(0xFF107C41),
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Konfirmasi Pemetaan Cell',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Pratinjau cell sebelum kirim data',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Info Sheet & Format
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Sheet Tujuan:',
+                              style: TextStyle(
+                                  fontSize: 11.5, color: Color(0xFF475569)),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDCFCE7),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                sheetName,
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF15803D),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Baris Mulai Data:',
+                              style: TextStyle(
+                                  fontSize: 11.5, color: Color(0xFF475569)),
+                            ),
+                            Text(
+                              'Baris $startRow',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Format Tanggal:',
+                              style: TextStyle(
+                                  fontSize: 11.5, color: Color(0xFF475569)),
+                            ),
+                            Text(
+                              '$dateFormat ($dateSample)',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Section Kolom Transaksi
+                  const Text(
+                    'Pemetaan Kolom Transaksi',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      children: _transactionFields.map((f) {
+                        final key = f['key']!;
+                        final label = f['label']!;
+                        final isVisible = _fieldVisibility[key] ?? true;
+                        final colVal = isVisible
+                            ? (_colControllers[key]?.text.trim().toUpperCase() ??
+                                '-')
+                            : 'Dikecualikan';
+                        final isExcluded = !isVisible || colVal == '-';
+
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                label,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isExcluded
+                                      ? const Color(0xFF94A3B8)
+                                      : const Color(0xFF334155),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: isExcluded
+                                      ? const Color(0xFFF1F5F9)
+                                      : const Color(0xFF107C41)
+                                          .withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                                child: Text(
+                                  isExcluded ? 'Dikecualikan' : 'Kolom $colVal',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: isExcluded
+                                        ? const Color(0xFF94A3B8)
+                                        : const Color(0xFF107C41),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Section Kolom Gambar Bukti
+                  const Text(
+                    'Pemetaan Gambar Bukti',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      children: [
+                        ..._evidenceImageFields.map((f) {
+                          final key = f['key']!;
+                          final label = f['label']!;
+                          final isVisible = _fieldVisibility[key] ?? true;
+                          final colVal =
+                              _colControllers[key]?.text.trim().toUpperCase() ??
+                                  '-';
+                          final rowVal =
+                              _rowControllers[key]?.text.trim() ??
+                              (SheetsConfig.defaultEvidenceRowMapping()[key]?.toString() ?? '60');
+                          final isExcluded =
+                              !isVisible || colVal.isEmpty || colVal == '-';
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    label,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isExcluded
+                                          ? const Color(0xFF94A3B8)
+                                          : const Color(0xFF334155),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: isExcluded
+                                        ? const Color(0xFFF1F5F9)
+                                        : const Color(0xFF0284C7)
+                                            .withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                  child: Text(
+                                    isExcluded
+                                        ? 'Dikecualikan'
+                                        : 'Sel $colVal$rowVal',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: isExcluded
+                                          ? const Color(0xFF94A3B8)
+                                          : const Color(0xFF0284C7),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                        const Divider(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Format Sisipkan Bukti:',
+                              style: TextStyle(
+                                  fontSize: 10.5, color: Color(0xFF64748B)),
+                            ),
+                            Text(
+                              _insertImageFormula
+                                  ? 'Sisipkan di Sel (HD)'
+                                  : 'Link Google Drive',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: _insertImageFormula
+                                    ? const Color(0xFF107C41)
+                                    : const Color(0xFF475569),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Pertanyaan Konfirmasi
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(
+                          Icons.help_outline_rounded,
+                          color: Color(0xFFD97706),
+                          size: 18,
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Apakah seluruh pemetaan cell di atas sudah benar dan sesuai dengan tabel Google Spreadsheet Anda?',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF92400E),
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        _activeTab = 1;
+                      });
+                    },
+                    icon: const Icon(Icons.tune_rounded, size: 15),
+                    label: const Text(
+                      'Cell',
+                      style:
+                          TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF107C41),
+                      side: const BorderSide(color: Color(0xFF107C41)),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text(
+                    'Batal',
+                    style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _saveCurrentState(markCellsConfigured: true);
+                      _executeSyncAll();
+                    },
+                    icon: const Icon(Icons.send_rounded, size: 15),
+                    label: const Text(
+                      'Konfirmasi',
+                      style:
+                          TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF107C41),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _executeSyncAll() async {
     setState(() {
       _isSyncing = true;
     });
@@ -781,7 +1274,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
               style: const TextStyle(fontSize: 12.5),
               textAlignVertical: TextAlignVertical.center,
               decoration: const InputDecoration(
-                hintText: 'Contoh: Lap Keu, Sheet1, Kas Struktur',
+                hintText: 'Masukkan nama Tab',
                 hintStyle:
                     TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
                 isDense: true,
@@ -975,20 +1468,22 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
     final def = SheetsConfig.defaultColumnMapping();
     final defRows = SheetsConfig.defaultEvidenceRowMapping();
     setState(() {
-      _startRowCtrl.text = '2';
-      _evidenceTargetRowCtrl.text = '2';
+      _startRowCtrl.text = '4';
+      _evidenceTargetRowCtrl.text = '60';
       _insertImageFormula = false;
       _selectedDateFormat = 'dd/MM/yyyy';
       _customDateFormatCtrl.text = '';
       for (var f in _fieldDefinitions) {
         final key = f['key']!;
-        final val = def[key] ?? 'A';
-        _fieldVisibility[key] = true;
-        _colControllers[key]?.text = val;
+        final val = def[key] ?? '-';
+        final isExcluded = val == '-' || val.trim().isEmpty;
+        _fieldVisibility[key] = !isExcluded;
+        final suggested = SheetsConfig.suggestedColumn(key);
+        _colControllers[key]?.text = isExcluded ? suggested : val;
       }
       for (var f in _evidenceImageFields) {
         final key = f['key']!;
-        final val = defRows[key] ?? 2;
+        final val = defRows[key] ?? 60;
         _rowControllers[key]?.text = val.toString();
       }
     });
@@ -1168,9 +1663,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
                 _fieldVisibility[key] = willBeVisible;
                 if (willBeVisible) {
                   if (ctrl.text.trim().isEmpty || ctrl.text.trim() == '-') {
-                    final def =
-                        SheetsConfig.defaultColumnMapping()[key] ?? 'A';
-                    ctrl.text = def;
+                    ctrl.text = SheetsConfig.suggestedColumn(key);
                   }
                 }
               });
@@ -1442,14 +1935,12 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
                 if (willBeVisible) {
                   if (colCtrl.text.trim().isEmpty ||
                       colCtrl.text.trim() == '-') {
-                    final def =
-                        SheetsConfig.defaultColumnMapping()[key] ?? 'A';
-                    colCtrl.text = def;
+                    colCtrl.text = SheetsConfig.suggestedColumn(key);
                   }
                   if (rowCtrl.text.trim().isEmpty ||
                       (int.tryParse(rowCtrl.text.trim()) ?? 0) <= 0) {
                     final defRow =
-                        SheetsConfig.defaultEvidenceRowMapping()[key] ?? 2;
+                        SheetsConfig.defaultEvidenceRowMapping()[key] ?? 60;
                     rowCtrl.text = defRow.toString();
                   }
                 }
@@ -1902,6 +2393,35 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (!_config.hasConfiguredCells) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded,
+                      color: Color(0xFFD97706), size: 22),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Pemetaan cell belum pernah dikonfigurasi. Silakan periksa posisi kolom & baris di bawah, lalu klik "Simpan Pemetaan" sebelum mengirim data.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: Color(0xFF92400E),
+                        fontWeight: FontWeight.w500,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           // Info Box
           Container(
             padding: const EdgeInsets.all(12),
@@ -1919,6 +2439,35 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
                   child: Text(
                     'Atur posisi kolom Google Spreadsheet untuk data transaksi & bukti gambar sesuai format yang Anda inginkan (misal: Kolom A, B, C, dst).',
                     style: TextStyle(fontSize: 11.5, color: Color(0xFF1E40AF)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Info Box: Format Visual Spreadsheet 100% Terjaga
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFBBF7D0)),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.auto_awesome_rounded,
+                    color: Color(0xFF16A34A), size: 18),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Format Sel Spreadsheet Terjaga: Pengiriman data hanya mengisi nilai sel (raw data). Seluruh pengaturan font, ukuran huruf, perataan teks (alignment), warna, border, dan format angka (Rp) akan 100% mengikuti format template di Google Sheets Anda tanpa terubah.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF14532D),
+                      height: 1.35,
+                    ),
                   ),
                 ),
               ],
@@ -2107,6 +2656,70 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
           // Daftar Kolom & Baris Field Gambar Bukti
           ..._evidenceImageFields.map((f) => _buildEvidenceFieldRow(f)),
 
+          const SizedBox(height: 20),
+
+          // Action Button: Simpan Pemetaan Cell
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                final err = _getMappingValidationError();
+                if (err != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded,
+                              color: Colors.white, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(err)),
+                        ],
+                      ),
+                      backgroundColor: const Color(0xFFDC2626),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  return;
+                }
+                _saveCurrentState(markCellsConfigured: true);
+                setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Row(
+                      children: [
+                        Icon(Icons.check_circle_rounded,
+                            color: Colors.white, size: 18),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Pemetaan cell berhasil disimpan!',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                    backgroundColor: Color(0xFF059669),
+                    behavior: SnackBarBehavior.floating,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.check_circle_rounded, size: 18),
+              label: const Text(
+                'Simpan Pemetaan Cell',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF107C41),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 0,
+              ),
+            ),
+          ),
           const SizedBox(height: 20),
         ],
       ),

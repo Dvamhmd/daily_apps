@@ -132,17 +132,28 @@ class SheetsSyncService {
       );
     }
 
+    if (config.sheetName.trim().isEmpty) {
+      return SheetsSyncResult(
+        isSuccess: false,
+        message: 'Nama Tab Sheet belum di isi',
+      );
+    }
+
     try {
       final payload = {
         'action': 'test_connection',
-        'sheetName': config.sheetName,
+        'sheetName': config.sheetName.trim(),
       };
 
       final res = await _sendPostRequest(config.webAppUrl, payload);
       final status = res['status'] as String?;
       final msg = res['message'] as String? ?? 'Koneksi berhasil terhubung.';
+      final returnedSheetName = res['sheetName'] as String?;
 
       if (status == 'success') {
+        if (returnedSheetName != null && returnedSheetName.trim().isNotEmpty) {
+          config.sheetName = returnedSheetName.trim();
+        }
         config.lastSyncStatus = 'success';
         config.lastSyncMessage = msg;
         config.lastSyncTime = DateTime.now();
@@ -235,6 +246,13 @@ class SheetsSyncService {
       );
     }
 
+    if (config.sheetName.trim().isEmpty) {
+      return SheetsSyncResult(
+        isSuccess: false,
+        message: 'Nama Tab Sheet belum di isi',
+      );
+    }
+
     try {
       // Urutkan transaksi berdasarkan waktu secara kronologis
       final sortedList = List<StrukturTransaction>.from(transactions)
@@ -254,7 +272,7 @@ class SheetsSyncService {
       if (rows.isEmpty) {
         final payload = {
           'action': 'sync_all',
-          'sheetName': config.sheetName,
+          'sheetName': config.sheetName.trim(),
           'startRow': config.startRow,
           'targetRow': config.evidenceTargetRow,
           'rowMapping': config.evidenceRowMapping,
@@ -281,7 +299,7 @@ class SheetsSyncService {
       if (rows.length <= 150) {
         final payload = {
           'action': 'sync_all',
-          'sheetName': config.sheetName,
+          'sheetName': config.sheetName.trim(),
           'startRow': config.startRow,
           'targetRow': config.evidenceTargetRow,
           'rowMapping': config.evidenceRowMapping,
@@ -328,7 +346,7 @@ class SheetsSyncService {
         final payload = {
           'action': 'sync_batch',
           'clearFirst': chunkIdx == 0,
-          'sheetName': config.sheetName,
+          'sheetName': config.sheetName.trim(),
           'startRow': chunkStartRow,
           'targetRow': config.evidenceTargetRow,
           'rowMapping': config.evidenceRowMapping,
@@ -384,10 +402,13 @@ class SheetsSyncService {
     int? rowNumber,
     List<CustomKodeRule>? customRules,
   }) async {
-    if (!config.isConfigured || !config.autoSyncOnInput) {
+    if (!config.isConfigured ||
+        !config.hasConfiguredCells ||
+        !config.autoSyncOnInput ||
+        config.sheetName.trim().isEmpty) {
       return SheetsSyncResult(
         isSuccess: false,
-        message: 'Auto-sync tidak aktif atau URL belum diatur.',
+        message: 'Auto-sync tidak aktif, cell belum dipetakan, nama Tab Sheet belum di isi, atau URL belum diatur.',
       );
     }
 
@@ -401,7 +422,7 @@ class SheetsSyncService {
 
       final payload = {
         'action': 'add_row',
-        'sheetName': config.sheetName,
+        'sheetName': config.sheetName.trim(),
         'startRow': config.startRow,
         'mapping': config.columnMapping,
         'row': rowData,
@@ -440,7 +461,7 @@ class SheetsSyncService {
     try {
       final payload = {
         'action': 'undo_last',
-        'sheetName': config.sheetName,
+        'sheetName': config.sheetName.trim(),
         'startRow': config.startRow,
         'mapping': config.columnMapping,
       };
@@ -483,6 +504,13 @@ class SheetsSyncService {
       );
     }
 
+    if (config.sheetName.trim().isEmpty) {
+      return SheetsSyncResult(
+        isSuccess: false,
+        message: 'Nama Tab Sheet belum di isi',
+      );
+    }
+
     if (imagesPayload.isEmpty) {
       return SheetsSyncResult(
         isSuccess: false,
@@ -500,7 +528,7 @@ class SheetsSyncService {
       final img = imagesPayload.first;
       final payload = {
         'action': 'upload_evidence_images',
-        'sheetName': config.sheetName,
+        'sheetName': config.sheetName.trim(),
         'startRow': config.startRow,
         'targetRow': targetRow ?? config.evidenceTargetRow,
         'mapping': config.columnMapping,
@@ -539,7 +567,7 @@ class SheetsSyncService {
       final key = img['key'] as String? ?? '';
       final payload = {
         'action': 'upload_evidence_images',
-        'sheetName': config.sheetName,
+        'sheetName': config.sheetName.trim(),
         'startRow': config.startRow,
         'targetRow': targetRow ?? config.evidenceTargetRow,
         'mapping': config.columnMapping,
@@ -624,6 +652,13 @@ class SheetsSyncService {
  *   TIDAK AKAN PERNAH disentuh atau dihapus.
  * - Sel yang mengandung rumus (cth: =SUM(...), =TOTAL, rumus saldo) otomatis dilindungi dan tidak akan ditimpa.
  * 
+ * MEMPERTAHANKAN FORMAT ASLI SPREADSHEET (Zero Style Overwrite):
+ * - Script HANYA mengirim dan menulis nilai data mentah (raw values) tanpa memodifikasi format sel.
+ * - Seluruh pengaturan tampilan di Google Sheets (perataan teks/alignment, font family, font size,
+ *   warna font/latar, border garis, serta format mata uang/angka) akan 100% tetap utuh mengikuti
+ *   format template yang telah Anda atur di Google Sheets.
+ * - Penghapusan data lama menggunakan clearContent() yang hanya mengosongkan nilai tanpa menghapus format visual.
+ * 
  * PETUNJUK PEMASANGAN LANGKAH DEMI LANGKAH:
  * 1. Buka Google Spreadsheet tujuan Anda.
  * 2. Di menu atas, pilih "Extensions" (Ekstensi) -> "Apps Script".
@@ -677,17 +712,80 @@ function doPost(e) {
   return processRequest(data);
 }
 
+// Helper pencarian tab sheet yang cerdas, tahan perbedaan spasi/casing, & anti-duplikasi
+function findOrCreateSheet(ss, rawName) {
+  var allSheets = ss.getSheets();
+  if (!allSheets || allSheets.length === 0) {
+    return ss.insertSheet("Lap Keu");
+  }
+
+  var target = (rawName !== undefined && rawName !== null) ? rawName.toString() : "";
+  var cleanTarget = target.trim();
+
+  // Helper normalisasi string (hapus invisible zero-width char, non-breaking space, collapse whitespace)
+  function normalizeStr(str) {
+    if (str === undefined || str === null) return "";
+    return str.toString()
+      .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, " ")
+      .replace(/\\s+/g, " ")
+      .trim()
+      .toLowerCase();
+  }
+
+  var targetNorm = normalizeStr(cleanTarget);
+
+  // Jika nama sheet kosong / tidak diatur, gunakan sheet aktif atau sheet pertama
+  if (!cleanTarget || !targetNorm) {
+    return ss.getActiveSheet() || allSheets[0];
+  }
+
+  // 1. Coba exact match persis (nama trim & nama asli)
+  var sheet = ss.getSheetByName(cleanTarget) || (cleanTarget !== target ? ss.getSheetByName(target) : null);
+  if (sheet) return sheet;
+
+  // 2. Coba Case-Insensitive & Whitespace-Normalized match di seluruh sheet yang ada
+  for (var i = 0; i < allSheets.length; i++) {
+    if (normalizeStr(allSheets[i].getName()) === targetNorm) {
+      return allSheets[i];
+    }
+  }
+
+  // 3. Jika spreadsheet hanya memiliki 1 sheet (misal file baru: "Sheet1" atau "Lembar 1"),
+  // dan target adalah default "Lap Keu" / "Sheet1", gunakan sheet tunggal yang sudah ada
+  if (allSheets.length === 1 && (targetNorm === "lap keu" || targetNorm === "sheet1" || targetNorm === "sheet 1" || targetNorm === "lembar1" || targetNorm === "lembar 1")) {
+    return allSheets[0];
+  }
+
+  // 4. Cegah race condition saat request bersamaan (misal concurrent upload bukti gambar)
+  // dengan ScriptLock sebelum insertSheet baru
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+    // Double check setelah mendapatkan lock
+    var recheck = ss.getSheetByName(cleanTarget);
+    if (recheck) return recheck;
+    var currentSheets = ss.getSheets();
+    for (var k = 0; k < currentSheets.length; k++) {
+      if (normalizeStr(currentSheets[k].getName()) === targetNorm) {
+        return currentSheets[k];
+      }
+    }
+    // Jika benar-benar belum ada tab dengan nama tersebut, buat sheet baru
+    return ss.insertSheet(cleanTarget);
+  } catch (eLock) {
+    // Fallback jika lock timeout agar tidak crash dan tidak membuat sheet duplikat
+    return ss.getSheetByName(cleanTarget) || ss.getActiveSheet() || allSheets[0];
+  } finally {
+    try { lock.releaseLock(); } catch(e) {}
+  }
+}
+
 function processRequest(data) {
   try {
     var action = data.action || "test_connection";
-    var sheetName = data.sheetName || "Lap Keu";
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(sheetName);
-    
-    // Buat sheet baru otomatis jika nama tab belum ada
-    if (!sheet) {
-      sheet = ss.insertSheet(sheetName);
-    }
+    var sheet = findOrCreateSheet(ss, data.sheetName);
+    var sheetName = sheet.getName();
     
     // --- AKSI 1: TES KONEKSI ---
     if (action === "test_connection") {
@@ -715,16 +813,16 @@ function processRequest(data) {
       ku: "C",
       kategori: "D",
       keterangan: "E",
-      jumlah: "F",
-      debit: "G",
-      kredit: "H",
-      bukti_saldo_rekening: "I",
+      jumlah: "-",
+      debit: "F",
+      kredit: "G",
+      bukti_saldo_rekening: "A",
       bukti_saldo_cash: "J",
-      bukti_mutasi_1: "K",
-      bukti_mutasi_2: "L",
-      bukti_mutasi_3: "M",
-      bukti_mutasi_4: "N",
-      bukti_mutasi_5: "O"
+      bukti_mutasi_1: "A",
+      bukti_mutasi_2: "D",
+      bukti_mutasi_3: "F",
+      bukti_mutasi_4: "J",
+      bukti_mutasi_5: "N"
     };
 
     var TRANSACTION_FIELDS = ['no', 'tanggal', 'ku', 'kategori', 'keterangan', 'jumlah', 'debit', 'kredit'];
@@ -936,14 +1034,14 @@ function processRequest(data) {
       }
       if (colIndices.length === 0) return;
 
-      // Batasi rentang pengecekan maksimal 100 baris ke bawah
-      var rowsToCheck = Math.min(totalRowsBelow, 100);
+      // Batasi rentang pengecekan maksimal 300 baris ke bawah
+      var rowsToCheck = Math.min(totalRowsBelow, 300);
       var numCols = maxCol - minCol + 1;
       var blockRange = targetSheet.getRange(checkStartRow, minCol, rowsToCheck, numCols);
       var blockFormulas = blockRange.getFormulas();
       var blockValues = blockRange.getValues();
 
-      var rowsToClear = 0;
+      var maxRowToClear = 0;
 
       for (var r = 0; r < rowsToCheck; r++) {
         var currentRowNum = checkStartRow + r;
@@ -971,7 +1069,6 @@ function processRequest(data) {
 
             // Cek jika sel berisi nilai teks
             if (vVal !== "" && vVal !== null && vVal !== undefined) {
-              rowHasNonEmpty = true;
               var strVal = vVal.toString().trim().toUpperCase();
               if (strVal === "TOTAL" || strVal === "JUMLAH TOTAL" || strVal.indexOf("SALDO") !== -1 ||
                   strVal.indexOf("BUKTI") !== -1 || strVal.indexOf("CATATAN") !== -1 ||
@@ -980,6 +1077,7 @@ function processRequest(data) {
                 rowHasKeywordHeader = true;
                 break;
               }
+              rowHasNonEmpty = true;
             }
           }
         }
@@ -989,21 +1087,17 @@ function processRequest(data) {
           break;
         }
 
-        // Jika seluruh kolom transaksi di baris ini kosong -> Berarti tabel transaksi sudah berakhir! STOP!
-        if (!rowHasNonEmpty) {
-          break;
+        if (rowHasNonEmpty) {
+          maxRowToClear = r + 1;
         }
-
-        // Baris ini terbukti berisi sisa data transaksi lama yang perlu dibersihkan
-        rowsToClear = r + 1;
       }
 
       // Bersihkan HANYA baris sisa data transaksi lama yang terdeteksi
-      if (rowsToClear > 0) {
+      if (maxRowToClear > 0) {
         for (var j = 0; j < colIndices.length; j++) {
           var col = colIndices[j];
           try {
-            targetSheet.getRange(checkStartRow, col, rowsToClear, 1).clearContent();
+            targetSheet.getRange(checkStartRow, col, maxRowToClear, 1).clearContent();
           } catch (eC) {}
         }
       }

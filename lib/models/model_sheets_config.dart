@@ -15,19 +15,21 @@ class SheetsConfig {
   bool insertImageFormula;
   int evidenceTargetRow;
   Map<String, int> evidenceRowMapping;
+  bool hasConfiguredCells;
 
   static const String prefKey = 'keuangan_sheets_config';
 
   SheetsConfig({
     this.webAppUrl = '',
-    this.sheetName = 'Lap Keu',
-    this.autoSyncOnInput = true,
-    this.startRow = 2,
+    this.sheetName = '',
+    this.autoSyncOnInput = false,
+    this.startRow = 4,
     this.dateFormat = 'dd/MM/yyyy',
     Map<String, String>? columnMapping,
     this.insertImageFormula = false,
     this.evidenceTargetRow = 2,
     Map<String, int>? evidenceRowMapping,
+    this.hasConfiguredCells = false,
     this.lastSyncTime,
     this.lastSyncStatus,
     this.lastSyncMessage,
@@ -40,30 +42,54 @@ class SheetsConfig {
         'ku': 'C',
         'kategori': 'D',
         'keterangan': 'E',
-        'jumlah': 'F',
-        'debit': 'G',
-        'kredit': 'H',
-        'bukti_saldo_rekening': 'I',
-        'bukti_saldo_cash': 'J',
-        'bukti_mutasi_1': 'K',
-        'bukti_mutasi_2': 'L',
-        'bukti_mutasi_3': 'M',
-        'bukti_mutasi_4': 'N',
-        'bukti_mutasi_5': 'O',
+        'jumlah': '-',
+        'debit': 'F',
+        'kredit': 'G',
+        'bukti_saldo_rekening': '-',
+        'bukti_saldo_cash': '-',
+        'bukti_mutasi_1': '-',
+        'bukti_mutasi_2': '-',
+        'bukti_mutasi_3': '-',
+        'bukti_mutasi_4': '-',
+        'bukti_mutasi_5': '-',
       };
+
+  static String suggestedColumn(String key) {
+    const suggested = {
+      'no': 'A',
+      'tanggal': 'B',
+      'ku': 'C',
+      'kategori': 'D',
+      'keterangan': 'E',
+      'jumlah': 'F',
+      'debit': 'F',
+      'kredit': 'G',
+      'bukti_saldo_rekening': 'A',
+      'bukti_saldo_cash': 'J',
+      'bukti_mutasi_1': 'A',
+      'bukti_mutasi_2': 'D',
+      'bukti_mutasi_3': 'F',
+      'bukti_mutasi_4': 'J',
+      'bukti_mutasi_5': 'N',
+    };
+    return suggested[key] ?? 'A';
+  }
 
   static Map<String, int> defaultEvidenceRowMapping() => {
-        'bukti_saldo_rekening': 2,
-        'bukti_saldo_cash': 2,
-        'bukti_mutasi_1': 2,
-        'bukti_mutasi_2': 2,
-        'bukti_mutasi_3': 2,
-        'bukti_mutasi_4': 2,
-        'bukti_mutasi_5': 2,
+        'bukti_saldo_rekening': 60,
+        'bukti_saldo_cash': 60,
+        'bukti_mutasi_1': 82,
+        'bukti_mutasi_2': 82,
+        'bukti_mutasi_3': 82,
+        'bukti_mutasi_4': 82,
+        'bukti_mutasi_5': 82,
       };
 
-  int getEvidenceRow(String key, {int fallback = 2}) {
-    return evidenceRowMapping[key] ?? evidenceTargetRow;
+  int getEvidenceRow(String key, {int? fallback}) {
+    return evidenceRowMapping[key] ??
+        fallback ??
+        defaultEvidenceRowMapping()[key] ??
+        evidenceTargetRow;
   }
 
   bool get isConfigured => webAppUrl.trim().isNotEmpty;
@@ -78,6 +104,7 @@ class SheetsConfig {
         'insertImageFormula': insertImageFormula,
         'evidenceTargetRow': evidenceTargetRow,
         'evidenceRowMapping': evidenceRowMapping,
+        'hasConfiguredCells': hasConfiguredCells,
         'lastSyncTime': lastSyncTime?.toIso8601String(),
         'lastSyncStatus': lastSyncStatus,
         'lastSyncMessage': lastSyncMessage,
@@ -94,7 +121,7 @@ class SheetsConfig {
       });
     }
 
-    final int defaultRow = (json['evidenceTargetRow'] as num?)?.toInt() ?? 2;
+    final int defaultRow = (json['evidenceTargetRow'] as num?)?.toInt() ?? 60;
     Map<String, int> rowMapping = defaultEvidenceRowMapping();
     if (json['evidenceRowMapping'] is Map) {
       final rawRow = json['evidenceRowMapping'] as Map;
@@ -106,23 +133,19 @@ class SheetsConfig {
           }
         }
       });
-    } else {
-      // Jika baru migrasi dari evidenceTargetRow lama, gunakan defaultRow untuk semua
-      for (var k in rowMapping.keys) {
-        rowMapping[k] = defaultRow;
-      }
     }
 
     return SheetsConfig(
       webAppUrl: json['webAppUrl'] as String? ?? '',
-      sheetName: json['sheetName'] as String? ?? 'Lap Keu',
-      autoSyncOnInput: json['autoSyncOnInput'] as bool? ?? true,
-      startRow: (json['startRow'] as num?)?.toInt() ?? 2,
+      sheetName: (json['sheetName'] as String? ?? '').trim(),
+      autoSyncOnInput: json['autoSyncOnInput'] as bool? ?? false,
+      startRow: (json['startRow'] as num?)?.toInt() ?? 4,
       dateFormat: json['dateFormat'] as String? ?? 'dd/MM/yyyy',
       columnMapping: mapping,
       insertImageFormula: json['insertImageFormula'] as bool? ?? false,
       evidenceTargetRow: defaultRow,
       evidenceRowMapping: rowMapping,
+      hasConfiguredCells: json['hasConfiguredCells'] as bool? ?? false,
       lastSyncTime: json['lastSyncTime'] != null
           ? DateTime.tryParse(json['lastSyncTime'] as String)
           : null,

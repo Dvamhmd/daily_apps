@@ -415,11 +415,16 @@ class _StrukturPageState extends State<StrukturPage> {
     await prefs.setString('struktur_keuangan_data', jsonEncode(_data.toJson()));
   }
 
-  void _triggerAutoSyncSheets() {
-    if (!_sheetsConfig.isConfigured || !_sheetsConfig.autoSyncOnInput) return;
+  void _triggerAutoSyncSheets({bool force = false}) {
+    if (!_sheetsConfig.isConfigured || !_sheetsConfig.hasConfiguredCells) {
+      return;
+    }
+    if (!force && !_sheetsConfig.autoSyncOnInput) {
+      return;
+    }
 
     _autoSyncDebounceTimer?.cancel();
-    _autoSyncDebounceTimer = Timer(const Duration(milliseconds: 500), () {
+    _autoSyncDebounceTimer = Timer(const Duration(milliseconds: 300), () {
       final allMutasi = _data.transactions
           .where((tx) => tx.isPemasukan || tx.isPengeluaran)
           .toList()
@@ -438,7 +443,7 @@ class _StrukturPageState extends State<StrukturPage> {
     });
   }
 
-  Future<void> _showGoogleSheetsConfigModal() async {
+  Future<void> _showGoogleSheetsConfigModal({int initialTab = 0}) async {
     final freshCfg = await SheetsConfig.load();
     if (!mounted) return;
     setState(() {
@@ -455,6 +460,7 @@ class _StrukturPageState extends State<StrukturPage> {
       config: _sheetsConfig,
       transactions: allMutasi,
       customRules: _data.customKodeRules,
+      initialTab: initialTab,
       onConfigSaved: (newCfg) {
         setState(() {
           _sheetsConfig = newCfg;
@@ -472,6 +478,55 @@ class _StrukturPageState extends State<StrukturPage> {
     setState(() {
       _sheetsConfig = freshCfg;
     });
+
+    if (!_sheetsConfig.hasConfiguredCells) {
+      final shouldConfigure = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706)),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Pemetaan Cell Belum Diatur',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Anda belum pernah mengonfigurasi pemetaan cell spreadsheet. Harap lakukan pemetaan cell terlebih dahulu sebelum mengunggah bukti atau mengirim data.',
+            style: TextStyle(fontSize: 13, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Batal',
+                  style: TextStyle(color: Color(0xFF64748B))),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.pop(ctx, true),
+              icon: const Icon(Icons.tune_rounded, size: 16),
+              label: const Text('Atur Pemetaan Cell'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF107C41),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldConfigure == true && mounted) {
+        _showGoogleSheetsConfigModal(initialTab: 1);
+      }
+      return;
+    }
 
     UploadEvidenceModal.show(
       context,
@@ -1663,7 +1718,7 @@ class _StrukturPageState extends State<StrukturPage> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Toggle Pilihan Metode: File Excel vs Paste
+                      // Toggle Pilihan Metode: File vs Paste vs Default
                       Container(
                         padding: const EdgeInsets.all(3),
                         decoration: BoxDecoration(
@@ -1672,11 +1727,15 @@ class _StrukturPageState extends State<StrukturPage> {
                         ),
                         child: Row(
                           children: [
+                            // Tab 0: File
                             Expanded(
                               child: InkWell(
                                 onTap: () {
                                   setDialogState(() {
                                     importMethod = 0;
+                                    if (pickedFileName == null) {
+                                      importResult = null;
+                                    }
                                   });
                                 },
                                 borderRadius: BorderRadius.circular(8),
@@ -1709,12 +1768,12 @@ class _StrukturPageState extends State<StrukturPage> {
                                             ? const Color(0xFF059669)
                                             : const Color(0xFF64748B),
                                       ),
-                                      const SizedBox(width: 6),
+                                      const SizedBox(width: 4),
                                       Flexible(
                                         child: Text(
-                                          'File (.xlsx / .csv)',
+                                          'File',
                                           style: TextStyle(
-                                            fontSize: 12,
+                                            fontSize: 11.5,
                                             fontWeight: FontWeight.bold,
                                             color: importMethod == 0
                                                 ? const Color(0xFF059669)
@@ -1728,11 +1787,17 @@ class _StrukturPageState extends State<StrukturPage> {
                                 ),
                               ),
                             ),
+                            // Tab 1: Salin Tempel
                             Expanded(
                               child: InkWell(
                                 onTap: () {
                                   setDialogState(() {
                                     importMethod = 1;
+                                    if (textCtrl.text.trim().isNotEmpty) {
+                                      handleProcessText();
+                                    } else {
+                                      importResult = null;
+                                    }
                                   });
                                 },
                                 borderRadius: BorderRadius.circular(8),
@@ -1765,14 +1830,73 @@ class _StrukturPageState extends State<StrukturPage> {
                                             ? const Color(0xFF059669)
                                             : const Color(0xFF64748B),
                                       ),
-                                      const SizedBox(width: 6),
+                                      const SizedBox(width: 4),
                                       Flexible(
                                         child: Text(
-                                          'Salin-Tempel (Paste)',
+                                          'Salin Tempel',
                                           style: TextStyle(
-                                            fontSize: 12,
+                                            fontSize: 11.5,
                                             fontWeight: FontWeight.bold,
                                             color: importMethod == 1
+                                                ? const Color(0xFF059669)
+                                                : const Color(0xFF64748B),
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Tab 2: Default
+                            Expanded(
+                              child: InkWell(
+                                onTap: () {
+                                  setDialogState(() {
+                                    importMethod = 2;
+                                    importResult = CustomRuleImportHelper
+                                        .getDefaultImportResult();
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: importMethod == 2
+                                        ? Colors.white
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(8),
+                                    boxShadow: importMethod == 2
+                                        ? [
+                                            BoxShadow(
+                                              color: Colors.black
+                                                  .withValues(alpha: 0.05),
+                                              blurRadius: 4,
+                                              offset: const Offset(0, 1),
+                                            )
+                                          ]
+                                        : [],
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.auto_awesome_rounded,
+                                        size: 15,
+                                        color: importMethod == 2
+                                            ? const Color(0xFF059669)
+                                            : const Color(0xFF64748B),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          'Default',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: importMethod == 2
                                                 ? const Color(0xFF059669)
                                                 : const Color(0xFF64748B),
                                           ),
@@ -1870,7 +1994,7 @@ class _StrukturPageState extends State<StrukturPage> {
                             ),
                           ),
                         ),
-                      ] else ...[
+                      ] else if (importMethod == 1) ...[
                         // METODE PASTE TEXT
                         // Format Panduan Ringkas (Hanya Tampil di Opsi Salin-Tempel/Paste)
                         Container(
@@ -1946,7 +2070,7 @@ class _StrukturPageState extends State<StrukturPage> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
                               borderSide:
-                                  const BorderSide(color: Color(0xFFCBD5E1)),
+                                   const BorderSide(color: Color(0xFFCBD5E1)),
                             ),
                           ),
                           onChanged: (_) => handleProcessText(),
@@ -1992,6 +2116,64 @@ class _StrukturPageState extends State<StrukturPage> {
                               ),
                             ),
                           ],
+                        ),
+                      ] else ...[
+                        // METODE DEFAULT (importMethod == 2)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFECFDF5),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFF10B981)
+                                  .withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF059669)
+                                      .withValues(alpha: 0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.auto_awesome_rounded,
+                                  size: 20,
+                                  color: Color(0xFF059669),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Konfigurasi Aturan Bawaan (Default)',
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF065F46),
+                                      ),
+                                    ),
+                                    SizedBox(height: 3),
+                                    Text(
+                                      '40 aturan standar (26 KU & 14 Kategori) siap diimpor. Silakan periksa pratinjau di bawah, pilih mode penyimpanan, lalu klik Simpan.',
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        color: Color(0xFF047857),
+                                        height: 1.35,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                       const SizedBox(height: 10),
@@ -2342,8 +2524,6 @@ class _StrukturPageState extends State<StrukturPage> {
   // --- MODAL EDIT REKENING STRUKTUR ---
   void _showEditRekeningStrukturModal() {
     String selectedBank = _data.rekeningStruktur.bankName;
-    final saldoCtrl = TextEditingController(
-        text: RupiahFormatter.format(_data.rekeningStruktur.balance));
     final noRekCtrl =
         TextEditingController(text: _data.rekeningStruktur.accountNumber);
     final holderCtrl =
@@ -2446,46 +2626,80 @@ class _StrukturPageState extends State<StrukturPage> {
 
                     const SizedBox(height: 14),
 
-                    // Saldo Rekening
-                    const Text('Saldo Rekening Struktur (Rp):',
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF334155))),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: saldoCtrl,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        RupiahInputFormatter(),
-                      ],
-                      style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: primaryPurple),
-                      decoration: InputDecoration(
-                        prefixText: 'Rp ',
-                        prefixStyle: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: primaryPurple),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
+                    // Saldo Rekening (Read-Only)
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Saldo Rekening Saat Ini',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: primaryPurple.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.lock_outline_rounded,
+                                        size: 12, color: primaryPurple),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Otomatis',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: primaryPurple,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Rp ${RupiahFormatter.format(_data.rekeningStruktur.balance)}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: primaryPurple,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Saldo rekening struktur diperbarui otomatis dari transaksi pemasukan dan pengeluaran.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF94A3B8),
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 
                     const SizedBox(height: 14),
 
                     // No Rekening & Pemilik
-                    const Text('Nomor Rekening & Nama Pemilik (Opsional):',
+                    const Text('Nomor Rekening & Nama Pemilik:',
                         style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
@@ -2494,6 +2708,7 @@ class _StrukturPageState extends State<StrukturPage> {
                     TextField(
                       controller: noRekCtrl,
                       keyboardType: TextInputType.number,
+                      onChanged: (v) => setModalState(() {}),
                       decoration: InputDecoration(
                         hintText: 'Nomor Rekening (contoh: 1234567890)',
                         filled: true,
@@ -2505,14 +2720,51 @@ class _StrukturPageState extends State<StrukturPage> {
                           borderSide:
                               const BorderSide(color: Color(0xFFE2E8F0)),
                         ),
+                        suffixIcon: noRekCtrl.text.trim().isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.copy_rounded,
+                                    size: 18, color: primaryPurple),
+                                tooltip: 'Salin Info Rekening Lengkap',
+                                onPressed: () {
+                                  final bank = selectedBank.trim();
+                                  final noRek = noRekCtrl.text.trim();
+                                  final holder = holderCtrl.text.trim();
+                                  final copyText = holder.isNotEmpty
+                                      ? '$bank - $noRek\nA.N $holder'
+                                      : '$bank - $noRek';
+                                  Clipboard.setData(ClipboardData(text: copyText));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Row(
+                                        children: [
+                                          const Icon(Icons.check_circle_rounded,
+                                              color: Colors.white, size: 18),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              holder.isNotEmpty
+                                                  ? '$bank - $noRek (A.N $holder) berhasil disalin!'
+                                                  : '$bank - $noRek berhasil disalin!',
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      behavior: SnackBarBehavior.floating,
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
+                              )
+                            : null,
                       ),
                     ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: holderCtrl,
                       textCapitalization: TextCapitalization.words,
+                      onChanged: (v) => setModalState(() {}),
                       decoration: InputDecoration(
-                        hintText: 'Atas Nama (contoh: Bendahara Struktur)',
+                        hintText: 'Nama Pemilik / Atas Nama (contoh: Dwinda Setyani)',
                         filled: true,
                         fillColor: const Color(0xFFF8FAFC),
                         contentPadding: const EdgeInsets.symmetric(
@@ -2533,17 +2785,34 @@ class _StrukturPageState extends State<StrukturPage> {
                       height: 48,
                       child: ElevatedButton(
                         onPressed: () {
-                          final saldoClean =
-                              saldoCtrl.text.replaceAll('.', '').trim();
-                          final newSaldo = int.tryParse(saldoClean) ?? 0;
+                          final noRek = noRekCtrl.text.trim();
+                          final holder = holderCtrl.text.trim();
+                          if (noRek.isNotEmpty && holder.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Row(
+                                  children: [
+                                    Icon(Icons.warning_amber_rounded,
+                                        color: Colors.white, size: 20),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                          '⚠️ Nama Pemilik Rekening (Atas Nama) wajib diisi!'),
+                                    ),
+                                  ],
+                                ),
+                                backgroundColor: Colors.redAccent,
+                                behavior: SnackBarBehavior.floating,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                            return;
+                          }
 
                           setState(() {
                             _data.rekeningStruktur.bankName = selectedBank;
-                            _data.rekeningStruktur.balance = newSaldo;
-                            _data.rekeningStruktur.accountNumber =
-                                noRekCtrl.text.trim();
-                            _data.rekeningStruktur.accountHolder =
-                                holderCtrl.text.trim();
+                            _data.rekeningStruktur.accountNumber = noRek;
+                            _data.rekeningStruktur.accountHolder = holder;
                           });
                           _saveData();
                           Navigator.pop(ctx);
@@ -4767,6 +5036,914 @@ class _StrukturPageState extends State<StrukturPage> {
     );
   }
 
+  // --- MODAL EDIT TRANSAKSI KEUANGAN (AUTO-SYNC SPREADSHEETS) ---
+  void _showEditTransactionModal(StrukturTransaction tx, [VoidCallback? onSaved]) {
+    DateTime selectedDate = tx.timestamp;
+    final isPemasukan = tx.isPemasukan;
+    final isPengeluaran = tx.isPengeluaran;
+
+    String selectedAccount = isPemasukan
+        ? (tx.targetAccount ?? 'rekening')
+        : (tx.sourceAccount ?? 'rekening');
+
+    final cleanTitle = tx.title.replaceFirst(
+      RegExp(r'^(Pemasukan|Pengeluaran):\s*', caseSensitive: false),
+      '',
+    );
+    final noteCtrl = TextEditingController(
+        text: (tx.note != null && tx.note!.isNotEmpty) ? tx.note! : cleanTitle);
+    final amountCtrl =
+        TextEditingController(text: RupiahFormatter.format(tx.amount));
+
+    String manualKu = (tx.ku != null && tx.ku!.trim().isNotEmpty && tx.ku != '-')
+        ? tx.ku!.trim()
+        : '-';
+    String manualKode = (tx.kode != null && tx.kode!.trim().isNotEmpty && tx.kode != '-')
+        ? tx.kode!.trim()
+        : '-';
+
+    final amountKey = GlobalKey();
+    final noteKey = GlobalKey();
+    final amountFocus = FocusNode();
+    final noteFocus = FocusNode();
+
+    bool amountHasError = false;
+    bool noteHasError = false;
+
+    // Kumpulkan daftar opsi KU unik
+    final List<String> kuOptions = [
+      '-',
+      'Sekretaris',
+      'SDK',
+      'SDM',
+      'Publikasi',
+      'Hukum',
+      'Ekonomi',
+    ];
+    for (final r in _data.customKodeRules) {
+      if (r.type == 'ku' && !kuOptions.contains(r.kode.trim())) {
+        kuOptions.add(r.kode.trim());
+      }
+    }
+    if (manualKu != '-' && !kuOptions.contains(manualKu)) {
+      kuOptions.add(manualKu);
+    }
+
+    // Kumpulkan daftar opsi Kategori unik
+    final List<String> kategoriOptions = [
+      '-',
+      'ATK',
+      'RTK',
+      'Bibit',
+      'DP',
+      'Sewa Tempat',
+      'Konsumsi',
+      'Adm Bank/Pajak',
+      'Transportasi Lokal',
+      'Komunikasi & Internet',
+      'Bunga Bank',
+      'Dana dari S3',
+    ];
+    for (final r in _data.customKodeRules) {
+      if (r.type != 'ku' && !kategoriOptions.contains(r.kode.trim())) {
+        kategoriOptions.add(r.kode.trim());
+      }
+    }
+    if (manualKode != '-' && !kategoriOptions.contains(manualKode)) {
+      kategoriOptions.add(manualKode);
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            final cleanAmountText =
+                amountCtrl.text.replaceAll('.', '').trim();
+            final newAmount = int.tryParse(cleanAmountText) ?? 0;
+            final currentNote = noteCtrl.text.trim();
+
+            // Auto-resolved KU & Kategori preview
+            final autoKuPreview = StrukturTransaction.resolveKuFromText(
+              currentNote,
+              customRules: _data.customKodeRules,
+            );
+            final autoKodePreview = StrukturTransaction.resolveKodeFromText(
+              currentNote,
+              customRules: _data.customKodeRules,
+            );
+
+            // Hitung saldo base akun jika transaksi lama di-rollback
+            int simulatedRekeningBalance = _data.rekeningStruktur.balance;
+            int simulatedDebitBalance = _data.onHandDebit.balance;
+            int simulatedCashBalance = _data.onHandCash.balance;
+
+            if (isPemasukan) {
+              if (tx.targetAccount == 'rekening') {
+                simulatedRekeningBalance -= tx.amount;
+              } else if (tx.targetAccount == 'debit') {
+                simulatedDebitBalance -= tx.amount;
+              } else if (tx.targetAccount == 'cash') {
+                simulatedCashBalance -= tx.amount;
+              }
+            } else if (isPengeluaran) {
+              if (tx.sourceAccount == 'rekening') {
+                simulatedRekeningBalance += tx.totalDeduction;
+              } else if (tx.sourceAccount == 'debit') {
+                simulatedDebitBalance += tx.totalDeduction;
+              } else if (tx.sourceAccount == 'cash') {
+                simulatedCashBalance += tx.totalDeduction;
+              }
+            }
+
+            int availableBalance = 0;
+            String accountName = '';
+            Color accountColor = primaryPurple;
+
+            if (selectedAccount == 'rekening') {
+              availableBalance = simulatedRekeningBalance;
+              accountName =
+                  'Rekening Struktur (${_data.rekeningStruktur.bankName})';
+              accountColor = primaryPurple;
+            } else if (selectedAccount == 'debit') {
+              availableBalance = simulatedDebitBalance;
+              accountName =
+                  'On Hand Debit (${_data.onHandDebit.bankName})';
+              accountColor = primaryTeal;
+            } else {
+              availableBalance = simulatedCashBalance;
+              accountName = 'On Hand Cash (Tunai)';
+              accountColor = const Color(0xFF059669);
+            }
+
+            final isSaldoCukup = isPemasukan ||
+                (availableBalance >= newAmount && newAmount > 0);
+
+            final badgeText = isPemasukan ? 'PEMASUKAN (DEBIT)' : 'PENGELUARAN (KREDIT)';
+            final badgeBg = isPemasukan ? const Color(0xFFD1FAE5) : const Color(0xFFFFE4E6);
+            final badgeFg = isPemasukan ? const Color(0xFF047857) : const Color(0xFFBE123C);
+            final primaryActionColor = isPemasukan ? const Color(0xFF059669) : const Color(0xFFE11D48);
+
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.94,
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Header Modal Edit
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: primaryActionColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            Icons.edit_note_rounded,
+                            color: primaryActionColor,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Text(
+                                    'Edit Transaksi Keuangan',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: badgeBg,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      badgeText,
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                        color: badgeFg,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              const Text(
+                                'Perubahan akan otomatis disinkronkan ke Google Spreadsheets',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // 1. Tanggal Transaksi
+                    const Text('1. Tanggal Transaksi:',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF334155))),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () async {
+                        final pickedDate = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2100),
+                        );
+                        if (pickedDate != null) {
+                          setModalState(() {
+                            selectedDate = pickedDate;
+                          });
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.calendar_today_rounded,
+                                    size: 16, color: primaryActionColor),
+                                const SizedBox(width: 10),
+                                Text(
+                                  DateFormat('d MMM yyyy').format(selectedDate),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF1E293B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              'Ubah',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: primaryActionColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // 2. Wadah / Akun Sumber/Tujuan
+                    Text(
+                      isPemasukan
+                          ? '2. Wadah Dana (Masuk Ke):'
+                          : '2. Sumber Dana (Dipotong Dari):',
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF334155)),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        _buildAccountSelectorCard(
+                          title: 'Rekening',
+                          subtitle: _data.rekeningStruktur.bankName,
+                          balance: simulatedRekeningBalance,
+                          icon: Icons.account_balance_rounded,
+                          isSelected: selectedAccount == 'rekening',
+                          activeColor: primaryPurple,
+                          onTap: () {
+                            setModalState(() => selectedAccount = 'rekening');
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        _buildAccountSelectorCard(
+                          title: 'Debit',
+                          subtitle: _data.onHandDebit.bankName,
+                          balance: simulatedDebitBalance,
+                          icon: Icons.credit_card_rounded,
+                          isSelected: selectedAccount == 'debit',
+                          activeColor: primaryTeal,
+                          onTap: () {
+                            setModalState(() => selectedAccount = 'debit');
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        _buildAccountSelectorCard(
+                          title: 'Cash',
+                          subtitle: 'Tunai',
+                          balance: simulatedCashBalance,
+                          icon: Icons.payments_rounded,
+                          isSelected: selectedAccount == 'cash',
+                          activeColor: const Color(0xFF059669),
+                          onTap: () {
+                            setModalState(() => selectedAccount = 'cash');
+                          },
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // 3. Jumlah Nominal (Rp)
+                    const Text('3. Jumlah Nominal (Rp):',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF334155))),
+                    const SizedBox(height: 6),
+                    Container(
+                      key: amountKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            controller: amountCtrl,
+                            focusNode: amountFocus,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              RupiahInputFormatter(),
+                            ],
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: primaryActionColor,
+                            ),
+                            decoration: InputDecoration(
+                              prefixText: 'Rp ',
+                              prefixStyle: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: primaryActionColor,
+                              ),
+                              hintText: '0',
+                              filled: true,
+                              fillColor: const Color(0xFFF8FAFC),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 12),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: amountHasError
+                                      ? Colors.redAccent
+                                      : const Color(0xFFE2E8F0),
+                                  width: amountHasError ? 1.6 : 1.0,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: amountHasError
+                                      ? Colors.redAccent
+                                      : const Color(0xFFE2E8F0),
+                                  width: amountHasError ? 1.6 : 1.0,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: amountHasError
+                                      ? Colors.redAccent
+                                      : primaryActionColor,
+                                  width: 1.8,
+                                ),
+                              ),
+                            ),
+                            onChanged: (val) {
+                              if (amountHasError && newAmount > 0 && isSaldoCukup) {
+                                amountHasError = false;
+                              }
+                              setModalState(() {});
+                            },
+                          ),
+                          if (amountHasError)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4, left: 4),
+                              child: Text(
+                                newAmount <= 0
+                                    ? '⚠️ Jumlah nominal harus lebih dari 0'
+                                    : '⚠️ Saldo $accountName tidak mencukupi (Tersedia: Rp ${RupiahFormatter.format(availableBalance)})',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: Colors.redAccent,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    if (!isSaldoCukup && newAmount > 0 && !amountHasError)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          '⚠️ Saldo $accountName tidak mencukupi (Tersedia: Rp ${RupiahFormatter.format(availableBalance)}).',
+                          style: const TextStyle(
+                              fontSize: 11.5,
+                              color: Colors.redAccent,
+                              fontWeight: FontWeight.bold),
+                        ),
+                      ),
+
+                    const SizedBox(height: 14),
+
+                    // 4. Keterangan / Catatan (Wajib)
+                    const Text('4. Keterangan Keperluan / Sumber (Wajib):',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF334155))),
+                    const SizedBox(height: 6),
+                    Container(
+                      key: noteKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            controller: noteCtrl,
+                            focusNode: noteFocus,
+                            decoration: InputDecoration(
+                              hintText:
+                                  'Contoh: konsumsi pembinaan AB Afwan, DP KK Barqi',
+                              hintStyle: const TextStyle(fontSize: 12),
+                              filled: true,
+                              fillColor: const Color(0xFFF8FAFC),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 12),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: noteHasError
+                                      ? Colors.redAccent
+                                      : const Color(0xFFE2E8F0),
+                                  width: noteHasError ? 1.6 : 1.0,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: noteHasError
+                                      ? Colors.redAccent
+                                      : const Color(0xFFE2E8F0),
+                                  width: noteHasError ? 1.6 : 1.0,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: noteHasError
+                                      ? Colors.redAccent
+                                      : primaryActionColor,
+                                  width: 1.8,
+                                ),
+                              ),
+                            ),
+                            onChanged: (val) {
+                              if (noteHasError && val.trim().isNotEmpty) {
+                                noteHasError = false;
+                              }
+                              setModalState(() {});
+                            },
+                          ),
+                          if (noteHasError)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 4, left: 4),
+                              child: Text(
+                                '⚠️ Keterangan transaksi wajib diisi',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: Colors.redAccent,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // 5. Pengaturan KU & Kategori (Otomatis / Manual)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.tune_rounded, size: 16, color: Color(0xFF64748B)),
+                              SizedBox(width: 6),
+                              Text(
+                                '5. Klasifikasi KU & Kategori:',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF334155),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              // Dropdown KU
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Kode Unit (KU): ${manualKu == "-" && autoKuPreview != "-" ? "($autoKuPreview)" : ""}',
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                                      ),
+                                      child: DropdownButtonHideUnderline(
+                                        child: DropdownButton<String>(
+                                          isExpanded: true,
+                                          value: kuOptions.contains(manualKu) ? manualKu : '-',
+                                          items: kuOptions.map((opt) {
+                                            return DropdownMenuItem(
+                                              value: opt,
+                                              child: Text(
+                                                opt == '-' ? (autoKuPreview != '-' ? 'Auto ($autoKuPreview)' : 'Auto (-)') : opt,
+                                                style: const TextStyle(fontSize: 11.5),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            );
+                                          }).toList(),
+                                          onChanged: (val) {
+                                            if (val != null) {
+                                              setModalState(() => manualKu = val);
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              // Dropdown Kategori
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Kategori: ${manualKode == "-" && autoKodePreview != "-" ? "($autoKodePreview)" : ""}',
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                                      ),
+                                      child: DropdownButtonHideUnderline(
+                                        child: DropdownButton<String>(
+                                          isExpanded: true,
+                                          value: kategoriOptions.contains(manualKode) ? manualKode : '-',
+                                          items: kategoriOptions.map((opt) {
+                                            return DropdownMenuItem(
+                                              value: opt,
+                                              child: Text(
+                                                opt == '-' ? (autoKodePreview != '-' ? 'Auto ($autoKodePreview)' : 'Auto (-)') : opt,
+                                                style: const TextStyle(fontSize: 11.5),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            );
+                                          }).toList(),
+                                          onChanged: (val) {
+                                            if (val != null) {
+                                              setModalState(() => manualKode = val);
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    if (newAmount > 0) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isPemasukan ? const Color(0xFFF0FDF4) : const Color(0xFFFFF1F2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: primaryActionColor.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              isPemasukan ? 'Saldo Baru $accountName:' : 'Sisa Saldo $accountName:',
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1E293B)),
+                            ),
+                            Text(
+                              'Rp ${RupiahFormatter.format(isPemasukan ? availableBalance + newAmount : availableBalance - newAmount)}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: accountColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 20),
+
+                    // Tombol Simpan Perubahan & Auto-Sync Spreadsheets
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          if (newAmount <= 0) {
+                            setModalState(() => amountHasError = true);
+                            if (amountKey.currentContext != null) {
+                              Scrollable.ensureVisible(
+                                amountKey.currentContext!,
+                                duration: const Duration(milliseconds: 350),
+                                curve: Curves.easeInOut,
+                                alignment: 0.3,
+                              );
+                            }
+                            amountFocus.requestFocus();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('⚠️ Silakan masukkan Jumlah Nominal (Rp)!'),
+                                backgroundColor: Colors.redAccent,
+                                behavior: SnackBarBehavior.floating,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                            return;
+                          }
+
+                          if (!isSaldoCukup) {
+                            setModalState(() => amountHasError = true);
+                            if (amountKey.currentContext != null) {
+                              Scrollable.ensureVisible(
+                                amountKey.currentContext!,
+                                duration: const Duration(milliseconds: 350),
+                                curve: Curves.easeInOut,
+                                alignment: 0.3,
+                              );
+                            }
+                            amountFocus.requestFocus();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('⚠️ Saldo $accountName tidak mencukupi! (Tersedia: Rp ${RupiahFormatter.format(availableBalance)})'),
+                                backgroundColor: Colors.redAccent,
+                                behavior: SnackBarBehavior.floating,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                            return;
+                          }
+
+                          if (noteCtrl.text.trim().isEmpty) {
+                            setModalState(() => noteHasError = true);
+                            if (noteKey.currentContext != null) {
+                              Scrollable.ensureVisible(
+                                noteKey.currentContext!,
+                                duration: const Duration(milliseconds: 350),
+                                curve: Curves.easeInOut,
+                                alignment: 0.3,
+                              );
+                            }
+                            noteFocus.requestFocus();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('⚠️ Keterangan transaksi wajib diisi!'),
+                                backgroundColor: Colors.redAccent,
+                                behavior: SnackBarBehavior.floating,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                            return;
+                          }
+
+                          final noteText = noteCtrl.text.trim();
+
+                          setState(() {
+                            // 1. Rollback saldo transaksi lama
+                            if (tx.isPemasukan) {
+                              if (tx.targetAccount == 'rekening') {
+                                _data.rekeningStruktur.balance -= tx.amount;
+                              } else if (tx.targetAccount == 'debit') {
+                                _data.onHandDebit.balance -= tx.amount;
+                              } else if (tx.targetAccount == 'cash') {
+                                _data.onHandCash.balance -= tx.amount;
+                              }
+                            } else if (tx.isPengeluaran) {
+                              if (tx.sourceAccount == 'rekening') {
+                                _data.rekeningStruktur.balance += tx.totalDeduction;
+                              } else if (tx.sourceAccount == 'debit') {
+                                _data.onHandDebit.balance += tx.totalDeduction;
+                              } else if (tx.sourceAccount == 'cash') {
+                                _data.onHandCash.balance += tx.totalDeduction;
+                              }
+                            }
+
+                            // 2. Tambah/Kurangi saldo baru
+                            if (isPemasukan) {
+                              if (selectedAccount == 'rekening') {
+                                _data.rekeningStruktur.balance += newAmount;
+                              } else if (selectedAccount == 'debit') {
+                                _data.onHandDebit.balance += newAmount;
+                              } else if (selectedAccount == 'cash') {
+                                _data.onHandCash.balance += newAmount;
+                              }
+                            } else if (isPengeluaran) {
+                              if (selectedAccount == 'rekening') {
+                                _data.rekeningStruktur.balance -= newAmount;
+                              } else if (selectedAccount == 'debit') {
+                                _data.onHandDebit.balance -= newAmount;
+                              } else if (selectedAccount == 'cash') {
+                                _data.onHandCash.balance -= newAmount;
+                              }
+                            }
+
+                            // 3. Update objek transaksi
+                            final resolvedKu = manualKu != '-' ? manualKu : (autoKuPreview != '-' ? autoKuPreview : null);
+                            final resolvedKode = manualKode != '-' ? manualKode : (autoKodePreview != '-' ? autoKodePreview : null);
+
+                            final updatedTx = StrukturTransaction(
+                              id: tx.id,
+                              title: noteText,
+                              type: tx.type,
+                              sourceAccount: isPengeluaran ? selectedAccount : tx.sourceAccount,
+                              targetAccount: isPemasukan ? selectedAccount : tx.targetAccount,
+                              manualSource: tx.manualSource,
+                              amount: newAmount,
+                              adminFee: tx.adminFee,
+                              note: noteText,
+                              ku: resolvedKu,
+                              kode: resolvedKode,
+                              timestamp: selectedDate,
+                            );
+
+                            final txIndex = _data.transactions.indexWhere((item) => item.id == tx.id);
+                            if (txIndex != -1) {
+                              _data.transactions[txIndex] = updatedTx;
+                            } else {
+                              _data.transactions.add(updatedTx);
+                            }
+                            _data.transactions.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+                          });
+
+                          _saveData();
+
+                          // 4. Sinkronisasi Otomatis ke Google Spreadsheets
+                          if (_sheetsConfig.isConfigured && _sheetsConfig.hasConfiguredCells) {
+                            final allMutasi = _data.transactions
+                                .where((t) => t.isPemasukan || t.isPengeluaran)
+                                .toList()
+                              ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+                            SheetsSyncService.syncAllTransactions(
+                              allMutasi,
+                              _sheetsConfig,
+                              customRules: _data.customKodeRules,
+                            ).then((res) {
+                              if (mounted) {
+                                debugPrint('Edit transaction sync result: ${res.isSuccess} - ${res.message}');
+                              }
+                            });
+                          } else {
+                            _triggerAutoSyncSheets();
+                          }
+
+                          onSaved?.call();
+                          Navigator.pop(ctx);
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _sheetsConfig.isConfigured
+                                          ? 'Transaksi berhasil diperbarui & disinkronkan ke Spreadsheets!'
+                                          : 'Transaksi berhasil diperbarui!',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              backgroundColor: const Color(0xFF059669),
+                              behavior: SnackBarBehavior.floating,
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.cloud_sync_rounded, size: 18),
+                        label: const Text(
+                          'Simpan & Sinkronkan',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF107C41),
+                          foregroundColor: Colors.white,
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   // --- DIALOG KONFIRMASI HAPUS / ROLLBACK TRANSAKSI ---
   void _confirmDeleteTransaction(StrukturTransaction tx, [VoidCallback? onDeleted]) {
     showDialog(
@@ -4855,13 +6032,25 @@ class _StrukturPageState extends State<StrukturPage> {
                   _data.transactions.removeWhere((item) => item.id == tx.id);
                 });
                 _saveData();
-                _triggerAutoSyncSheets();
+                _triggerAutoSyncSheets(force: true);
                 onDeleted?.call();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                        'Transaksi berhasil dibatalkan dan saldo telah dipulihkan.'),
-                    backgroundColor: Colors.blueGrey,
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        const Icon(Icons.check_circle_rounded,
+                            color: Colors.white, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _sheetsConfig.isConfigured
+                                ? 'Transaksi dibatalkan, saldo dipulihkan & dihapus dari Spreadsheet.'
+                                : 'Transaksi berhasil dibatalkan dan saldo telah dipulihkan.',
+                          ),
+                        ),
+                      ],
+                    ),
+                    backgroundColor: Colors.blueGrey.shade800,
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
@@ -4985,12 +6174,24 @@ class _StrukturPageState extends State<StrukturPage> {
                   _data.transactions.clear();
                 });
                 _saveData();
-                _triggerAutoSyncSheets();
+                _triggerAutoSyncSheets(force: true);
                 onDeleted?.call();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(
-                        '${txList.length} transaksi berhasil dihapus dan saldo telah dipulihkan.'),
+                    content: Row(
+                      children: [
+                        const Icon(Icons.delete_sweep_rounded,
+                            color: Colors.white, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _sheetsConfig.isConfigured
+                                ? '${txList.length} transaksi dibatalkan, saldo dipulihkan & Spreadsheet dikosongkan.'
+                                : '${txList.length} transaksi berhasil dihapus dan saldo telah dipulihkan.',
+                          ),
+                        ),
+                      ],
+                    ),
                     backgroundColor: const Color(0xFFDC2626),
                     behavior: SnackBarBehavior.floating,
                   ),
@@ -5608,6 +6809,9 @@ class _StrukturPageState extends State<StrukturPage> {
   }
 
   Widget _buildRekeningStrukturCard() {
+    final hasNoRek = _data.rekeningStruktur.accountNumber.trim().isNotEmpty;
+    final hasHolder = _data.rekeningStruktur.accountHolder.trim().isNotEmpty;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -5629,39 +6833,68 @@ class _StrukturPageState extends State<StrukturPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: primaryPurple.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: primaryPurple.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.account_balance_rounded,
+                          color: primaryPurple, size: 20),
                     ),
-                    child: const Icon(Icons.account_balance_rounded,
-                        color: primaryPurple, size: 20),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Rekening Struktur',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
-                        ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Rekening Struktur',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  'Bank ${_data.rekeningStruktur.bankName}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF64748B),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (hasHolder) ...[
+                                const Text(
+                                  ' • ',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Color(0xFF94A3B8)),
+                                ),
+                                Flexible(
+                                  child: Text(
+                                    _data.rekeningStruktur.accountHolder,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
                       ),
-                      Text(
-                        'Bank ${_data.rekeningStruktur.bankName} ${_data.rekeningStruktur.accountNumber.isNotEmpty ? "• ${_data.rekeningStruktur.accountNumber}" : ""}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
               IconButton(
                 icon: const Icon(Icons.edit_rounded,
@@ -5671,6 +6904,95 @@ class _StrukturPageState extends State<StrukturPage> {
               ),
             ],
           ),
+          if (hasNoRek) ...[
+            const SizedBox(height: 10),
+            InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () {
+                final bank = _data.rekeningStruktur.bankName.trim();
+                final noRek = _data.rekeningStruktur.accountNumber.trim();
+                final holder = _data.rekeningStruktur.accountHolder.trim();
+                final copyText = holder.isNotEmpty
+                    ? '$bank - $noRek\nA.N $holder'
+                    : '$bank - $noRek';
+                Clipboard.setData(ClipboardData(text: copyText));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        const Icon(Icons.check_circle_rounded,
+                            color: Colors.white, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            holder.isNotEmpty
+                                ? '$bank - $noRek (A.N $holder) berhasil disalin!'
+                                : '$bank - $noRek berhasil disalin!',
+                          ),
+                        ),
+                      ],
+                    ),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: const Color(0xFF059669),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: primaryPurple.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: primaryPurple.withValues(alpha: 0.15),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.credit_card_rounded,
+                        size: 14, color: primaryPurple),
+                    const SizedBox(width: 6),
+                    Text(
+                      'No. Rek: ${_data.rekeningStruktur.accountNumber.trim()}',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        color: primaryPurple,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: primaryPurple.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.copy_rounded,
+                              size: 11, color: primaryPurple),
+                          SizedBox(width: 3),
+                          Text(
+                            'Salin',
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              color: primaryPurple,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
           Container(
             width: double.infinity,
@@ -5938,7 +7260,7 @@ class _StrukturPageState extends State<StrukturPage> {
       child: Text(
         ku.isEmpty ? '-' : ku,
         style: TextStyle(
-          fontSize: isLarge ? 10.5 : 9.5,
+          fontSize: isLarge ? 12 : 11,
           fontWeight: FontWeight.bold,
           color: fg,
         ),
@@ -5999,7 +7321,7 @@ class _StrukturPageState extends State<StrukturPage> {
       child: Text(
         kode.isEmpty ? '-' : kode,
         style: TextStyle(
-          fontSize: isLarge ? 10.5 : 9.5,
+          fontSize: isLarge ? 12 : 11,
           fontWeight: FontWeight.bold,
           color: fg,
         ),
@@ -6059,30 +7381,16 @@ class _StrukturPageState extends State<StrukturPage> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Tabel Keuangan',
-                                style: TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF78350F),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const Text(
-                                '5 Transaksi terbaru • Ketuk detail',
-                                style: TextStyle(
-                                  fontSize: 9.5,
-                                  color: Color(0xFF92400E),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
+                        const Expanded(
+                          child: Text(
+                            'Tabel Keuangan',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF78350F),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -6212,12 +7520,12 @@ class _StrukturPageState extends State<StrukturPage> {
                           const Color(0xFFFEF3C7),
                         ),
                         headingTextStyle: const TextStyle(
-                          fontSize: 10.5,
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF78350F),
                         ),
                         dataTextStyle: const TextStyle(
-                          fontSize: 10.5,
+                          fontSize: 12,
                           color: Color(0xFF451A03),
                         ),
                         horizontalMargin: 10,
@@ -6271,7 +7579,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                     child: Text(
                                       '$itemNumber',
                                       style: const TextStyle(
-                                        fontSize: 10,
+                                        fontSize: 11.5,
                                         fontWeight: FontWeight.bold,
                                         color: Color(0xFF92400E),
                                       ),
@@ -6283,7 +7591,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                   Text(
                                     dateFormatted,
                                     style: const TextStyle(
-                                      fontSize: 9.5,
+                                      fontSize: 11,
                                       color: Color(0xFF78350F),
                                       fontWeight: FontWeight.w500,
                                       height: 1.25,
@@ -6305,7 +7613,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                           itemTitle,
                                           style: const TextStyle(
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 10.5,
+                                            fontSize: 12,
                                             color: Color(0xFF451A03),
                                           ),
                                           maxLines: 1,
@@ -6317,7 +7625,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                           Text(
                                             itemSubtitle,
                                             style: const TextStyle(
-                                              fontSize: 9,
+                                              fontSize: 10,
                                               fontStyle: FontStyle.italic,
                                               color: Color(0xFF92400E),
                                             ),
@@ -6336,7 +7644,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                       'Rp ${RupiahFormatter.format(tx.amount)}',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 10.5,
+                                        fontSize: 12,
                                         color: isDebit
                                             ? const Color(0xFF059669)
                                             : const Color(0xFFE11D48),
@@ -6365,7 +7673,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                       child: Text(
                                         isDebit ? 'Debit' : 'Kredit',
                                         style: TextStyle(
-                                          fontSize: 9.5,
+                                          fontSize: 11,
                                           fontWeight: FontWeight.bold,
                                           color: isDebit
                                               ? const Color(0xFF047857)
@@ -6465,7 +7773,7 @@ class _StrukturPageState extends State<StrukturPage> {
             }
 
             const headerStyle = TextStyle(
-              fontSize: 9.5,
+              fontSize: 11.5,
               fontWeight: FontWeight.bold,
               color: Color(0xFF78350F),
             );
@@ -6538,7 +7846,7 @@ class _StrukturPageState extends State<StrukturPage> {
                             child: Text(
                               tableTitle,
                               style: const TextStyle(
-                                fontSize: 12.5,
+                                fontSize: 13,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF78350F),
                               ),
@@ -6601,7 +7909,7 @@ class _StrukturPageState extends State<StrukturPage> {
                           child: Text(
                             'Belum ada data ${isPengeluaran ? "pengeluaran" : "pemasukan"}',
                             style: const TextStyle(
-                              fontSize: 11.5,
+                              fontSize: 12.5,
                               color: Color(0xFF94A3B8),
                               fontStyle: FontStyle.italic,
                             ),
@@ -6660,7 +7968,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                           child: Text(
                                             '$count tx',
                                             style: const TextStyle(
-                                              fontSize: 9.5,
+                                              fontSize: 11,
                                               color: Color(0xFF64748B),
                                               fontWeight: FontWeight.w600,
                                             ),
@@ -6687,7 +7995,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                     child: Text(
                                       'Rp ${RupiahFormatter.format(amount)}',
                                       style: TextStyle(
-                                        fontSize: 11.5,
+                                        fontSize: 13,
                                         fontWeight: FontWeight.bold,
                                         color: amount > 0
                                             ? (isPengeluaran
@@ -6731,7 +8039,7 @@ class _StrukturPageState extends State<StrukturPage> {
                               child: Text(
                                 'Total',
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 13.5,
                                   fontWeight: FontWeight.bold,
                                   color: isPengeluaran
                                       ? const Color(0xFF9F1239)
@@ -6757,7 +8065,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                 child: Text(
                                   'Rp ${RupiahFormatter.format(totalAmount)}',
                                   style: TextStyle(
-                                    fontSize: 12.5,
+                                    fontSize: 14,
                                     fontWeight: FontWeight.bold,
                                     color: isPengeluaran
                                         ? const Color(0xFFE11D48)
@@ -6867,7 +8175,7 @@ class _StrukturPageState extends State<StrukturPage> {
                           ),
                           child: Row(
                             children: [
-                              // 1. Tab Lap Keu
+                              // 1. Tab Keuangan
                               Expanded(
                                 child: InkWell(
                                   onTap: () => setModalState(
@@ -6895,7 +8203,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                     ),
                                     child: Center(
                                       child: Text(
-                                        'Lap Keu',
+                                        'Keuangan',
                                         style: TextStyle(
                                           fontSize: 11.5,
                                           fontWeight: mainTab == 'laporan'
@@ -7456,7 +8764,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                                         'Kredit',
                                                                         style: TextStyle(
                                                                           fontSize:
-                                                                              9.5,
+                                                                              11.5,
                                                                           fontWeight:
                                                                               FontWeight.bold,
                                                                           color: Color(
@@ -7475,9 +8783,9 @@ class _StrukturPageState extends State<StrukturPage> {
                                                             height: 42,
                                                             color: const Color(
                                                                 0xFFFDE68A)),
-                                                        // 8. Aksi (44)
+                                                        // 8. Aksi (72)
                                                         const SizedBox(
-                                                          width: 44,
+                                                          width: 72,
                                                           height: 42,
                                                           child: Center(
                                                             child: Text('Aksi',
@@ -7564,7 +8872,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                                   style:
                                                                       const TextStyle(
                                                                     fontSize:
-                                                                        9.5,
+                                                                        11,
                                                                     fontWeight:
                                                                         FontWeight
                                                                             .bold,
@@ -7592,7 +8900,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                                   style:
                                                                       const TextStyle(
                                                                     fontSize:
-                                                                        9.5,
+                                                                        11,
                                                                     color: Color(
                                                                         0xFF451A03),
                                                                   ),
@@ -7684,7 +8992,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                                           FontWeight
                                                                               .bold,
                                                                       fontSize:
-                                                                          9.5,
+                                                                          11.5,
                                                                       color: Color(
                                                                           0xFF451A03),
                                                                     ),
@@ -7705,7 +9013,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                                       style:
                                                                           const TextStyle(
                                                                         fontSize:
-                                                                            8.5,
+                                                                            10,
                                                                         fontStyle:
                                                                             FontStyle.italic,
                                                                         color: Color(
@@ -7749,7 +9057,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                                         FontWeight
                                                                             .bold,
                                                                     fontSize:
-                                                                        9.5,
+                                                                        11.5,
                                                                     color: Color(
                                                                         0xFF451A03),
                                                                   ),
@@ -7785,7 +9093,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                                           fontWeight:
                                                                               FontWeight.bold,
                                                                           fontSize:
-                                                                              9.5,
+                                                                              11.5,
                                                                           color: Color(
                                                                               0xFF059669),
                                                                         ),
@@ -7799,7 +9107,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                                           fontWeight:
                                                                               FontWeight.bold,
                                                                           fontSize:
-                                                                              9.5,
+                                                                              11.5,
                                                                         ),
                                                                       ),
                                                               ),
@@ -7833,7 +9141,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                                           fontWeight:
                                                                               FontWeight.bold,
                                                                           fontSize:
-                                                                              9.5,
+                                                                              11.5,
                                                                           color: Color(
                                                                               0xFFE11D48),
                                                                         ),
@@ -7847,7 +9155,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                                           fontWeight:
                                                                               FontWeight.bold,
                                                                           fontSize:
-                                                                              9.5,
+                                                                              11.5,
                                                                         ),
                                                                       ),
                                                               ),
@@ -7862,30 +9170,74 @@ class _StrukturPageState extends State<StrukturPage> {
                                                                             0.6)),
                                                             // 9. Aksi
                                                             SizedBox(
-                                                              width: 44,
+                                                              width: 72,
                                                               height: 38,
-                                                              child: IconButton(
-                                                                padding:
-                                                                    EdgeInsets
-                                                                        .zero,
-                                                                icon: const Icon(
-                                                                  Icons
-                                                                      .delete_outline_rounded,
-                                                                  color: Colors
-                                                                      .redAccent,
-                                                                  size: 16,
-                                                                ),
-                                                                tooltip:
-                                                                    'Hapus Transaksi',
-                                                                onPressed: () {
-                                                                  _confirmDeleteTransaction(
-                                                                    tx,
-                                                                    () {
-                                                                      setModalState(
-                                                                          () {});
+                                                              child: Row(
+                                                                mainAxisAlignment:
+                                                                    MainAxisAlignment
+                                                                        .center,
+                                                                children: [
+                                                                  InkWell(
+                                                                    onTap: () {
+                                                                      _showEditTransactionModal(
+                                                                        tx,
+                                                                        () {
+                                                                          setModalState(
+                                                                              () {});
+                                                                        },
+                                                                      );
                                                                     },
-                                                                  );
-                                                                },
+                                                                    borderRadius:
+                                                                        BorderRadius
+                                                                            .circular(
+                                                                                6),
+                                                                    child:
+                                                                        const Padding(
+                                                                      padding:
+                                                                          EdgeInsets.all(
+                                                                              4),
+                                                                      child: Icon(
+                                                                        Icons
+                                                                            .edit_outlined,
+                                                                        color: Color(
+                                                                            0xFF0284C7),
+                                                                        size:
+                                                                            16,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                  const SizedBox(
+                                                                      width: 2),
+                                                                  InkWell(
+                                                                    onTap: () {
+                                                                      _confirmDeleteTransaction(
+                                                                        tx,
+                                                                        () {
+                                                                          setModalState(
+                                                                              () {});
+                                                                        },
+                                                                      );
+                                                                    },
+                                                                    borderRadius:
+                                                                        BorderRadius
+                                                                            .circular(
+                                                                                6),
+                                                                    child:
+                                                                        const Padding(
+                                                                      padding:
+                                                                          EdgeInsets.all(
+                                                                              4),
+                                                                      child: Icon(
+                                                                        Icons
+                                                                            .delete_outline_rounded,
+                                                                        color: Colors
+                                                                            .redAccent,
+                                                                        size:
+                                                                            16,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ],
                                                               ),
                                                             ),
                                                           ],
@@ -8314,7 +9666,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                             child: Text(
                                               '$count tx',
                                               style: const TextStyle(
-                                                fontSize: 9.5,
+                                                fontSize: 11,
                                                 color: Color(0xFF64748B),
                                                 fontWeight: FontWeight.w600,
                                               ),
@@ -8341,7 +9693,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                       child: Text(
                                         'Rp ${RupiahFormatter.format(amount)}',
                                         style: TextStyle(
-                                          fontSize: 11.5,
+                                          fontSize: 13,
                                           fontWeight: FontWeight.bold,
                                           color: customTextColor ??
                                               (amount > 0
@@ -8485,7 +9837,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                             child: Text(
                                               'Rincian Pemasukan',
                                               style: TextStyle(
-                                                fontSize: 12.5,
+                                                fontSize: 13,
                                                 fontWeight: FontWeight.bold,
                                                 color: Color(0xFF78350F),
                                               ),
@@ -8609,7 +9961,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                   const Text(
                                                     'Total Pemasukkan',
                                                     style: TextStyle(
-                                                      fontSize: 11.5,
+                                                      fontSize: 13,
                                                       fontWeight:
                                                           FontWeight.bold,
                                                       color:
@@ -8638,7 +9990,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                 child: Text(
                                                   'Rp ${RupiahFormatter.format(totalPemasukanNonDPNominal)}',
                                                   style: const TextStyle(
-                                                    fontSize: 12,
+                                                    fontSize: 13.5,
                                                     fontWeight:
                                                         FontWeight.bold,
                                                     color: Color(0xFF059669),
@@ -8683,7 +10035,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                   const Text(
                                                     'Total Pengeluaran',
                                                     style: TextStyle(
-                                                      fontSize: 11.5,
+                                                      fontSize: 13,
                                                       fontWeight:
                                                           FontWeight.bold,
                                                       color:
@@ -8712,7 +10064,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                 child: Text(
                                                   'Rp ${RupiahFormatter.format(totalPengeluaranNominal)}',
                                                   style: const TextStyle(
-                                                    fontSize: 12,
+                                                    fontSize: 13.5,
                                                     fontWeight:
                                                         FontWeight.bold,
                                                     color: Color(0xFFE11D48),
@@ -8762,7 +10114,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                   Text(
                                                     'Sisa Saldo',
                                                     style: TextStyle(
-                                                      fontSize: 12,
+                                                      fontSize: 13.5,
                                                       fontWeight:
                                                           FontWeight.bold,
                                                       color: sisaSaldo >= 0
@@ -8775,7 +10127,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                   Text(
                                                     'Total Pemasukkan - Total Pengeluaran',
                                                     style: TextStyle(
-                                                      fontSize: 9,
+                                                      fontSize: 10.5,
                                                       color: sisaSaldo >= 0
                                                           ? const Color(
                                                               0xFF92400E)
@@ -8809,7 +10161,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                       ? '-Rp ${RupiahFormatter.format(sisaSaldo.abs())}'
                                                       : 'Rp ${RupiahFormatter.format(sisaSaldo)}',
                                                   style: TextStyle(
-                                                    fontSize: 13,
+                                                    fontSize: 14.5,
                                                     fontWeight:
                                                         FontWeight.bold,
                                                     color: sisaSaldo >= 0
@@ -8888,7 +10240,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                             child: Text(
                                               'Total Dana Kontribusi',
                                               style: TextStyle(
-                                                fontSize: 12.5,
+                                                fontSize: 13,
                                                 fontWeight: FontWeight.bold,
                                                 color: Color(0xFF78350F),
                                               ),
@@ -8909,7 +10261,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                       child: Text(
                                         'Rp ${RupiahFormatter.format(totalPemasukanDP)}',
                                         style: TextStyle(
-                                          fontSize: 13.5,
+                                          fontSize: 15,
                                           fontWeight: FontWeight.bold,
                                           color: totalPemasukanDP > 0
                                               ? const Color(0xFF059669)
@@ -9291,21 +10643,43 @@ class _StrukturPageState extends State<StrukturPage> {
                                           ),
                                         ),
                                         const SizedBox(height: 4),
-                                        InkWell(
-                                          onTap: () {
-                                            _confirmDeleteTransaction(
-                                                tx, () => setModalState(() {}));
-                                          },
-                                          borderRadius:
-                                              BorderRadius.circular(6),
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(4),
-                                            child: Icon(
-                                              Icons.delete_outline_rounded,
-                                              size: 18,
-                                              color: Colors.grey[400],
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            InkWell(
+                                              onTap: () {
+                                                _showEditTransactionModal(
+                                                    tx, () => setModalState(() {}));
+                                              },
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                              child: const Padding(
+                                                padding: EdgeInsets.all(4),
+                                                child: Icon(
+                                                  Icons.edit_outlined,
+                                                  size: 18,
+                                                  color: Color(0xFF0284C7),
+                                                ),
+                                              ),
                                             ),
-                                          ),
+                                            const SizedBox(width: 4),
+                                            InkWell(
+                                              onTap: () {
+                                                _confirmDeleteTransaction(
+                                                    tx, () => setModalState(() {}));
+                                              },
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                              child: Padding(
+                                                padding: const EdgeInsets.all(4),
+                                                child: Icon(
+                                                  Icons.delete_outline_rounded,
+                                                  size: 18,
+                                                  color: Colors.grey[400],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),

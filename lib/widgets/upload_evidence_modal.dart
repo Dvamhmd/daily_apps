@@ -272,12 +272,17 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
     super.dispose();
   }
 
+  bool _isCellConfigured(String key) {
+    final col = _config.columnMapping[key];
+    return col != null && col.trim().isNotEmpty && col.trim() != '-';
+  }
+
   int get _totalSelectedCount {
     int count = 0;
-    if (_saldoRekening.hasFile) count++;
-    if (_saldoCash.hasFile) count++;
+    if (_saldoRekening.hasFile && _isCellConfigured(_saldoRekening.key)) count++;
+    if (_saldoCash.hasFile && _isCellConfigured(_saldoCash.key)) count++;
     for (var m in _mutasiList) {
-      if (m.hasFile) count++;
+      if (m.hasFile && _isCellConfigured(m.key)) count++;
     }
     return count;
   }
@@ -292,6 +297,18 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
   }
 
   Future<void> _pickSingleImage(_EvidenceItem item) async {
+    if (!_isCellConfigured(item.key)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Cell ${item.label} dinonaktifkan (-). Atur pemetaan cell terlebih dahulu di Pengaturan.'),
+          backgroundColor: const Color(0xFFD97706),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -336,6 +353,20 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
   }
 
   Future<void> _pickMultipleMutasi() async {
+    final enabledMutasi =
+        _mutasiList.where((m) => _isCellConfigured(m.key)).toList();
+    if (enabledMutasi.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Semua cell mutasi dinonaktifkan (-). Atur pemetaan cell terlebih dahulu di Pengaturan.'),
+          backgroundColor: Color(0xFFD97706),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -345,25 +376,25 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
       );
 
       if (result != null && result.files.isNotEmpty) {
-        final files = result.files.take(5).toList();
+        final files = result.files.take(enabledMutasi.length).toList();
 
         setState(() {
-          for (int i = 0; i < 5; i++) {
+          for (int i = 0; i < enabledMutasi.length; i++) {
             if (i < files.length && files[i].bytes != null) {
               final ext = files[i].extension?.toLowerCase() ?? 'jpg';
               String mime = 'image/jpeg';
               if (ext == 'png') mime = 'image/png';
               if (ext == 'webp') mime = 'image/webp';
 
-              _mutasiList[i].bytes = files[i].bytes;
-              _mutasiList[i].fileName = files[i].name;
-              _mutasiList[i].mimeType = mime;
-              _mutasiList[i].resetUploadState();
+              enabledMutasi[i].bytes = files[i].bytes;
+              enabledMutasi[i].fileName = files[i].name;
+              enabledMutasi[i].mimeType = mime;
+              enabledMutasi[i].resetUploadState();
             }
           }
         });
 
-        for (int i = 0; i < files.length && i < 5; i++) {
+        for (int i = 0; i < files.length && i < enabledMutasi.length; i++) {
           if (files[i].bytes != null) {
             final ext = files[i].extension?.toLowerCase() ?? 'jpg';
             String mime = 'image/jpeg';
@@ -371,7 +402,7 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
             if (ext == 'webp') mime = 'image/webp';
 
             await EvidenceCacheService.saveItem(
-              _mutasiList[i].key,
+              enabledMutasi[i].key,
               files[i].bytes!,
               files[i].name,
               mime,
@@ -501,6 +532,7 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
               GoogleSheetsConfigModal.show(
                 context: context,
                 config: _config,
+                initialTab: 0,
                 onConfigSaved: (newCfg) {
                   setState(() => _config = newCfg);
                   widget.onConfigChanged?.call(newCfg);
@@ -513,11 +545,27 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
       return;
     }
 
-    if (_totalSelectedCount == 0) {
+    if (!_config.hasConfiguredCells) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pilih minimal 1 gambar bukti untuk diunggah.'),
-          backgroundColor: Colors.orange,
+        SnackBar(
+          content: const Text(
+              'Pemetaan cell belum dikonfigurasi. Atur pemetaan cell terlebih dahulu.'),
+          backgroundColor: const Color(0xFFD97706),
+          action: SnackBarAction(
+            label: 'Atur Cell',
+            textColor: Colors.white,
+            onPressed: () {
+              GoogleSheetsConfigModal.show(
+                context: context,
+                config: _config,
+                initialTab: 1,
+                onConfigSaved: (newCfg) {
+                  setState(() => _config = newCfg);
+                  widget.onConfigChanged?.call(newCfg);
+                },
+              );
+            },
+          ),
         ),
       );
       return;
@@ -527,7 +575,7 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
     final List<Map<String, dynamic>> payloadImages = [];
 
     void addPayloadItem(_EvidenceItem item) {
-      if (item.hasFile) {
+      if (item.hasFile && _isCellConfigured(item.key)) {
         item.isUploading = true;
         item.isSuccess = null;
         item.uploadStatus = null;
@@ -543,20 +591,32 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
       }
     }
 
+    addPayloadItem(_saldoRekening);
+    addPayloadItem(_saldoCash);
+    for (var m in _mutasiList) {
+      addPayloadItem(m);
+    }
+
+    if (payloadImages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Tidak ada gambar pada cell yang aktif. Pastikan cell pemetaan sudah diatur (tidak bernilai "-") sebelum mengunggah.'),
+          backgroundColor: Color(0xFFD97706),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isUploading = true;
       _uploadStatusMessage = null;
       _uploadSuccess = null;
       _uploadProgress = 0.0;
       _completedUploadCount = 0;
-      _totalUploadCount = _totalSelectedCount;
+      _totalUploadCount = payloadImages.length;
     });
-
-    addPayloadItem(_saldoRekening);
-    addPayloadItem(_saldoCash);
-    for (var m in _mutasiList) {
-      addPayloadItem(m);
-    }
 
     final result = await SheetsSyncService.uploadEvidenceImages(
       config: _config,
@@ -812,6 +872,7 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
                   GoogleSheetsConfigModal.show(
                     context: context,
                     config: _config,
+                    initialTab: 1,
                     onConfigSaved: (newCfg) {
                       setState(() => _config = newCfg);
                       widget.onConfigChanged?.call(newCfg);
@@ -871,33 +932,47 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
   Widget _buildSingleSlotCard(_EvidenceItem item) {
     final colMapped = _config.columnMapping[item.key] ?? '-';
     final rowMapped = _config.getEvidenceRow(item.key);
-    final cellDisplay = colMapped == '-' ? '-' : '$colMapped$rowMapped';
+    final isCellEnabled = _isCellConfigured(item.key);
+    final cellDisplay = !isCellEnabled ? 'Nonaktif' : '$colMapped$rowMapped';
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isCellEnabled ? Colors.white : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: item.isUploading
-              ? const Color(0xFF2563EB)
-              : (item.isSuccess == true
-                  ? const Color(0xFF107C41)
-                  : (item.hasFile
+          color: !isCellEnabled
+              ? const Color(0xFFE2E8F0)
+              : (item.isUploading
+                  ? const Color(0xFF2563EB)
+                  : (item.isSuccess == true
                       ? const Color(0xFF107C41)
-                      : const Color(0xFFE2E8F0))),
-          width: item.hasFile || item.isUploading ? 1.5 : 1,
+                      : (item.hasFile
+                          ? const Color(0xFF107C41)
+                          : const Color(0xFFCBD5E1)))),
+          width: isCellEnabled && (item.hasFile || item.isUploading) ? 1.5 : 1,
         ),
       ),
       child: Row(
         children: [
           // Preview Thumbnail / Placeholder
           GestureDetector(
-            onTap: item.isUploading
-                ? null
-                : (item.hasFile
-                    ? () => _showImagePreviewDialog(item)
-                    : () => _pickSingleImage(item)),
+            onTap: !isCellEnabled
+                ? () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                            'Cell ${item.label} dinonaktifkan (-). Atur pemetaan cell di Pengaturan.'),
+                        backgroundColor: const Color(0xFFD97706),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                : (item.isUploading
+                    ? null
+                    : (item.hasFile
+                        ? () => _showImagePreviewDialog(item)
+                        : () => _pickSingleImage(item))),
             child: Stack(
               children: [
                 Container(
@@ -906,9 +981,13 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
                   decoration: BoxDecoration(
                     color: const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                    border: Border.all(
+                      color: isCellEnabled
+                          ? const Color(0xFFCBD5E1)
+                          : const Color(0xFFE2E8F0),
+                    ),
                   ),
-                  child: item.hasFile
+                  child: item.hasFile && isCellEnabled
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(9),
                           child: Image.memory(
@@ -916,15 +995,20 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
                             fit: BoxFit.cover,
                           ),
                         )
-                      : const Column(
+                      : Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.add_photo_alternate_rounded,
-                                size: 24, color: Color(0xFF94A3B8)),
-                            SizedBox(height: 2),
+                            Icon(
+                              !isCellEnabled
+                                  ? Icons.block_rounded
+                                  : Icons.add_photo_alternate_rounded,
+                              size: 24,
+                              color: const Color(0xFF94A3B8),
+                            ),
+                            const SizedBox(height: 2),
                             Text(
-                              'Pilih',
-                              style: TextStyle(
+                              !isCellEnabled ? 'Nonaktif' : 'Pilih',
+                              style: const TextStyle(
                                   fontSize: 9,
                                   fontWeight: FontWeight.bold,
                                   color: Color(0xFF64748B)),
@@ -965,10 +1049,12 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
                     Flexible(
                       child: Text(
                         item.label,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
+                          color: isCellEnabled
+                              ? const Color(0xFF1E293B)
+                              : const Color(0xFF94A3B8),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -979,22 +1065,39 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 5, vertical: 1.5),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFDCFCE7),
+                        color: isCellEnabled
+                            ? const Color(0xFFDCFCE7)
+                            : const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(4),
+                        border: !isCellEnabled
+                            ? Border.all(
+                                color: const Color(0xFFE2E8F0), width: 0.8)
+                            : null,
                       ),
                       child: Text(
                         'Sel: $cellDisplay',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 9.5,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF15803D),
+                          color: isCellEnabled
+                              ? const Color(0xFF15803D)
+                              : const Color(0xFF64748B),
                         ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 3),
-                if (item.isUploading)
+                if (!isCellEnabled)
+                  const Text(
+                    'Cell dinonaktifkan (-)',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFF94A3B8),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  )
+                else if (item.isUploading)
                   const Row(
                     children: [
                       SizedBox(
@@ -1007,7 +1110,7 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
                       ),
                       SizedBox(width: 5),
                       Text(
-                        'Mengunggah cepat (HD)...',
+                        'Mengunggah gambar...',
                         style: TextStyle(
                           fontSize: 10,
                           color: Color(0xFF2563EB),
@@ -1072,7 +1175,25 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
             ),
           ),
           // Action Buttons
-          if (item.hasFile && !item.isUploading) ...[
+          if (!isCellEnabled) ...[
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Text(
+                'Nonaktif',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Color(0xFF94A3B8),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ] else if (item.hasFile && !item.isUploading) ...[
             IconButton(
               icon: const Icon(Icons.zoom_in_rounded,
                   color: Color(0xFF2563EB), size: 20),
@@ -1093,7 +1214,8 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1E293B),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -1121,22 +1243,27 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
         final item = _mutasiList[index];
         final colMapped = _config.columnMapping[item.key] ?? '-';
         final rowMapped = _config.getEvidenceRow(item.key);
-        final cellDisplay = colMapped == '-' ? '-' : '$colMapped$rowMapped';
+        final isCellEnabled = _isCellConfigured(item.key);
+        final cellDisplay = !isCellEnabled ? 'Nonaktif' : '$colMapped$rowMapped';
 
         return Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isCellEnabled ? Colors.white : const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: item.isUploading
-                  ? const Color(0xFF2563EB)
-                  : (item.isSuccess == true
-                      ? const Color(0xFF107C41)
-                      : (item.hasFile
+              color: !isCellEnabled
+                  ? const Color(0xFFE2E8F0)
+                  : (item.isUploading
+                      ? const Color(0xFF2563EB)
+                      : (item.isSuccess == true
                           ? const Color(0xFF107C41)
-                          : const Color(0xFFE2E8F0))),
-              width: item.hasFile || item.isUploading ? 1.4 : 1,
+                          : (item.hasFile
+                              ? const Color(0xFF107C41)
+                              : const Color(0xFFCBD5E1)))),
+              width: isCellEnabled && (item.hasFile || item.isUploading)
+                  ? 1.4
+                  : 1,
             ),
           ),
           child: Stack(
@@ -1149,25 +1276,35 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
                     children: [
                       Text(
                         'Mutasi ${index + 1}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
+                          color: isCellEnabled
+                              ? const Color(0xFF1E293B)
+                              : const Color(0xFF94A3B8),
                         ),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 4, vertical: 1),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFDCFCE7),
+                          color: isCellEnabled
+                              ? const Color(0xFFDCFCE7)
+                              : const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(4),
+                          border: !isCellEnabled
+                              ? Border.all(
+                                  color: const Color(0xFFE2E8F0), width: 0.8)
+                              : null,
                         ),
                         child: Text(
                           'Sel: $cellDisplay',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF15803D),
+                            color: isCellEnabled
+                                ? const Color(0xFF15803D)
+                                : const Color(0xFF64748B),
                           ),
                         ),
                       ),
@@ -1176,41 +1313,67 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
                   const SizedBox(height: 6),
                   Expanded(
                     child: GestureDetector(
-                      onTap: item.isUploading
-                          ? null
-                          : (item.hasFile
-                              ? () => _showImagePreviewDialog(item)
-                              : () => _pickSingleImage(item)),
+                      onTap: !isCellEnabled
+                          ? () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                      'Cell Mutasi ${index + 1} dinonaktifkan (-). Atur pemetaan cell di Pengaturan.'),
+                                  backgroundColor: const Color(0xFFD97706),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          : (item.isUploading
+                              ? null
+                              : (item.hasFile
+                                  ? () => _showImagePreviewDialog(item)
+                                  : () => _pickSingleImage(item))),
                       child: Stack(
+                        fit: StackFit.expand,
                         children: [
                           Container(
                             width: double.infinity,
+                            height: double.infinity,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
+                              color: isCellEnabled
+                                  ? const Color(0xFFF8FAFC)
+                                  : const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: const Color(0xFFCBD5E1),
+                                color: isCellEnabled
+                                    ? const Color(0xFFCBD5E1)
+                                    : const Color(0xFFE2E8F0),
                                 style: BorderStyle.solid,
                               ),
                             ),
-                            child: item.hasFile
+                            child: item.hasFile && isCellEnabled
                                 ? ClipRRect(
                                     borderRadius: BorderRadius.circular(7),
                                     child: Image.memory(
                                       item.bytes!,
+                                      width: double.infinity,
+                                      height: double.infinity,
                                       fit: BoxFit.cover,
                                     ),
                                   )
-                                : const Row(
+                                : Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.add_photo_alternate_rounded,
-                                          size: 15, color: Color(0xFF94A3B8)),
-                                      SizedBox(width: 4),
+                                      Icon(
+                                        !isCellEnabled
+                                            ? Icons.block_rounded
+                                            : Icons.add_photo_alternate_rounded,
+                                        size: 22,
+                                        color: const Color(0xFF94A3B8),
+                                      ),
+                                      const SizedBox(height: 4),
                                       Text(
-                                        'Pilih Foto',
-                                        style: TextStyle(
-                                          fontSize: 9.5,
+                                        !isCellEnabled
+                                            ? 'Nonaktif'
+                                            : 'Pilih Gambar',
+                                        style: const TextStyle(
+                                          fontSize: 10,
                                           fontWeight: FontWeight.w600,
                                           color: Color(0xFF64748B),
                                         ),
@@ -1261,7 +1424,7 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
                   ),
                 ],
               ),
-              if (item.hasFile && !item.isUploading)
+              if (item.hasFile && isCellEnabled && !item.isUploading)
                 Positioned(
                   top: 0,
                   right: 0,

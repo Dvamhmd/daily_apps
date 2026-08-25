@@ -106,7 +106,51 @@ class CustomKodeRule {
     );
   }
 
-  static List<CustomKodeRule> defaultRules() => [];
+  static List<CustomKodeRule> defaultRules() => [
+        // Aturan KU (26 aturan)
+        CustomKodeRule(keyword: 'rapat', kode: 'Sekretaris', type: 'ku'),
+        CustomKodeRule(keyword: 'rakor', kode: 'Sekretaris', type: 'ku'),
+        CustomKodeRule(keyword: 'rab', kode: 'Sekretaris', type: 'ku'),
+        CustomKodeRule(keyword: 'rkub', kode: 'Sekretaris', type: 'ku'),
+        CustomKodeRule(keyword: 'bensin', kode: 'Sekretaris', type: 'ku'),
+        CustomKodeRule(keyword: 'ATK', kode: 'Sekretaris', type: 'ku'),
+        CustomKodeRule(keyword: 'RTK', kode: 'Sekretaris', type: 'ku'),
+        CustomKodeRule(keyword: 'simulasi', kode: 'Sekretaris', type: 'ku'),
+        CustomKodeRule(keyword: 'admin', kode: 'SDK', type: 'ku'),
+        CustomKodeRule(keyword: 'bank', kode: 'SDK', type: 'ku'),
+        CustomKodeRule(keyword: 'pulsa', kode: 'SDK', type: 'ku'),
+        CustomKodeRule(keyword: 'pembinaan AP', kode: 'SDM', type: 'ku'),
+        CustomKodeRule(keyword: 'olahraga', kode: 'SDM', type: 'ku'),
+        CustomKodeRule(keyword: 'silah', kode: 'SDM', type: 'ku'),
+        CustomKodeRule(keyword: 'Pekabaran', kode: 'Publikasi', type: 'ku'),
+        CustomKodeRule(keyword: 'Talwiyah', kode: 'Publikasi', type: 'ku'),
+        CustomKodeRule(keyword: 'Pengabaran', kode: 'Publikasi', type: 'ku'),
+        CustomKodeRule(keyword: 'pembinaan AB', kode: 'Publikasi', type: 'ku'),
+        CustomKodeRule(keyword: 'Pratal', kode: 'Publikasi', type: 'ku'),
+        CustomKodeRule(keyword: 'Moral', kode: 'Hukum', type: 'ku'),
+        CustomKodeRule(keyword: 'Disiplin', kode: 'Hukum', type: 'ku'),
+        CustomKodeRule(keyword: 'MPMD', kode: 'Hukum', type: 'ku'),
+        CustomKodeRule(keyword: 'RPM', kode: 'Ekonomi', type: 'ku'),
+        CustomKodeRule(keyword: 'Pangan', kode: 'Ekonomi', type: 'ku'),
+        CustomKodeRule(keyword: 'Kedaulatan Pangan', kode: 'Ekonomi', type: 'ku'),
+        CustomKodeRule(keyword: 'Bibit', kode: 'Ekonomi', type: 'ku'),
+
+        // Aturan Kategori (14 aturan)
+        CustomKodeRule(keyword: 'ATK', kode: 'ATK', type: 'kategori'),
+        CustomKodeRule(keyword: 'RTK', kode: 'RTK', type: 'kategori'),
+        CustomKodeRule(keyword: 'Bibit', kode: 'RTK', type: 'kategori'),
+        CustomKodeRule(keyword: 'DP', kode: 'DP', type: 'kategori'),
+        CustomKodeRule(keyword: 'Sewa', kode: 'Sewa Tempat', type: 'kategori'),
+        CustomKodeRule(keyword: 'Konsumsi', kode: 'Konsumsi', type: 'kategori'),
+        CustomKodeRule(keyword: 'admin', kode: 'Adm Bank/Pajak', type: 'kategori'),
+        CustomKodeRule(keyword: 'dari S3', kode: 'Dana dari S3', type: 'kategori'),
+        CustomKodeRule(keyword: 'bensin', kode: 'Transportasi Lokal', type: 'kategori'),
+        CustomKodeRule(keyword: 'transport', kode: 'Transportasi Lokal', type: 'kategori'),
+        CustomKodeRule(keyword: 'pulsa', kode: 'Komunikasi & Internet', type: 'kategori'),
+        CustomKodeRule(keyword: 'internet', kode: 'Komunikasi & Internet', type: 'kategori'),
+        CustomKodeRule(keyword: 'kuota', kode: 'Komunikasi & Internet', type: 'kategori'),
+        CustomKodeRule(keyword: 'bunga', kode: 'Bunga Bank', type: 'kategori'),
+      ];
 }
 
 class StrukturTransaction {
