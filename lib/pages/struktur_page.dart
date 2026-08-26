@@ -2299,41 +2299,26 @@ class _StrukturPageState extends State<StrukturPage> {
                                           : 1.0,
                                     ),
                                   ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                  child: Row(
                                     children: [
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            defaultPreset == 'general'
-                                                ? Icons.radio_button_checked_rounded
-                                                : Icons.radio_button_off_rounded,
-                                            size: 15,
-                                            color: defaultPreset == 'general'
-                                                ? const Color(0xFF2563EB)
-                                                : const Color(0xFF94A3B8),
-                                          ),
-                                          const SizedBox(width: 5),
-                                          Text(
-                                            'General',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                              color: defaultPreset == 'general'
-                                                  ? const Color(0xFF1E40AF)
-                                                  : const Color(0xFF334155),
-                                            ),
-                                          ),
-                                        ],
+                                      Icon(
+                                        defaultPreset == 'general'
+                                            ? Icons.radio_button_checked_rounded
+                                            : Icons.radio_button_off_rounded,
+                                        size: 15,
+                                        color: defaultPreset == 'general'
+                                            ? const Color(0xFF2563EB)
+                                            : const Color(0xFF94A3B8),
                                       ),
-                                      const SizedBox(height: 4),
-                                      const Text(
-                                        '40 aturan (26 KU & 14 Kat) • Saldo Terkunci',
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        'General',
                                         style: TextStyle(
-                                          fontSize: 9.5,
-                                          color: Color(0xFF64748B),
-                                          height: 1.25,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: defaultPreset == 'general'
+                                              ? const Color(0xFF1E40AF)
+                                              : const Color(0xFF334155),
                                         ),
                                       ),
                                     ],
@@ -2342,7 +2327,7 @@ class _StrukturPageState extends State<StrukturPage> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            // Tombol Preset 2: K12 (Protected)
+                            // Tombol Preset 2: Admin (Protected)
                             Expanded(
                               child: InkWell(
                                 onTap: () async {
@@ -2352,9 +2337,9 @@ class _StrukturPageState extends State<StrukturPage> {
                                     context: sbContext,
                                     targetPassword:
                                         CustomRuleImportHelper.k12Password,
-                                    title: 'Verifikasi Sandi K12',
+                                    title: 'Verifikasi Sandi Admin',
                                     description:
-                                        'Masukkan kata sandi untuk mengimpor aturan khusus profil Sheet K12.',
+                                        'Masukkan kata sandi untuk mengimpor aturan khusus profil Admin.',
                                   );
 
                                   if (isVerified == true) {
@@ -2368,7 +2353,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                           .showSnackBar(
                                         const SnackBar(
                                           content: Text(
-                                              '✅ Sandi terverifikasi! Profil aturan K12 dipilih.'),
+                                              '✅ Sandi terverifikasi! Profil aturan Admin dipilih.'),
                                           backgroundColor: Color(0xFF059669),
                                           behavior: SnackBarBehavior.floating,
                                           duration: Duration(seconds: 2),
@@ -2394,63 +2379,48 @@ class _StrukturPageState extends State<StrukturPage> {
                                           defaultPreset == 'k12' ? 1.5 : 1.0,
                                     ),
                                   ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                  child: Row(
                                     children: [
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            defaultPreset == 'k12'
-                                                ? Icons.radio_button_checked_rounded
-                                                : Icons.lock_outline_rounded,
-                                            size: 15,
-                                            color: defaultPreset == 'k12'
-                                                ? const Color(0xFFDB2777)
-                                                : const Color(0xFF94A3B8),
-                                          ),
-                                          const SizedBox(width: 5),
-                                          Text(
-                                            'K12',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                              color: defaultPreset == 'k12'
-                                                  ? const Color(0xFF9D174D)
-                                                  : const Color(0xFF334155),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 4, vertical: 1),
-                                            decoration: BoxDecoration(
-                                              color: defaultPreset == 'k12'
-                                                  ? const Color(0xFFFCE7F3)
-                                                  : const Color(0xFFF1F5F9),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              'Protected',
-                                              style: TextStyle(
-                                                fontSize: 8.5,
-                                                fontWeight: FontWeight.bold,
-                                                color: defaultPreset == 'k12'
-                                                    ? const Color(0xFFBE185D)
-                                                    : const Color(0xFF64748B),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
+                                      Icon(
+                                        defaultPreset == 'k12'
+                                            ? Icons.radio_button_checked_rounded
+                                            : Icons.lock_outline_rounded,
+                                        size: 15,
+                                        color: defaultPreset == 'k12'
+                                            ? const Color(0xFFDB2777)
+                                            : const Color(0xFF94A3B8),
                                       ),
-                                      const SizedBox(height: 4),
-                                      const Text(
-                                        '25 aturan Kat K12 • Saldo Fleksibel',
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        'Admin',
                                         style: TextStyle(
-                                          fontSize: 9.5,
-                                          color: Color(0xFF64748B),
-                                          height: 1.25,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: defaultPreset == 'k12'
+                                              ? const Color(0xFF9D174D)
+                                              : const Color(0xFF334155),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 4, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: defaultPreset == 'k12'
+                                              ? const Color(0xFFFCE7F3)
+                                              : const Color(0xFFF1F5F9),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          'Protected',
+                                          style: TextStyle(
+                                            fontSize: 8.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: defaultPreset == 'k12'
+                                                ? const Color(0xFFBE185D)
+                                                : const Color(0xFF64748B),
+                                          ),
                                         ),
                                       ),
                                     ],
