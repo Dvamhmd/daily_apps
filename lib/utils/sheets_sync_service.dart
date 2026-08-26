@@ -675,7 +675,7 @@ class SheetsSyncService {
 
 /**
  * Fungsi pembantu untuk memicu popup izin Google Drive & Spreadsheet secara instan.
- * Jalankan fungsi ini (klik Run ▶️) jika Google meminta izin akses Google Drive.
+ * Jalankan fungsi ini (klik Run / Jalankan) jika Google meminta izin akses Google Drive.
  */
 function authorizeDrive() {
   var testFolder = DriveApp.createFolder("DailyApps_Temp_Auth");

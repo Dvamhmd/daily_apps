@@ -2962,7 +2962,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
           _buildStepItem(
             '4',
             'Beri Izin Akses (Authorize)',
-            'Pilih fungsi "authorizeDrive" di dropdown toolbar atas -> klik tombol "Run" (▶️ Jalankan) -> klik "Review Permissions / Tinjau Izin" -> pilih Akun Google -> klik "Advanced / Lanjutan" -> klik "Go to ... (unsafe)" -> klik "Allow / Izinkan".',
+            'Pilih fungsi "authorizeDrive" di dropdown toolbar atas -> klik tombol "Run" (Run / Jalankan) -> klik "Review Permissions / Tinjau Izin" -> pilih Akun Google -> klik "Advanced / Lanjutan" -> klik "Go to ... (unsafe)" -> klik "Allow / Izinkan".',
             isHighlight: true,
           ),
           _buildStepItem(

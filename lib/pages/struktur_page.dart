@@ -9370,7 +9370,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                                         'Debit',
                                                                         style: TextStyle(
                                                                           fontSize:
-                                                                              9.5,
+                                                                              11.5,
                                                                           fontWeight:
                                                                               FontWeight.bold,
                                                                           color: Color(
