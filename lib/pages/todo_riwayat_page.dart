@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:daily_apps/models/model_todo.dart';
+import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -294,156 +295,159 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
           : RefreshIndicator(
               onRefresh: _loadData,
               color: primaryTerracotta,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-                children: [
-                  // Banner Ringkasan Riwayat
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF2E7D32), Color(0xFF1B5E20)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(22),
-                      boxShadow: [
-                        BoxShadow(
-                          color: accentCompleted.withValues(alpha: 0.28),
-                          blurRadius: 15,
-                          offset: const Offset(0, 6),
+              child: ResponsiveContentWrapper(
+                maxWidth: 720,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                  children: [
+                    // Banner Ringkasan Riwayat
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF2E7D32), Color(0xFF1B5E20)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Text(
-                                'ARCHIVE & COMPLETION',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.8,
+                        borderRadius: BorderRadius.circular(22),
+                        boxShadow: [
+                          BoxShadow(
+                            color: accentCompleted.withValues(alpha: 0.28),
+                            blurRadius: 15,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Text(
+                                  'ARCHIVE & COMPLETION',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.8,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const Icon(
-                              Icons.check_circle_rounded,
+                              const Icon(
+                                Icons.check_circle_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          const Text(
+                            'Pekerjaan yang Telah Tuntas',
+                            style: TextStyle(
                               color: Colors.white,
-                              size: 22,
+                              fontSize: 18.5,
+                              fontWeight: FontWeight.bold,
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        const Text(
-                          'Pekerjaan yang Telah Tuntas',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18.5,
-                            fontWeight: FontWeight.bold,
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Semua section to-do yang telah berhasil kamu selesaikan 100%.',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.88),
-                            fontSize: 12.5,
+                          const SizedBox(height: 4),
+                          Text(
+                            'Semua section to-do yang telah berhasil kamu selesaikan 100%.',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.88),
+                              fontSize: 12.5,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            _buildStatBadge(
-                              '${completedList.length} Section',
-                              Icons.calendar_today_rounded,
-                            ),
-                            const SizedBox(width: 10),
-                            _buildStatBadge(
-                              '$_totalCompletedTasks Tugas Selesai',
-                              Icons.task_alt_rounded,
-                            ),
-                          ],
-                        ),
-                      ],
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              _buildStatBadge(
+                                '${completedList.length} Section',
+                                Icons.calendar_today_rounded,
+                              ),
+                              const SizedBox(width: 10),
+                              _buildStatBadge(
+                                '$_totalCompletedTasks Tugas',
+                                Icons.task_alt_rounded,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 18),
+                    const SizedBox(height: 16),
 
-                  // Search Field
-                  TextField(
-                    onChanged: (val) {
-                      setState(() {
-                        _searchQuery = val;
-                      });
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Cari riwayat tugas atau tanggal...',
-                      hintStyle:
-                          TextStyle(color: Colors.grey[400], fontSize: 13.5),
-                      prefixIcon: const Icon(
-                        Icons.search_rounded,
-                        color: accentCompleted,
-                        size: 20,
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(
-                          color: accentCompleted.withValues(alpha: 0.15),
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(
-                          color: Colors.black.withValues(alpha: 0.05),
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(
+                    // Search Bar
+                    TextField(
+                      onChanged: (val) {
+                        setState(() {
+                          _searchQuery = val;
+                        });
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Cari riwayat tugas atau tanggal...',
+                        hintStyle:
+                            TextStyle(color: Colors.grey[400], fontSize: 13.5),
+                        prefixIcon: const Icon(
+                          Icons.search_rounded,
                           color: accentCompleted,
-                          width: 1.5,
+                          size: 20,
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(
+                            color: accentCompleted.withValues(alpha: 0.15),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(
+                            color: Colors.black.withValues(alpha: 0.05),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: accentCompleted,
+                            width: 1.5,
+                          ),
                         ),
                       ),
                     ),
-                  ),
 
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-                  // Daftar Section Selesai
-                  if (completedList.isEmpty)
-                    _buildEmptyRiwayat()
-                  else
-                    ...completedList.map(
-                      (group) => _buildCompletedGroupCard(group),
-                    ),
+                    // Daftar Section Selesai
+                    if (completedList.isEmpty)
+                      _buildEmptyRiwayat()
+                    else
+                      ...completedList.map(
+                        (group) => _buildCompletedGroupCard(group),
+                      ),
 
-                  const SizedBox(height: 40),
-                ],
+                    const SizedBox(height: 40),
+                  ],
+                ),
               ),
             ),
     );

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:daily_apps/models/model_todo.dart';
 import 'package:daily_apps/pages/todo_riwayat_page.dart';
+import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/widgets/gta_switch_wheel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -949,141 +950,144 @@ class _TodoPageState extends State<TodoPage> {
           : RefreshIndicator(
               onRefresh: _loadTodoData,
               color: primaryTerracotta,
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
-                ),
-                slivers: [
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
-                    sliver: SliverToBoxAdapter(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildHeaderBanner(),
-                          const SizedBox(height: 18),
-                          _buildSearchAndFilterBar(),
-                          const SizedBox(height: 20),
+              child: ResponsiveContentWrapper(
+                maxWidth: 720,
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
+                  ),
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+                      sliver: SliverToBoxAdapter(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildHeaderBanner(),
+                            const SizedBox(height: 18),
+                            _buildSearchAndFilterBar(),
+                            const SizedBox(height: 20),
 
-                          // Section Title
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  const Text(
-                                    'Daftar Rencana & Tugas',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF1E293B),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: primaryTerracotta
-                                          .withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      '${_dateGroups.length} Hari',
-                                      style: const TextStyle(
-                                        color: primaryTerracotta,
-                                        fontSize: 11,
+                            // Section Title
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Text(
+                                      'Daftar Rencana & Tugas',
+                                      style: TextStyle(
+                                        fontSize: 16,
                                         fontWeight: FontWeight.bold,
+                                        color: Color(0xFF1E293B),
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              if (filtered.length > 1)
-                                const Row(
-                                  children: [
-                                    Icon(
-                                      Icons.drag_indicator_rounded,
-                                      size: 14,
-                                      color: Color(0xFF94A3B8),
-                                    ),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      'Tahan & Geser',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Color(0xFF94A3B8),
-                                        fontWeight: FontWeight.w500,
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: primaryTerracotta
+                                            .withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        '${_dateGroups.length} Hari',
+                                        style: const TextStyle(
+                                          color: primaryTerracotta,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
-                            ],
-                          ),
+                                if (filtered.length > 1)
+                                  const Row(
+                                    children: [
+                                      Icon(
+                                        Icons.drag_indicator_rounded,
+                                        size: 14,
+                                        color: Color(0xFF94A3B8),
+                                      ),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Tahan & Geser',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF94A3B8),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                              ],
+                            ),
 
-                          const SizedBox(height: 12),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // REORDERABLE LIST OF DATE SECTIONS
-                  if (filtered.isEmpty)
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      sliver: SliverToBoxAdapter(
-                        child: _buildEmptyState(),
-                      ),
-                    )
-                  else
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      sliver: SliverReorderableList(
-                        itemCount: filtered.length,
-                        // ignore: deprecated_member_use
-                        onReorder: _onReorderGroups,
-                        proxyDecorator:
-                            (Widget child, int index, Animation<double> animation) {
-                          return AnimatedBuilder(
-                            animation: animation,
-                            builder: (context, _) {
-                              final elevation = 4.0 + 8.0 * animation.value;
-                              return Material(
-                                color: Colors.transparent,
-                                elevation: elevation,
-                                shadowColor: Colors.black38,
-                                borderRadius: BorderRadius.circular(20),
-                                child: child,
-                              );
-                            },
-                          );
-                        },
-                        itemBuilder: (context, index) {
-                          final group = filtered[index];
-                          return ReorderableDelayedDragStartListener(
-                            key: ValueKey(group.id),
-                            index: index,
-                            child: _buildDateGroupSection(group, index),
-                          );
-                        },
+                            const SizedBox(height: 12),
+                          ],
+                        ),
                       ),
                     ),
 
-                  // FOOTER / ADD BUTTON
-                  if (filtered.isNotEmpty)
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                      sliver: SliverToBoxAdapter(
-                        child: _buildAddNewSectionButton(),
+                    // REORDERABLE LIST OF DATE SECTIONS
+                    if (filtered.isEmpty)
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        sliver: SliverToBoxAdapter(
+                          child: _buildEmptyState(),
+                        ),
+                      )
+                    else
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        sliver: SliverReorderableList(
+                          itemCount: filtered.length,
+                          // ignore: deprecated_member_use
+                          onReorder: _onReorderGroups,
+                          proxyDecorator:
+                              (Widget child, int index, Animation<double> animation) {
+                            return AnimatedBuilder(
+                              animation: animation,
+                              builder: (context, _) {
+                                final elevation = 4.0 + 8.0 * animation.value;
+                                return Material(
+                                  color: Colors.transparent,
+                                  elevation: elevation,
+                                  shadowColor: Colors.black38,
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: child,
+                                );
+                              },
+                            );
+                          },
+                          itemBuilder: (context, index) {
+                            final group = filtered[index];
+                            return ReorderableDelayedDragStartListener(
+                              key: ValueKey(group.id),
+                              index: index,
+                              child: _buildDateGroupSection(group, index),
+                            );
+                          },
+                        ),
                       ),
-                    ),
 
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: 100),
-                  ),
-                ],
+                    // FOOTER / ADD BUTTON
+                    if (filtered.isNotEmpty)
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                        sliver: SliverToBoxAdapter(
+                          child: _buildAddNewSectionButton(),
+                        ),
+                      ),
+
+                    const SliverToBoxAdapter(
+                      child: SizedBox(height: 100),
+                    ),
+                  ],
+                ),
               ),
             ),
     );

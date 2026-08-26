@@ -1,4 +1,5 @@
 import 'package:daily_apps/models/model_riwayat.dart';
+import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/utils/riwayat_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -292,9 +293,11 @@ class _RiwayatPageState extends State<RiwayatPage> {
           const SizedBox(width: 8),
         ],
       ),
-      body: Column(
-        children: [
-          // Top Filter & Search Section
+      body: ResponsiveContentWrapper(
+        maxWidth: 720,
+        child: Column(
+          children: [
+            // Top Filter & Search Section
           Container(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             decoration: BoxDecoration(
@@ -426,8 +429,9 @@ class _RiwayatPageState extends State<RiwayatPage> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildFilterChip(String title, int count) {
     final isSelected = _selectedFilter.toLowerCase() == title.toLowerCase();

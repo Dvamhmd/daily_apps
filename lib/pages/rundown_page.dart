@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:daily_apps/models/model_rundown.dart';
 import 'package:daily_apps/pages/rundown_detail_page.dart';
+import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/widgets/dialog_tambah_rundown.dart';
 import 'package:daily_apps/widgets/gta_switch_wheel.dart';
 import 'package:flutter/material.dart';
@@ -242,54 +243,57 @@ class _RundownPageState extends State<RundownPage> {
           : SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 1. Header Banner Card
-                  _buildHeaderBanner(),
+              child: ResponsiveContentWrapper(
+                maxWidth: 720,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 1. Header Banner Card
+                    _buildHeaderBanner(),
 
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
-                  // 2. Section Title
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Daftar Rundown (${_rundownList.length})',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
-                        ),
-                      ),
-                      if (_rundownList.isNotEmpty)
-                        TextButton.icon(
-                          onPressed: _openTambahRundownModal,
-                          icon:
-                              const Icon(Icons.add, size: 16, color: primaryTeal),
-                          label: const Text(
-                            'Tambah',
-                            style: TextStyle(
-                              color: primaryTeal,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
+                    // 2. Section Title
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Daftar Rundown (${_rundownList.length})',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E293B),
                           ),
                         ),
+                        if (_rundownList.isNotEmpty)
+                          TextButton.icon(
+                            onPressed: _openTambahRundownModal,
+                            icon:
+                                const Icon(Icons.add, size: 16, color: primaryTeal),
+                            label: const Text(
+                              'Tambah',
+                              style: TextStyle(
+                                color: primaryTeal,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // 3. List of Rundowns or Empty State
+                    if (_rundownList.isEmpty) ...[
+                      _buildEmptyState(),
+                    ] else ...[
+                      _buildRundownList(),
                     ],
-                  ),
 
-                  const SizedBox(height: 12),
-
-                  // 3. List of Rundowns or Empty State
-                  if (_rundownList.isEmpty) ...[
-                    _buildEmptyState(),
-                  ] else ...[
-                    _buildRundownList(),
+                    const SizedBox(height: 100), // Spacing for FAB
                   ],
-
-                  const SizedBox(height: 100), // Spacing for FAB
-                ],
+                ),
               ),
             ),
     );
