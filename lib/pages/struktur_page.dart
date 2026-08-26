@@ -2757,7 +2757,7 @@ class _StrukturPageState extends State<StrukturPage> {
 
                           if (importMethod == 2 && defaultPreset == 'k12') {
                             successMsg +=
-                                '\n🔓 Mode K12 diterapkan: Saldo rekening saat ini fleksibel (dapat diedit).';
+                                '\n🔓 Mode Admin diterapkan: Saldo dana internal dapat diedit secara fleksibel.';
                           } else if (importMethod == 2 &&
                               defaultPreset == 'general') {
                             successMsg +=
@@ -2909,9 +2909,9 @@ class _StrukturPageState extends State<StrukturPage> {
 
                     const SizedBox(height: 14),
 
-                    // Saldo Rekening (Fleksibel jika K12 aktif, Terkunci jika General)
+                    // Saldo Rekening (Fleksibel jika Admin aktif, Terkunci jika General)
                     if (_data.isSaldoRekeningUnlocked) ...[
-                      // MODE K12: Fleksibel & Dapat Diedit
+                      // MODE ADMIN: Fleksibel & Dapat Diedit
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
@@ -2951,7 +2951,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                           size: 12, color: Color(0xFF059669)),
                                       SizedBox(width: 4),
                                       Text(
-                                        'Fleksibel (K12)',
+                                        'Fleksibel',
                                         style: TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.bold,
@@ -3009,15 +3009,6 @@ class _StrukturPageState extends State<StrukturPage> {
                                 }
                                 setModalState(() {});
                               },
-                            ),
-                            const SizedBox(height: 6),
-                            const Text(
-                              'Mode aturan K12 aktif: Saldo rekening dapat diedit secara manual dan fleksibel.',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF047857),
-                                height: 1.3,
-                              ),
                             ),
                           ],
                         ),
@@ -3111,7 +3102,7 @@ class _StrukturPageState extends State<StrukturPage> {
                       keyboardType: TextInputType.number,
                       onChanged: (v) => setModalState(() {}),
                       decoration: InputDecoration(
-                        hintText: 'Nomor Rekening (contoh: 1234567890)',
+                        hintText: 'Nomor Rekening',
                         filled: true,
                         fillColor: const Color(0xFFF8FAFC),
                         contentPadding: const EdgeInsets.symmetric(
@@ -3168,8 +3159,7 @@ class _StrukturPageState extends State<StrukturPage> {
                       textCapitalization: TextCapitalization.words,
                       onChanged: (v) => setModalState(() {}),
                       decoration: InputDecoration(
-                        hintText:
-                            'Nama Pemilik / Atas Nama (contoh: Dwinda Setyani)',
+                        hintText: 'Nama pemilik rekening',
                         filled: true,
                         fillColor: const Color(0xFFF8FAFC),
                         contentPadding: const EdgeInsets.symmetric(
@@ -3259,13 +3249,17 @@ class _StrukturPageState extends State<StrukturPage> {
     );
   }
 
-  // --- MODAL EDIT AKUN ON HAND DEBIT (INFO REKENING) ---
+  // --- MODAL EDIT AKUN ON HAND DEBIT & CASH ---
   void _showEditOnHandModal() {
     String selectedBank = _data.onHandDebit.bankName;
     final noRekCtrl =
         TextEditingController(text: _data.onHandDebit.accountNumber);
     final holderCtrl =
         TextEditingController(text: _data.onHandDebit.accountHolder);
+    final saldoDebitCtrl = TextEditingController(
+        text: RupiahFormatter.format(_data.onHandDebit.balance));
+    final saldoCashCtrl = TextEditingController(
+        text: RupiahFormatter.format(_data.onHandCash.balance));
 
     showModalBottomSheet(
       context: context,
@@ -3306,7 +3300,7 @@ class _StrukturPageState extends State<StrukturPage> {
                         Icon(Icons.wallet_rounded, color: primaryTeal),
                         SizedBox(width: 8),
                         Text(
-                          'Pengaturan Akun On Hand Debit',
+                          'Pengaturan Dana On Hand',
                           style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.bold,
@@ -3315,12 +3309,201 @@ class _StrukturPageState extends State<StrukturPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Ubah data rekening On Hand Debit. Untuk perputaran saldo, gunakan tombol Alokasi Dana.',
-                      style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
-                    ),
                     const SizedBox(height: 16),
+
+                    // Saldo On Hand Debit & Cash (Fleksibel jika Preset Admin / isSaldoRekeningUnlocked)
+                    if (_data.isSaldoRekeningUnlocked) ...[
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: const Color(0xFF10B981)
+                                .withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Saldo On Hand Debit Saat Ini',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF065F46),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981)
+                                        .withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.lock_open_rounded,
+                                          size: 12, color: Color(0xFF059669)),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Fleksibel',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF059669),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: saldoDebitCtrl,
+                              keyboardType: TextInputType.number,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF065F46),
+                              ),
+                              decoration: InputDecoration(
+                                prefixText: 'Rp ',
+                                prefixStyle: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF059669),
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xFFA7F3D0)),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xFF059669), width: 1.5),
+                                ),
+                              ),
+                              onChanged: (v) {
+                                final raw =
+                                    v.replaceAll(RegExp(r'[^0-9]'), '');
+                                final numVal = int.tryParse(raw) ?? 0;
+                                final formatted =
+                                    RupiahFormatter.format(numVal);
+                                if (formatted != v && raw.isNotEmpty) {
+                                  saldoDebitCtrl.value = TextEditingValue(
+                                    text: formatted,
+                                    selection: TextSelection.collapsed(
+                                        offset: formatted.length),
+                                  );
+                                }
+                                setModalState(() {});
+                              },
+                            ),
+                            const SizedBox(height: 14),
+                            Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Saldo On Hand Cash Saat Ini',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF065F46),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981)
+                                        .withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.lock_open_rounded,
+                                          size: 12, color: Color(0xFF059669)),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Fleksibel',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF059669),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: saldoCashCtrl,
+                              keyboardType: TextInputType.number,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF065F46),
+                              ),
+                              decoration: InputDecoration(
+                                prefixText: 'Rp ',
+                                prefixStyle: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF059669),
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xFFA7F3D0)),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xFF059669), width: 1.5),
+                                ),
+                              ),
+                              onChanged: (v) {
+                                final raw =
+                                    v.replaceAll(RegExp(r'[^0-9]'), '');
+                                final numVal = int.tryParse(raw) ?? 0;
+                                final formatted =
+                                    RupiahFormatter.format(numVal);
+                                if (formatted != v && raw.isNotEmpty) {
+                                  saldoCashCtrl.value = TextEditingValue(
+                                    text: formatted,
+                                    selection: TextSelection.collapsed(
+                                        offset: formatted.length),
+                                  );
+                                }
+                                setModalState(() {});
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
 
                     // 1. Pilih Bank / Jenis Rekening
                     const Text('Jenis Rekening / Bank On Hand Debit:',
@@ -3432,6 +3615,19 @@ class _StrukturPageState extends State<StrukturPage> {
                                 noRekCtrl.text.trim();
                             _data.onHandDebit.accountHolder =
                                 holderCtrl.text.trim();
+                            if (_data.isSaldoRekeningUnlocked) {
+                              final cleanDebit = saldoDebitCtrl.text
+                                  .replaceAll(RegExp(r'[^0-9]'), '');
+                              final newDebit = int.tryParse(cleanDebit) ??
+                                  _data.onHandDebit.balance;
+                              _data.onHandDebit.balance = newDebit;
+
+                              final cleanCash = saldoCashCtrl.text
+                                  .replaceAll(RegExp(r'[^0-9]'), '');
+                              final newCash = int.tryParse(cleanCash) ??
+                                  _data.onHandCash.balance;
+                              _data.onHandCash.balance = newCash;
+                            }
                           });
                           _saveData();
                           Navigator.pop(ctx);
@@ -3439,7 +3635,7 @@ class _StrukturPageState extends State<StrukturPage> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
-                                  'Data Akun On Hand Debit berhasil diperbarui!'),
+                                  'Data On Hand berhasil diperbarui!'),
                               backgroundColor: primaryTeal,
                               behavior: SnackBarBehavior.floating,
                             ),
@@ -7511,64 +7707,68 @@ class _StrukturPageState extends State<StrukturPage> {
             children: [
               // 1. On Hand Debit
               Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: primaryPurple.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              _data.onHandDebit.bankName,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: primaryPurple,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: _showEditOnHandModal,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: primaryPurple.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                _data.onHandDebit.bankName,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: primaryPurple,
+                                ),
                               ),
                             ),
-                          ),
-                          const Icon(Icons.credit_card_rounded,
-                              size: 16, color: Color(0xFF64748B)),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      const Text('On Hand Debit',
-                          style: TextStyle(
-                              fontSize: 11, color: Color(0xFF64748B))),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Rp ${RupiahFormatter.format(_data.onHandDebit.balance)}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
+                            const Icon(Icons.credit_card_rounded,
+                                size: 16, color: Color(0xFF64748B)),
+                          ],
                         ),
-                      ),
-                      if (_data.onHandDebit.accountNumber.isNotEmpty ||
-                          _data.onHandDebit.accountHolder.isNotEmpty) ...[
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
+                        const Text('On Hand Debit',
+                            style: TextStyle(
+                                fontSize: 11, color: Color(0xFF64748B))),
+                        const SizedBox(height: 2),
                         Text(
-                          '${_data.onHandDebit.accountNumber.isNotEmpty ? _data.onHandDebit.accountNumber : ""}${_data.onHandDebit.accountNumber.isNotEmpty && _data.onHandDebit.accountHolder.isNotEmpty ? " • " : ""}${_data.onHandDebit.accountHolder}',
+                          'Rp ${RupiahFormatter.format(_data.onHandDebit.balance)}',
                           style: const TextStyle(
-                              fontSize: 10, color: Color(0xFF94A3B8)),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
                         ),
+                        if (_data.onHandDebit.accountNumber.isNotEmpty ||
+                            _data.onHandDebit.accountHolder.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            '${_data.onHandDebit.accountNumber.isNotEmpty ? _data.onHandDebit.accountNumber : ""}${_data.onHandDebit.accountNumber.isNotEmpty && _data.onHandDebit.accountHolder.isNotEmpty ? " • " : ""}${_data.onHandDebit.accountHolder}',
+                            style: const TextStyle(
+                                fontSize: 10, color: Color(0xFF94A3B8)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -7577,54 +7777,58 @@ class _StrukturPageState extends State<StrukturPage> {
 
               // 2. On Hand Cash
               Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF059669)
-                                  .withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'TUNAI / FISIK',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF059669),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: _showEditOnHandModal,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF059669)
+                                    .withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'TUNAI / FISIK',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF059669),
+                                ),
                               ),
                             ),
-                          ),
-                          const Icon(Icons.payments_rounded,
-                              size: 16, color: Color(0xFF64748B)),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      const Text('On Hand Cash',
-                          style: TextStyle(
-                              fontSize: 11, color: Color(0xFF64748B))),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Rp ${RupiahFormatter.format(_data.onHandCash.balance)}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
+                            const Icon(Icons.payments_rounded,
+                                size: 16, color: Color(0xFF64748B)),
+                          ],
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 6),
+                        const Text('On Hand Cash',
+                            style: TextStyle(
+                                fontSize: 11, color: Color(0xFF64748B))),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Rp ${RupiahFormatter.format(_data.onHandCash.balance)}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
