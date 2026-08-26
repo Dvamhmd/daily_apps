@@ -34,9 +34,11 @@ class GoogleSheetsConfigModal extends StatefulWidget {
     int initialTab = 0,
     required Function(SheetsConfig) onConfigSaved,
     VoidCallback? onSyncCompleted,
+    bool useRootNavigator = true,
   }) {
     return showModalBottomSheet(
       context: context,
+      useRootNavigator: useRootNavigator,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => GoogleSheetsConfigModal(
@@ -58,6 +60,7 @@ class GoogleSheetsConfigModal extends StatefulWidget {
 class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
   late SheetsConfig _config;
   int _activeTab = 0; // 0: Koneksi, 1: Pemetaan Cell, 2: Script & Panduan
+  final Set<int> _loadedTabs = {};
 
   late TextEditingController _urlCtrl;
   late TextEditingController _sheetNameCtrl;
@@ -190,6 +193,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
   void initState() {
     super.initState();
     _activeTab = widget.initialTab.clamp(0, 2);
+    _loadedTabs.add(_activeTab);
     _config = SheetsConfig.fromJson(widget.initialConfig.toJson());
 
     _urlCtrl = TextEditingController(text: _config.webAppUrl);
@@ -947,9 +951,15 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
               child: IndexedStack(
                 index: _activeTab,
                 children: [
-                  _buildConnectionTab(),
-                  _buildColumnMappingTab(),
-                  _buildScriptGuideTab(),
+                  _loadedTabs.contains(0)
+                      ? _buildConnectionTab()
+                      : const SizedBox.shrink(),
+                  _loadedTabs.contains(1)
+                      ? _buildColumnMappingTab()
+                      : const SizedBox.shrink(),
+                  _loadedTabs.contains(2)
+                      ? _buildScriptGuideTab()
+                      : const SizedBox.shrink(),
                 ],
               ),
             ),
@@ -1060,6 +1070,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
           _saveCurrentState();
           setState(() {
             _activeTab = index;
+            _loadedTabs.add(index);
           });
         },
         child: AnimatedContainer(

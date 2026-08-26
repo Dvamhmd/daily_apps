@@ -443,12 +443,12 @@ class _StrukturPageState extends State<StrukturPage> {
     });
   }
 
-  Future<void> _showGoogleSheetsConfigModal({int initialTab = 0}) async {
-    final freshCfg = await SheetsConfig.load();
-    if (!mounted) return;
-    setState(() {
-      _sheetsConfig = freshCfg;
-    });
+  void _showGoogleSheetsConfigModal({
+    int initialTab = 0,
+    BuildContext? targetContext,
+  }) {
+    if (targetContext != null && !targetContext.mounted) return;
+    final effectiveContext = targetContext ?? context;
 
     final allMutasi = _data.transactions
         .where((tx) => tx.isPemasukan || tx.isPengeluaran)
@@ -456,7 +456,8 @@ class _StrukturPageState extends State<StrukturPage> {
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
     GoogleSheetsConfigModal.show(
-      context: context,
+      context: effectiveContext,
+      useRootNavigator: true,
       config: _sheetsConfig,
       transactions: allMutasi,
       customRules: _data.customKodeRules,
@@ -472,16 +473,14 @@ class _StrukturPageState extends State<StrukturPage> {
     );
   }
 
-  Future<void> _showUploadEvidenceModal() async {
-    final freshCfg = await SheetsConfig.load();
-    if (!mounted) return;
-    setState(() {
-      _sheetsConfig = freshCfg;
-    });
+  Future<void> _showUploadEvidenceModal({BuildContext? targetContext}) async {
+    if (targetContext != null && !targetContext.mounted) return;
+    final effectiveContext = targetContext ?? context;
 
     if (!_sheetsConfig.hasConfiguredCells) {
       final shouldConfigure = await showDialog<bool>(
-        context: context,
+        context: effectiveContext,
+        useRootNavigator: true,
         builder: (ctx) => AlertDialog(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -523,15 +522,25 @@ class _StrukturPageState extends State<StrukturPage> {
       );
 
       if (shouldConfigure == true && mounted) {
-        _showGoogleSheetsConfigModal(initialTab: 1);
+        if (effectiveContext.mounted) {
+          _showGoogleSheetsConfigModal(
+            initialTab: 1,
+            targetContext: effectiveContext,
+          );
+        }
       }
       return;
     }
 
+    if (!mounted) return;
+    if (!effectiveContext.mounted) return;
+
     UploadEvidenceModal.show(
-      context,
+      effectiveContext,
+      useRootNavigator: true,
       sheetsConfig: _sheetsConfig,
-      monthLabel: '${_namaBulan[_selectedMonth.month - 1]} ${_selectedMonth.year}',
+      monthLabel:
+          '${_namaBulan[_selectedMonth.month - 1]} ${_selectedMonth.year}',
       onConfigChanged: (newCfg) {
         setState(() {
           _sheetsConfig = newCfg;
@@ -6928,14 +6937,14 @@ class _StrukturPageState extends State<StrukturPage> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.table_chart_rounded, color: Colors.white),
+            tooltip: 'Pengaturan Google Sheets',
+            onPressed: () => _showGoogleSheetsConfigModal(),
+          ),
+          IconButton(
             icon: const Icon(Icons.style_rounded, color: Colors.white),
             tooltip: 'Kustom KU & Kategori',
             onPressed: () => _showKelolaKustomKodeModal(),
-          ),
-          IconButton(
-            icon: const Icon(Icons.receipt_long_rounded, color: Colors.white),
-            tooltip: 'Riwayat Mutasi & Distribusi',
-            onPressed: () => _showRiwayatMutasiModal(),
           ),
         ],
       ),
@@ -9014,14 +9023,18 @@ class _StrukturPageState extends State<StrukturPage> {
                                         ),
                                         const SizedBox(width: 8),
                                         InkWell(
-                                          onTap: () => _showUploadEvidenceModal(),
-                                          borderRadius: BorderRadius.circular(10),
+                                          onTap: () => _showUploadEvidenceModal(
+                                              targetContext: context),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
                                           child: Container(
                                             height: 38,
-                                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 10),
                                             decoration: BoxDecoration(
                                               color: const Color(0xFF107C41),
-                                              borderRadius: BorderRadius.circular(10),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
                                               border: Border.all(
                                                 color: const Color(0xFF0D6334),
                                               ),
@@ -9050,9 +9063,11 @@ class _StrukturPageState extends State<StrukturPage> {
                                         const SizedBox(width: 6),
                                         InkWell(
                                           onTap: () {
-                                            _showGoogleSheetsConfigModal();
+                                            _showGoogleSheetsConfigModal(
+                                                targetContext: context);
                                           },
-                                          borderRadius: BorderRadius.circular(10),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
                                           child: Container(
                                             height: 38,
                                             padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -10883,6 +10898,7 @@ class _StrukturPageState extends State<StrukturPage> {
     );
   }
 
+  // ignore: unused_element
   void _showRiwayatMutasiModal() {
     String selectedTab = 'semua'; // 'semua', 'pemasukan', 'pengeluaran'
 

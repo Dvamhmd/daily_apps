@@ -629,9 +629,11 @@ class SheetsSyncService {
     }
   }
 
+  static String? _cachedScriptCode;
+
   /// Mengembalikan script Google Apps Script siap salin (Copy-Paste)
   static String getGoogleAppsScriptCode() {
-    return '''/**
+    return _cachedScriptCode ??= '''/**
  * =========================================================================
  * GOOGLE APPS SCRIPT - INTEGRASI TABEL LAP KEU & BUKTI GAMBAR KEUANGAN
  * Aplikasi: Daily Apps

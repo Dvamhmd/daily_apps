@@ -27,9 +27,11 @@ class UploadEvidenceModal extends StatefulWidget {
     required String monthLabel,
     Function(SheetsConfig)? onConfigChanged,
     VoidCallback? onUploaded,
+    bool useRootNavigator = true,
   }) {
     return showModalBottomSheet(
       context: context,
+      useRootNavigator: useRootNavigator,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => UploadEvidenceModal(
