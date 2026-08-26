@@ -953,6 +953,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
         return StatefulBuilder(
           builder: (context, setLocalState) {
             return AlertDialog(
+              scrollable: true,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -1195,7 +1196,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
       ),
       appBar: AppBar(
         backgroundColor: const Color(0xFF5E35B1),
-        centerTitle: true,
+        centerTitle: false,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         systemOverlayStyle: const SystemUiOverlayStyle(
@@ -1384,19 +1385,22 @@ class _KeuanganPageState extends State<KeuanganPage> {
                                 size: 18,
                                 color: Color(0xFF5E35B1),
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '${namaBulan[selectedMonth.month - 1]} ${selectedMonth.year}',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF5E35B1),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  '${namaBulan[selectedMonth.month - 1]} ${selectedMonth.year}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF5E35B1),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: 2),
                               const Icon(
                                 Icons.keyboard_arrow_down_rounded,
-                                size: 20,
+                                size: 18,
                                 color: Color(0xFF5E35B1),
                               ),
                             ],
@@ -1484,31 +1488,38 @@ class _KeuanganPageState extends State<KeuanganPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(7),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                shape: BoxShape.circle,
+                        Flexible(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.shield_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
                               ),
-                              child: const Icon(
-                                Icons.shield_rounded,
-                                color: Colors.white,
-                                size: 18,
+                              const SizedBox(width: 8),
+                              const Flexible(
+                                child: Text(
+                                  'Dana Aman',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white70,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            const Text(
-                              'Dana Aman',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         InkWell(
                           onTap: showOpsiDeadlineDanaAman,
                           borderRadius: BorderRadius.circular(10),
@@ -1664,32 +1675,39 @@ class _KeuanganPageState extends State<KeuanganPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(7),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF5E35B1)
-                                    .withValues(alpha: 0.1),
-                                shape: BoxShape.circle,
+                        Flexible(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF5E35B1)
+                                      .withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.flag_rounded,
+                                  color: Color(0xFF5E35B1),
+                                  size: 18,
+                                ),
                               ),
-                              child: const Icon(
-                                Icons.flag_rounded,
-                                color: Color(0xFF5E35B1),
-                                size: 18,
+                              const SizedBox(width: 8),
+                              const Flexible(
+                                child: Text(
+                                  'Target Tabunganku',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF1E293B),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            const Text(
-                              'Target Tabunganku',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1E293B),
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         InkWell(
                           onTap: showEditTarget,
                           borderRadius: BorderRadius.circular(10),
@@ -1887,12 +1905,15 @@ class _KeuanganPageState extends State<KeuanganPage> {
                                 color: Color(0xFF64748B),
                               ),
                               const SizedBox(width: 5),
-                              Text(
-                                'Kekurangan',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  color: Colors.grey[600],
-                                  fontWeight: FontWeight.w500,
+                              Flexible(
+                                child: Text(
+                                  'Kekurangan',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
@@ -1941,12 +1962,15 @@ class _KeuanganPageState extends State<KeuanganPage> {
                                 color: Color(0xFF16A34A),
                               ),
                               const SizedBox(width: 5),
-                              Text(
-                                'Nabung / Hari',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  color: Colors.grey[600],
-                                  fontWeight: FontWeight.w500,
+                              Flexible(
+                                child: Text(
+                                  'Nabung / Hari',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],

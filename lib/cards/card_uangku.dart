@@ -197,6 +197,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
+            scrollable: true,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -395,6 +396,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
+            scrollable: true,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -595,6 +597,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
       builder: (_) => StatefulBuilder(
         builder: (dialogContext, setDialogState) {
           return AlertDialog(
+            scrollable: true,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -804,37 +807,44 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
               'Hapus Uangku',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: uangkuList.asMap().entries.map((e) {
-                final i = e.key;
-                final item = e.value;
-                return CheckboxListTile(
-                  value: selected.contains(i),
-                  onChanged: (val) {
-                    setLocal(() {
-                      val! ? selected.add(i) : selected.remove(i);
-                    });
-                  },
-                  title: Text(
-                    item.nama,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
-                  ),
-                  controlAffinity: ListTileControlAffinity.trailing,
-                  activeColor: Colors.green,
-                  dense: true,
-                  visualDensity: const VisualDensity(
-                    vertical: -4,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 0,
-                    vertical: 0,
-                  ),
-                );
-              }).toList(),
+            content: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.5,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: uangkuList.asMap().entries.map((e) {
+                    final i = e.key;
+                    final item = e.value;
+                    return CheckboxListTile(
+                      value: selected.contains(i),
+                      onChanged: (val) {
+                        setLocal(() {
+                          val! ? selected.add(i) : selected.remove(i);
+                        });
+                      },
+                      title: Text(
+                        item.nama,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                      ),
+                      controlAffinity: ListTileControlAffinity.trailing,
+                      activeColor: Colors.green,
+                      dense: true,
+                      visualDensity: const VisualDensity(
+                        vertical: -4,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 0,
+                        vertical: 0,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
             ),
             actions: [
               SizedBox(
@@ -1002,17 +1012,21 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(
-                RupiahFormatter.format(
-                  onlyCair ? totalSudahCair : int.parse(widget.amount),
-                ),
-                style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
-                  letterSpacing: -0.5,
+              Expanded(
+                child: Text(
+                  RupiahFormatter.format(
+                    onlyCair ? totalSudahCair : int.parse(widget.amount),
+                  ),
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                    letterSpacing: -0.5,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               InkWell(
                 onTap: _toggleOnlyCair,
                 borderRadius: BorderRadius.circular(10),

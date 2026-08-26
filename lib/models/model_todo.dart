@@ -48,11 +48,13 @@ class TodoDateGroup {
   String id;
   DateTime date;
   List<TodoItem> items;
+  bool isArchived;
 
   TodoDateGroup({
     required this.id,
     required this.date,
     List<TodoItem>? items,
+    this.isArchived = false,
   }) : items = items ?? [];
 
   int get totalCount => items.length;
@@ -126,6 +128,7 @@ class TodoDateGroup {
         'id': id,
         'date': date.toIso8601String(),
         'items': items.map((item) => item.toJson()).toList(),
+        'isArchived': isArchived,
       };
 
   factory TodoDateGroup.fromJson(Map<String, dynamic> json) {
@@ -144,6 +147,7 @@ class TodoDateGroup {
       id: json['id'] as String? ?? DateTime.now().microsecondsSinceEpoch.toString(),
       date: rawDate,
       items: parsedItems,
+      isArchived: json['isArchived'] as bool? ?? false,
     );
   }
 }

@@ -556,6 +556,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     final colName = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Text(
           'Tambah Kolom Baru',

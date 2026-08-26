@@ -285,7 +285,7 @@ void main() {
       expect(restored.days.first.rows.first.location, 'Hall A');
     });
 
-    test('TodoDateGroup and TodoItem serialization', () {
+    test('TodoDateGroup and TodoItem serialization with isArchived', () {
       final todoItem = TodoItem(
         id: 't_1',
         title: 'Beli ATK Kantor',
@@ -295,6 +295,7 @@ void main() {
         id: 'g_1',
         date: DateTime(2026, 8, 26),
         items: [todoItem],
+        isArchived: true,
       );
 
       final json = group.toJson();
@@ -303,6 +304,7 @@ void main() {
       expect(restored.items.first.title, 'Beli ATK Kantor');
       expect(restored.items.first.isCompleted, isTrue);
       expect(restored.isAllCompleted, isTrue);
+      expect(restored.isArchived, isTrue);
     });
 
     testWidgets('RundownPage renders header banner', (tester) async {
@@ -338,7 +340,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Riwayat To-Do Selesai'), findsOneWidget);
-      expect(find.text('Belum Ada Riwayat Selesai'), findsOneWidget);
+      expect(find.text('Belum Ada Section yang Diarsipkan'), findsOneWidget);
     });
   });
 
@@ -349,6 +351,92 @@ void main() {
 
       final k12Result = CustomRuleImportHelper.getK12ImportResult();
       expect(k12Result.rules.length, 25);
+    });
+  });
+
+  group('8. Multi-Screen Scalability & Zero-Defect Logic Tests', () {
+    testWidgets('KeuanganPage renders flawlessly on Compact Screen (320x480)',
+        (tester) async {
+      tester.view.physicalSize = const Size(320, 480);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(fontFamily: 'Poppins'),
+          home: Scaffold(
+            body: KeuanganPage(onPageSelected: (_) {}),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(InfoCardUangku), findsOneWidget);
+      expect(find.byType(InfoCardTagihan), findsOneWidget);
+      expect(find.byType(InfoCardTabungan), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('RundownPage renders flawlessly on Tablet/Large Screen (800x1280)',
+        (tester) async {
+      tester.view.physicalSize = const Size(800, 1280);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(fontFamily: 'Poppins'),
+          home: Scaffold(
+            body: RundownPage(onPageSelected: (_) {}),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Rundown Acara'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('TodoPage renders flawlessly on Compact Screen (320x480)',
+        (tester) async {
+      tester.view.physicalSize = const Size(320, 480);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(fontFamily: 'Poppins'),
+          home: Scaffold(
+            body: TodoPage(onPageSelected: (_) {}),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('To-Do List'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    });
+
+    test('Zero Division & Negative Boundary protections in Financial calculations', () {
+      // Test Tabungan calculations with 0 target
+      final zeroTargetTabungan = Tabungan('Tabungan Bebas', 500000, targetNominal: 0);
+      expect(zeroTargetTabungan.progress, 0.0);
+      expect(zeroTargetTabungan.percentage, 0);
+      expect(zeroTargetTabungan.sisaTarget, 0);
+
+      // Test Tabungan progress clamping with surplus
+      final surplusTabungan = Tabungan('Tabungan Lebih', 3000000, targetNominal: 1000000);
+      expect(surplusTabungan.progress, 1.0);
+      expect(surplusTabungan.percentage, 300);
+      expect(surplusTabungan.sisaTarget, 0);
+
+      // Test TodoDateGroup progress with 0 items
+      final emptyGroup = TodoDateGroup(id: 'g0', date: DateTime.now());
+      expect(emptyGroup.progress, 0.0);
+      expect(emptyGroup.isAllCompleted, isFalse);
     });
   });
 }

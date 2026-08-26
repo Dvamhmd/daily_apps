@@ -19,6 +19,7 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
   static const String _prefsKey = 'daily_apps_todo_groups_v1';
 
   List<TodoDateGroup> _allGroups = [];
+  final Set<String> _collapsedGroupIds = {};
   bool _isLoading = true;
   String _searchQuery = '';
 
@@ -61,19 +62,17 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
     }
   }
 
-  // Section yang sudah 100% selesai (ada tugas dan semua tugas selesai)
-  List<TodoDateGroup> get _completedGroups {
-    final completed = _allGroups.where((group) {
-      return group.items.isNotEmpty && group.isAllCompleted;
-    }).toList();
+  // Section yang telah diarsipkan
+  List<TodoDateGroup> get _archivedGroups {
+    final archived = _allGroups.where((group) => group.isArchived).toList();
 
     // Urutkan dari tanggal terbaru
-    completed.sort((a, b) => b.date.compareTo(a.date));
+    archived.sort((a, b) => b.date.compareTo(a.date));
 
-    if (_searchQuery.isEmpty) return completed;
+    if (_searchQuery.isEmpty) return archived;
 
     final query = _searchQuery.toLowerCase();
-    return completed.where((group) {
+    return archived.where((group) {
       final matchesDate = group.formattedFullDate.toLowerCase().contains(query);
       final matchesTask = group.items.any(
         (item) => item.title.toLowerCase().contains(query),
@@ -83,7 +82,29 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
   }
 
   int get _totalCompletedTasks {
-    return _completedGroups.fold(0, (sum, g) => sum + g.completedCount);
+    return _archivedGroups.fold(0, (sum, g) => sum + g.completedCount);
+  }
+
+  bool _isGroupCollapsed(String id) => _collapsedGroupIds.contains(id);
+
+  void _toggleGroupCollapse(String id) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (_collapsedGroupIds.contains(id)) {
+        _collapsedGroupIds.remove(id);
+      } else {
+        _collapsedGroupIds.add(id);
+      }
+    });
+  }
+
+  /// Mengembalikan section dari arsip ke daftar aktif
+  void _unarchiveGroup(TodoDateGroup group) {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      group.isArchived = false;
+    });
+    _saveData();
   }
 
   /// Aktifkan kembali / batalkan checklist tugas
@@ -91,35 +112,14 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
     HapticFeedback.selectionClick();
     setState(() {
       item.isCompleted = false;
+      // Jika tugas diaktifkan kembali, otomatis unarchive section agar muncul di todo list aktif
+      group.isArchived = false;
       group.items = [
         ...group.items.where((i) => !i.isCompleted),
         ...group.items.where((i) => i.isCompleted),
       ];
     });
     _saveData();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Tugas "${item.title}" dipindahkan ke daftar aktif'),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        action: SnackBarAction(
-          label: 'Undo',
-          textColor: Colors.white,
-          onPressed: () {
-            setState(() {
-              item.isCompleted = true;
-              group.items = [
-                ...group.items.where((i) => !i.isCompleted),
-                ...group.items.where((i) => i.isCompleted),
-              ];
-            });
-            _saveData();
-          },
-        ),
-      ),
-    );
   }
 
   /// Hapus Riwayat Section
@@ -190,9 +190,9 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
     }
   }
 
-  /// Bersihkan Semua Riwayat Selesai
+  /// Bersihkan Semua Riwayat Arsip Selesai
   Future<void> _clearAllCompleted() async {
-    if (_completedGroups.isEmpty) return;
+    if (_archivedGroups.isEmpty) return;
 
     final bool? confirm = await showDialog<bool>(
       context: context,
@@ -216,7 +216,7 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
             ],
           ),
           content: const Text(
-            'Apakah kamu yakin ingin menghapus seluruh riwayat section to-do yang sudah selesai?',
+            'Apakah kamu yakin ingin menghapus seluruh riwayat section to-do yang sudah diarsipkan?',
             style: TextStyle(fontSize: 13.5, color: Color(0xFF475569)),
           ),
           actions: [
@@ -242,7 +242,7 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
 
     if (confirm == true) {
       setState(() {
-        _allGroups.removeWhere((g) => g.items.isNotEmpty && g.isAllCompleted);
+        _allGroups.removeWhere((g) => g.isArchived);
       });
       _saveData();
     }
@@ -250,7 +250,7 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
 
   @override
   Widget build(BuildContext context) {
-    final completedList = _completedGroups;
+    final archivedList = _archivedGroups;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFBF8F6),
@@ -280,7 +280,7 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
           ],
         ),
         actions: [
-          if (completedList.isNotEmpty)
+          if (archivedList.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep_rounded, color: Colors.white),
               tooltip: 'Hapus Semua Riwayat',
@@ -338,7 +338,7 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: const Text(
-                                  'ARCHIVE & COMPLETION',
+                                  'ARCHIVED SECTIONS',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 11,
@@ -348,7 +348,7 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                                 ),
                               ),
                               const Icon(
-                                Icons.check_circle_rounded,
+                                Icons.archive_rounded,
                                 color: Colors.white,
                                 size: 22,
                               ),
@@ -356,7 +356,7 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                           ),
                           const SizedBox(height: 14),
                           const Text(
-                            'Pekerjaan yang Telah Tuntas',
+                            'Section yang Telah Diarsipkan',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 18.5,
@@ -365,7 +365,7 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Semua section to-do yang telah berhasil kamu selesaikan 100%.',
+                            'Daftar section to-do yang telah diselesaikan dan kamu arsipkan.',
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.88),
                               fontSize: 12.5,
@@ -375,7 +375,7 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                           Row(
                             children: [
                               _buildStatBadge(
-                                '${completedList.length} Section',
+                                '${archivedList.length} Section',
                                 Icons.calendar_today_rounded,
                               ),
                               const SizedBox(width: 10),
@@ -438,10 +438,10 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                     const SizedBox(height: 20),
 
                     // Daftar Section Selesai
-                    if (completedList.isEmpty)
+                    if (archivedList.isEmpty)
                       _buildEmptyRiwayat()
                     else
-                      ...completedList.map(
+                      ...archivedList.map(
                         (group) => _buildCompletedGroupCard(group),
                       ),
 
@@ -479,6 +479,8 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
   }
 
   Widget _buildCompletedGroupCard(TodoDateGroup group) {
+    final isCollapsed = _isGroupCollapsed(group.id);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -501,133 +503,210 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Section Selesai
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              color: accentCompleted.withValues(alpha: 0.08),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: accentCompleted,
-                      borderRadius: BorderRadius.circular(10),
+            // Header Section Diarsipkan (Tappable untuk Expand / Collapse)
+            InkWell(
+              onTap: () => _toggleGroupCollapse(group.id),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                color: accentCompleted.withValues(alpha: 0.08),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: accentCompleted,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.done_all_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.done_all_rounded,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          group.formattedFullDate,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1E293B),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            group.formattedFullDate,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E293B),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${group.completedCount} tugas telah tuntas',
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            color: accentCompleted,
-                            fontWeight: FontWeight.bold,
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Text(
+                                '${group.completedCount}/${group.totalCount} tugas selesai (Diarsipkan)',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: accentCompleted,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              if (isCollapsed) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 1,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: accentCompleted.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'Tertutup',
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      color: accentCompleted,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
+                        ],
+                      ),
+                    ),
+
+                    // Tombol Kembalikan / Batalkan Arsip (Unarchive)
+                    IconButton(
+                      icon: const Icon(
+                        Icons.unarchive_rounded,
+                        color: primaryTerracotta,
+                        size: 20,
+                      ),
+                      tooltip: 'Kembalikan ke Daftar Aktif',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => _unarchiveGroup(group),
+                    ),
+
+                    // Chevron Expand / Collapse
+                    IconButton(
+                      icon: AnimatedRotation(
+                        turns: isCollapsed ? 0.0 : 0.5,
+                        duration: const Duration(milliseconds: 280),
+                        curve: Curves.easeInOutCubic,
+                        child: const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: accentCompleted,
+                          size: 22,
                         ),
-                      ],
+                      ),
+                      tooltip: isCollapsed ? 'Buka Section' : 'Tutup Section',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => _toggleGroupCollapse(group.id),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.delete_outline_rounded,
-                      color: Colors.redAccent,
-                      size: 20,
+
+                    // Tombol Hapus Section Ini
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        color: Colors.redAccent,
+                        size: 20,
+                      ),
+                      tooltip: 'Hapus Riwayat Ini',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => _deleteCompletedSection(group),
                     ),
-                    tooltip: 'Hapus Riwayat Ini',
-                    onPressed: () => _deleteCompletedSection(group),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
 
-            // Daftar Tugas
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              itemCount: group.items.length,
-              separatorBuilder: (ctx, idx) => Divider(
-                height: 1,
-                thickness: 0.6,
-                color: Colors.grey.withValues(alpha: 0.12),
-                indent: 44,
-              ),
-              itemBuilder: (ctx, idx) {
-                final item = group.items[idx];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 3.5,
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 20,
-                        height: 20,
-                        decoration: const BoxDecoration(
-                          color: accentCompleted,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.check_rounded,
-                          color: Colors.white,
-                          size: 13,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          item.title,
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            color: Color(0xFF64748B),
-                            decoration: TextDecoration.lineThrough,
-                            decorationColor: Color(0xFF94A3B8),
+            // Daftar Tugas dengan animasi slide yang mulus
+            AnimatedSize(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeInOutCubic,
+              clipBehavior: Clip.antiAlias,
+              alignment: Alignment.topCenter,
+              child: isCollapsed
+                  ? const SizedBox.shrink()
+                  : Column(
+                      children: [
+                        for (int idx = 0; idx < group.items.length; idx++) ...[
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 20,
+                                  height: 20,
+                                  decoration: BoxDecoration(
+                                    color: group.items[idx].isCompleted
+                                        ? accentCompleted
+                                        : Colors.grey[400],
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    group.items[idx].isCompleted
+                                        ? Icons.check_rounded
+                                        : Icons.radio_button_unchecked,
+                                    color: Colors.white,
+                                    size: 13,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    group.items[idx].title,
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      color: group.items[idx].isCompleted
+                                          ? const Color(0xFF64748B)
+                                          : const Color(0xFF1E293B),
+                                      decoration: group.items[idx].isCompleted
+                                          ? TextDecoration.lineThrough
+                                          : TextDecoration.none,
+                                      decorationColor: const Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                                ),
+                                TextButton.icon(
+                                  onPressed: () => _uncompleteTask(
+                                      group, group.items[idx]),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  icon: const Icon(
+                                    Icons.undo_rounded,
+                                    size: 13,
+                                    color: primaryTerracotta,
+                                  ),
+                                  label: const Text(
+                                    'Aktifkan',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: primaryTerracotta,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: () => _uncompleteTask(group, item),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        icon: const Icon(
-                          Icons.undo_rounded,
-                          size: 13,
-                          color: primaryTerracotta,
-                        ),
-                        label: const Text(
-                          'Aktifkan',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: primaryTerracotta,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
+                          if (idx < group.items.length - 1)
+                            Divider(
+                              height: 1,
+                              thickness: 0.6,
+                              color: Colors.grey.withValues(alpha: 0.12),
+                              indent: 44,
+                            ),
+                        ],
+                      ],
+                    ),
             ),
           ],
         ),
@@ -663,14 +742,14 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
               shape: BoxShape.circle,
             ),
             child: const Icon(
-              Icons.history_rounded,
+              Icons.archive_rounded,
               size: 36,
               color: accentCompleted,
             ),
           ),
           const SizedBox(height: 18),
           const Text(
-            'Belum Ada Riwayat Selesai',
+            'Belum Ada Section yang Diarsipkan',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -679,7 +758,7 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Section tanggal yang seluruh tugasnya sudah dichecklist akan tercatat di sini secara otomatis.',
+            'Section tanggal yang telah selesai dan kamu pilih untuk "Arsipkan" pada halaman To-Do List akan muncul di sini.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,

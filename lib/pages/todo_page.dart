@@ -27,6 +27,7 @@ class _TodoPageState extends State<TodoPage> {
   static const String _prefsKey = 'daily_apps_todo_groups_v1';
 
   List<TodoDateGroup> _dateGroups = [];
+  final Set<String> _collapsedGroupIds = {};
   bool _isLoading = true;
   String _searchQuery = '';
   String _selectedFilter = 'all'; // 'all', 'pending', 'completed'
@@ -100,17 +101,45 @@ class _TodoPageState extends State<TodoPage> {
     _saveTodoData();
   }
 
+  List<TodoDateGroup> get _activeDateGroups =>
+      _dateGroups.where((g) => !g.isArchived).toList();
+
   int get _totalTasks {
-    return _dateGroups.fold(0, (sum, g) => sum + g.totalCount);
+    return _activeDateGroups.fold(0, (sum, g) => sum + g.totalCount);
   }
 
   int get _completedTasks {
-    return _dateGroups.fold(0, (sum, g) => sum + g.completedCount);
+    return _activeDateGroups.fold(0, (sum, g) => sum + g.completedCount);
   }
 
   double get _overallProgress {
     if (_totalTasks == 0) return 0.0;
     return _completedTasks / _totalTasks;
+  }
+
+  bool _isGroupCollapsed(String id) => _collapsedGroupIds.contains(id);
+
+  void _toggleGroupCollapse(String id) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (_collapsedGroupIds.contains(id)) {
+        _collapsedGroupIds.remove(id);
+      } else {
+        _collapsedGroupIds.add(id);
+      }
+    });
+  }
+
+  void _archiveGroup(TodoDateGroup group) {
+    if (!group.isAllCompleted || group.items.isEmpty) {
+      HapticFeedback.vibrate();
+      return;
+    }
+    HapticFeedback.mediumImpact();
+    setState(() {
+      group.isArchived = true;
+    });
+    _saveTodoData();
   }
 
   // --- ACTIONS ---
@@ -392,8 +421,11 @@ class _TodoPageState extends State<TodoPage> {
                                 );
 
                                 if (existingIndex != -1) {
+                                  final existingGroup = _dateGroups[existingIndex];
+                                  existingGroup.isArchived = false;
+                                  _collapsedGroupIds.remove(existingGroup.id);
                                   if (taskTitle.isNotEmpty) {
-                                    _dateGroups[existingIndex].items.add(
+                                    existingGroup.items.add(
                                       TodoItem(
                                         id: DateTime.now()
                                             .microsecondsSinceEpoch
@@ -402,12 +434,10 @@ class _TodoPageState extends State<TodoPage> {
                                         isCompleted: false,
                                       ),
                                     );
-                                    _dateGroups[existingIndex].items = [
-                                      ..._dateGroups[existingIndex]
-                                          .items
+                                    existingGroup.items = [
+                                      ...existingGroup.items
                                           .where((i) => !i.isCompleted),
-                                      ..._dateGroups[existingIndex]
-                                          .items
+                                      ...existingGroup.items
                                           .where((i) => i.isCompleted),
                                     ];
                                   }
@@ -417,6 +447,7 @@ class _TodoPageState extends State<TodoPage> {
                                         .microsecondsSinceEpoch
                                         .toString(),
                                     date: cleanDate,
+                                    isArchived: false,
                                     items: taskTitle.isNotEmpty
                                         ? [
                                             TodoItem(
@@ -429,28 +460,18 @@ class _TodoPageState extends State<TodoPage> {
                                           ]
                                         : [],
                                   );
+                                  _collapsedGroupIds.remove(newGroup.id);
                                   // Masukkan di urutan pertama
                                   _dateGroups.insert(0, newGroup);
                                 }
+
+                                _searchQuery = '';
+                                _selectedFilter = 'all';
                               });
 
                               _saveTodoData();
                               Navigator.pop(context);
                               HapticFeedback.mediumImpact();
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text(
-                                    'To-Do List baru berhasil dibuat!',
-                                  ),
-                                  backgroundColor: primaryTerracotta,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  duration: const Duration(seconds: 2),
-                                ),
-                              );
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: primaryTerracotta,
@@ -700,6 +721,7 @@ class _TodoPageState extends State<TodoPage> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
+          scrollable: true,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
@@ -868,7 +890,7 @@ class _TodoPageState extends State<TodoPage> {
   }
 
   List<TodoDateGroup> get _filteredGroups {
-    return _dateGroups.where((group) {
+    return _activeDateGroups.where((group) {
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
         final matchesDate =
@@ -880,9 +902,11 @@ class _TodoPageState extends State<TodoPage> {
       }
 
       if (_selectedFilter == 'pending') {
-        return group.items.any((item) => !item.isCompleted);
+        return group.items.isEmpty ||
+            group.items.any((item) => !item.isCompleted);
       } else if (_selectedFilter == 'completed') {
-        return group.items.any((item) => item.isCompleted);
+        return group.items.isNotEmpty &&
+            group.items.every((item) => item.isCompleted);
       }
 
       return true;
@@ -897,7 +921,7 @@ class _TodoPageState extends State<TodoPage> {
       backgroundColor: const Color(0xFFFBF8F6),
       appBar: AppBar(
         backgroundColor: primaryTerracotta,
-        centerTitle: true,
+        centerTitle: false,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         systemOverlayStyle: const SystemUiOverlayStyle(
@@ -908,14 +932,17 @@ class _TodoPageState extends State<TodoPage> {
         title: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.checklist_rounded, color: Colors.white, size: 22),
-            SizedBox(width: 8),
-            Text(
-              'To-Do List',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
+            Icon(Icons.checklist_rounded, color: Colors.white, size: 20),
+            SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                'To-Do List',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 17,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -972,40 +999,48 @@ class _TodoPageState extends State<TodoPage> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Row(
-                                  children: [
-                                    const Text(
-                                      'Daftar Rencana & Tugas',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF1E293B),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: primaryTerracotta
-                                            .withValues(alpha: 0.12),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Text(
-                                        '${_dateGroups.length} Hari',
-                                        style: const TextStyle(
-                                          color: primaryTerracotta,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
+                                Flexible(
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Flexible(
+                                        child: Text(
+                                          'Daftar Rencana & Tugas',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF1E293B),
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: primaryTerracotta
+                                              .withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Text(
+                                          '${_activeDateGroups.length} Hari',
+                                          style: const TextStyle(
+                                            color: primaryTerracotta,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                if (filtered.length > 1)
+                                if (filtered.length > 1) ...[
+                                  const SizedBox(width: 8),
                                   const Row(
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(
                                         Icons.drag_indicator_rounded,
@@ -1023,6 +1058,7 @@ class _TodoPageState extends State<TodoPage> {
                                       ),
                                     ],
                                   ),
+                                ],
                               ],
                             ),
 
@@ -1178,8 +1214,11 @@ class _TodoPageState extends State<TodoPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -1244,7 +1283,7 @@ class _TodoPageState extends State<TodoPage> {
           Text(
             'Kelola pekerjaan terstruktur per tanggal untuk produktivitas yang rapi dan terpantau.',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.85),
+              color: Colors.white,
               fontSize: 12.5,
             ),
           ),
@@ -1400,8 +1439,9 @@ class _TodoPageState extends State<TodoPage> {
     );
   }
 
-  // --- SECTION TANGGAL (DATE GROUP CARD DENGAN DRAG HANDLE) ---
+  // --- SECTION TANGGAL (DATE GROUP CARD DENGAN DRAG HANDLE, EXPAND/COLLAPSE & ARSIP) ---
   Widget _buildDateGroupSection(TodoDateGroup group, int index) {
+    final isCollapsed = _isGroupCollapsed(group.id);
     final itemsToShow = group.items.where((item) {
       if (_selectedFilter == 'pending') return !item.isCompleted;
       if (_selectedFilter == 'completed') return item.isCompleted;
@@ -1415,313 +1455,524 @@ class _TodoPageState extends State<TodoPage> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: group.isToday
-              ? primaryTerracotta.withValues(alpha: 0.4)
-              : Colors.black.withValues(alpha: 0.06),
-          width: group.isToday ? 1.6 : 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+          border: Border.all(
+            color: group.isToday
+                ? primaryTerracotta.withValues(alpha: 0.4)
+                : Colors.black.withValues(alpha: 0.06),
+            width: group.isToday ? 1.6 : 1.0,
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header Tanggal Section
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-              decoration: BoxDecoration(
-                color: group.isToday
-                    ? primaryTerracotta.withValues(alpha: 0.07)
-                    : const Color(0xFFF8FAFC),
-                border: Border(
-                  bottom: BorderSide(
-                    color: Colors.grey.withValues(alpha: 0.12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Tanggal Section (Tappable untuk Expand / Collapse)
+              Container(
+                decoration: BoxDecoration(
+                  color: group.isToday
+                      ? primaryTerracotta.withValues(alpha: 0.07)
+                      : const Color(0xFFF8FAFC),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: isCollapsed
+                          ? Colors.transparent
+                          : Colors.grey.withValues(alpha: 0.12),
+                    ),
                   ),
                 ),
-              ),
-              child: Row(
-                children: [
-                  // Dedicated Drag Handle Icon
-                  ReorderableDragStartListener(
-                    index: index,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      color: Colors.transparent,
-                      child: const Icon(
-                        Icons.drag_indicator_rounded,
-                        color: Color(0xFF94A3B8),
-                        size: 20,
+                child: Row(
+                  children: [
+                    const SizedBox(width: 8),
+                    // Dedicated Drag Handle Icon
+                    ReorderableDragStartListener(
+                      index: index,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        color: Colors.transparent,
+                        child: const Icon(
+                          Icons.drag_indicator_rounded,
+                          color: Color(0xFF94A3B8),
+                          size: 20,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
+                    const SizedBox(width: 4),
 
-                  // Icon Kalender / Date Indicator
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: group.isToday
-                          ? primaryTerracotta
-                          : const Color(0xFFE2E8F0),
-                      borderRadius: BorderRadius.circular(9),
-                    ),
-                    child: Icon(
-                      Icons.event_note_rounded,
-                      color: group.isToday
-                          ? Colors.white
-                          : const Color(0xFF475569),
-                      size: 15,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-
-                  // Tanggal & Hari Label
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              group.formattedFullDate,
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.bold,
-                                color: group.isToday
-                                    ? primaryTerracotta
-                                    : const Color(0xFF1E293B),
-                              ),
-                            ),
-                            if (group.isToday ||
-                                group.isTomorrow ||
-                                group.isYesterday) ...[
-                              const SizedBox(width: 6),
+                    // Area Header yang bisa di-tap untuk buka/tutup (Expand/Collapse)
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => _toggleGroupCollapse(group.id),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 10,
+                            horizontal: 4,
+                          ),
+                          child: Row(
+                            children: [
+                              // Icon Kalender / Date Indicator
                               Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
+                                padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(
                                   color: group.isToday
-                                      ? primaryTerracotta.withValues(alpha: 0.15)
-                                      : Colors.grey.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
+                                      ? primaryTerracotta
+                                      : const Color(0xFFE2E8F0),
+                                  borderRadius: BorderRadius.circular(9),
                                 ),
-                                child: Text(
-                                  group.relativeDateLabel,
-                                  style: TextStyle(
-                                    color: group.isToday
-                                        ? primaryTerracotta
-                                        : const Color(0xFF475569),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                child: Icon(
+                                  Icons.event_note_rounded,
+                                  color: group.isToday
+                                      ? Colors.white
+                                      : const Color(0xFF475569),
+                                  size: 15,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+
+                              // Tanggal & Hari Label
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            group.formattedFullDate,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: group.isToday
+                                                  ? primaryTerracotta
+                                                  : const Color(0xFF1E293B),
+                                            ),
+                                          ),
+                                        ),
+                                        if (group.isToday ||
+                                            group.isTomorrow ||
+                                            group.isYesterday) ...[
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: group.isToday
+                                                  ? primaryTerracotta
+                                                      .withValues(alpha: 0.15)
+                                                  : Colors.grey
+                                                      .withValues(alpha: 0.15),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              group.relativeDateLabel,
+                                              style: TextStyle(
+                                                color: group.isToday
+                                                    ? primaryTerracotta
+                                                    : const Color(0xFF475569),
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          '${group.completedCount}/${group.totalCount} Tugas selesai',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: group.isAllCompleted
+                                                ? accentCompleted
+                                                : const Color(0xFF64748B),
+                                            fontWeight: group.isAllCompleted
+                                                ? FontWeight.bold
+                                                : FontWeight.normal,
+                                          ),
+                                        ),
+                                        if (isCollapsed) ...[
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 1,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[200],
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            child: const Text(
+                                              'Tertutup',
+                                              style: TextStyle(
+                                                fontSize: 9.5,
+                                                color: Color(0xFF64748B),
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
-                          ],
+                          ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${group.completedCount}/${group.totalCount} Tugas selesai',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: group.isAllCompleted
-                                ? accentCompleted
-                                : const Color(0xFF64748B),
-                            fontWeight: group.isAllCompleted
-                                ? FontWeight.bold
-                                : FontWeight.normal,
+                      ),
+                    ),
+
+                    // Chevron Expand / Collapse Button
+                    IconButton(
+                      icon: AnimatedRotation(
+                        turns: isCollapsed ? 0.0 : 0.5,
+                        duration: const Duration(milliseconds: 280),
+                        curve: Curves.easeInOutCubic,
+                        child: Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: group.isToday
+                              ? primaryTerracotta
+                              : const Color(0xFF64748B),
+                          size: 22,
+                        ),
+                      ),
+                      tooltip: isCollapsed ? 'Buka Section' : 'Tutup Section',
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(),
+                      onPressed: () => _toggleGroupCollapse(group.id),
+                    ),
+
+                    // Menu Titik Tiga
+                    PopupMenuButton<String>(
+                      icon: const Icon(
+                        Icons.more_vert_rounded,
+                        color: Color(0xFF64748B),
+                        size: 20,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      onSelected: (val) {
+                        if (val == 'add') {
+                          _showAddTaskDialog(group);
+                        } else if (val == 'archive') {
+                          _archiveGroup(group);
+                        } else if (val == 'toggle_collapse') {
+                          _toggleGroupCollapse(group.id);
+                        } else if (val == 'complete_all') {
+                          setState(() {
+                            for (final i in group.items) {
+                              i.isCompleted = true;
+                            }
+                          });
+                          _saveTodoData();
+                        } else if (val == 'clear_completed') {
+                          setState(() {
+                            group.items.removeWhere((i) => i.isCompleted);
+                          });
+                          _saveTodoData();
+                        } else if (val == 'delete_section') {
+                          _confirmDeleteGroup(group);
+                        }
+                      },
+                      itemBuilder: (ctx) => [
+                        const PopupMenuItem(
+                          value: 'add',
+                          child: Row(
+                            children: [
+                              Icon(Icons.add_rounded,
+                                  size: 18, color: primaryTerracotta),
+                              SizedBox(width: 8),
+                              Text('Tambah Tugas',
+                                  style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'archive',
+                          enabled:
+                              group.isAllCompleted && group.items.isNotEmpty,
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.archive_rounded,
+                                size: 18,
+                                color: (group.isAllCompleted &&
+                                        group.items.isNotEmpty)
+                                    ? accentCompleted
+                                    : const Color(0xFF94A3B8),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                (group.isAllCompleted && group.items.isNotEmpty)
+                                    ? 'Arsipkan Section'
+                                    : 'Arsipkan (Belum Selesai)',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: (group.isAllCompleted &&
+                                          group.items.isNotEmpty)
+                                      ? null
+                                      : const Color(0xFF94A3B8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'toggle_collapse',
+                          child: Row(
+                            children: [
+                              Icon(
+                                isCollapsed
+                                    ? Icons.unfold_more_rounded
+                                    : Icons.unfold_less_rounded,
+                                size: 18,
+                                color: const Color(0xFF64748B),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                isCollapsed ? 'Buka Section' : 'Tutup Section',
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuDivider(),
+                        const PopupMenuItem(
+                          value: 'complete_all',
+                          child: Row(
+                            children: [
+                              Icon(Icons.done_all_rounded,
+                                  size: 18, color: accentCompleted),
+                              SizedBox(width: 8),
+                              Text('Tandai Semua Selesai',
+                                  style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'clear_completed',
+                          child: Row(
+                            children: [
+                              Icon(Icons.cleaning_services_rounded,
+                                  size: 18, color: Colors.orange),
+                              SizedBox(width: 8),
+                              Text('Hapus Tugas Selesai',
+                                  style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuDivider(),
+                        const PopupMenuItem(
+                          value: 'delete_section',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline_rounded,
+                                  size: 18, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Hapus Section Ini',
+                                  style: TextStyle(
+                                      fontSize: 13, color: Colors.red)),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                  ),
-
-                  // Menu Titik Tiga
-                  PopupMenuButton<String>(
-                    icon: const Icon(
-                      Icons.more_vert_rounded,
-                      color: Color(0xFF64748B),
-                      size: 20,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    onSelected: (val) {
-                      if (val == 'add') {
-                        _showAddTaskDialog(group);
-                      } else if (val == 'complete_all') {
-                        setState(() {
-                          for (final i in group.items) {
-                            i.isCompleted = true;
-                          }
-                        });
-                        _saveTodoData();
-                      } else if (val == 'clear_completed') {
-                        setState(() {
-                          group.items.removeWhere((i) => i.isCompleted);
-                        });
-                        _saveTodoData();
-                      } else if (val == 'delete_section') {
-                        _confirmDeleteGroup(group);
-                      }
-                    },
-                    itemBuilder: (ctx) => [
-                      const PopupMenuItem(
-                        value: 'add',
-                        child: Row(
-                          children: [
-                            Icon(Icons.add_rounded,
-                                size: 18, color: primaryTerracotta),
-                            SizedBox(width: 8),
-                            Text('Tambah Tugas', style: TextStyle(fontSize: 13)),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'complete_all',
-                        child: Row(
-                          children: [
-                            Icon(Icons.done_all_rounded,
-                                size: 18, color: accentCompleted),
-                            SizedBox(width: 8),
-                            Text('Tandai Semua Selesai',
-                                style: TextStyle(fontSize: 13)),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'clear_completed',
-                        child: Row(
-                          children: [
-                            Icon(Icons.cleaning_services_rounded,
-                                size: 18, color: Colors.orange),
-                            SizedBox(width: 8),
-                            Text('Hapus Tugas Selesai',
-                                style: TextStyle(fontSize: 13)),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuDivider(),
-                      const PopupMenuItem(
-                        value: 'delete_section',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete_outline_rounded,
-                                size: 18, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Hapus Section Ini',
-                                style: TextStyle(
-                                    fontSize: 13, color: Colors.red)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            if (group.totalCount > 0)
-              ClipRRect(
-                child: LinearProgressIndicator(
-                  value: group.progress,
-                  minHeight: 2.5,
-                  backgroundColor: Colors.transparent,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    group.isAllCompleted ? accentCompleted : primaryTerracotta,
-                  ),
+                    const SizedBox(width: 4),
+                  ],
                 ),
               ),
 
-            if (itemsToShow.isEmpty)
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                child: Center(
-                  child: Text(
-                    group.items.isEmpty
-                        ? 'Belum ada tugas pada tanggal ini'
-                        : 'Tidak ada tugas yang sesuai filter',
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 12.5,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ),
-              )
-            else
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                itemCount: itemsToShow.length,
-                separatorBuilder: (ctx, idx) => Divider(
-                  height: 1,
-                  thickness: 0.6,
-                  color: Colors.grey.withValues(alpha: 0.12),
-                  indent: 44,
-                ),
-                itemBuilder: (ctx, idx) {
-                  final item = itemsToShow[idx];
-                  return _buildTaskItemTile(group, item);
-                },
-              ),
+              // KONTEN SECTION DENGAN ANIMASI SLIDE YANG MULUS & STABIL
+              AnimatedSize(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeInOutCubic,
+                clipBehavior: Clip.antiAlias,
+                alignment: Alignment.topCenter,
+                child: isCollapsed
+                    ? const SizedBox.shrink()
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (group.totalCount > 0)
+                            ClipRRect(
+                              child: LinearProgressIndicator(
+                                value: group.progress,
+                                minHeight: 2.5,
+                                backgroundColor: Colors.transparent,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  group.isAllCompleted
+                                      ? accentCompleted
+                                      : primaryTerracotta,
+                                ),
+                              ),
+                            ),
 
-            // Tombol + Tambah Kerjaan pada section ini
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
-              child: InkWell(
-                onTap: () => _showAddTaskDialog(group),
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 7),
-                  decoration: BoxDecoration(
-                    color: primaryTerracotta.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: primaryTerracotta.withValues(alpha: 0.2),
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.add_circle_rounded,
-                        size: 16,
-                        color: primaryTerracotta,
+                          // Tombol Arsipkan Section Jika Sudah 100% Selesai
+                          if (group.isAllCompleted && group.items.isNotEmpty)
+                            Container(
+                              margin: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: accentCompleted.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color:
+                                      accentCompleted.withValues(alpha: 0.25),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.check_circle_rounded,
+                                    color: accentCompleted,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Expanded(
+                                    child: Text(
+                                      'Semua tugas selesai! Siap diarsipkan.',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: accentCompleted,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  ElevatedButton.icon(
+                                    onPressed: () => _archiveGroup(group),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: accentCompleted,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 6,
+                                      ),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.archive_rounded,
+                                        size: 14),
+                                    label: const Text(
+                                      'Arsipkan',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                          if (itemsToShow.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 20, horizontal: 16),
+                              child: Center(
+                                child: Text(
+                                  group.items.isEmpty
+                                      ? 'Belum ada tugas pada tanggal ini'
+                                      : 'Tidak ada tugas yang sesuai filter',
+                                  style: TextStyle(
+                                    color: Colors.grey[500],
+                                    fontSize: 12.5,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            Column(
+                              children: [
+                                for (int idx = 0;
+                                    idx < itemsToShow.length;
+                                    idx++) ...[
+                                  _buildTaskItemTile(group, itemsToShow[idx]),
+                                  if (idx < itemsToShow.length - 1)
+                                    Divider(
+                                      height: 1,
+                                      thickness: 0.6,
+                                      color:
+                                          Colors.grey.withValues(alpha: 0.12),
+                                      indent: 44,
+                                    ),
+                                ],
+                              ],
+                            ),
+
+                          // Tombol + Tambah Kerjaan pada section ini
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
+                            child: InkWell(
+                              onTap: () => _showAddTaskDialog(group),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 7),
+                                decoration: BoxDecoration(
+                                  color:
+                                      primaryTerracotta.withValues(alpha: 0.06),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: primaryTerracotta
+                                        .withValues(alpha: 0.2),
+                                  ),
+                                ),
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.add_circle_rounded,
+                                      size: 16,
+                                      color: primaryTerracotta,
+                                    ),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Tambah Kerjaan',
+                                      style: TextStyle(
+                                        color: primaryTerracotta,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      SizedBox(width: 6),
-                      Text(
-                        'Tambah Kerjaan',
-                        style: TextStyle(
-                          color: primaryTerracotta,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   // --- TASK ITEM TILE DENGAN CHECKBOX & NAMA TUGAS ---
   Widget _buildTaskItemTile(TodoDateGroup group, TodoItem item) {
