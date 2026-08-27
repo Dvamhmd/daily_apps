@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:daily_apps/utils/backup_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 class BackupRestoreModal extends StatefulWidget {
@@ -30,7 +29,8 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
   late TabController _tabController;
   BackupSummary? _liveSummary;
   bool _isLoadingSummary = true;
-  bool _isExporting = false;
+  bool _isSavingToStorage = false;
+  bool _isSharing = false;
   bool _isImporting = false;
 
   // Selected file for import
@@ -70,13 +70,14 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
     }
   }
 
-  Future<void> _handleExport() async {
+  Future<void> _handleSaveToLocalStorage() async {
     setState(() {
-      _isExporting = true;
+      _isSavingToStorage = true;
     });
 
     try {
-      await BackupService.exportAndShareBackup();
+      final file = await BackupService.saveBackupToLocalStorage();
+      final fileName = file.path.split(Platform.isWindows ? '\\' : '/').last;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -84,14 +85,15 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
             behavior: SnackBarBehavior.floating,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            content: const Row(
+            content: Row(
               children: [
-                Icon(Icons.check_circle_rounded, color: Colors.white),
-                SizedBox(width: 10),
+                const Icon(Icons.check_circle_rounded, color: Colors.white),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Cadangan data berhasil dibuat!',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    'File cadangan tersimpan di Download:\n$fileName',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                 ),
               ],
@@ -107,52 +109,43 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
             behavior: SnackBarBehavior.floating,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            content: Text('Gagal mengekspor data: $e'),
+            content: Text('Gagal menyimpan file: $e'),
           ),
         );
       }
     } finally {
       if (mounted) {
         setState(() {
-          _isExporting = false;
+          _isSavingToStorage = false;
         });
       }
     }
   }
 
-  Future<void> _handleCopyJson() async {
-    try {
-      final backup = await BackupService.generateBackupData();
-      final jsonStr = const JsonEncoder.withIndent('  ').convert(backup.toJson());
-      await Clipboard.setData(ClipboardData(text: jsonStr));
+  Future<void> _handleShareFile() async {
+    setState(() {
+      _isSharing = true;
+    });
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFF5E35B1),
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            content: const Row(
-              children: [
-                Icon(Icons.copy_rounded, color: Colors.white),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text('Data JSON cadangan disalin ke clipboard!'),
-                ),
-              ],
-            ),
-          ),
-        );
-      }
+    try {
+      await BackupService.exportAndShareBackup();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: const Color(0xFFD32F2F),
-            content: Text('Gagal menyalin data: $e'),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            content: Text('Gagal membagikan file: $e'),
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSharing = false;
+        });
       }
     }
   }
@@ -446,6 +439,8 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
   }
 
   Widget _buildExportTab() {
+    final isBusy = _isSavingToStorage || _isSharing;
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
       children: [
@@ -459,41 +454,9 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
           isLoading: _isLoadingSummary,
         ),
 
-        const SizedBox(height: 16),
-
-        // Information banner
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE8EAF6),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: const Color(0xFF5E35B1).withValues(alpha: 0.2),
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.info_outline_rounded,
-                  color: Color(0xFF5E35B1), size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'File cadangan tersimpan dalam format standar JSON (.json) yang aman dan mencakup Keuangan, Struktur Keuangan, Rundown, serta Todo List.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[800],
-                    height: 1.4,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-
         const SizedBox(height: 20),
 
-        // Export button
+        // Tombol 1: Ekspor File ke Penyimpanan Lokal
         ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF5E35B1),
@@ -505,8 +468,8 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
             elevation: 3,
             shadowColor: const Color(0xFF5E35B1).withValues(alpha: 0.4),
           ),
-          onPressed: _isExporting ? null : _handleExport,
-          child: _isExporting
+          onPressed: isBusy ? null : _handleSaveToLocalStorage,
+          child: _isSavingToStorage
               ? const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -519,16 +482,19 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
                       ),
                     ),
                     SizedBox(width: 12),
-                    Text('Menyiapkan file cadangan...'),
+                    Text(
+                      'Menyimpan file...',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ],
                 )
               : const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.share_rounded, size: 20),
+                    Icon(Icons.download_rounded, size: 22),
                     SizedBox(width: 8),
                     Text(
-                      'Ekspor & Bagikan File Cadangan',
+                      'Ekspor File ke Penyimpanan Lokal',
                       style: TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.bold,
@@ -538,24 +504,57 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
                 ),
         ),
 
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
 
-        // Copy JSON Button
-        OutlinedButton.icon(
+        // Tombol 2: Bagikan File
+        OutlinedButton(
           style: OutlinedButton.styleFrom(
             foregroundColor: const Color(0xFF5E35B1),
-            side: const BorderSide(color: Color(0xFF5E35B1)),
-            padding: const EdgeInsets.symmetric(vertical: 13),
+            side: const BorderSide(color: Color(0xFF5E35B1), width: 1.5),
+            padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
             ),
           ),
-          onPressed: _handleCopyJson,
-          icon: const Icon(Icons.copy_rounded, size: 18),
-          label: const Text(
-            'Salin Teks JSON Cadangan ke Clipboard',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-          ),
+          onPressed: isBusy ? null : _handleShareFile,
+          child: _isSharing
+              ? const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Color(0xFF5E35B1)),
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      'Menyiapkan berkas...',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF5E35B1),
+                      ),
+                    ),
+                  ],
+                )
+              : const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.share_rounded, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Bagikan File',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
         ),
       ],
     );

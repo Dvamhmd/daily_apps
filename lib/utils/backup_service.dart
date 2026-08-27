@@ -269,7 +269,50 @@ class BackupService {
     );
   }
 
-  /// Mengekspor file backup JSON dan memicu sheet Share
+  /// Menyimpan file backup JSON ke penyimpanan lokal (folder Download bawaan Android)
+  static Future<File> saveBackupToLocalStorage() async {
+    final backupData = await generateBackupData();
+    const encoder = JsonEncoder.withIndent('  ');
+    final jsonString = encoder.convert(backupData.toJson());
+
+    final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+    final fileName = 'DailyApps_Backup_$timestamp.json';
+
+    Directory? targetDir;
+
+    if (Platform.isAndroid) {
+      final androidDownload = Directory('/storage/emulated/0/Download');
+      if (await androidDownload.exists()) {
+        targetDir = androidDownload;
+      } else {
+        try {
+          targetDir = await getDownloadsDirectory();
+        } catch (_) {}
+        if (targetDir == null || !(await targetDir.exists())) {
+          try {
+            targetDir = await getExternalStorageDirectory();
+          } catch (_) {}
+        }
+      }
+    } else {
+      try {
+        targetDir = await getDownloadsDirectory();
+      } catch (_) {}
+      if (targetDir == null) {
+        try {
+          targetDir = await getApplicationDocumentsDirectory();
+        } catch (_) {}
+      }
+    }
+
+    targetDir ??= await getTemporaryDirectory();
+
+    final file = File('${targetDir.path}/$fileName');
+    await file.writeAsString(jsonString, flush: true);
+    return file;
+  }
+
+  /// Mengekspor file backup JSON sementara dan memicu sheet Share
   static Future<File> createBackupFile() async {
     final backupData = await generateBackupData();
     const encoder = JsonEncoder.withIndent('  ');
