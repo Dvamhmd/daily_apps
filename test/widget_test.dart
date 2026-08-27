@@ -645,7 +645,7 @@ void main() {
     });
 
     testWidgets(
-        'Tambah Uangku belum cair TIDAK menambah DP, tapi Uangku sudah cair menambah DP',
+        'Tambah Uangku default toggle DP OFF tidak menambah DP, jika di-ON-kan menambah DP',
         (WidgetTester tester) async {
       final now = DateTime.now();
 
@@ -659,7 +659,7 @@ void main() {
       await tester.tap(find.text('Uangku'));
       await tester.pumpAndSettle();
 
-      // 1. Tambah Uangku yang sudah cair (tanpa tanggal)
+      // 1. Tambah Uangku dengan toggle DP OFF (default)
       final tambahUangkuBtn = find.descendant(
         of: find.byType(InfoCardUangku),
         matching: find.widgetWithText(ElevatedButton, 'Tambah'),
@@ -672,16 +672,37 @@ void main() {
       await tester.enterText(namaField, 'Gaji Pokok');
       await tester.enterText(nominalField, '1000000');
 
-      // Submit dialog (tanpa tanggal cair -> otomatis cair)
+      // Submit dialog (toggle DP default OFF)
       await tester.tap(find.widgetWithText(ElevatedButton, 'Tambah Uangku'));
       await tester.pumpAndSettle();
 
-      // DP harus dibuat 10% (100.000)
       final currentMonthKey = '${now.year}_${now.month.toString().padLeft(2, '0')}';
-      final tagihanData = prefs.getStringList('tagihan_$currentMonthKey') ?? prefs.getStringList('tagihan') ?? [];
+      var tagihanData = prefs.getStringList('tagihan_$currentMonthKey') ?? prefs.getStringList('tagihan') ?? [];
+      // DP tidak boleh bertambah jika toggle OFF
+      expect(tagihanData.isEmpty, true);
+
+      // 2. Tambah Uangku dengan toggle DP diaktifkan (ON)
+      await tester.tap(tambahUangkuBtn);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(namaField, 'Bonus');
+      await tester.enterText(nominalField, '500000');
+
+      // Switch toggle DP to ON
+      final switchFinder = find.byType(Switch);
+      expect(switchFinder, findsOneWidget);
+      await tester.tap(switchFinder);
+      await tester.pumpAndSettle();
+
+      // Submit dialog
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Tambah Uangku'));
+      await tester.pumpAndSettle();
+
+      // DP harus dibuat 10% dari 500.000 (50.000)
+      tagihanData = prefs.getStringList('tagihan_$currentMonthKey') ?? prefs.getStringList('tagihan') ?? [];
       expect(tagihanData.isNotEmpty, true);
       expect(tagihanData.first, contains('"DP"'));
-      expect(tagihanData.first, contains('100000'));
+      expect(tagihanData.first, contains('50000'));
     });
   });
 }

@@ -191,6 +191,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
     final namaCtrl = TextEditingController();
     final jumlahCtrl = TextEditingController();
     DateTime? selectedTanggalCair;
+    bool isDpEnabled = false;
 
     showDialog(
       context: context,
@@ -201,7 +202,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            title: Text(
+            title: const Text(
               'Tambah Uangku',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
@@ -210,13 +211,13 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
               children: [
                 TextField(
                   controller: namaCtrl,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
                   decoration: InputDecoration(
                     hintText: 'nama',
-                    hintStyle: TextStyle(
+                    hintStyle: const TextStyle(
                         fontWeight: FontWeight.w500,
                         color: Colors.blueGrey),
                     filled: true,
@@ -235,13 +236,13 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     FilteringTextInputFormatter.digitsOnly,
                     RupiahInputFormatter(),
                   ],
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
                   decoration: InputDecoration(
                     hintText: 'jumlah',
-                    hintStyle: TextStyle(
+                    hintStyle: const TextStyle(
                         fontWeight: FontWeight.w500,
                         color: Colors.blueGrey),
                     filled: true,
@@ -321,6 +322,46 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF9C3),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: const Color(0xFFFDE047),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'DP',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: isDpEnabled
+                              ? const Color(0xFF92400E)
+                              : const Color(0xFF78350F),
+                        ),
+                      ),
+                      Switch(
+                        value: isDpEnabled,
+                        activeTrackColor: const Color(0xFF81C784),
+                        activeThumbColor: const Color(0xFF2E7D32),
+                        onChanged: (val) {
+                          setDialogState(() {
+                            isDpEnabled = val;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
             actions: [
@@ -353,7 +394,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     });
 
                     await _saveUangku();
-                    if (jumlah > 0 && newUangku.isCair) {
+                    if (isDpEnabled && jumlah > 0 && newUangku.isCair) {
                       await _tambah10PersenKeTagihanDp(jumlah);
                     }
                     await RiwayatService.catatTambahUangku(
@@ -366,7 +407,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                       Navigator.pop(context);
                     }
                   },
-                  child: Text(
+                  child: const Text(
                     'Tambah Uangku',
                     style: TextStyle(
                         fontWeight: FontWeight.bold,
@@ -390,6 +431,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
       text: RupiahFormatter.format(item.jumlah),
     );
     DateTime? selectedTanggalCair = item.tanggalCair;
+    bool isDpEnabled = false;
 
     showDialog(
       context: context,
@@ -400,7 +442,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            title: Text(
+            title: const Text(
               'Edit Uangku',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
@@ -409,7 +451,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
               children: [
                 TextField(
                   controller: namaCtrl,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
@@ -431,7 +473,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     FilteringTextInputFormatter.digitsOnly,
                     RupiahInputFormatter(),
                   ],
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
@@ -514,6 +556,46 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF9C3),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: const Color(0xFFFDE047),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'DP',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: isDpEnabled
+                              ? const Color(0xFF92400E)
+                              : const Color(0xFF78350F),
+                        ),
+                      ),
+                      Switch(
+                        value: isDpEnabled,
+                        activeTrackColor: const Color(0xFF81C784),
+                        activeThumbColor: const Color(0xFF2E7D32),
+                        onChanged: (val) {
+                          setDialogState(() {
+                            isDpEnabled = val;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
             actions: [
@@ -546,7 +628,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     });
 
                     await _saveUangku();
-                    if (itemBaru.isCair) {
+                    if (isDpEnabled && itemBaru.isCair) {
                       if (!itemLama.isCair) {
                         if (jumlahBaru > 0) {
                           await _tambah10PersenKeTagihanDp(jumlahBaru);
@@ -570,7 +652,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                       Navigator.pop(context);
                     }
                   },
-                  child: Text(
+                  child: const Text(
                     'Simpan Perubahan',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
@@ -591,6 +673,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
     final item = uangkuList[index];
     final nominalCtrl = TextEditingController();
     String? errorText;
+    bool isDpEnabled = false;
 
     showDialog(
       context: context,
@@ -603,7 +686,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
             ),
             title: Text(
               'Kelola ${item.nama}',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -625,13 +708,13 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     FilteringTextInputFormatter.digitsOnly,
                     RupiahInputFormatter(),
                   ],
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
                   decoration: InputDecoration(
                     hintText: 'Nominal',
-                    hintStyle: TextStyle(
+                    hintStyle: const TextStyle(
                       fontWeight: FontWeight.w500,
                       color: Colors.blueGrey,
                     ),
@@ -651,6 +734,46 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                       });
                     }
                   },
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF9C3),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: const Color(0xFFFDE047),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'DP',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: isDpEnabled
+                              ? const Color(0xFF92400E)
+                              : const Color(0xFF78350F),
+                        ),
+                      ),
+                      Switch(
+                        value: isDpEnabled,
+                        activeTrackColor: const Color(0xFF81C784),
+                        activeThumbColor: const Color(0xFF2E7D32),
+                        onChanged: (val) {
+                          setDialogState(() {
+                            isDpEnabled = val;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -693,7 +816,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                         });
 
                         await _saveUangku();
-                        if (item.isCair) {
+                        if (isDpEnabled && item.isCair) {
                           await _tambah10PersenKeTagihanDp(nominal);
                         }
                         await RiwayatService.catatEditUangku(
@@ -708,7 +831,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                           Navigator.pop(dialogContext);
                         }
                       },
-                      child: Text(
+                      child: const Text(
                         'Debit',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
