@@ -2,6 +2,7 @@ import 'package:daily_apps/models/model_tagihan.dart';
 import 'package:daily_apps/pages/riwayat_page.dart';
 import 'package:daily_apps/pages/struktur_page.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
+import 'package:daily_apps/widgets/backup_restore_modal.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -277,6 +278,22 @@ class AppDrawer extends StatelessWidget {
                     final navContext = Navigator.of(context).context;
                     Navigator.pop(context);
                     _showArsipTagihanLunas(navContext);
+                  },
+                ),
+
+                _buildMenuItem(
+                  context: context,
+                  icon: Icons.cloud_sync_rounded,
+                  iconColor: const Color(0xFF5E35B1),
+                  title: 'Backup Data',
+                  subtitle: 'Ekspor/Impor Data aplikasi Daily Apps',
+                  onTap: () {
+                    final navContext = Navigator.of(context).context;
+                    Navigator.pop(context);
+                    BackupRestoreModal.show(
+                      navContext,
+                      onDataRestored: onDataChanged,
+                    );
                   },
                 ),
               ],
