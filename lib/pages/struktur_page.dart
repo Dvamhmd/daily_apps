@@ -6974,17 +6974,25 @@ class _StrukturPageState extends State<StrukturPage> {
 
                   const SizedBox(height: 10),
 
-                  // 3. Kartu Rekening Struktur
-                  _buildRekeningStrukturCard(),
+                  // 3. Kartu Rekening Struktur & Dana On Hand (Bersampingan Kanan Kiri)
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: _buildRekeningStrukturCard(),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _buildOnHandCard(),
+                        ),
+                      ],
+                    ),
+                  ),
 
                   const SizedBox(height: 10),
 
-                  // 4. Kartu On Hand (Debit & Cash)
-                  _buildOnHandCard(),
-
-                  const SizedBox(height: 10),
-
-                  // 5. Tabel Keuangan (Nama Bulan)
+                  // 4. Tabel Keuangan (Nama Bulan)
                   _buildTabelKeuangan(),
 
                   const SizedBox(height: 24),
@@ -7428,422 +7436,444 @@ class _StrukturPageState extends State<StrukturPage> {
   Widget _buildRekeningStrukturCard() {
     final hasNoRek = _data.rekeningStruktur.accountNumber.trim().isNotEmpty;
     final hasHolder = _data.rekeningStruktur.accountHolder.trim().isNotEmpty;
+    final bankName = _data.rekeningStruktur.bankName.trim();
+    final noRek = _data.rekeningStruktur.accountNumber.trim();
+    final holder = _data.rekeningStruktur.accountHolder.trim();
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: primaryPurple.withValues(alpha: 0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: _showEditRekeningStrukturModal,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: primaryPurple.withValues(alpha: 0.18)),
+            boxShadow: [
+              BoxShadow(
+                color: primaryPurple.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: primaryPurple.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
+              // Header: Icon, Title, Bank badge, Tune icon
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: primaryPurple.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.account_balance_rounded,
+                                color: primaryPurple,
+                                size: 15,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Flexible(
+                              child: Text(
+                                'Rek. Struktur',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      child: const Icon(Icons.account_balance_rounded,
-                          color: primaryPurple, size: 20),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.tune_rounded,
+                        color: primaryPurple,
+                        size: 15,
+                      ),
+                    ],
+                  ),
+                  if (bankName.isNotEmpty) ...[
+                    const SizedBox(height: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: primaryPurple.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        bankName,
+                        style: const TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                          color: primaryPurple,
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
+                  ],
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              // Saldo Display
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Saldo Rekening',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Rp ${RupiahFormatter.format(_data.rekeningStruktur.balance)}',
+                      style: const TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                        color: primaryPurple,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              // Detail Rekening (Holder & No Rek)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: (hasHolder || hasNoRek)
+                    ? Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Rekening Struktur',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF0F172A),
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  'Bank ${_data.rekeningStruktur.bankName}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF64748B),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (hasHolder) ...[
-                                const Text(
-                                  ' • ',
-                                  style: TextStyle(
-                                      fontSize: 12, color: Color(0xFF94A3B8)),
-                                ),
-                                Flexible(
+                          if (hasHolder)
+                            Row(
+                              children: [
+                                const Icon(Icons.person_outline_rounded,
+                                    size: 11, color: Color(0xFF64748B)),
+                                const SizedBox(width: 4),
+                                Expanded(
                                   child: Text(
-                                    _data.rekeningStruktur.accountHolder,
+                                    holder,
                                     style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFF64748B),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF475569),
                                     ),
+                                    maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],
-                            ],
-                          ),
+                            ),
+                          if (hasHolder && hasNoRek)
+                            const SizedBox(height: 3),
+                          if (hasNoRek)
+                            InkWell(
+                              onTap: () {
+                                final copyText = holder.isNotEmpty
+                                    ? '$bankName - $noRek\nA.N $holder'
+                                    : '$bankName - $noRek';
+                                Clipboard.setData(
+                                    ClipboardData(text: copyText));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Row(
+                                      children: [
+                                        const Icon(Icons.check_circle_rounded,
+                                            color: Colors.white, size: 16),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            holder.isNotEmpty
+                                                ? '$bankName - $noRek (A.N $holder) berhasil disalin!'
+                                                : '$bankName - $noRek berhasil disalin!',
+                                            style:
+                                                const TextStyle(fontSize: 12),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    behavior: SnackBarBehavior.floating,
+                                    backgroundColor: const Color(0xFF059669),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(4),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      noRek,
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: primaryPurple,
+                                        fontFamily: 'monospace',
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.copy_rounded,
+                                      size: 10, color: primaryPurple),
+                                ],
+                              ),
+                            ),
                         ],
+                      )
+                    : const Text(
+                        'Ketuk untuk atur',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontStyle: FontStyle.italic,
+                          color: Color(0xFF94A3B8),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.edit_rounded,
-                    color: primaryPurple, size: 20),
-                tooltip: 'Edit Rekening Struktur',
-                onPressed: _showEditRekeningStrukturModal,
               ),
             ],
           ),
-          if (hasNoRek) ...[
-            const SizedBox(height: 10),
-            InkWell(
-              borderRadius: BorderRadius.circular(10),
-              onTap: () {
-                final bank = _data.rekeningStruktur.bankName.trim();
-                final noRek = _data.rekeningStruktur.accountNumber.trim();
-                final holder = _data.rekeningStruktur.accountHolder.trim();
-                final copyText = holder.isNotEmpty
-                    ? '$bank - $noRek\nA.N $holder'
-                    : '$bank - $noRek';
-                Clipboard.setData(ClipboardData(text: copyText));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Row(
-                      children: [
-                        const Icon(Icons.check_circle_rounded,
-                            color: Colors.white, size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            holder.isNotEmpty
-                                ? '$bank - $noRek (A.N $holder) berhasil disalin!'
-                                : '$bank - $noRek berhasil disalin!',
-                          ),
-                        ),
-                      ],
-                    ),
-                    behavior: SnackBarBehavior.floating,
-                    backgroundColor: const Color(0xFF059669),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              },
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: primaryPurple.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: primaryPurple.withValues(alpha: 0.15),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.credit_card_rounded,
-                        size: 14, color: primaryPurple),
-                    const SizedBox(width: 6),
-                    Text(
-                      'No. Rek: ${_data.rekeningStruktur.accountNumber.trim()}',
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.bold,
-                        color: primaryPurple,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: primaryPurple.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.copy_rounded,
-                              size: 11, color: primaryPurple),
-                          SizedBox(width: 3),
-                          Text(
-                            'Salin',
-                            style: TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.bold,
-                              color: primaryPurple,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 14),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Saldo Rekening Utama',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Rp ${RupiahFormatter.format(_data.rekeningStruktur.balance)}',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: primaryPurple,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildOnHandCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: primaryTeal.withValues(alpha: 0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: primaryTeal.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.wallet_rounded,
-                        color: primaryTeal, size: 20),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Dana On Hand (Dipegang)',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      Text(
-                        'Total On Hand: Rp ${RupiahFormatter.format(_data.totalOnHand)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: primaryTeal,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              IconButton(
-                icon: const Icon(Icons.tune_rounded,
-                    color: primaryTeal, size: 20),
-                tooltip: 'Atur Akun On Hand',
-                onPressed: _showEditOnHandModal,
+    final debitBank = _data.onHandDebit.bankName.trim();
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: _showEditOnHandModal,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: primaryTeal.withValues(alpha: 0.2)),
+            boxShadow: [
+              BoxShadow(
+                color: primaryTeal.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-
-          // Two Sub Cards: Debit & Cash
-          Row(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // 1. On Hand Debit
-              Expanded(
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(14),
-                  onTap: _showEditOnHandModal,
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              // Header: Icon, Title, Tune icon
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Row(
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: primaryPurple.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                _data.onHandDebit.bankName,
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: primaryPurple,
-                                ),
-                              ),
-                            ),
-                            const Icon(Icons.credit_card_rounded,
-                                size: 16, color: Color(0xFF64748B)),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        const Text('On Hand Debit',
-                            style: TextStyle(
-                                fontSize: 11, color: Color(0xFF64748B))),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Rp ${RupiahFormatter.format(_data.onHandDebit.balance)}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: primaryTeal.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.wallet_rounded,
+                            color: primaryTeal,
+                            size: 15,
                           ),
                         ),
-                        if (_data.onHandDebit.accountNumber.isNotEmpty ||
-                            _data.onHandDebit.accountHolder.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            '${_data.onHandDebit.accountNumber.isNotEmpty ? _data.onHandDebit.accountNumber : ""}${_data.onHandDebit.accountNumber.isNotEmpty && _data.onHandDebit.accountHolder.isNotEmpty ? " • " : ""}${_data.onHandDebit.accountHolder}',
-                            style: const TextStyle(
-                                fontSize: 10, color: Color(0xFF94A3B8)),
+                        const SizedBox(width: 6),
+                        const Flexible(
+                          child: Text(
+                            'Dana On Hand',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A),
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                        ],
+                        ),
                       ],
                     ),
                   ),
-                ),
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.tune_rounded,
+                    color: primaryTeal,
+                    size: 15,
+                  ),
+                ],
               ),
 
-              const SizedBox(width: 10),
+              const SizedBox(height: 8),
 
-              // 2. On Hand Cash
-              Expanded(
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(14),
-                  onTap: _showEditOnHandModal,
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+              // Saldo Total On Hand
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Total On Hand',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF64748B),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  ),
+                  const SizedBox(height: 1),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Rp ${RupiahFormatter.format(_data.totalOnHand)}',
+                      style: const TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                        color: primaryTeal,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              // Breakdown Debit & Tunai
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Debit Item
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF059669)
-                                    .withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Text(
-                                'TUNAI / FISIK',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF059669),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              const Icon(Icons.credit_card_rounded,
+                                  size: 11, color: primaryPurple),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  debitBank.isNotEmpty
+                                      ? 'Debit ($debitBank)'
+                                      : 'Debit',
+                                  style: const TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF475569),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                            ),
-                            const Icon(Icons.payments_rounded,
-                                size: 16, color: Color(0xFF64748B)),
-                          ],
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 6),
-                        const Text('On Hand Cash',
-                            style: TextStyle(
-                                fontSize: 11, color: Color(0xFF64748B))),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Rp ${RupiahFormatter.format(_data.onHandCash.balance)}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A),
+                        const SizedBox(width: 4),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            'Rp ${RupiahFormatter.format(_data.onHandDebit.balance)}',
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E293B),
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 4),
+                    // Cash Item
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Expanded(
+                          child: Row(
+                            children: [
+                              Icon(Icons.payments_rounded,
+                                  size: 11, color: Color(0xFF059669)),
+                              SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  'Tunai',
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF475569),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            'Rp ${RupiahFormatter.format(_data.onHandCash.balance)}',
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E293B),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -7961,8 +7991,8 @@ class _StrukturPageState extends State<StrukturPage> {
         .where((tx) => tx.isPemasukan || tx.isPengeluaran)
         .toList()
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
-    final previewList = allMutasi.length > 5
-        ? allMutasi.sublist(allMutasi.length - 5)
+    final previewList = allMutasi.length > 3
+        ? allMutasi.sublist(allMutasi.length - 3)
         : allMutasi;
 
     return Container(
@@ -8087,7 +8117,7 @@ class _StrukturPageState extends State<StrukturPage> {
           ),
           const Divider(height: 1, color: Color(0xFFFDE68A)),
 
-          // Konten Tabel Preview (5 data transaksi terbaru: No, Tanggal, Keterangan, Jumlah, Kategori)
+          // Konten Tabel Preview (3 data transaksi terbaru: No, Tanggal, Keterangan, Jumlah, Kategori)
           if (previewList.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 26),
@@ -8124,7 +8154,7 @@ class _StrukturPageState extends State<StrukturPage> {
             )
           else ...[
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
               child: Align(
                 alignment: Alignment.topCenter,
                 child: ClipRRect(
@@ -8318,6 +8348,42 @@ class _StrukturPageState extends State<StrukturPage> {
                 ),
               ),
             ),
+            if (allMutasi.length > 3)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                child: InkWell(
+                  onTap: () => _showDetailTabelKeuanganModal(),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Lihat Semua (${allMutasi.length} Transaksi)',
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFB45309),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 13,
+                          color: Color(0xFFB45309),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
           ],
         ],
       ),

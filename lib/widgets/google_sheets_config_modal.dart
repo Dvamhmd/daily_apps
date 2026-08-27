@@ -57,10 +57,11 @@ class GoogleSheetsConfigModal extends StatefulWidget {
       _GoogleSheetsConfigModalState();
 }
 
-class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
+class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
+    with SingleTickerProviderStateMixin {
   late SheetsConfig _config;
-  int _activeTab = 0; // 0: Koneksi, 1: Pemetaan Cell, 2: Script & Panduan
-  final Set<int> _loadedTabs = {};
+  late TabController _tabController;
+  int _activeTab = 0; // 0: Koneksi, 1: Atur Cell, 2: Script
 
   late TextEditingController _urlCtrl;
   late TextEditingController _sheetNameCtrl;
@@ -193,7 +194,21 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
   void initState() {
     super.initState();
     _activeTab = widget.initialTab.clamp(0, 2);
-    _loadedTabs.add(_activeTab);
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: _activeTab,
+    );
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        _saveCurrentState();
+        if (_activeTab != _tabController.index) {
+          setState(() {
+            _activeTab = _tabController.index;
+          });
+        }
+      }
+    });
     _config = SheetsConfig.fromJson(widget.initialConfig.toJson());
 
     _urlCtrl = TextEditingController(text: _config.webAppUrl);
@@ -230,6 +245,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
 
   @override
   void dispose() {
+    _tabController.dispose();
     _urlCtrl.dispose();
     _sheetNameCtrl.dispose();
     _startRowCtrl.dispose();
@@ -242,6 +258,18 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  void _switchTab(int index) {
+    _saveCurrentState();
+    if (_tabController.index != index) {
+      _tabController.animateTo(index);
+    }
+    if (_activeTab != index) {
+      setState(() {
+        _activeTab = index;
+      });
+    }
   }
 
   String? _getMappingValidationError() {
@@ -312,9 +340,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
   Future<void> _handleTestConnection() async {
     final mappingError = _getMappingValidationError();
     if (mappingError != null) {
-      setState(() {
-        _activeTab = 1;
-      });
+      _switchTab(1);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -384,9 +410,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
   Future<void> _handleSyncAll() async {
     final mappingError = _getMappingValidationError();
     if (mappingError != null) {
-      setState(() {
-        _activeTab = 1;
-      });
+      _switchTab(1);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -417,9 +441,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
     }
 
     if (_sheetNameCtrl.text.trim().isEmpty) {
-      setState(() {
-        _activeTab = 0;
-      });
+      _switchTab(0);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Row(
@@ -437,9 +459,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
     }
 
     if (!_config.hasConfiguredCells) {
-      setState(() {
-        _activeTab = 1;
-      });
+      _switchTab(1);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Row(
@@ -818,9 +838,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
                   child: OutlinedButton.icon(
                     onPressed: () {
                       Navigator.pop(ctx);
-                      setState(() {
-                        _activeTab = 1;
-                      });
+                      _switchTab(1);
                     },
                     icon: const Icon(Icons.tune_rounded, size: 15),
                     label: const Text(
@@ -948,18 +966,13 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
 
             // Body Content
             Expanded(
-              child: IndexedStack(
-                index: _activeTab,
+              child: TabBarView(
+                controller: _tabController,
+                physics: const BouncingScrollPhysics(),
                 children: [
-                  _loadedTabs.contains(0)
-                      ? _buildConnectionTab()
-                      : const SizedBox.shrink(),
-                  _loadedTabs.contains(1)
-                      ? _buildColumnMappingTab()
-                      : const SizedBox.shrink(),
-                  _loadedTabs.contains(2)
-                      ? _buildScriptGuideTab()
-                      : const SizedBox.shrink(),
+                  _KeepAliveWrapper(child: _buildConnectionTab()),
+                  _KeepAliveWrapper(child: _buildColumnMappingTab()),
+                  _KeepAliveWrapper(child: _buildScriptGuideTab()),
                 ],
               ),
             ),
@@ -1046,16 +1059,37 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Container(
+        height: 42,
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
           color: const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Row(
-          children: [
+        child: TabBar(
+          controller: _tabController,
+          indicator: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          indicatorSize: TabBarIndicatorSize.tab,
+          dividerColor: Colors.transparent,
+          labelPadding: EdgeInsets.zero,
+          splashFactory: NoSplash.splashFactory,
+          overlayColor: WidgetStateProperty.all(Colors.transparent),
+          onTap: (index) {
+            _switchTab(index);
+          },
+          tabs: [
             _buildTabItem(0, Icons.link_rounded, 'Koneksi'),
-            _buildTabItem(1, Icons.view_column_rounded, 'Pemetaan Cell'),
-            _buildTabItem(2, Icons.code_rounded, 'Script & Panduan'),
+            _buildTabItem(1, Icons.view_column_rounded, 'Atur Cell'),
+            _buildTabItem(2, Icons.code_rounded, 'Script'),
           ],
         ),
       ),
@@ -1063,55 +1097,46 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
   }
 
   Widget _buildTabItem(int index, IconData icon, String title) {
-    final isActive = _activeTab == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          _saveCurrentState();
-          setState(() {
-            _activeTab = index;
-            _loadedTabs.add(index);
-          });
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isActive ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: isActive
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    )
-                  ]
-                : null,
-          ),
-          child: Row(
+    return Tab(
+      child: AnimatedBuilder(
+        animation: _tabController.animation ?? _tabController,
+        builder: (context, _) {
+          final animVal =
+              _tabController.animation?.value ?? _tabController.index.toDouble();
+          final diff = (animVal - index).abs();
+          final progress = (1.0 - diff).clamp(0.0, 1.0);
+          final iconColor = Color.lerp(
+            const Color(0xFF64748B),
+            const Color(0xFF107C41),
+            progress,
+          );
+          final textColor = Color.lerp(
+            const Color(0xFF64748B),
+            const Color(0xFF0F172A),
+            progress,
+          );
+          final isSelected = diff < 0.5;
+
+          return Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 icon,
                 size: 15,
-                color:
-                    isActive ? const Color(0xFF107C41) : const Color(0xFF64748B),
+                color: iconColor,
               ),
               const SizedBox(width: 5),
               Text(
                 title,
                 style: TextStyle(
                   fontSize: 11.5,
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                  color: isActive
-                      ? const Color(0xFF0F172A)
-                      : const Color(0xFF64748B),
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: textColor,
                 ),
               ),
             ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -3088,3 +3113,24 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal> {
     );
   }
 }
+
+class _KeepAliveWrapper extends StatefulWidget {
+  final Widget child;
+  const _KeepAliveWrapper({required this.child});
+
+  @override
+  State<_KeepAliveWrapper> createState() => _KeepAliveWrapperState();
+}
+
+class _KeepAliveWrapperState extends State<_KeepAliveWrapper>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
+
