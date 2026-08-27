@@ -927,13 +927,13 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                                   .copyWith(scrollbars: false),
                               child: ConstrainedBox(
                                 constraints: BoxConstraints(
-                                  maxHeight: tabunganList.length > 5
-                                      ? 260
+                                  maxHeight: tabunganList.length > 3
+                                      ? 165
                                       : double.infinity,
                                 ),
                                 child: ReorderableListView.builder(
                                   shrinkWrap: true,
-                                  physics: tabunganList.length > 5
+                                  physics: tabunganList.length > 3
                                       ? const ClampingScrollPhysics()
                                       : const NeverScrollableScrollPhysics(),
                                   buildDefaultDragHandles: false,
