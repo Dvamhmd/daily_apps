@@ -2,7 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:daily_apps/models/model_struktur.dart';
 import 'package:daily_apps/models/model_todo.dart';
+import 'package:daily_apps/utils/web_file_saver.dart';
 import 'package:daily_apps/widgets/upload_evidence_modal.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -269,38 +272,91 @@ class BackupService {
     );
   }
 
-  /// Menyimpan file backup JSON ke penyimpanan lokal (folder Download bawaan Android)
-  static Future<File> saveBackupToLocalStorage() async {
+  /// Mengekspor file backup dengan dialog pemilihan lokasi dan nama file (Save As...)
+  static Future<String?> saveBackupWithLocationPicker({
+    String? customFileName,
+  }) async {
     final backupData = await generateBackupData();
     const encoder = JsonEncoder.withIndent('  ');
     final jsonString = encoder.convert(backupData.toJson());
+    final bytes = Uint8List.fromList(utf8.encode(jsonString));
 
     final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-    final fileName = 'DailyApps_Backup_$timestamp.json';
+    final fileName = customFileName ?? 'DailyApps_Backup_$timestamp.json';
+
+    if (kIsWeb) {
+      return await saveFileWeb(bytes, fileName, askLocation: true);
+    }
+
+    final outputPath = await FilePicker.platform.saveFile(
+      dialogTitle: 'Pilih Lokasi Simpan File Cadangan',
+      fileName: fileName,
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+      bytes: bytes,
+    );
+
+    if (outputPath == null) {
+      // Pengguna membatalkan pemilihan lokasi
+      return null;
+    }
+
+    try {
+      final file = File(outputPath);
+      if (!await file.exists() || (await file.length()) == 0) {
+        await file.writeAsString(jsonString, flush: true);
+      }
+    } catch (_) {}
+
+    return outputPath;
+  }
+
+  /// Menyimpan file backup JSON langsung ke folder Download perangkat / browser download
+  static Future<String> saveBackupToDefaultDownload({
+    String? customFileName,
+  }) async {
+    final backupData = await generateBackupData();
+    const encoder = JsonEncoder.withIndent('  ');
+    final jsonString = encoder.convert(backupData.toJson());
+    final bytes = Uint8List.fromList(utf8.encode(jsonString));
+
+    final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+    final fileName = customFileName ?? 'DailyApps_Backup_$timestamp.json';
+
+    if (kIsWeb) {
+      final res = await saveFileWeb(bytes, fileName, askLocation: false);
+      return res ?? fileName;
+    }
 
     Directory? targetDir;
 
     if (Platform.isAndroid) {
       final androidDownload = Directory('/storage/emulated/0/Download');
-      if (await androidDownload.exists()) {
-        targetDir = androidDownload;
-      } else {
-        try {
-          targetDir = await getDownloadsDirectory();
-        } catch (_) {}
-        if (targetDir == null || !(await targetDir.exists())) {
-          try {
-            targetDir = await getExternalStorageDirectory();
-          } catch (_) {}
-        }
-      }
-    } else {
       try {
-        targetDir = await getDownloadsDirectory();
+        if (await androidDownload.exists()) {
+          targetDir = androidDownload;
+        }
+      } catch (_) {}
+
+      if (targetDir == null) {
+        try {
+          final ext = await getExternalStorageDirectory();
+          if (ext != null) targetDir = ext;
+        } catch (_) {}
+      }
+    } else if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+      try {
+        final dl = await getDownloadsDirectory();
+        if (dl != null && await dl.exists()) {
+          targetDir = dl;
+        }
       } catch (_) {}
       if (targetDir == null) {
         try {
-          targetDir = await getApplicationDocumentsDirectory();
+          final docs = await getApplicationDocumentsDirectory();
+          if (await docs.exists()) {
+            targetDir = docs;
+          }
         } catch (_) {}
       }
     }
@@ -309,30 +365,33 @@ class BackupService {
 
     final file = File('${targetDir.path}/$fileName');
     await file.writeAsString(jsonString, flush: true);
-    return file;
+    return file.path;
+  }
+
+  /// Alias kompatibilitas untuk menyimpan ke folder Download default
+  static Future<String> saveBackupToLocalStorage() async {
+    return saveBackupToDefaultDownload();
   }
 
   /// Mengekspor file backup JSON sementara dan memicu sheet Share
-  static Future<File> createBackupFile() async {
+  static Future<void> exportAndShareBackup() async {
     final backupData = await generateBackupData();
     const encoder = JsonEncoder.withIndent('  ');
     final jsonString = encoder.convert(backupData.toJson());
+    final bytes = Uint8List.fromList(utf8.encode(jsonString));
 
-    final tempDir = await getTemporaryDirectory();
     final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
     final fileName = 'DailyApps_Backup_$timestamp.json';
-    final file = File('${tempDir.path}/$fileName');
 
-    await file.writeAsString(jsonString, flush: true);
-    return file;
-  }
-
-  /// Mengekspor dan membagikan file backup
-  static Future<void> exportAndShareBackup() async {
-    final file = await createBackupFile();
     await SharePlus.instance.share(
       ShareParams(
-        files: [XFile(file.path)],
+        files: [
+          XFile.fromData(
+            bytes,
+            name: fileName,
+            mimeType: 'application/json',
+          ),
+        ],
         subject: 'Backup Data Daily Apps',
         text:
             'File Cadangan Data Aplikasi Daily Apps (${DateFormat('dd MMM yyyy HH:mm').format(DateTime.now())})',

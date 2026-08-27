@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:daily_apps/utils/backup_service.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -32,6 +33,7 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
   bool _isSavingToStorage = false;
   bool _isSharing = false;
   bool _isImporting = false;
+  String? _saveFeedbackMessage;
 
   // Selected file for import
   String? _selectedFileName;
@@ -70,30 +72,52 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
     }
   }
 
-  Future<void> _handleSaveToLocalStorage() async {
+  /// Ekspor file dengan memilih lokasi penyimpanan sendiri (Save As...)
+  Future<void> _handleSaveWithLocationPicker() async {
     setState(() {
       _isSavingToStorage = true;
+      _saveFeedbackMessage = null;
     });
 
     try {
-      final file = await BackupService.saveBackupToLocalStorage();
-      final fileName = file.path.split(Platform.isWindows ? '\\' : '/').last;
+      final savedPath = await BackupService.saveBackupWithLocationPicker();
+      if (savedPath == null) {
+        // Pengguna membatalkan dialog pemilih file
+        if (mounted) {
+          setState(() {
+            _isSavingToStorage = false;
+          });
+        }
+        return;
+      }
+
+      final fileName = savedPath.split(RegExp(r'[\\/]')).last;
       if (mounted) {
+        setState(() {
+          _saveFeedbackMessage = 'File cadangan berhasil disimpan:\n$fileName';
+          _isSavingToStorage = false;
+        });
+
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: const Color(0xFF2E7D32),
             behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 3),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
             content: Row(
               children: [
                 const Icon(Icons.check_circle_rounded, color: Colors.white),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'File cadangan tersimpan di Download:\n$fileName',
+                    'File cadangan berhasil disimpan:\n$fileName',
                     style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 13),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ],
@@ -103,24 +127,90 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
       }
     } catch (e) {
       if (mounted) {
+        setState(() {
+          _isSavingToStorage = false;
+        });
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: const Color(0xFFD32F2F),
             behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 4),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
             content: Text('Gagal menyimpan file: $e'),
           ),
         );
       }
-    } finally {
+    }
+  }
+
+  /// Ekspor file langsung ke folder Download perangkat / browser
+  Future<void> _handleSaveToDefaultDownload() async {
+    setState(() {
+      _isSavingToStorage = true;
+      _saveFeedbackMessage = null;
+    });
+
+    try {
+      final savedPath = await BackupService.saveBackupToDefaultDownload();
+      final fileName = savedPath.split(RegExp(r'[\\/]')).last;
+      if (mounted) {
+        setState(() {
+          _saveFeedbackMessage =
+              'File cadangan tersimpan di Download:\n$fileName';
+          _isSavingToStorage = false;
+        });
+
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF2E7D32),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'File cadangan tersimpan di Download:\n$fileName',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
       if (mounted) {
         setState(() {
           _isSavingToStorage = false;
         });
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFD32F2F),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            content: Text('Gagal menyimpan file: $e'),
+          ),
+        );
       }
     }
   }
+
 
   Future<void> _handleShareFile() async {
     setState(() {
@@ -175,7 +265,7 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
       String content = '';
       if (file.bytes != null) {
         content = utf8.decode(file.bytes!);
-      } else if (file.path != null) {
+      } else if (!kIsWeb && file.path != null) {
         final f = File(file.path!);
         content = await f.readAsString();
       }
@@ -454,21 +544,76 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
           isLoading: _isLoadingSummary,
         ),
 
+        if (_saveFeedbackMessage != null) ...[
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F5E9),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFA5D6A7)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: Color(0xFF2E7D32),
+                  size: 22,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _saveFeedbackMessage!,
+                    style: const TextStyle(
+                      color: Color(0xFF1B5E20),
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _saveFeedbackMessage = null;
+                    });
+                  },
+                  child: const Icon(
+                    Icons.close_rounded,
+                    size: 18,
+                    color: Color(0xFF2E7D32),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+
         const SizedBox(height: 20),
 
-        // Tombol 1: Ekspor File ke Penyimpanan Lokal
+        // Section Title
+        const Text(
+          'Pilihan Ekspor Cadangan',
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF334155),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // Tombol 1: Pilih Lokasi & Simpan (Save As...)
         ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF5E35B1),
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 15),
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
             ),
             elevation: 3,
             shadowColor: const Color(0xFF5E35B1).withValues(alpha: 0.4),
           ),
-          onPressed: isBusy ? null : _handleSaveToLocalStorage,
+          onPressed: isBusy ? null : _handleSaveWithLocationPicker,
           child: _isSavingToStorage
               ? const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -483,7 +628,7 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
                     ),
                     SizedBox(width: 12),
                     Text(
-                      'Menyimpan file...',
+                      'Menyiapkan & menyimpan file...',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ],
@@ -491,12 +636,12 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
               : const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.download_rounded, size: 22),
+                    Icon(Icons.create_new_folder_rounded, size: 20),
                     SizedBox(width: 8),
                     Text(
-                      'Ekspor File ke Penyimpanan Lokal',
+                      'Pilih Lokasi & Simpan File',
                       style: TextStyle(
-                        fontSize: 14.5,
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -504,14 +649,45 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
                 ),
         ),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
 
-        // Tombol 2: Bagikan File
+        // Tombol 2: Simpan Cepat ke Download
         OutlinedButton(
           style: OutlinedButton.styleFrom(
             foregroundColor: const Color(0xFF5E35B1),
+            backgroundColor: Colors.white,
             side: const BorderSide(color: Color(0xFF5E35B1), width: 1.5),
-            padding: const EdgeInsets.symmetric(vertical: 14),
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          onPressed: isBusy ? null : _handleSaveToDefaultDownload,
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.download_rounded, size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Simpan Cepat ke Folder Download',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // Tombol 3: Bagikan File
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF475569),
+            backgroundColor: Colors.white,
+            side: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
             ),
@@ -534,7 +710,7 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
                     Text(
                       'Menyiapkan berkas...',
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 13.5,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF5E35B1),
                       ),
@@ -547,10 +723,10 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
                     Icon(Icons.share_rounded, size: 20),
                     SizedBox(width: 8),
                     Text(
-                      'Bagikan File',
+                      'Bagikan File Cadangan',
                       style: TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
