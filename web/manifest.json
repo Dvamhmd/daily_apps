@@ -1,6 +1,6 @@
 {
-    "name": "daily_apps",
-    "short_name": "daily_apps",
+    "name": "Daily Apps",
+    "short_name": "Daily Apps",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
