@@ -1296,7 +1296,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                         .copyWith(scrollbars: false),
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
-                        maxHeight: displayedList.length > 4 ? 245 : double.infinity,
+                        maxHeight: displayedList.length > 4 ? 225 : double.infinity,
                       ),
                       child: ReorderableListView.builder(
                         shrinkWrap: true,
@@ -1336,7 +1336,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
 
                           return Container(
                             key: ValueKey('${item.nama}_${item.jumlah}_$index'),
-                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            margin: const EdgeInsets.symmetric(vertical: 2.5),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
@@ -1368,7 +1368,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                                 },
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 8),
+                                      horizontal: 10, vertical: 6.5),
                                   child: Row(
                                     children: [
                                       if (!onlyCair)
