@@ -526,99 +526,112 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                     ),
                   )
                 else
-                  ReorderableListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    buildDefaultDragHandles: false,
-                    itemCount: tabunganList.length,
-                    proxyDecorator: (child, index, animation) {
-                      return AnimatedBuilder(
-                        animation: animation,
-                        builder: (context, child) {
-                          return Material(
-                            elevation: 4,
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            shadowColor: Colors.black.withValues(alpha: 0.15),
+                  ScrollConfiguration(
+                    behavior: ScrollConfiguration.of(context)
+                        .copyWith(scrollbars: false),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: tabunganList.length > 4 ? 205 : double.infinity,
+                      ),
+                      child: ReorderableListView.builder(
+                        shrinkWrap: true,
+                        physics: tabunganList.length > 4
+                            ? const ClampingScrollPhysics()
+                            : const NeverScrollableScrollPhysics(),
+                        buildDefaultDragHandles: false,
+                        itemCount: tabunganList.length,
+                        proxyDecorator: (child, index, animation) {
+                          return AnimatedBuilder(
+                            animation: animation,
+                            builder: (context, child) {
+                              return Material(
+                                elevation: 4,
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                shadowColor:
+                                    Colors.black.withValues(alpha: 0.15),
+                                child: child,
+                              );
+                            },
                             child: child,
                           );
                         },
-                        child: child,
-                      );
-                    },
-                    onReorderItem: (oldIndex, newIndex) {
-                      setState(() {
-                        final item = tabunganList.removeAt(oldIndex);
-                        tabunganList.insert(newIndex, item);
-                      });
-                      _saveTabungan();
-                      widget.onChanged();
-                    },
-                    itemBuilder: (context, index) {
-                      final item = tabunganList[index];
-                      return Container(
-                        key: ValueKey('${item.nama}_${item.jumlah}_$index'),
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: const Color(0xFFFB7185)
-                                .withValues(alpha: 0.65),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFE11D48)
-                                  .withValues(alpha: 0.05),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
+                        onReorderItem: (oldIndex, newIndex) {
+                          setState(() {
+                            final item = tabunganList.removeAt(oldIndex);
+                            tabunganList.insert(newIndex, item);
+                          });
+                          _saveTabungan();
+                          widget.onChanged();
+                        },
+                        itemBuilder: (context, index) {
+                          final item = tabunganList[index];
+                          return Container(
+                            key: ValueKey('${item.nama}_${item.jumlah}_$index'),
+                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFFFB7185)
+                                    .withValues(alpha: 0.65),
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFE11D48)
+                                      .withValues(alpha: 0.05),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(12),
-                            splashColor:
-                                const Color(0xFFE11D48).withValues(alpha: 0.1),
-                            highlightColor:
-                                const Color(0xFFE11D48).withValues(alpha: 0.05),
-                            onLongPress: () {
-                              showEditTabungan(index);
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 8),
-                              child: Row(
-                                children: [
-                                  ReorderableDragStartListener(
-                                    index: index,
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(right: 8),
-                                      child: Icon(
-                                        Icons.drag_indicator_rounded,
-                                        size: 18,
-                                        color: Colors.grey[400],
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                splashColor:
+                                    const Color(0xFFE11D48).withValues(alpha: 0.1),
+                                highlightColor:
+                                    const Color(0xFFE11D48).withValues(alpha: 0.05),
+                                onLongPress: () {
+                                  showEditTabungan(index);
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 8),
+                                  child: Row(
+                                    children: [
+                                      ReorderableDragStartListener(
+                                        index: index,
+                                        child: Padding(
+                                          padding:
+                                              const EdgeInsets.only(right: 8),
+                                          child: Icon(
+                                            Icons.drag_indicator_rounded,
+                                            size: 18,
+                                            color: Colors.grey[400],
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Text(
-                                      '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        color: Color(0xFF1E293B),
-                                        fontWeight: FontWeight.w600,
+                                      Expanded(
+                                        child: Text(
+                                          '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            color: Color(0xFF1E293B),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                      );
-                    },
+                          );
+                        },
+                      ),
+                    ),
                   ),
 
                 const SizedBox(height: 10),

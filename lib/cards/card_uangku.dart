@@ -1291,187 +1291,199 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     ),
                   )
                 else
-                  ReorderableListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    buildDefaultDragHandles: false,
-                    itemCount: displayedList.length,
-                    proxyDecorator: (child, index, animation) {
-                      return AnimatedBuilder(
-                        animation: animation,
-                        builder: (context, child) {
-                          return Material(
-                            elevation: 4,
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            shadowColor: Colors.black.withValues(alpha: 0.15),
+                  ScrollConfiguration(
+                    behavior: ScrollConfiguration.of(context)
+                        .copyWith(scrollbars: false),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: displayedList.length > 4 ? 245 : double.infinity,
+                      ),
+                      child: ReorderableListView.builder(
+                        shrinkWrap: true,
+                        physics: displayedList.length > 4
+                            ? const ClampingScrollPhysics()
+                            : const NeverScrollableScrollPhysics(),
+                        buildDefaultDragHandles: false,
+                        itemCount: displayedList.length,
+                        proxyDecorator: (child, index, animation) {
+                          return AnimatedBuilder(
+                            animation: animation,
+                            builder: (context, child) {
+                              return Material(
+                                elevation: 4,
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                shadowColor:
+                                    Colors.black.withValues(alpha: 0.15),
+                                child: child,
+                              );
+                            },
                             child: child,
                           );
                         },
-                        child: child,
-                      );
-                    },
-                    onReorderItem: (oldIndex, newIndex) {
-                      if (onlyCair) return;
-                      setState(() {
-                        final item = uangkuList.removeAt(oldIndex);
-                        uangkuList.insert(newIndex, item);
-                      });
-                      _saveUangku();
-                      widget.onChanged();
-                    },
-                    itemBuilder: (context, index) {
-                      final item = displayedList[index];
-                      final originalIndex = uangkuList.indexOf(item);
+                        onReorderItem: (oldIndex, newIndex) {
+                          if (onlyCair) return;
+                          setState(() {
+                            final item = uangkuList.removeAt(oldIndex);
+                            uangkuList.insert(newIndex, item);
+                          });
+                          _saveUangku();
+                          widget.onChanged();
+                        },
+                        itemBuilder: (context, index) {
+                          final item = displayedList[index];
+                          final originalIndex = uangkuList.indexOf(item);
 
-                      return Container(
-                        key: ValueKey('${item.nama}_${item.jumlah}_$index'),
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: const Color(0xFF86EFAC)
-                                .withValues(alpha: 0.6),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF15803D)
-                                  .withValues(alpha: 0.04),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
+                          return Container(
+                            key: ValueKey('${item.nama}_${item.jumlah}_$index'),
+                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFF86EFAC)
+                                    .withValues(alpha: 0.6),
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF15803D)
+                                      .withValues(alpha: 0.04),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(12),
-                            splashColor:
-                                const Color(0xFF16A34A).withValues(alpha: 0.1),
-                            highlightColor:
-                                const Color(0xFF16A34A).withValues(alpha: 0.05),
-                            onLongPress: () {
-                              if (originalIndex != -1) {
-                                showEditUangku(originalIndex);
-                              }
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 8),
-                              child: Row(
-                                children: [
-                                  if (!onlyCair)
-                                    ReorderableDragStartListener(
-                                      index: index,
-                                      child: Padding(
-                                        padding:
-                                            const EdgeInsets.only(right: 8),
-                                        child: Icon(
-                                          Icons.drag_indicator_rounded,
-                                          size: 18,
-                                          color: Colors.grey[400],
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                splashColor:
+                                    const Color(0xFF16A34A).withValues(alpha: 0.1),
+                                highlightColor:
+                                    const Color(0xFF16A34A).withValues(alpha: 0.05),
+                                onLongPress: () {
+                                  if (originalIndex != -1) {
+                                    showEditUangku(originalIndex);
+                                  }
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 8),
+                                  child: Row(
+                                    children: [
+                                      if (!onlyCair)
+                                        ReorderableDragStartListener(
+                                          index: index,
+                                          child: Padding(
+                                            padding:
+                                                const EdgeInsets.only(right: 8),
+                                            child: Icon(
+                                              Icons.drag_indicator_rounded,
+                                              size: 18,
+                                              color: Colors.grey[400],
+                                            ),
+                                          ),
+                                        ),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                color: Color(0xFF1E293B),
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            if (item.tanggalCair != null) ...[
+                                              const SizedBox(height: 2),
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    item.isCair
+                                                        ? Icons.check_circle_rounded
+                                                        : Icons.schedule_rounded,
+                                                    size: 12,
+                                                    color: item.isCair
+                                                        ? const Color(0xFF2E7D32)
+                                                        : const Color(0xFFE65100),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    item.isCair
+                                                        ? 'Cair • ${item.formattedTanggalCair}'
+                                                        : 'Belum Cair • ${item.formattedTanggalCair}',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: item.isCair
+                                                        ? const Color(0xFF2E7D32)
+                                                        : const Color(0xFFE65100),
+                                                      fontWeight: FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ],
                                         ),
                                       ),
-                                    ),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          '${item.nama} : ${RupiahFormatter.format(item.jumlah)}',
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            color: Color(0xFF1E293B),
-                                            fontWeight: FontWeight.w600,
+                                      const SizedBox(width: 6),
+                                      InkWell(
+                                        borderRadius: BorderRadius.circular(8),
+                                        onTap: () {
+                                          if (originalIndex != -1) {
+                                            showKelolaNominalUangku(originalIndex);
+                                          }
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 5,
                                           ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        if (item.tanggalCair != null) ...[
-                                          const SizedBox(height: 2),
-                                          Row(
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF63B967)
+                                                .withValues(alpha: 0.15),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: const Color(0xFF63B967)
+                                                  .withValues(alpha: 0.5),
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: const Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Icon(
-                                                item.isCair
-                                                    ? Icons.check_circle_rounded
-                                                    : Icons.schedule_rounded,
-                                                size: 12,
-                                                color: item.isCair
-                                                    ? const Color(0xFF2E7D32)
-                                                    : const Color(0xFFE65100),
+                                                Icons.exposure_rounded,
+                                                size: 14,
+                                                color: Color(0xFF2E7D32),
                                               ),
-                                              const SizedBox(width: 4),
+                                              SizedBox(width: 3),
                                               Text(
-                                                item.isCair
-                                                    ? 'Cair • ${item.formattedTanggalCair}'
-                                                    : 'Belum Cair • ${item.formattedTanggalCair}',
+                                                '+/-',
                                                 style: TextStyle(
                                                   fontSize: 11,
-                                                  color: item.isCair
-                                                      ? const Color(0xFF2E7D32)
-                                                      : const Color(0xFFE65100),
-                                                  fontWeight: FontWeight.w500,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF2E7D32),
                                                 ),
                                               ),
                                             ],
                                           ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  InkWell(
-                                    borderRadius: BorderRadius.circular(8),
-                                    onTap: () {
-                                      if (originalIndex != -1) {
-                                        showKelolaNominalUangku(originalIndex);
-                                      }
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 5,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF63B967)
-                                            .withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: const Color(0xFF63B967)
-                                              .withValues(alpha: 0.5),
-                                          width: 1,
                                         ),
                                       ),
-                                      child: const Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.exposure_rounded,
-                                            size: 14,
-                                            color: Color(0xFF2E7D32),
-                                          ),
-                                          SizedBox(width: 3),
-                                          Text(
-                                            '+/-',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: Color(0xFF2E7D32),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                      );
-                    },
+                          );
+                        },
+                      ),
+                    ),
                   ),
 
                 const SizedBox(height: 10),
