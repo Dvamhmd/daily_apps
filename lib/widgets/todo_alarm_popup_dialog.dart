@@ -28,9 +28,9 @@ class TodoAlarmPopupDialog extends StatefulWidget {
       await showGeneralDialog(
         context: context,
         barrierDismissible: false,
-        barrierColor: Colors.black.withValues(alpha: 0.75),
+        barrierColor: Colors.black.withValues(alpha: 0.72),
         barrierLabel: 'Alarm Reminder',
-        transitionDuration: const Duration(milliseconds: 350),
+        transitionDuration: const Duration(milliseconds: 380),
         pageBuilder: (context, anim1, anim2) {
           return TodoAlarmPopupDialog(
             group: group,
@@ -61,11 +61,14 @@ class TodoAlarmPopupDialog extends StatefulWidget {
 }
 
 class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   static const Color primaryTerracotta = Color(0xFFBA5A3A);
+  static const Color softTerracottaBg = Color(0xFFFDF6F3);
 
   late AnimationController _bellAnimController;
   late Animation<double> _bellRotationAnim;
+  late AnimationController _pulseAnimController;
+  late Animation<double> _pulseScaleAnim;
 
   int _remainingSeconds = 300; // 5 menit
   Timer? _countdownTimer;
@@ -74,15 +77,28 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
   void initState() {
     super.initState();
 
-    // Animasi lonceng bergetar
+    // Animasi lonceng berdering bolak-balik
     _bellAnimController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 700),
     )..repeat(reverse: true);
 
-    _bellRotationAnim = Tween<double>(begin: -0.15, end: 0.15).animate(
+    _bellRotationAnim = Tween<double>(begin: -0.16, end: 0.16).animate(
       CurvedAnimation(
         parent: _bellAnimController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    // Animasi pulse ring di belakang lonceng
+    _pulseAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+
+    _pulseScaleAnim = Tween<double>(begin: 0.95, end: 1.06).animate(
+      CurvedAnimation(
+        parent: _pulseAnimController,
         curve: Curves.easeInOut,
       ),
     );
@@ -107,6 +123,7 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
   @override
   void dispose() {
     _bellAnimController.dispose();
+    _pulseAnimController.dispose();
     _countdownTimer?.cancel();
     super.dispose();
   }
@@ -137,16 +154,21 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
       child: Center(
         child: Container(
           margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-          constraints: const BoxConstraints(maxWidth: 420),
+          constraints: const BoxConstraints(maxWidth: 400),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(32),
             boxShadow: [
               BoxShadow(
-                color: primaryTerracotta.withValues(alpha: 0.35),
-                blurRadius: 30,
-                spreadRadius: 4,
-                offset: const Offset(0, 10),
+                color: primaryTerracotta.withValues(alpha: 0.28),
+                blurRadius: 36,
+                spreadRadius: 2,
+                offset: const Offset(0, 12),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -155,79 +177,126 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Top Header Banner with Ringing Animation
+                // Top Header Section dengan Padding Atas Nyaman & Gradien Terracotta Premium
                 Container(
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
+                        Color(0xFFC86745),
                         Color(0xFFBA5A3A),
                         Color(0xFF8C3E26),
                       ],
                     ),
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
                   ),
                   child: Column(
                     children: [
-                      // Animated Bell Icon
+                      // Animated Pulsing Glowing Bell
                       AnimatedBuilder(
-                        animation: _bellRotationAnim,
+                        animation: Listenable.merge([
+                          _bellAnimController,
+                          _pulseAnimController,
+                        ]),
                         builder: (context, child) {
-                          return Transform.rotate(
-                            angle: _bellRotationAnim.value,
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.4),
-                                  width: 2,
+                          return Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Outer Glowing Aura Ring
+                              Transform.scale(
+                                scale: _pulseScaleAnim.value,
+                                child: Container(
+                                  width: 82,
+                                  height: 82,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.white.withValues(alpha: 0.14),
+                                  ),
                                 ),
                               ),
-                              child: const Icon(
-                                Icons.notifications_active_rounded,
-                                color: Colors.white,
-                                size: 40,
+                              // Inner Ring with Bell
+                              Transform.rotate(
+                                angle: _bellRotationAnim.value,
+                                child: Container(
+                                  width: 66,
+                                  height: 66,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.22),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.55),
+                                      width: 2.5,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.12),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.notifications_active_rounded,
+                                    color: Colors.white,
+                                    size: 34,
+                                  ),
+                                ),
                               ),
-                            ),
+                            ],
                           );
                         },
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 18),
 
-                      // Pesan Utama
+                      // Pesan Utama: "Tugasmu belum selesai nih"
                       const Text(
-                        'Tugasmu ada yang belum selesai Nih',
+                        'Tugasmu belum selesai nih',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 18.5,
                           fontWeight: FontWeight.w800,
                           color: Colors.white,
-                          letterSpacing: 0.2,
+                          letterSpacing: -0.2,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 10),
 
-                      // Tanggal Section
+                      // Tanggal Badge Capsule
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 4,
+                          horizontal: 14,
+                          vertical: 5,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.18),
+                          color: Colors.black.withValues(alpha: 0.20),
                           borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          '📅 ${widget.group.formattedFullDate}',
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.24),
+                            width: 1,
                           ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.calendar_today_rounded,
+                              color: Colors.white,
+                              size: 12,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              widget.group.formattedFullDate,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.1,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -237,9 +306,9 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
                 // Content Body: List of Unfinished Tasks
                 Container(
                   constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.35,
+                    maxHeight: MediaQuery.of(context).size.height * 0.32,
                   ),
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -247,25 +316,43 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'DAFTAR TUGAS BELUM SELESAI (${pendingTasks.length})',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF94A3B8),
-                              letterSpacing: 0.6,
-                            ),
+                          Row(
+                            children: [
+                              Container(
+                                width: 7,
+                                height: 7,
+                                decoration: const BoxDecoration(
+                                  color: primaryTerracotta,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 7),
+                              Text(
+                                'DAFTAR TUGAS (${pendingTasks.length})',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF64748B),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
+                              horizontal: 9,
+                              vertical: 3.5,
                             ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFFEF2F2),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: const Color(0xFFFECACA),
+                                width: 1,
+                              ),
                             ),
                             child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 const Icon(
                                   Icons.volume_up_rounded,
@@ -276,8 +363,8 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
                                 Text(
                                   _formattedCountdown,
                                   style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
                                     color: Color(0xFFDC2626),
                                   ),
                                 ),
@@ -286,17 +373,17 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                       if (pendingTasks.isEmpty)
                         const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 20),
+                          padding: EdgeInsets.symmetric(vertical: 24),
                           child: Center(
                             child: Text(
                               'Semua tugas telah diselesaikan! 🎉',
                               style: TextStyle(
                                 color: Color(0xFF16A34A),
                                 fontWeight: FontWeight.bold,
-                                fontSize: 14,
+                                fontSize: 13.5,
                               ),
                             ),
                           ),
@@ -306,17 +393,18 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
                           child: ListView.separated(
                             shrinkWrap: true,
                             itemCount: pendingTasks.length,
-                            separatorBuilder: (ctx, i) => const SizedBox(height: 8),
+                            separatorBuilder: (ctx, i) =>
+                                const SizedBox(height: 8),
                             itemBuilder: (ctx, i) {
                               final item = pendingTasks[i];
                               return Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 14,
-                                  vertical: 10,
+                                  vertical: 11,
                                 ),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFF8FAFC),
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
                                     color: const Color(0xFFE2E8F0),
                                   ),
@@ -324,11 +412,15 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
                                 child: Row(
                                   children: [
                                     Container(
-                                      width: 8,
-                                      height: 8,
+                                      padding: const EdgeInsets.all(5),
                                       decoration: const BoxDecoration(
-                                        color: primaryTerracotta,
+                                        color: softTerracottaBg,
                                         shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.check_box_outline_blank_rounded,
+                                        size: 13,
+                                        color: primaryTerracotta,
                                       ),
                                     ),
                                     const SizedBox(width: 10),
@@ -339,6 +431,7 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
                                           fontSize: 13.5,
                                           fontWeight: FontWeight.w600,
                                           color: Color(0xFF1E293B),
+                                          height: 1.3,
                                         ),
                                       ),
                                     ),
@@ -356,7 +449,7 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
 
                 // Action Button: "Iyaa tau"
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 22),
                   child: SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -366,20 +459,22 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
                         backgroundColor: primaryTerracotta,
                         foregroundColor: Colors.white,
                         elevation: 3,
+                        shadowColor: primaryTerracotta.withValues(alpha: 0.45),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(18),
                         ),
                       ),
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.check_rounded, size: 22, color: Colors.white),
+                          Icon(Icons.check_circle_rounded,
+                              size: 22, color: Colors.white),
                           SizedBox(width: 8),
                           Text(
                             'Iyaa tau',
                             style: TextStyle(
                               fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w800,
                               letterSpacing: 0.3,
                             ),
                           ),

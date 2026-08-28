@@ -303,6 +303,30 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
     Navigator.pop(context, result);
   }
 
+  void _testAlarmNow() {
+    TodoAlarmService.stopPreview();
+    Navigator.pop(context);
+    final tempGroup = TodoDateGroup(
+      id: 'test_group_${DateTime.now().millisecondsSinceEpoch}',
+      date: DateTime.now(),
+      reminderSoundType: _soundType,
+      reminderDefaultSound: _defaultSound,
+      reminderCustomSoundPath: _customSoundPath,
+      reminderCustomSoundName: _customSoundName,
+      items: [
+        TodoItem(id: '1', title: 'Contoh Tugas 1 (Testing Alarm)', isCompleted: false),
+        TodoItem(id: '2', title: 'Contoh Tugas 2 (Testing Alarm)', isCompleted: false),
+      ],
+    );
+    TodoAlarmService.triggerTestAlarm(
+      group: tempGroup,
+      soundType: _soundType,
+      defaultSound: _defaultSound,
+      customPath: _customSoundPath,
+      customName: _customSoundName,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -763,28 +787,61 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                 top: BorderSide(color: Color(0xFFF1F5F9)),
               ),
             ),
-            child: SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: _saveAndClose,
-                icon: const Icon(Icons.check_circle_rounded, color: Colors.white),
-                label: const Text(
-                  'Simpan Pengingat',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: OutlinedButton.icon(
+                    onPressed: _testAlarmNow,
+                    icon: const Icon(
+                      Icons.notifications_active_rounded,
+                      color: primaryTerracotta,
+                      size: 20,
+                    ),
+                    label: const Text(
+                      'Tes Pop-up Alarm Sekarang',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: primaryTerracotta,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: primaryTerracotta, width: 1.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      backgroundColor: softTerracottaBg,
+                    ),
                   ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryTerracotta,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: _saveAndClose,
+                    icon: const Icon(Icons.check_circle_rounded, color: Colors.white),
+                    label: const Text(
+                      'Simpan Pengingat',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryTerracotta,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 2,
+                    ),
                   ),
-                  elevation: 2,
                 ),
-              ),
+              ],
             ),
           ),
         ],

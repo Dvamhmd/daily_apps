@@ -98,7 +98,7 @@ class MainActivity : FlutterActivity() {
                         val id = call.argument<Int>("id") ?: 0
                         val timeMillis = call.argument<Long>("timeMillis") ?: 0L
                         val payload = call.argument<String>("payload") ?: "{}"
-                        val title = call.argument<String>("title") ?: "🚨 Tugasmu ada yang belum selesai Nih"
+                        val title = call.argument<String>("title") ?: "🚨 Tugasmu belum selesai nih"
                         val body = call.argument<String>("body") ?: "Ada tugas to-do list yang belum selesai!"
 
                         val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager

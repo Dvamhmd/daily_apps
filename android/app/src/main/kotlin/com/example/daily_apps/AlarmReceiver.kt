@@ -22,7 +22,7 @@ class AlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val payload = intent.getStringExtra("payload") ?: "{}"
-        val title = intent.getStringExtra("title") ?: "🚨 Tugasmu ada yang belum selesai Nih"
+        val title = intent.getStringExtra("title") ?: "🚨 Tugasmu belum selesai nih"
         val body = intent.getStringExtra("body") ?: "Ada tugas to-do list yang belum selesai!"
         val notificationId = intent.getIntExtra("notificationId", 88888)
 

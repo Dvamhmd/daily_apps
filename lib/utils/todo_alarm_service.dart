@@ -107,113 +107,115 @@ class TodoAlarmService {
         } catch (_) {}
       }
 
-      const androidSettings =
-          AndroidInitializationSettings('@mipmap/launcher_icon');
-      const iosSettings = DarwinInitializationSettings(
-        requestAlertPermission: true,
-        requestBadgePermission: true,
-        requestSoundPermission: true,
-      );
+      if (!kIsWeb) {
+        const androidSettings =
+            AndroidInitializationSettings('@mipmap/launcher_icon');
+        const iosSettings = DarwinInitializationSettings(
+          requestAlertPermission: true,
+          requestBadgePermission: true,
+          requestSoundPermission: true,
+        );
 
-      const initSettings = InitializationSettings(
-        android: androidSettings,
-        iOS: iosSettings,
-      );
+        const initSettings = InitializationSettings(
+          android: androidSettings,
+          iOS: iosSettings,
+        );
 
-      await _notifications.initialize(
-        settings: initSettings,
-        onDidReceiveNotificationResponse: (NotificationResponse resp) {
-          if (resp.actionId == 'action_dismiss') {
-            stopAlarmSound();
-            return;
-          }
-          final payloadStr = resp.payload;
-          if (payloadStr != null && payloadStr.isNotEmpty) {
-            try {
+        await _notifications.initialize(
+          settings: initSettings,
+          onDidReceiveNotificationResponse: (NotificationResponse resp) {
+            if (resp.actionId == 'action_dismiss') {
+              stopAlarmSound();
+              return;
+            }
+            final payloadStr = resp.payload;
+            if (payloadStr != null && payloadStr.isNotEmpty) {
+              try {
+                final data = jsonDecode(payloadStr);
+                final payload = AlarmTriggerPayload.fromJson(data);
+                _handleAlarmTrigger(payload);
+                _onNotificationClickCallback?.call(payload);
+              } catch (e) {
+                debugPrint('Error parsing notification payload: $e');
+              }
+            }
+          },
+          onDidReceiveBackgroundNotificationResponse:
+              todoAlarmBackgroundNotificationResponseHandler,
+        );
+
+        // Cek apakah aplikasi dibuka langsung dari Full Screen Intent / Notifikasi Alarm saat mati/tertutup
+        try {
+          final launchDetails =
+              await _notifications.getNotificationAppLaunchDetails();
+          if (launchDetails != null &&
+              launchDetails.didNotificationLaunchApp &&
+              launchDetails.notificationResponse != null) {
+            final payloadStr = launchDetails.notificationResponse!.payload;
+            if (payloadStr != null && payloadStr.isNotEmpty) {
               final data = jsonDecode(payloadStr);
               final payload = AlarmTriggerPayload.fromJson(data);
-              _handleAlarmTrigger(payload);
-              _onNotificationClickCallback?.call(payload);
-            } catch (e) {
-              debugPrint('Error parsing notification payload: $e');
+              Future.delayed(const Duration(milliseconds: 600), () {
+                _handleAlarmTrigger(payload);
+                _onNotificationClickCallback?.call(payload);
+              });
             }
           }
-        },
-        onDidReceiveBackgroundNotificationResponse:
-            todoAlarmBackgroundNotificationResponseHandler,
-      );
+        } catch (e) {
+          debugPrint('Error checking notification launch details: $e');
+        }
 
-      // Cek apakah aplikasi dibuka langsung dari Full Screen Intent / Notifikasi Alarm saat mati/tertutup
-      try {
-        final launchDetails =
-            await _notifications.getNotificationAppLaunchDetails();
-        if (launchDetails != null &&
-            launchDetails.didNotificationLaunchApp &&
-            launchDetails.notificationResponse != null) {
-          final payloadStr = launchDetails.notificationResponse!.payload;
-          if (payloadStr != null && payloadStr.isNotEmpty) {
-            final data = jsonDecode(payloadStr);
-            final payload = AlarmTriggerPayload.fromJson(data);
-            Future.delayed(const Duration(milliseconds: 600), () {
-              _handleAlarmTrigger(payload);
-              _onNotificationClickCallback?.call(payload);
-            });
+        // Buat Android Notification Channel dengan prioritas tertinggi untuk Alarm
+        try {
+          final androidPlatform = _notifications
+              .resolvePlatformSpecificImplementation<
+                  AndroidFlutterLocalNotificationsPlugin>();
+          if (androidPlatform != null) {
+            final alarmChannel = AndroidNotificationChannel(
+              _channelId,
+              _channelName,
+              description: _channelDesc,
+              importance: Importance.max,
+              playSound: true,
+              enableVibration: true,
+              vibrationPattern:
+                  Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
+              enableLights: true,
+              showBadge: true,
+            );
+            await androidPlatform.createNotificationChannel(alarmChannel);
           }
+        } catch (e) {
+          debugPrint('Error creating Android notification channel: $e');
         }
-      } catch (e) {
-        debugPrint('Error checking notification launch details: $e');
-      }
-
-      // Buat Android Notification Channel dengan prioritas tertinggi untuk Alarm
-      try {
-        final androidPlatform = _notifications
-            .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>();
-        if (androidPlatform != null) {
-          final alarmChannel = AndroidNotificationChannel(
-            _channelId,
-            _channelName,
-            description: _channelDesc,
-            importance: Importance.max,
-            playSound: true,
-            enableVibration: true,
-            vibrationPattern:
-                Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
-            enableLights: true,
-            showBadge: true,
-          );
-          await androidPlatform.createNotificationChannel(alarmChannel);
-        }
-      } catch (e) {
-        debugPrint('Error creating Android notification channel: $e');
       }
 
       // Konfigurasi audio context alarm
       await _alarmPlayer.setReleaseMode(ReleaseMode.loop);
 
-      // Listener MethodChannel dari native Android (AlarmReceiver / AlarmActionReceiver / MainActivity)
-      _nativeChannel.setMethodCallHandler((call) async {
-        debugPrint('🔔 [NATIVE CHANNEL CALL]: ${call.method}');
-        if (call.method == 'onAlarmTriggered') {
-          final payloadStr = call.arguments as String?;
-          if (payloadStr != null && payloadStr.isNotEmpty) {
-            try {
-              final data = jsonDecode(payloadStr);
-              final payload = AlarmTriggerPayload.fromJson(data);
-              await _handleAlarmTrigger(payload);
-              _onNotificationClickCallback?.call(payload);
-            } catch (e) {
-              debugPrint('Error parsing native onAlarmTriggered payload: $e');
+      if (!kIsWeb && Platform.isAndroid) {
+        // Listener MethodChannel dari native Android (AlarmReceiver / AlarmActionReceiver / MainActivity)
+        _nativeChannel.setMethodCallHandler((call) async {
+          debugPrint('🔔 [NATIVE CHANNEL CALL]: ${call.method}');
+          if (call.method == 'onAlarmTriggered') {
+            final payloadStr = call.arguments as String?;
+            if (payloadStr != null && payloadStr.isNotEmpty) {
+              try {
+                final data = jsonDecode(payloadStr);
+                final payload = AlarmTriggerPayload.fromJson(data);
+                await _handleAlarmTrigger(payload);
+                _onNotificationClickCallback?.call(payload);
+              } catch (e) {
+                debugPrint('Error parsing native onAlarmTriggered payload: $e');
+              }
             }
+          } else if (call.method == 'onAlarmDismissed') {
+            await stopAlarmSound();
           }
-        } else if (call.method == 'onAlarmDismissed') {
-          await stopAlarmSound();
-        }
-      });
+        });
 
-      // Cek apakah aplikasi baru saja dibuka/dinyalakan oleh native AlarmReceiver
-      try {
-        if (!kIsWeb && Platform.isAndroid) {
+        // Cek apakah aplikasi baru saja dibuka/dinyalakan oleh native AlarmReceiver
+        try {
           final initialPayloadStr =
               await _nativeChannel.invokeMethod<String>('getInitialAlarmPayload');
           if (initialPayloadStr != null && initialPayloadStr.isNotEmpty) {
@@ -225,9 +227,9 @@ class TodoAlarmService {
               _onNotificationClickCallback?.call(payload);
             });
           }
+        } catch (e) {
+          debugPrint('Error checking native initial alarm payload: $e');
         }
-      } catch (e) {
-        debugPrint('Error checking native initial alarm payload: $e');
       }
 
       _startForegroundTicker();
@@ -312,6 +314,7 @@ class TodoAlarmService {
   /// Dialog konfirmasi permintaan izin Tampilkan di Atas Aplikasi Lain
   static Future<bool> requestOverlayPermissionWithDialog(
       BuildContext context) async {
+    if (kIsWeb) return true;
     final bool isGranted = await isOverlayPermissionGranted();
     if (isGranted) return true;
 
@@ -383,6 +386,7 @@ class TodoAlarmService {
 
   /// Request permissions untuk Android 13+ & Alarm & Notifications
   static Future<void> requestPermissions() async {
+    if (kIsWeb) return;
     try {
       final androidPlatform = _notifications.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
@@ -403,6 +407,27 @@ class TodoAlarmService {
     } catch (e) {
       debugPrint('Request permissions error: $e');
     }
+  }
+
+  /// Memicu pop-up alarm dan suara seketika untuk keperluan testing / demo (mendukung Chrome & Web)
+  static Future<void> triggerTestAlarm({
+    required TodoDateGroup group,
+    String? soundType,
+    String? defaultSound,
+    String? customPath,
+    String? customName,
+  }) async {
+    await initialize();
+    final payload = AlarmTriggerPayload(
+      groupId: group.id,
+      date: group.date,
+      soundType: soundType ?? group.reminderSoundType,
+      defaultSound: defaultSound ?? group.reminderDefaultSound,
+      customSoundPath: customPath ?? group.reminderCustomSoundPath,
+      customSoundName: customName ?? group.reminderCustomSoundName,
+    );
+    await _handleAlarmTrigger(payload);
+    _onNotificationClickCallback?.call(payload);
   }
 
   /// Real-time Ticker internal untuk memantau alarm saat aplikasi terbuka (foreground)
@@ -793,7 +818,7 @@ class TodoAlarmService {
             Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
         styleInformation: BigTextStyleInformation(
           '📅 ${group.formattedFullDate}\n\n$taskSummary',
-          contentTitle: '🚨 Tugasmu ada yang belum selesai Nih',
+          contentTitle: '🚨 Tugasmu belum selesai nih',
           summaryText: '$pendingCount tugas belum selesai',
         ),
         actions: const [
@@ -823,16 +848,18 @@ class TodoAlarmService {
         iOS: iosDetails,
       );
 
-      await _notifications.zonedSchedule(
-        id: id,
-        title: '🚨 Tugasmu ada yang belum selesai Nih',
-        body:
-            '📅 ${group.formattedDateShort}: $pendingCount tugas belum selesai',
-        scheduledDate: tzScheduled,
-        notificationDetails: details,
-        payload: payload,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      );
+      if (!kIsWeb) {
+        await _notifications.zonedSchedule(
+          id: id,
+          title: '🚨 Tugasmu belum selesai nih',
+          body:
+              '📅 ${group.formattedDateShort}: $pendingCount tugas belum selesai',
+          scheduledDate: tzScheduled,
+          notificationDetails: details,
+          payload: payload,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        );
+      }
 
       // Sinkronkan juga langsung ke native Android AlarmManager untuk membuka pop-up overlay otomatis saat ditutup
       try {
@@ -841,7 +868,7 @@ class TodoAlarmService {
             'id': id,
             'timeMillis': scheduledDate.millisecondsSinceEpoch,
             'payload': payload,
-            'title': '🚨 Tugasmu ada yang belum selesai Nih',
+            'title': '🚨 Tugasmu belum selesai nih',
             'body':
                 '📅 ${group.formattedDateShort}: $pendingCount tugas belum selesai',
           });
@@ -864,7 +891,9 @@ class TodoAlarmService {
       final baseHash = groupId.hashCode.abs() % 50000;
       for (int i = 0; i < 10; i++) {
         final notifId = baseHash * 10 + i;
-        await _notifications.cancel(id: notifId);
+        if (!kIsWeb) {
+          await _notifications.cancel(id: notifId);
+        }
         if (!kIsWeb && Platform.isAndroid) {
           try {
             await _nativeChannel.invokeMethod('cancelNativeAlarm', {
@@ -882,7 +911,9 @@ class TodoAlarmService {
   static Future<void> syncAllAlarms(List<TodoDateGroup> groups) async {
     try {
       _registeredGroups.clear();
-      await _notifications.cancelAll();
+      if (!kIsWeb) {
+        await _notifications.cancelAll();
+      }
       for (final g in groups) {
         _registeredGroups[g.id] = g;
         if (g.reminderEnabled && !g.isArchived && !g.isAllCompleted) {
