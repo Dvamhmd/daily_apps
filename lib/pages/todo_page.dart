@@ -231,7 +231,9 @@ class _TodoPageState extends State<TodoPage> {
   }
 
   Future<void> _showConfigureAlarmDialog(TodoDateGroup group) async {
+    await TodoAlarmService.requestOverlayPermissionWithDialog(context);
     final initialConfig = TodoAlarmConfig.fromGroup(group);
+    if (!mounted) return;
     final res = await TodoAlarmSetupSheet.show(
       context,
       initialConfig: initialConfig,
@@ -241,7 +243,11 @@ class _TodoPageState extends State<TodoPage> {
       setState(() {
         res.applyToGroup(group);
       });
-      await TodoAlarmService.scheduleGroupAlarm(group);
+      if (group.reminderEnabled) {
+        await TodoAlarmService.scheduleGroupAlarm(group);
+      } else {
+        await TodoAlarmService.cancelGroupAlarm(group.id);
+      }
       await _saveTodoData();
       if (mounted) {
         _showToast(context, 'Berhasil atur pengingat');
@@ -564,6 +570,10 @@ class _TodoPageState extends State<TodoPage> {
                                 activeThumbColor: primaryTerracotta,
                                 onChanged: (val) async {
                                   if (val) {
+                                    await TodoAlarmService
+                                        .requestOverlayPermissionWithDialog(
+                                            context);
+                                    if (!context.mounted) return;
                                     final res = await TodoAlarmSetupSheet.show(
                                       context,
                                       initialConfig: alarmConfig,
@@ -578,7 +588,8 @@ class _TodoPageState extends State<TodoPage> {
                                         alarmConfig.enabled = true;
                                       });
                                       if (context.mounted) {
-                                        _showToast(context, 'Berhasil atur pengingat');
+                                        _showToast(
+                                            context, 'Berhasil atur pengingat');
                                       }
                                     }
                                   } else {

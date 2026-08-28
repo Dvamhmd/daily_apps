@@ -110,7 +110,8 @@ class _MainScreenWrapperState extends State<MainScreenWrapper> {
     if (!mounted) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final String? jsonStr = prefs.getString('todo_date_groups_v1');
+      final String? jsonStr = prefs.getString('daily_apps_todo_groups_v1') ??
+          prefs.getString('todo_date_groups_v1');
       TodoDateGroup targetGroup;
       if (jsonStr != null && jsonStr.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(jsonStr);
@@ -131,7 +132,8 @@ class _MainScreenWrapperState extends State<MainScreenWrapper> {
         targetGroup = TodoDateGroup(id: payload.groupId, date: payload.date);
       }
 
-      if (targetGroup.pendingItems.isNotEmpty) {
+      if (!mounted) return;
+      if (targetGroup.items.isEmpty || targetGroup.pendingItems.isNotEmpty) {
         TodoAlarmPopupDialog.show(
           context,
           group: targetGroup,

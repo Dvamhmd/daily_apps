@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:daily_apps/models/model_todo.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -50,6 +50,13 @@ class AlarmTriggerPayload {
   }
 }
 
+@pragma('vm:entry-point')
+void todoAlarmBackgroundNotificationResponseHandler(NotificationResponse resp) {
+  if (resp.actionId == 'action_dismiss') {
+    TodoAlarmService.stopAlarmSound();
+  }
+}
+
 class TodoAlarmService {
   static final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
@@ -65,6 +72,8 @@ class TodoAlarmService {
   static final Map<String, TodoDateGroup> _registeredGroups = {};
   static final Set<String> _triggeredKeys = {};
 
+  static Function(AlarmTriggerPayload payload)? _onNotificationClickCallback;
+
   static final ValueNotifier<AlarmTriggerPayload?> activeAlarmNotifier =
       ValueNotifier<AlarmTriggerPayload?>(null);
 
@@ -79,6 +88,10 @@ class TodoAlarmService {
   static Future<void> initialize({
     Function(AlarmTriggerPayload payload)? onNotificationClick,
   }) async {
+    if (onNotificationClick != null) {
+      _onNotificationClickCallback = onNotificationClick;
+    }
+
     if (_isInitialized) {
       _startForegroundTicker();
       return;
@@ -110,18 +123,24 @@ class TodoAlarmService {
       await _notifications.initialize(
         settings: initSettings,
         onDidReceiveNotificationResponse: (NotificationResponse resp) {
+          if (resp.actionId == 'action_dismiss') {
+            stopAlarmSound();
+            return;
+          }
           final payloadStr = resp.payload;
           if (payloadStr != null && payloadStr.isNotEmpty) {
             try {
               final data = jsonDecode(payloadStr);
               final payload = AlarmTriggerPayload.fromJson(data);
               _handleAlarmTrigger(payload);
-              onNotificationClick?.call(payload);
+              _onNotificationClickCallback?.call(payload);
             } catch (e) {
               debugPrint('Error parsing notification payload: $e');
             }
           }
         },
+        onDidReceiveBackgroundNotificationResponse:
+            todoAlarmBackgroundNotificationResponseHandler,
       );
 
       // Cek apakah aplikasi dibuka langsung dari Full Screen Intent / Notifikasi Alarm saat mati/tertutup
@@ -137,7 +156,7 @@ class TodoAlarmService {
             final payload = AlarmTriggerPayload.fromJson(data);
             Future.delayed(const Duration(milliseconds: 600), () {
               _handleAlarmTrigger(payload);
-              onNotificationClick?.call(payload);
+              _onNotificationClickCallback?.call(payload);
             });
           }
         }
@@ -172,6 +191,45 @@ class TodoAlarmService {
       // Konfigurasi audio context alarm
       await _alarmPlayer.setReleaseMode(ReleaseMode.loop);
 
+      // Listener MethodChannel dari native Android (AlarmReceiver / AlarmActionReceiver / MainActivity)
+      _nativeChannel.setMethodCallHandler((call) async {
+        debugPrint('🔔 [NATIVE CHANNEL CALL]: ${call.method}');
+        if (call.method == 'onAlarmTriggered') {
+          final payloadStr = call.arguments as String?;
+          if (payloadStr != null && payloadStr.isNotEmpty) {
+            try {
+              final data = jsonDecode(payloadStr);
+              final payload = AlarmTriggerPayload.fromJson(data);
+              await _handleAlarmTrigger(payload);
+              _onNotificationClickCallback?.call(payload);
+            } catch (e) {
+              debugPrint('Error parsing native onAlarmTriggered payload: $e');
+            }
+          }
+        } else if (call.method == 'onAlarmDismissed') {
+          await stopAlarmSound();
+        }
+      });
+
+      // Cek apakah aplikasi baru saja dibuka/dinyalakan oleh native AlarmReceiver
+      try {
+        if (!kIsWeb && Platform.isAndroid) {
+          final initialPayloadStr =
+              await _nativeChannel.invokeMethod<String>('getInitialAlarmPayload');
+          if (initialPayloadStr != null && initialPayloadStr.isNotEmpty) {
+            debugPrint('🔔 [COLD START ALARM PAYLOAD DETECTED]');
+            final data = jsonDecode(initialPayloadStr);
+            final payload = AlarmTriggerPayload.fromJson(data);
+            Future.delayed(const Duration(milliseconds: 400), () {
+              _handleAlarmTrigger(payload);
+              _onNotificationClickCallback?.call(payload);
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('Error checking native initial alarm payload: $e');
+      }
+
       _startForegroundTicker();
 
       _isInitialized = true;
@@ -180,7 +238,150 @@ class TodoAlarmService {
     }
   }
 
-  /// Request permissions untuk Android 13+ & Alarm
+  static const MethodChannel _nativeChannel =
+      MethodChannel('com.example.daily_apps/alarm_permissions');
+
+  /// Bawa aplikasi ke layar depan saat alarm berbunyi jika izin overlay aktif
+  static Future<void> bringAppToForeground() async {
+    try {
+      if (!kIsWeb && Platform.isAndroid) {
+        await _nativeChannel.invokeMethod('bringAppToForeground');
+      }
+    } catch (e) {
+      debugPrint('Error bringing app to foreground: $e');
+    }
+  }
+
+  /// Cek apakah izin Full Screen Intent aktif di Android 14+
+  static Future<bool> canUseFullScreenIntent() async {
+    try {
+      if (kIsWeb || !Platform.isAndroid) return true;
+      final bool? granted =
+          await _nativeChannel.invokeMethod<bool>('canUseFullScreenIntent');
+      return granted ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// Buka pengaturan Full Screen Intent di Android 14+
+  static Future<void> openFullScreenIntentSettings() async {
+    try {
+      if (!kIsWeb && Platform.isAndroid) {
+        await _nativeChannel.invokeMethod('openFullScreenIntentSettings');
+      }
+    } catch (e) {
+      debugPrint('Error opening full screen intent settings: $e');
+    }
+  }
+
+  /// Cek apakah izin overlay ("Tampilkan di atas aplikasi lain") sudah aktif
+  static Future<bool> isOverlayPermissionGranted() async {
+    try {
+      if (kIsWeb || !Platform.isAndroid) return true;
+      final bool? granted =
+          await _nativeChannel.invokeMethod<bool>('canDrawOverlays');
+      return granted ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// Buka pengaturan izin overlay di Android
+  static Future<void> openOverlaySettings() async {
+    try {
+      if (!kIsWeb && Platform.isAndroid) {
+        await _nativeChannel.invokeMethod('openOverlaySettings');
+      }
+    } catch (e) {
+      debugPrint('Error opening overlay settings: $e');
+    }
+  }
+
+  /// Buka pengaturan izin alarm presisi di Android 12+
+  static Future<void> openExactAlarmSettings() async {
+    try {
+      if (!kIsWeb && Platform.isAndroid) {
+        await _nativeChannel.invokeMethod('openExactAlarmSettings');
+      }
+    } catch (e) {
+      debugPrint('Error opening exact alarm settings: $e');
+    }
+  }
+
+  /// Dialog konfirmasi permintaan izin Tampilkan di Atas Aplikasi Lain
+  static Future<bool> requestOverlayPermissionWithDialog(
+      BuildContext context) async {
+    final bool isGranted = await isOverlayPermissionGranted();
+    if (isGranted) return true;
+
+    if (!context.mounted) return false;
+
+    final bool? result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.layers_rounded, color: Color(0xFFBA5A3A), size: 24),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Izin Tampil di Layar',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Agar pop-up pengingat tugas dapat otomatis muncul di atas layar saat HP terkunci atau saat membuka aplikasi lain, mohon aktifkan izin "Tampilkan di atas aplikasi lain" untuk Daily Apps.',
+            style: TextStyle(
+              fontSize: 13,
+              color: Color(0xFF475569),
+              height: 1.45,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text(
+                'Nanti Saja',
+                style: TextStyle(
+                    color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx, true);
+                await openOverlaySettings();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFBA5A3A),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text(
+                'Buka Pengaturan',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result ?? false;
+  }
+
+  /// Request permissions untuk Android 13+ & Alarm & Notifications
   static Future<void> requestPermissions() async {
     try {
       final androidPlatform = _notifications.resolvePlatformSpecificImplementation<
@@ -305,6 +506,8 @@ class TodoAlarmService {
 
   /// Trigger internal saat alarm aktif
   static Future<void> _handleAlarmTrigger(AlarmTriggerPayload payload) async {
+    // Tarik aplikasi ke layar depan jika izin overlay aktif
+    await bringAppToForeground();
     activeAlarmNotifier.value = payload;
     await playAlarmSound(
       soundType: payload.soundType,
@@ -630,6 +833,22 @@ class TodoAlarmService {
         payload: payload,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       );
+
+      // Sinkronkan juga langsung ke native Android AlarmManager untuk membuka pop-up overlay otomatis saat ditutup
+      try {
+        if (!kIsWeb && Platform.isAndroid) {
+          await _nativeChannel.invokeMethod('scheduleNativeAlarm', {
+            'id': id,
+            'timeMillis': scheduledDate.millisecondsSinceEpoch,
+            'payload': payload,
+            'title': '🚨 Tugasmu ada yang belum selesai Nih',
+            'body':
+                '📅 ${group.formattedDateShort}: $pendingCount tugas belum selesai',
+          });
+        }
+      } catch (e) {
+        debugPrint('Schedule native alarm error: $e');
+      }
     } catch (e) {
       debugPrint('Schedule single todo alarm error: $e');
     }
@@ -644,7 +863,15 @@ class TodoAlarmService {
       }
       final baseHash = groupId.hashCode.abs() % 50000;
       for (int i = 0; i < 10; i++) {
-        await _notifications.cancel(id: baseHash * 10 + i);
+        final notifId = baseHash * 10 + i;
+        await _notifications.cancel(id: notifId);
+        if (!kIsWeb && Platform.isAndroid) {
+          try {
+            await _nativeChannel.invokeMethod('cancelNativeAlarm', {
+              'id': notifId,
+            });
+          } catch (_) {}
+        }
       }
     } catch (e) {
       debugPrint('Cancel group alarm error: $e');
