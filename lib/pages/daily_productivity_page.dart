@@ -75,7 +75,7 @@ class ProductivityHelper {
       case ProductivityLevel.amazing:
         return 'Kamu luar biasaaa, semangattt!!! 🤩';
       case ProductivityLevel.king:
-        return 'Anjayy kelas king 👑, kamu memang legenda';
+        return 'Anjayy kelas king 👑, ente bukan kaleng-kaleng';
       case ProductivityLevel.overload:
         return 'kerja boleh, tapi jangan maksain diri yaa 🥺, kamu boleh istirahat kok kalo capek, jaga kesehatan yaa, kita sayang kamu ❤️';
     }
@@ -320,7 +320,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                   physics: const AlwaysScrollableScrollPhysics(
                     parent: BouncingScrollPhysics(),
                   ),
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
                   children: [
                     // Month Navigator & Metrics Card
                     _buildMonthOverviewCard(
@@ -329,10 +329,16 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                       monthCrownDays: monthCrownDays,
                       isCurrentMonth: isCurrentMonth,
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 10),
 
-                    // Strava Heatmap Calendar Card with Inline Expandable Detail
+                    // Strava Heatmap Calendar Card
                     _buildCalendarCard(),
+
+                    // Separate Date Detail & Praise Card
+                    if (_selectedDateDetail != null) ...[
+                      const SizedBox(height: 10),
+                      _buildDateDetailCard(_selectedDateDetail!),
+                    ],
                   ],
                 ),
               ),
@@ -350,7 +356,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
     final year = _selectedMonth.year;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -380,14 +386,14 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         '$monthName $year',
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 15.5,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF1E293B),
                         ),
@@ -396,7 +402,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
+                            horizontal: 6,
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
@@ -406,7 +412,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                           child: const Text(
                             'Bulan Ini',
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: 9.5,
                               color: primaryTerracotta,
                               fontWeight: FontWeight.bold,
                             ),
@@ -425,7 +431,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
 
           // 3 Metric Pills
           Row(
@@ -445,7 +451,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
               ),
               const SizedBox(width: 8),
               _buildMiniMetric(
-                label: 'Juara & King',
+                label: 'Legendary',
                 value: '$monthCrownDays Hari',
                 icon: Icons.emoji_events_rounded,
                 color: const Color(0xFFCA8A04),
@@ -465,10 +471,10 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
   }) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: color.withValues(alpha: 0.2),
             width: 1,
@@ -479,13 +485,13 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, size: 14, color: color),
-                const SizedBox(width: 4),
+                Icon(icon, size: 13, color: color),
+                const SizedBox(width: 3),
                 Flexible(
                   child: Text(
                     label,
                     style: TextStyle(
-                      fontSize: 10.5,
+                      fontSize: 10,
                       color: color,
                       fontWeight: FontWeight.w600,
                     ),
@@ -494,11 +500,11 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               value,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.bold,
                 color: color,
               ),
@@ -520,7 +526,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
     final completedMap = _completedTasksByDate;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -540,29 +546,29 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
             children: [
               Icon(
                 Icons.calendar_month_rounded,
-                size: 20,
+                size: 18,
                 color: primaryTerracotta,
               ),
-              SizedBox(width: 8),
+              SizedBox(width: 7),
               Text(
                 'Kalender Aktivitas Harian',
                 style: TextStyle(
-                  fontSize: 15,
+                  fontSize: 14.5,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF1E293B),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           const Text(
-            'Klik tanggal untuk melihat pencapaian dan daftar aktivitas harian.',
+            'Klik tanggal untuk melihat pencapaian dan daftar aktivitas.',
             style: TextStyle(
-              fontSize: 11.5,
+              fontSize: 11,
               color: Color(0xFF64748B),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
 
           // Row Hari Singkat (Sen, Sel, Rab, Kam, Jum, Sab, Min)
           Row(
@@ -574,7 +580,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                   child: Text(
                     _namaHariSingkat[index],
                     style: TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
                       color: isWeekend
                           ? primaryTerracotta.withValues(alpha: 0.85)
@@ -585,7 +591,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
               );
             }),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
 
           // Grid Tanggal (Heatmap Cells)
           _buildHeatmapGrid(
@@ -596,12 +602,6 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
             now: now,
             completedMap: completedMap,
           ),
-
-          // Selected Date Detail Section (Inline & Expandable)
-          if (_selectedDateDetail != null) ...[
-            const SizedBox(height: 14),
-            _buildDateDetailInline(_selectedDateDetail!),
-          ],
         ],
       ),
     );
@@ -627,7 +627,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
           dayWidgets.add(
             const Expanded(
               child: AspectRatio(
-                aspectRatio: 1,
+                aspectRatio: 1.18,
                 child: SizedBox(),
               ),
             ),
@@ -648,7 +648,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
           dayWidgets.add(
             Expanded(
               child: AspectRatio(
-                aspectRatio: 1,
+                aspectRatio: 1.18,
                 child: _buildHeatmapCell(
                   date: date,
                   dayNumber: currentDay,
@@ -665,7 +665,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
           dayWidgets.add(
             const Expanded(
               child: AspectRatio(
-                aspectRatio: 1,
+                aspectRatio: 1.18,
                 child: SizedBox(),
               ),
             ),
@@ -675,7 +675,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
 
       rows.add(
         Padding(
-          padding: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.only(bottom: 3.5),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: dayWidgets,
@@ -827,7 +827,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
     );
   }
 
-  Widget _buildDateDetailInline(DateTime date) {
+  Widget _buildDateDetailCard(DateTime date) {
     final count = _getCompletedCountForDate(date);
     final items = _getCompletedItemsForDate(date);
     final level = ProductivityHelper.getLevel(count);
@@ -960,7 +960,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                 },
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
                   child: Row(
                     children: [
                       Text(
@@ -972,12 +972,15 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      Icon(
-                        _isActivitiesExpanded
-                            ? Icons.keyboard_arrow_up_rounded
-                            : Icons.keyboard_arrow_down_rounded,
-                        size: 18,
-                        color: const Color(0xFFF87171),
+                      AnimatedRotation(
+                        turns: _isActivitiesExpanded ? 0.5 : 0.0,
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeInOut,
+                        child: const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 18,
+                          color: Color(0xFFF87171),
+                        ),
                       ),
                       const Spacer(),
                       Text(
@@ -992,46 +995,10 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                   ),
                 ),
               ),
-              AnimatedCrossFade(
-                firstChild: const SizedBox(width: double.infinity),
-                secondChild: Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Column(
-                    children: items.map(
-                      (item) => Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Padding(
-                              padding: EdgeInsets.only(top: 2),
-                              child: Icon(
-                                Icons.check_circle_rounded,
-                                size: 14,
-                                color: Color(0xFFEF4444),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                item.title,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ).toList(),
-                  ),
-                ),
-                crossFadeState: _isActivitiesExpanded
-                    ? CrossFadeState.showSecond
-                    : CrossFadeState.showFirst,
-                duration: const Duration(milliseconds: 200),
+              _buildExpandableTaskList(
+                isExpanded: _isActivitiesExpanded,
+                items: items,
+                isOverload: true,
               ),
             ] else ...[
               const SizedBox(height: 6),
@@ -1212,7 +1179,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
               },
               borderRadius: BorderRadius.circular(8),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
                 child: Row(
                   children: [
                     Text(
@@ -1224,12 +1191,15 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Icon(
-                      _isActivitiesExpanded
-                          ? Icons.keyboard_arrow_up_rounded
-                          : Icons.keyboard_arrow_down_rounded,
-                      size: 18,
-                      color: primaryTerracotta,
+                    AnimatedRotation(
+                      turns: _isActivitiesExpanded ? 0.5 : 0.0,
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeInOut,
+                      child: const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 18,
+                        color: primaryTerracotta,
+                      ),
                     ),
                     const Spacer(),
                     Text(
@@ -1244,46 +1214,10 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                 ),
               ),
             ),
-            AnimatedCrossFade(
-              firstChild: const SizedBox(width: double.infinity),
-              secondChild: Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Column(
-                  children: items.map(
-                    (item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Padding(
-                            padding: EdgeInsets.only(top: 2),
-                            child: Icon(
-                              Icons.check_circle_rounded,
-                              size: 14,
-                              color: Color(0xFF16A34A),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              item.title,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF1E293B),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ).toList(),
-                ),
-              ),
-              crossFadeState: _isActivitiesExpanded
-                  ? CrossFadeState.showSecond
-                  : CrossFadeState.showFirst,
-              duration: const Duration(milliseconds: 200),
+            _buildExpandableTaskList(
+              isExpanded: _isActivitiesExpanded,
+              items: items,
+              isOverload: false,
             ),
           ] else ...[
             const SizedBox(height: 6),
@@ -1300,6 +1234,59 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
       ),
     );
   }
+
+  Widget _buildExpandableTaskList({
+    required bool isExpanded,
+    required List<TodoItem> items,
+    required bool isOverload,
+  }) {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeInOutCubic,
+      alignment: Alignment.topCenter,
+      child: isExpanded
+          ? Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Column(
+                children: items.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Icon(
+                            Icons.check_circle_rounded,
+                            size: 14,
+                            color: isOverload
+                                ? const Color(0xFFEF4444)
+                                : const Color(0xFF16A34A),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isOverload
+                                  ? Colors.white
+                                  : const Color(0xFF1E293B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ).toList(),
+              ),
+            )
+          : const SizedBox(width: double.infinity, height: 0),
+    );
+  }
 }
+
 
 
