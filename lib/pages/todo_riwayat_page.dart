@@ -540,34 +540,13 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                           Row(
                             children: [
                               Text(
-                                '${group.completedCount}/${group.totalCount} tugas selesai (Diarsipkan)',
+                                '${group.totalCount} Tugas selesai',
                                 style: const TextStyle(
                                   fontSize: 11.5,
                                   color: accentCompleted,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              if (isCollapsed) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 1,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: accentCompleted.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Text(
-                                    'Tertutup',
-                                    style: TextStyle(
-                                      fontSize: 9.5,
-                                      color: accentCompleted,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
                             ],
                           ),
                         ],

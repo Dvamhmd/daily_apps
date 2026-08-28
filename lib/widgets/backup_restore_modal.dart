@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:daily_apps/utils/backup_service.dart';
+import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -34,6 +36,7 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
   bool _isSharing = false;
   bool _isImporting = false;
   String? _saveFeedbackMessage;
+  Timer? _feedbackTimer;
 
   // Selected file for import
   String? _selectedFileName;
@@ -50,6 +53,7 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
 
   @override
   void dispose() {
+    _feedbackTimer?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -70,6 +74,37 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
         });
       }
     }
+  }
+
+  void _showSaveSuccessFeedback({
+    required String title,
+    required String subtitle,
+    required String inModalText,
+  }) {
+    _feedbackTimer?.cancel();
+    if (!mounted) return;
+
+    setState(() {
+      _saveFeedbackMessage = inModalText;
+      _isSavingToStorage = false;
+    });
+
+    // Tampilkan toast message dengan efek halus dan otomatis hilang 1.5 detik
+    CustomToast.showSuccess(
+      context,
+      title: title,
+      subtitle: subtitle,
+      duration: const Duration(milliseconds: 1500),
+    );
+
+    // Otomatis hilangkan banner modal juga setelah 1.5 detik
+    _feedbackTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        setState(() {
+          _saveFeedbackMessage = null;
+        });
+      }
+    });
   }
 
   /// Ekspor file dengan memilih lokasi penyimpanan sendiri (Save As...)
@@ -93,36 +128,10 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
 
       final fileName = savedPath.split(RegExp(r'[\\/]')).last;
       if (mounted) {
-        setState(() {
-          _saveFeedbackMessage = 'File cadangan berhasil disimpan:\n$fileName';
-          _isSavingToStorage = false;
-        });
-
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFF2E7D32),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 3),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle_rounded, color: Colors.white),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'File cadangan berhasil disimpan:\n$fileName',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+        _showSaveSuccessFeedback(
+          title: 'File cadangan berhasil disimpan',
+          subtitle: fileName,
+          inModalText: 'File cadangan berhasil disimpan:\n$fileName',
         );
       }
     } catch (e) {
@@ -130,17 +139,10 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
         setState(() {
           _isSavingToStorage = false;
         });
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFFD32F2F),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 4),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            content: Text('Gagal menyimpan file: $e'),
-          ),
+        CustomToast.showError(
+          context,
+          title: 'Gagal Menyimpan File',
+          subtitle: e.toString(),
         );
       }
     }
@@ -157,37 +159,10 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
       final savedPath = await BackupService.saveBackupToDefaultDownload();
       final fileName = savedPath.split(RegExp(r'[\\/]')).last;
       if (mounted) {
-        setState(() {
-          _saveFeedbackMessage =
-              'File cadangan tersimpan di Download:\n$fileName';
-          _isSavingToStorage = false;
-        });
-
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFF2E7D32),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 3),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle_rounded, color: Colors.white),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'File cadangan tersimpan di Download:\n$fileName',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+        _showSaveSuccessFeedback(
+          title: 'File cadangan berhasil disimpan',
+          subtitle: 'Tersimpan di Download: $fileName',
+          inModalText: 'File cadangan tersimpan di Download:\n$fileName',
         );
       }
     } catch (e) {
@@ -195,22 +170,14 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
         setState(() {
           _isSavingToStorage = false;
         });
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFFD32F2F),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 4),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            content: Text('Gagal menyimpan file: $e'),
-          ),
+        CustomToast.showError(
+          context,
+          title: 'Gagal Menyimpan File',
+          subtitle: e.toString(),
         );
       }
     }
   }
-
 
   Future<void> _handleShareFile() async {
     setState(() {
@@ -544,49 +511,57 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
           isLoading: _isLoadingSummary,
         ),
 
-        if (_saveFeedbackMessage != null) ...[
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8F5E9),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFA5D6A7)),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.check_circle_rounded,
-                  color: Color(0xFF2E7D32),
-                  size: 22,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _saveFeedbackMessage!,
-                    style: const TextStyle(
-                      color: Color(0xFF1B5E20),
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
+        AnimatedCrossFade(
+          duration: const Duration(milliseconds: 300),
+          crossFadeState: _saveFeedbackMessage != null
+              ? CrossFadeState.showFirst
+              : CrossFadeState.showSecond,
+          firstChild: Padding(
+            padding: const EdgeInsets.only(top: 14),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFA5D6A7)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: Color(0xFF2E7D32),
+                    size: 22,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _saveFeedbackMessage ?? '',
+                      style: const TextStyle(
+                        color: Color(0xFF1B5E20),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _saveFeedbackMessage = null;
-                    });
-                  },
-                  child: const Icon(
-                    Icons.close_rounded,
-                    size: 18,
-                    color: Color(0xFF2E7D32),
+                  GestureDetector(
+                    onTap: () {
+                      _feedbackTimer?.cancel();
+                      setState(() {
+                        _saveFeedbackMessage = null;
+                      });
+                    },
+                    child: const Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                      color: Color(0xFF2E7D32),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ],
+          secondChild: const SizedBox.shrink(),
+        ),
 
         const SizedBox(height: 20),
 

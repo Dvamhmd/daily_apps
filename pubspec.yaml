@@ -43,6 +43,7 @@ dependencies:
   http: ^1.2.2
   share_plus: ^12.0.2
   path_provider: ^2.1.6
+  audioplayers: ^6.1.0
 
 dev_dependencies:
   flutter_test:
@@ -81,6 +82,7 @@ flutter:
 
   assets:
     - assets/icon/app_icon.png
+    - assets/sounds/
 
   fonts:
     - family: Poppins

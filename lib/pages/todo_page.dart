@@ -2,7 +2,10 @@ import 'dart:convert';
 import 'package:daily_apps/models/model_todo.dart';
 import 'package:daily_apps/pages/todo_riwayat_page.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
+import 'package:daily_apps/utils/todo_alarm_service.dart';
 import 'package:daily_apps/widgets/gta_switch_wheel.dart';
+import 'package:daily_apps/widgets/todo_alarm_popup_dialog.dart';
+import 'package:daily_apps/widgets/todo_alarm_setup_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -35,7 +38,57 @@ class _TodoPageState extends State<TodoPage> {
   @override
   void initState() {
     super.initState();
+    _initAlarmSystem();
     _loadTodoData();
+  }
+
+  @override
+  void dispose() {
+    TodoAlarmService.activeAlarmNotifier.removeListener(_onActiveAlarmChanged);
+    super.dispose();
+  }
+
+  void _initAlarmSystem() {
+    TodoAlarmService.initialize(
+      onNotificationClick: (payload) {
+        _handleNotificationAlarmTrigger(payload);
+      },
+    );
+    TodoAlarmService.requestPermissions();
+    TodoAlarmService.activeAlarmNotifier.addListener(_onActiveAlarmChanged);
+  }
+
+  void _onActiveAlarmChanged() {
+    final payload = TodoAlarmService.activeAlarmNotifier.value;
+    if (payload != null && mounted) {
+      _handleNotificationAlarmTrigger(payload);
+    }
+  }
+
+  void _handleNotificationAlarmTrigger(AlarmTriggerPayload payload) {
+    if (!mounted) return;
+    final targetGroup = _dateGroups.firstWhere(
+      (g) => g.id == payload.groupId,
+      orElse: () => _dateGroups.firstWhere(
+        (g) =>
+            g.date.year == payload.date.year &&
+            g.date.month == payload.date.month &&
+            g.date.day == payload.date.day,
+        orElse: () => TodoDateGroup(id: payload.groupId, date: payload.date),
+      ),
+    );
+
+    if (targetGroup.pendingItems.isNotEmpty) {
+      TodoAlarmPopupDialog.show(
+        context,
+        group: targetGroup,
+        onDismiss: () {
+          _loadTodoData();
+        },
+      );
+    } else {
+      TodoAlarmService.stopAlarmSound();
+    }
   }
 
   Future<void> _loadTodoData() async {
@@ -56,6 +109,8 @@ class _TodoPageState extends State<TodoPage> {
       } else {
         _dateGroups = [];
       }
+      // Sinkronisasi jadwal alarm seluruh group
+      TodoAlarmService.syncAllAlarms(_dateGroups);
     } catch (e) {
       debugPrint('Error loading todos: $e');
     } finally {
@@ -142,12 +197,72 @@ class _TodoPageState extends State<TodoPage> {
     _saveTodoData();
   }
 
-  // --- ACTIONS ---
+  void _showToast(BuildContext context, String message, {bool isSuccess = true}) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              isSuccess ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13.5,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: isSuccess ? primaryTerracotta : const Color(0xFF1E293B),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _showConfigureAlarmDialog(TodoDateGroup group) async {
+    final initialConfig = TodoAlarmConfig.fromGroup(group);
+    final res = await TodoAlarmSetupSheet.show(
+      context,
+      initialConfig: initialConfig,
+      dateTitle: group.formattedFullDate,
+    );
+    if (res != null) {
+      setState(() {
+        res.applyToGroup(group);
+      });
+      await TodoAlarmService.scheduleGroupAlarm(group);
+      await _saveTodoData();
+      if (mounted) {
+        _showToast(context, 'Berhasil atur pengingat');
+      }
+    }
+  }
 
   /// Dialog Buat To-Do List Baru
   Future<void> _showCreateTodoListDialog() async {
     DateTime selectedDate = DateTime.now();
     final taskController = TextEditingController();
+    TodoAlarmConfig alarmConfig = TodoAlarmConfig(
+      enabled: false,
+      type: 'specific',
+      intervalMinutes: 60,
+      intervalStartTime: '08:00',
+      intervalEndTime: '21:00',
+      specificTimes: ['09:00', '13:00', '19:00'],
+      soundType: 'default',
+      defaultSound: 'chime_classic',
+    );
 
     await showModalBottomSheet(
       context: context,
@@ -333,7 +448,7 @@ class _TodoPageState extends State<TodoPage> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 16),
                     const Text(
                       'Tugas Pertama (Opsional)',
                       style: TextStyle(
@@ -378,6 +493,165 @@ class _TodoPageState extends State<TodoPage> {
                         ),
                       ),
                     ),
+
+                    const SizedBox(height: 16),
+
+                    // Toggle Pengingat / Alarm
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: alarmConfig.enabled
+                            ? primaryTerracotta.withValues(alpha: 0.06)
+                            : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: alarmConfig.enabled
+                              ? primaryTerracotta.withValues(alpha: 0.4)
+                              : Colors.grey.withValues(alpha: 0.25),
+                          width: alarmConfig.enabled ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: alarmConfig.enabled
+                                      ? primaryTerracotta
+                                      : const Color(0xFFE2E8F0),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  Icons.alarm_rounded,
+                                  color: alarmConfig.enabled
+                                      ? Colors.white
+                                      : const Color(0xFF64748B),
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Pengingat / Alarm Section',
+                                      style: TextStyle(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF1E293B),
+                                      ),
+                                    ),
+                                    Text(
+                                      alarmConfig.enabled
+                                          ? 'Alarm aktif berbunyi looping jika tugas belum selesai'
+                                          : 'Nyalakan alarm pengingat tugas',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: alarmConfig.enabled
+                                            ? darkTerracotta
+                                            : const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Switch(
+                                value: alarmConfig.enabled,
+                                activeThumbColor: primaryTerracotta,
+                                onChanged: (val) async {
+                                  if (val) {
+                                    final res = await TodoAlarmSetupSheet.show(
+                                      context,
+                                      initialConfig: alarmConfig,
+                                      dateTitle: TodoDateGroup(
+                                        id: '',
+                                        date: selectedDate,
+                                      ).formattedFullDate,
+                                    );
+                                    if (res != null) {
+                                      setModalState(() {
+                                        alarmConfig = res;
+                                        alarmConfig.enabled = true;
+                                      });
+                                      if (context.mounted) {
+                                        _showToast(context, 'Berhasil atur pengingat');
+                                      }
+                                    }
+                                  } else {
+                                    setModalState(() {
+                                      alarmConfig.enabled = false;
+                                    });
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                          if (alarmConfig.enabled) ...[
+                            const SizedBox(height: 8),
+                            const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    alarmConfig.type == 'interval'
+                                        ? '🔔 Tiap ${alarmConfig.intervalMinutes < 60 ? "${alarmConfig.intervalMinutes} Menit" : "${alarmConfig.intervalMinutes ~/ 60} Jam"} (${alarmConfig.intervalStartTime} - ${alarmConfig.intervalEndTime}) • ${_getSoundLabel(alarmConfig)}'
+                                        : '🔔 Jam: ${alarmConfig.specificTimes.join(', ')} • ${_getSoundLabel(alarmConfig)}',
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      color: darkTerracotta,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                TextButton.icon(
+                                  onPressed: () async {
+                                    final res = await TodoAlarmSetupSheet.show(
+                                      context,
+                                      initialConfig: alarmConfig,
+                                      dateTitle: TodoDateGroup(
+                                        id: '',
+                                        date: selectedDate,
+                                      ).formattedFullDate,
+                                    );
+                                    if (res != null) {
+                                      setModalState(() {
+                                        alarmConfig = res;
+                                        alarmConfig.enabled = true;
+                                      });
+                                      if (context.mounted) {
+                                        _showToast(context, 'Berhasil atur pengingat');
+                                      }
+                                    }
+                                  },
+                                  icon: const Icon(Icons.edit_rounded, size: 14, color: primaryTerracotta),
+                                  label: const Text(
+                                    'Ubah',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: primaryTerracotta,
+                                    ),
+                                  ),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+
                     const SizedBox(height: 24),
                     Row(
                       children: [
@@ -412,65 +686,77 @@ class _TodoPageState extends State<TodoPage> {
                               );
                               final taskTitle = taskController.text.trim();
 
-                              setState(() {
-                                final existingIndex = _dateGroups.indexWhere(
-                                  (g) =>
-                                      g.date.year == cleanDate.year &&
-                                      g.date.month == cleanDate.month &&
-                                      g.date.day == cleanDate.day,
-                                );
+                              final existingIndex = _dateGroups.indexWhere(
+                                (g) =>
+                                    g.date.year == cleanDate.year &&
+                                    g.date.month == cleanDate.month &&
+                                    g.date.day == cleanDate.day,
+                              );
 
-                                if (existingIndex != -1) {
-                                  final existingGroup = _dateGroups[existingIndex];
-                                  existingGroup.isArchived = false;
-                                  _collapsedGroupIds.remove(existingGroup.id);
-                                  if (taskTitle.isNotEmpty) {
-                                    existingGroup.items.add(
-                                      TodoItem(
-                                        id: DateTime.now()
-                                            .microsecondsSinceEpoch
-                                            .toString(),
-                                        title: taskTitle,
-                                        isCompleted: false,
-                                      ),
-                                    );
-                                    existingGroup.items = [
-                                      ...existingGroup.items
-                                          .where((i) => !i.isCompleted),
-                                      ...existingGroup.items
-                                          .where((i) => i.isCompleted),
-                                    ];
-                                  }
-                                } else {
-                                  final newGroup = TodoDateGroup(
-                                    id: DateTime.now()
-                                        .microsecondsSinceEpoch
-                                        .toString(),
-                                    date: cleanDate,
-                                    isArchived: false,
-                                    items: taskTitle.isNotEmpty
-                                        ? [
-                                            TodoItem(
-                                              id: DateTime.now()
-                                                  .microsecondsSinceEpoch
-                                                  .toString(),
-                                              title: taskTitle,
-                                              isCompleted: false,
-                                            ),
-                                          ]
-                                        : [],
+                              final TodoDateGroup targetGroup;
+
+                              if (existingIndex != -1) {
+                                final existingGroup = _dateGroups[existingIndex];
+                                existingGroup.isArchived = false;
+                                _collapsedGroupIds.remove(existingGroup.id);
+                                alarmConfig.applyToGroup(existingGroup);
+
+                                if (taskTitle.isNotEmpty) {
+                                  existingGroup.items.add(
+                                    TodoItem(
+                                      id: DateTime.now()
+                                          .microsecondsSinceEpoch
+                                          .toString(),
+                                      title: taskTitle,
+                                      isCompleted: false,
+                                    ),
                                   );
-                                  _collapsedGroupIds.remove(newGroup.id);
-                                  // Masukkan di urutan pertama
-                                  _dateGroups.insert(0, newGroup);
+                                  existingGroup.items = [
+                                    ...existingGroup.items
+                                        .where((i) => !i.isCompleted),
+                                    ...existingGroup.items
+                                        .where((i) => i.isCompleted),
+                                  ];
                                 }
+                                targetGroup = existingGroup;
+                              } else {
+                                final newGroup = TodoDateGroup(
+                                  id: DateTime.now()
+                                      .microsecondsSinceEpoch
+                                      .toString(),
+                                  date: cleanDate,
+                                  isArchived: false,
+                                  items: taskTitle.isNotEmpty
+                                      ? [
+                                          TodoItem(
+                                            id: DateTime.now()
+                                                .microsecondsSinceEpoch
+                                                .toString(),
+                                            title: taskTitle,
+                                            isCompleted: false,
+                                          ),
+                                        ]
+                                      : [],
+                                );
+                                alarmConfig.applyToGroup(newGroup);
+                                _collapsedGroupIds.remove(newGroup.id);
+                                _dateGroups.insert(0, newGroup);
+                                targetGroup = newGroup;
+                              }
 
+                              setState(() {
                                 _searchQuery = '';
                                 _selectedFilter = 'all';
                               });
 
+                              // Jadwalkan Alarm Service
+                              if (targetGroup.reminderEnabled) {
+                                TodoAlarmService.scheduleGroupAlarm(targetGroup);
+                              }
+
                               _saveTodoData();
                               Navigator.pop(context);
+                              _showToast(context, 'To-Do List berhasil dibuat!');
                               HapticFeedback.mediumImpact();
                             },
                             style: ElevatedButton.styleFrom(
@@ -502,6 +788,23 @@ class _TodoPageState extends State<TodoPage> {
         );
       },
     );
+  }
+
+  String _getSoundLabel(TodoAlarmConfig config) {
+    if (config.soundType == 'custom') {
+      return config.customSoundName ?? 'Kustom MP3';
+    }
+    switch (config.defaultSound) {
+      case 'alarm_digital':
+        return 'Alarm Digital';
+      case 'gentle_bell':
+        return 'Bel Lembut';
+      case 'cheerful_melody':
+        return 'Melodi Ceria';
+      case 'chime_classic':
+      default:
+        return 'Chime Klasik';
+    }
   }
 
   /// Tambah Kerjaan Baru ke Section Tanggal
@@ -680,6 +983,10 @@ class _TodoPageState extends State<TodoPage> {
                             ];
                           });
 
+                          if (group.reminderEnabled) {
+                            TodoAlarmService.scheduleGroupAlarm(group);
+                          }
+
                           _saveTodoData();
                           Navigator.pop(context);
                           HapticFeedback.lightImpact();
@@ -794,6 +1101,13 @@ class _TodoPageState extends State<TodoPage> {
         ...group.items.where((i) => i.isCompleted),
       ];
     });
+    if (group.reminderEnabled) {
+      if (group.isAllCompleted) {
+        TodoAlarmService.cancelGroupAlarm(group.id);
+      } else {
+        TodoAlarmService.scheduleGroupAlarm(group);
+      }
+    }
     _saveTodoData();
   }
 
@@ -801,15 +1115,15 @@ class _TodoPageState extends State<TodoPage> {
     setState(() {
       group.items.removeWhere((i) => i.id == item.id);
     });
+    if (group.reminderEnabled) {
+      if (group.isAllCompleted || group.items.isEmpty) {
+        TodoAlarmService.cancelGroupAlarm(group.id);
+      } else {
+        TodoAlarmService.scheduleGroupAlarm(group);
+      }
+    }
     _saveTodoData();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Tugas berhasil dihapus'),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 1),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
+    _showToast(context, 'Tugas berhasil dihapus');
   }
 
   Future<void> _confirmDeleteGroup(TodoDateGroup group) async {
@@ -860,10 +1174,14 @@ class _TodoPageState extends State<TodoPage> {
     );
 
     if (confirm == true) {
+      TodoAlarmService.cancelGroupAlarm(group.id);
       setState(() {
         _dateGroups.removeWhere((g) => g.id == group.id);
       });
       _saveTodoData();
+      if (mounted) {
+        _showToast(context, 'Section berhasil dihapus');
+      }
     }
   }
 
@@ -875,18 +1193,11 @@ class _TodoPageState extends State<TodoPage> {
         for (final item in g.items) {
           item.isCompleted = true;
         }
+        TodoAlarmService.cancelGroupAlarm(g.id);
       }
     });
     _saveTodoData();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Semua tugas berhasil ditandai selesai! 🎉'),
-        backgroundColor: accentCompleted,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
+    _showToast(context, 'Semua tugas berhasil ditandai selesai! 🎉');
   }
 
   List<TodoDateGroup> get _filteredGroups {
@@ -1604,30 +1915,51 @@ class _TodoPageState extends State<TodoPage> {
                                                 : FontWeight.normal,
                                           ),
                                         ),
-                                        if (isCollapsed) ...[
-                                          const SizedBox(width: 6),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 6,
-                                              vertical: 1,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: Colors.grey[200],
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
-                                            ),
-                                            child: const Text(
-                                              'Tertutup',
-                                              style: TextStyle(
-                                                fontSize: 9.5,
-                                                color: Color(0xFF64748B),
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
                                       ],
                                     ),
+                                    if (group.reminderEnabled) ...[
+                                      const SizedBox(height: 4),
+                                      InkWell(
+                                        onTap: () => _showConfigureAlarmDialog(group),
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: primaryTerracotta.withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: primaryTerracotta.withValues(alpha: 0.3),
+                                              width: 0.8,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(
+                                                Icons.alarm_on_rounded,
+                                                size: 12,
+                                                color: primaryTerracotta,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Flexible(
+                                                child: Text(
+                                                  group.reminderSummaryLabel,
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: primaryTerracotta,
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -1671,6 +2003,8 @@ class _TodoPageState extends State<TodoPage> {
                       onSelected: (val) {
                         if (val == 'add') {
                           _showAddTaskDialog(group);
+                        } else if (val == 'alarm') {
+                          _showConfigureAlarmDialog(group);
                         } else if (val == 'archive') {
                           _archiveGroup(group);
                         } else if (val == 'toggle_collapse') {
@@ -1681,6 +2015,7 @@ class _TodoPageState extends State<TodoPage> {
                               i.isCompleted = true;
                             }
                           });
+                          TodoAlarmService.cancelGroupAlarm(group.id);
                           _saveTodoData();
                         } else if (val == 'clear_completed') {
                           setState(() {
@@ -1701,6 +2036,27 @@ class _TodoPageState extends State<TodoPage> {
                               SizedBox(width: 8),
                               Text('Tambah Tugas',
                                   style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'alarm',
+                          child: Row(
+                            children: [
+                              Icon(
+                                group.reminderEnabled
+                                    ? Icons.alarm_on_rounded
+                                    : Icons.alarm_add_rounded,
+                                size: 18,
+                                color: primaryTerracotta,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                group.reminderEnabled
+                                    ? 'Atur Pengingat Alarm'
+                                    : 'Nyalakan Pengingat Alarm',
+                                style: const TextStyle(fontSize: 13),
+                              ),
                             ],
                           ),
                         ),
