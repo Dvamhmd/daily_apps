@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'package:daily_apps/models/model_todo.dart';
+import 'package:daily_apps/pages/daily_productivity_page.dart';
 import 'package:daily_apps/pages/todo_riwayat_page.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/utils/todo_alarm_service.dart';
 import 'package:daily_apps/widgets/gta_switch_wheel.dart';
 import 'package:daily_apps/widgets/todo_alarm_popup_dialog.dart';
 import 'package:daily_apps/widgets/todo_alarm_setup_sheet.dart';
+import 'package:daily_apps/widgets/todo_productivity_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1241,6 +1243,12 @@ class _TodoPageState extends State<TodoPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFFBF8F6),
+      drawer: TodoProductivityDrawer(
+        activeGroups: _dateGroups,
+        onDataChanged: () async {
+          await _loadTodoData();
+        },
+      ),
       appBar: AppBar(
         backgroundColor: primaryTerracotta,
         centerTitle: false,
@@ -1271,8 +1279,21 @@ class _TodoPageState extends State<TodoPage> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.insights_rounded, color: Colors.white),
+            tooltip: 'Activity',
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (ctx) => const DailyProductivityPage(),
+                ),
+              );
+              _loadTodoData();
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.history_rounded, color: Colors.white),
-            tooltip: 'Riwayat To-Do Selesai',
+            tooltip: 'Riwayat Task',
             onPressed: () async {
               await Navigator.push(
                 context,
@@ -1307,15 +1328,15 @@ class _TodoPageState extends State<TodoPage> {
                   ),
                   slivers: [
                     SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                       sliver: SliverToBoxAdapter(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _buildHeaderBanner(),
-                            const SizedBox(height: 18),
+                            const SizedBox(height: 14),
                             _buildSearchAndFilterBar(),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 14),
 
                             // Section Title
                             Row(
@@ -1384,7 +1405,7 @@ class _TodoPageState extends State<TodoPage> {
                               ],
                             ),
 
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
                           ],
                         ),
                       ),
@@ -1435,7 +1456,7 @@ class _TodoPageState extends State<TodoPage> {
                     // FOOTER / ADD BUTTON
                     if (filtered.isNotEmpty)
                       SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                        padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
                         sliver: SliverToBoxAdapter(
                           child: _buildAddNewSectionButton(),
                         ),
@@ -1773,7 +1794,7 @@ class _TodoPageState extends State<TodoPage> {
     return Material(
       color: Colors.transparent,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 18),
+        margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),

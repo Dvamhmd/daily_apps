@@ -5,9 +5,13 @@ import android.app.KeyguardManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.provider.Settings
 import android.view.WindowManager
 import androidx.core.app.AlarmManagerCompat
@@ -22,6 +26,45 @@ class MainActivity : FlutterActivity() {
         var methodChannel: MethodChannel? = null
         var pendingAlarmPayload: String? = null
 
+        fun getVibrator(context: Context): Vibrator? {
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vibratorManager?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            }
+        }
+
+        fun startAlarmVibration(context: Context) {
+            try {
+                val vibrator = getVibrator(context) ?: return
+                val pattern = longArrayOf(0, 800, 400, 800, 400, 800)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val effect = VibrationEffect.createWaveform(pattern, 0)
+                    val audioAttributes = AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .build()
+                    vibrator.vibrate(effect, audioAttributes)
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(pattern, 0)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        fun stopAlarmVibration(context: Context) {
+            try {
+                val vibrator = getVibrator(context) ?: return
+                vibrator.cancel()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
         fun sendAlarmEventToFlutter(payload: String) {
             instance?.runOnUiThread {
                 try {
@@ -35,6 +78,9 @@ class MainActivity : FlutterActivity() {
         }
 
         fun stopAlarmFromNative() {
+            instance?.let { ctx ->
+                stopAlarmVibration(ctx)
+            }
             instance?.runOnUiThread {
                 try {
                     methodChannel?.invokeMethod("onAlarmDismissed", null)
@@ -92,6 +138,14 @@ class MainActivity : FlutterActivity() {
                     val payload = pendingAlarmPayload
                     pendingAlarmPayload = null
                     result.success(payload)
+                }
+                "startVibration" -> {
+                    startAlarmVibration(this)
+                    result.success(true)
+                }
+                "stopVibration" -> {
+                    stopAlarmVibration(this)
+                    result.success(true)
                 }
                 "scheduleNativeAlarm" -> {
                     try {

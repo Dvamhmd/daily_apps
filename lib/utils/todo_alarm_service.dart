@@ -588,7 +588,15 @@ class TodoAlarmService {
         await _playDefaultAsset(defaultSound, _alarmPlayer);
       }
 
-      // Mulai getaran berulang (looping) selama alarm berbunyi
+      // Mulai getaran berulang di Android (Native Vibrator) & HapticFeedback
+      if (!kIsWeb && Platform.isAndroid) {
+        try {
+          await _nativeChannel.invokeMethod('startVibration');
+        } catch (e) {
+          debugPrint('Error starting native vibration: $e');
+        }
+      }
+
       _vibrationTimer?.cancel();
       try {
         HapticFeedback.vibrate();
@@ -640,6 +648,16 @@ class TodoAlarmService {
       _vibrationTimer?.cancel();
       _vibrationTimer = null;
       _isPlayingAlarm = false;
+
+      // Hentikan getaran native Android
+      if (!kIsWeb && Platform.isAndroid) {
+        try {
+          await _nativeChannel.invokeMethod('stopVibration');
+        } catch (e) {
+          debugPrint('Error stopping native vibration: $e');
+        }
+      }
+
       await _alarmPlayer.stop();
       activeAlarmNotifier.value = null;
     } catch (e) {
@@ -769,115 +787,19 @@ class TodoAlarmService {
     required String payload,
   }) async {
     try {
-      tz.Location loc;
-      try {
-        loc = tz.local;
-      } catch (_) {
-        loc = tz.UTC;
-      }
-
-      tz.TZDateTime tzScheduled;
-      try {
-        tzScheduled = tz.TZDateTime(
-          loc,
-          scheduledDate.year,
-          scheduledDate.month,
-          scheduledDate.day,
-          scheduledDate.hour,
-          scheduledDate.minute,
-        );
-      } catch (_) {
-        tzScheduled = tz.TZDateTime.from(scheduledDate, loc);
-      }
-
-      final pendingTasks = group.pendingItems;
-      final pendingCount = pendingTasks.length;
-      final previewTasks =
-          pendingTasks.take(3).map((t) => '• ${t.title}').join('\n');
-      final taskSummary = pendingCount > 3
-          ? '$previewTasks\n...dan ${pendingCount - 3} tugas lainnya'
-          : previewTasks.isNotEmpty
-              ? previewTasks
-              : 'Ada tugas yang belum selesai!';
-
-      final androidDetails = AndroidNotificationDetails(
-        _channelId,
-        _channelName,
-        channelDescription: _channelDesc,
-        importance: Importance.max,
-        priority: Priority.max,
-        fullScreenIntent: true,
-        category: AndroidNotificationCategory.alarm,
-        audioAttributesUsage: AudioAttributesUsage.alarm,
-        visibility: NotificationVisibility.public,
-        ticker: '🚨 Pengingat To-Do List',
-        channelShowBadge: true,
-        enableLights: true,
-        enableVibration: true,
-        vibrationPattern:
-            Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
-        styleInformation: BigTextStyleInformation(
-          '📅 ${group.formattedFullDate}\n\n$taskSummary',
-          contentTitle: '🚨 Tugasmu belum selesai nih',
-          summaryText: '$pendingCount tugas belum selesai',
-        ),
-        actions: const [
-          AndroidNotificationAction(
-            'action_dismiss',
-            'Iyaa tau',
-            showsUserInterface: true,
-            cancelNotification: true,
-          ),
-          AndroidNotificationAction(
-            'action_view',
-            'Buka To-Do',
-            showsUserInterface: true,
-          ),
-        ],
-      );
-
-      const iosDetails = DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-        interruptionLevel: InterruptionLevel.timeSensitive,
-      );
-
-      final details = NotificationDetails(
-        android: androidDetails,
-        iOS: iosDetails,
-      );
-
-      if (!kIsWeb) {
-        await _notifications.zonedSchedule(
-          id: id,
-          title: '🚨 Tugasmu belum selesai nih',
-          body:
-              '📅 ${group.formattedDateShort}: $pendingCount tugas belum selesai',
-          scheduledDate: tzScheduled,
-          notificationDetails: details,
-          payload: payload,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        );
-      }
-
-      // Sinkronkan juga langsung ke native Android AlarmManager untuk membuka pop-up overlay otomatis saat ditutup
-      try {
-        if (!kIsWeb && Platform.isAndroid) {
-          await _nativeChannel.invokeMethod('scheduleNativeAlarm', {
-            'id': id,
-            'timeMillis': scheduledDate.millisecondsSinceEpoch,
-            'payload': payload,
-            'title': '🚨 Tugasmu belum selesai nih',
-            'body':
-                '📅 ${group.formattedDateShort}: $pendingCount tugas belum selesai',
-          });
-        }
-      } catch (e) {
-        debugPrint('Schedule native alarm error: $e');
+      // Jadwalkan langsung ke native Android AlarmManager untuk memicu getaran dan membuka pop-up alarm tanpa notifikasi sistem berisik
+      if (!kIsWeb && Platform.isAndroid) {
+        await _nativeChannel.invokeMethod('scheduleNativeAlarm', {
+          'id': id,
+          'timeMillis': scheduledDate.millisecondsSinceEpoch,
+          'payload': payload,
+          'title': '🚨 Tugasmu belum selesai nih',
+          'body':
+              '📅 ${group.formattedDateShort}: ${group.pendingItems.length} tugas belum selesai',
+        });
       }
     } catch (e) {
-      debugPrint('Schedule single todo alarm error: $e');
+      debugPrint('Schedule native todo alarm error: $e');
     }
   }
 

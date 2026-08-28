@@ -10,11 +10,16 @@ class AlarmActionReceiver : BroadcastReceiver() {
         val action = intent.action
         val notificationId = intent.getIntExtra("notificationId", 88888)
 
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.cancel(notificationId)
+        try {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.cancel(notificationId)
+        } catch (_: Exception) {}
+
+        MainActivity.stopAlarmVibration(context)
 
         if (action == "com.example.daily_apps.ACTION_DISMISS_ALARM") {
             MainActivity.stopAlarmFromNative()
         }
     }
 }
+

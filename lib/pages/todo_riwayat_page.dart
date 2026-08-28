@@ -270,7 +270,7 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
             Icon(Icons.history_toggle_off_rounded, color: Colors.white, size: 22),
             SizedBox(width: 8),
             Text(
-              'Riwayat To-Do Selesai',
+              'Riwayat Task',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -482,7 +482,7 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
     final isCollapsed = _isGroupCollapsed(group.id);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
