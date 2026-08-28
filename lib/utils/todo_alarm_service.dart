@@ -323,12 +323,12 @@ class TodoAlarmService {
       await stopAlarmSound();
       _isPlayingAlarm = true;
 
-      // Konfigurasi audio context ke alarm/speaker
+      // Konfigurasi audio context ke stream ALARM sistem Android (mengikuti slider volume Alarm sistem & aturan DND/Jangan Ganggu)
       try {
         await _alarmPlayer.setAudioContext(
           AudioContext(
             android: const AudioContextAndroid(
-              isSpeakerphoneOn: true,
+              isSpeakerphoneOn: false,
               stayAwake: true,
               contentType: AndroidContentType.sonification,
               usageType: AndroidUsageType.alarm,
@@ -419,7 +419,7 @@ class TodoAlarmService {
     }
   }
 
-  /// Preview suara saat memilih nada dering di halaman setup
+  /// Preview suara saat memilih nada dering di halaman setup (mengikuti stream Media)
   static Future<void> playPreview({
     required String soundType,
     String defaultSound = 'chime_classic',
@@ -427,6 +427,27 @@ class TodoAlarmService {
   }) async {
     try {
       await stopPreview();
+
+      try {
+        await _previewPlayer.setAudioContext(
+          AudioContext(
+            android: const AudioContextAndroid(
+              isSpeakerphoneOn: false,
+              stayAwake: false,
+              contentType: AndroidContentType.sonification,
+              usageType: AndroidUsageType.media,
+              audioFocus: AndroidAudioFocus.gainTransient,
+            ),
+            iOS: AudioContextIOS(
+              category: AVAudioSessionCategory.ambient,
+              options: {
+                AVAudioSessionOptions.duckOthers,
+              },
+            ),
+          ),
+        );
+      } catch (_) {}
+
       await _previewPlayer.setReleaseMode(ReleaseMode.stop);
 
       if (soundType == 'custom' && customPath != null && customPath.isNotEmpty) {
