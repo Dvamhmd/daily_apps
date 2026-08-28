@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:daily_apps/models/model_todo.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -58,6 +60,7 @@ class TodoAlarmService {
   static bool _isPlayingAlarm = false;
   static Timer? _timeoutTimer;
   static Timer? _foregroundTicker;
+  static Timer? _vibrationTimer;
 
   static final Map<String, TodoDateGroup> _registeredGroups = {};
   static final Set<String> _triggeredKeys = {};
@@ -65,10 +68,10 @@ class TodoAlarmService {
   static final ValueNotifier<AlarmTriggerPayload?> activeAlarmNotifier =
       ValueNotifier<AlarmTriggerPayload?>(null);
 
-  static const String _channelId = 'todo_reminder_alarm_channel_v2';
+  static const String _channelId = 'todo_reminder_alarm_channel_v3';
   static const String _channelName = 'Pengingat Alarm To-Do List';
   static const String _channelDesc =
-      'Alarm pengingat tugas to-do list yang belum selesai dengan suara looping dan layar penuh.';
+      'Alarm pengingat tugas to-do list yang belum selesai dengan suara looping, getar, dan layar penuh.';
 
   static bool get isPlayingAlarm => _isPlayingAlarm;
 
@@ -121,19 +124,42 @@ class TodoAlarmService {
         },
       );
 
+      // Cek apakah aplikasi dibuka langsung dari Full Screen Intent / Notifikasi Alarm saat mati/tertutup
+      try {
+        final launchDetails =
+            await _notifications.getNotificationAppLaunchDetails();
+        if (launchDetails != null &&
+            launchDetails.didNotificationLaunchApp &&
+            launchDetails.notificationResponse != null) {
+          final payloadStr = launchDetails.notificationResponse!.payload;
+          if (payloadStr != null && payloadStr.isNotEmpty) {
+            final data = jsonDecode(payloadStr);
+            final payload = AlarmTriggerPayload.fromJson(data);
+            Future.delayed(const Duration(milliseconds: 600), () {
+              _handleAlarmTrigger(payload);
+              onNotificationClick?.call(payload);
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('Error checking notification launch details: $e');
+      }
+
       // Buat Android Notification Channel dengan prioritas tertinggi untuk Alarm
       try {
         final androidPlatform = _notifications
             .resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin>();
         if (androidPlatform != null) {
-          const alarmChannel = AndroidNotificationChannel(
+          final alarmChannel = AndroidNotificationChannel(
             _channelId,
             _channelName,
             description: _channelDesc,
             importance: Importance.max,
             playSound: true,
             enableVibration: true,
+            vibrationPattern:
+                Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
             enableLights: true,
             showBadge: true,
           );
@@ -334,6 +360,17 @@ class TodoAlarmService {
         await _playDefaultAsset(defaultSound, _alarmPlayer);
       }
 
+      // Mulai getaran berulang (looping) selama alarm berbunyi
+      _vibrationTimer?.cancel();
+      try {
+        HapticFeedback.vibrate();
+      } catch (_) {}
+      _vibrationTimer = Timer.periodic(const Duration(milliseconds: 1400), (t) {
+        try {
+          HapticFeedback.vibrate();
+        } catch (_) {}
+      });
+
       // Pasang timeout 5 menit untuk otomatis berhenti jika pengguna tidak merespons
       _timeoutTimer?.cancel();
       _timeoutTimer = Timer(const Duration(minutes: 5), () {
@@ -367,11 +404,13 @@ class TodoAlarmService {
     await player.play(AssetSource(assetFile));
   }
 
-  /// Hentikan suara alarm & batalkan timeout 5 menit
+  /// Hentikan suara alarm & getaran serta batalkan timeout 5 menit
   static Future<void> stopAlarmSound() async {
     try {
       _timeoutTimer?.cancel();
       _timeoutTimer = null;
+      _vibrationTimer?.cancel();
+      _vibrationTimer = null;
       _isPlayingAlarm = false;
       await _alarmPlayer.stop();
       activeAlarmNotifier.value = null;
@@ -521,6 +560,13 @@ class TodoAlarmService {
         fullScreenIntent: true,
         category: AndroidNotificationCategory.alarm,
         audioAttributesUsage: AudioAttributesUsage.alarm,
+        visibility: NotificationVisibility.public,
+        ticker: '🚨 Pengingat To-Do List',
+        channelShowBadge: true,
+        enableLights: true,
+        enableVibration: true,
+        vibrationPattern:
+            Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
         styleInformation: BigTextStyleInformation(
           '📅 ${group.formattedFullDate}\n\n$taskSummary',
           contentTitle: '🚨 Tugasmu ada yang belum selesai Nih',

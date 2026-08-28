@@ -3,6 +3,7 @@ import 'package:daily_apps/cards/card_tabungan.dart';
 import 'package:daily_apps/cards/card_uangku.dart';
 import 'package:daily_apps/models/model_tagihan.dart';
 import 'package:daily_apps/models/model_tabungan.dart';
+import 'package:daily_apps/models/model_todo.dart';
 import 'package:daily_apps/models/model_uangku.dart';
 import 'package:daily_apps/pages/riwayat_page.dart';
 import 'package:daily_apps/pages/rundown_page.dart';
@@ -10,9 +11,11 @@ import 'package:daily_apps/pages/todo_page.dart';
 import 'package:daily_apps/utils/notification_service.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
+import 'package:daily_apps/utils/todo_alarm_service.dart';
 import 'package:daily_apps/widgets/app_drawer.dart';
 import 'package:daily_apps/widgets/gta_switch_wheel.dart';
 import 'package:daily_apps/widgets/menu_transition_overlay.dart';
+import 'package:daily_apps/widgets/todo_alarm_popup_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -77,6 +80,68 @@ class _MainScreenWrapperState extends State<MainScreenWrapper> {
   void initState() {
     super.initState();
     _loadDefaultMainPage();
+    _initGlobalAlarmListener();
+  }
+
+  @override
+  void dispose() {
+    TodoAlarmService.activeAlarmNotifier.removeListener(_onActiveAlarmTriggered);
+    super.dispose();
+  }
+
+  void _initGlobalAlarmListener() {
+    TodoAlarmService.initialize(
+      onNotificationClick: (payload) {
+        _handleGlobalAlarm(payload);
+      },
+    );
+    TodoAlarmService.requestPermissions();
+    TodoAlarmService.activeAlarmNotifier.addListener(_onActiveAlarmTriggered);
+  }
+
+  void _onActiveAlarmTriggered() {
+    final payload = TodoAlarmService.activeAlarmNotifier.value;
+    if (payload != null && mounted) {
+      _handleGlobalAlarm(payload);
+    }
+  }
+
+  Future<void> _handleGlobalAlarm(AlarmTriggerPayload payload) async {
+    if (!mounted) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? jsonStr = prefs.getString('todo_date_groups_v1');
+      TodoDateGroup targetGroup;
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(jsonStr);
+        final list = decoded
+            .map((item) => TodoDateGroup.fromJson(item as Map<String, dynamic>))
+            .toList();
+        targetGroup = list.firstWhere(
+          (g) => g.id == payload.groupId,
+          orElse: () => list.firstWhere(
+            (g) =>
+                g.date.year == payload.date.year &&
+                g.date.month == payload.date.month &&
+                g.date.day == payload.date.day,
+            orElse: () => TodoDateGroup(id: payload.groupId, date: payload.date),
+          ),
+        );
+      } else {
+        targetGroup = TodoDateGroup(id: payload.groupId, date: payload.date);
+      }
+
+      if (targetGroup.pendingItems.isNotEmpty) {
+        TodoAlarmPopupDialog.show(
+          context,
+          group: targetGroup,
+        );
+      } else {
+        TodoAlarmService.stopAlarmSound();
+      }
+    } catch (e) {
+      debugPrint('Global alarm popup handling error: $e');
+    }
   }
 
   Future<void> _loadDefaultMainPage() async {
