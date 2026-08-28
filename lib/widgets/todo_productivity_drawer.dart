@@ -91,18 +91,13 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
   @override
   Widget build(BuildContext context) {
     final todayCount = _todayCompletedCount;
-    final isCrown = todayCount > 10;
     final level = ProductivityHelper.getLevel(todayCount);
-    final statusTitle = isCrown
-        ? 'Mahkota Juara 👑'
-        : (todayCount > 5
-            ? 'Sangat Produktif 🔥'
-            : (todayCount > 0 ? 'Hari Aktif ✨' : 'Belum Ada Kegiatan 🌱'));
-    final statusDesc = isCrown
-        ? 'Luar biasa! Kamu menyelesaikan lebih dari 10 kegiatan hari ini.'
-        : (todayCount > 0
-            ? 'Kamu telah menyelesaikan $todayCount kegiatan hari ini. Pertahankan!'
-            : 'Belum ada to-do yang selesai hari ini. Yuk mulai selesaikan tugasmu!');
+    final isCrown = level == ProductivityLevel.king;
+    final isOverload = level == ProductivityLevel.overload;
+    final statusTitle = ProductivityHelper.getLevelLabel(level);
+    final statusDesc = todayCount == 0
+        ? 'Belum ada to-do yang selesai hari ini. Yuk mulai selesaikan tugasmu!'
+        : ProductivityHelper.getPraiseQuote(level);
 
     return Drawer(
       backgroundColor: const Color(0xFFF7F9FC),
@@ -126,6 +121,7 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
                       _buildQuickStatusCard(
                         todayCount: todayCount,
                         isCrown: isCrown,
+                        isOverload: isOverload,
                         level: level,
                         statusTitle: statusTitle,
                         statusDesc: statusDesc,
@@ -282,13 +278,101 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
   Widget _buildQuickStatusCard({
     required int todayCount,
     required bool isCrown,
+    required bool isOverload,
     required ProductivityLevel level,
     required String statusTitle,
     required String statusDesc,
   }) {
-    final statusColor = isCrown
-        ? const Color(0xFFCA8A04)
-        : (todayCount > 0 ? const Color(0xFF16A34A) : const Color(0xFF64748B));
+    final statusColor = isOverload
+        ? const Color(0xFFEF4444)
+        : (isCrown
+            ? const Color(0xFFD97706)
+            : (todayCount > 0
+                ? const Color(0xFF16A34A)
+                : const Color(0xFF64748B)));
+
+    if (isOverload) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF09090B),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: const Color(0xFFEF4444),
+            width: 1.8,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFEF4444).withValues(alpha: 0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text('💀', style: TextStyle(fontSize: 18)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    statusTitle,
+                    style: const TextStyle(
+                      color: Color(0xFFFCA5A5),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              statusDesc,
+              style: const TextStyle(
+                color: Color(0xFFFECACA),
+                fontSize: 12,
+                height: 1.35,
+              ),
+            ),
+            const Divider(height: 18, color: Color(0xFF27272A)),
+            // Mini Stats Row
+            Row(
+              children: [
+                Expanded(
+                  child: _buildMiniStat(
+                    'Hari Ini',
+                    '$todayCount Selesai',
+                    const Color(0xFFEF4444),
+                    isDark: true,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _buildMiniStat(
+                    'Bulan Ini',
+                    '$_thisMonthCompletedCount Selesai',
+                    const Color(0xFFF87171),
+                    isDark: true,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _buildMiniStat(
+                    'Total Selesai',
+                    '$_totalAllCompletedCount',
+                    const Color(0xFFE2E8F0),
+                    isDark: true,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -375,7 +459,7 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
     );
   }
 
-  Widget _buildMiniStat(String label, String value, Color color) {
+  Widget _buildMiniStat(String label, String value, Color color, {bool isDark = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -383,7 +467,10 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+          style: TextStyle(
+            fontSize: 10,
+            color: isDark ? const Color(0xFF94A3B8) : Colors.grey[500],
+          ),
         ),
         const SizedBox(height: 2),
         FittedBox(

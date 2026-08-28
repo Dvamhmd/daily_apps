@@ -8,37 +8,41 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Level produktivitas berdasarkan jumlah kegiatan/tugas yang diselesaikan dalam 1 hari
 enum ProductivityLevel {
   none, // 0
-  low, // 1 - 2
-  medium, // 3 - 5
-  high, // 6 - 8
-  veryHigh, // 8 - 10
-  crown, // > 10
+  lazy, // 1 - 2
+  okay, // 3 - 5
+  good, // 6 - 8
+  amazing, // 9 - 10
+  king, // 11 - 15
+  overload, // > 15
 }
 
 class ProductivityHelper {
   static ProductivityLevel getLevel(int count) {
     if (count <= 0) return ProductivityLevel.none;
-    if (count <= 2) return ProductivityLevel.low;
-    if (count <= 5) return ProductivityLevel.medium;
-    if (count <= 8) return ProductivityLevel.high;
-    if (count <= 10) return ProductivityLevel.veryHigh;
-    return ProductivityLevel.crown;
+    if (count <= 2) return ProductivityLevel.lazy;
+    if (count <= 5) return ProductivityLevel.okay;
+    if (count <= 8) return ProductivityLevel.good;
+    if (count <= 10) return ProductivityLevel.amazing;
+    if (count <= 15) return ProductivityLevel.king;
+    return ProductivityLevel.overload;
   }
 
   static Color getCellColor(ProductivityLevel level) {
     switch (level) {
       case ProductivityLevel.none:
         return const Color(0xFFF1F5F9); // Abu-abu netral lembut
-      case ProductivityLevel.low:
-        return const Color(0xFFBBF7D0); // Hijau samar (Light pastel green)
-      case ProductivityLevel.medium:
-        return const Color(0xFF4ADE80); // Hijau sedang (Mid green)
-      case ProductivityLevel.high:
-        return const Color(0xFF16A34A); // Hijau lebih terang (Strong vibrant green)
-      case ProductivityLevel.veryHigh:
-        return const Color(0xFF15803D); // Hijau sangat terang/pekat (Deep rich green)
-      case ProductivityLevel.crown:
-        return const Color(0xFF0F766E); // Royal emerald base with gold crown
+      case ProductivityLevel.lazy:
+        return const Color(0xFFDCFCE7); // Hijau sangat muda
+      case ProductivityLevel.okay:
+        return const Color(0xFF86EFAC); // Hijau muda segar
+      case ProductivityLevel.good:
+        return const Color(0xFF22C55E); // Hijau sedang
+      case ProductivityLevel.amazing:
+        return const Color(0xFF15803D); // Hijau pekat
+      case ProductivityLevel.king:
+        return const Color(0xFFD97706); // Emas / Amber
+      case ProductivityLevel.overload:
+        return const Color(0xFF09090B); // Hitam pekat
     }
   }
 
@@ -46,31 +50,53 @@ class ProductivityHelper {
     switch (level) {
       case ProductivityLevel.none:
         return const Color(0xFF64748B);
-      case ProductivityLevel.low:
-        return const Color(0xFF14532D);
-      case ProductivityLevel.medium:
-        return const Color(0xFF052E16);
-      case ProductivityLevel.high:
-      case ProductivityLevel.veryHigh:
-      case ProductivityLevel.crown:
+      case ProductivityLevel.lazy:
+        return const Color(0xFF166534);
+      case ProductivityLevel.okay:
+        return const Color(0xFF064E3B);
+      case ProductivityLevel.good:
+      case ProductivityLevel.amazing:
+      case ProductivityLevel.king:
+      case ProductivityLevel.overload:
         return Colors.white;
+    }
+  }
+
+  static String getPraiseQuote(ProductivityLevel level) {
+    switch (level) {
+      case ProductivityLevel.none:
+        return 'Belum ada kegiatan yang diselesaikan.';
+      case ProductivityLevel.lazy:
+        return 'huuu, dasar pemalas 😜';
+      case ProductivityLevel.okay:
+        return 'B aja sih, tapi okeelah 😌';
+      case ProductivityLevel.good:
+        return 'Boleh jugaa nih, yukk pertahankan!! 💪';
+      case ProductivityLevel.amazing:
+        return 'Kamu luar biasaaa, semangattt!!! 🤩';
+      case ProductivityLevel.king:
+        return 'Anjayy kelas king 👑, kamu memang legenda';
+      case ProductivityLevel.overload:
+        return 'kerja boleh, tapi jangan maksain diri yaa 🥺, kamu boleh istirahat kok kalo capek, jaga kesehatan yaa, kita sayang kamu ❤️';
     }
   }
 
   static String getLevelLabel(ProductivityLevel level) {
     switch (level) {
       case ProductivityLevel.none:
-        return 'Belum Ada Kegiatan';
-      case ProductivityLevel.low:
-        return 'Ringan (1-2 Kegiatan)';
-      case ProductivityLevel.medium:
-        return 'Produktif (3-5 Kegiatan)';
-      case ProductivityLevel.high:
-        return 'Sangat Aktif (6-8 Kegiatan)';
-      case ProductivityLevel.veryHigh:
-        return 'Luar Biasa (8-10 Kegiatan)';
-      case ProductivityLevel.crown:
-        return 'Mahkota Juara (>10 Kegiatan)';
+        return 'Belum Ada Kegiatan 🌱';
+      case ProductivityLevel.lazy:
+        return '1 - 2 Kegiatan 😜';
+      case ProductivityLevel.okay:
+        return '3 - 5 Kegiatan 😌';
+      case ProductivityLevel.good:
+        return '6 - 8 Kegiatan 💪';
+      case ProductivityLevel.amazing:
+        return '9 - 10 Kegiatan 🤩';
+      case ProductivityLevel.king:
+        return '11 - 15 Kegiatan 👑';
+      case ProductivityLevel.overload:
+        return '>15 Kegiatan 💀';
     }
   }
 
@@ -78,16 +104,18 @@ class ProductivityHelper {
     switch (level) {
       case ProductivityLevel.none:
         return '0';
-      case ProductivityLevel.low:
+      case ProductivityLevel.lazy:
         return '1-2';
-      case ProductivityLevel.medium:
+      case ProductivityLevel.okay:
         return '3-5';
-      case ProductivityLevel.high:
+      case ProductivityLevel.good:
         return '6-8';
-      case ProductivityLevel.veryHigh:
-        return '8-10';
-      case ProductivityLevel.crown:
-        return '>10';
+      case ProductivityLevel.amazing:
+        return '9-10';
+      case ProductivityLevel.king:
+        return '11-15';
+      case ProductivityLevel.overload:
+        return '>15';
     }
   }
 }
@@ -107,6 +135,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
   DateTime? _selectedDateDetail;
   List<TodoDateGroup> _allGroups = [];
   bool _isLoading = true;
+  bool _isActivitiesExpanded = false;
 
   static const List<String> _namaBulan = [
     'Januari',
@@ -244,15 +273,11 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
       if (count > 0) {
         monthTotalCompleted += count;
         monthActiveDays += 1;
-        if (count > 10) {
+        if (count >= 11) {
           monthCrownDays += 1;
         }
       }
     }
-
-    final todayKey = DateTime(now.year, now.month, now.day);
-    final todayCount = completedMap[todayKey]?.length ?? 0;
-    final todayLevel = ProductivityHelper.getLevel(todayCount);
 
     return Scaffold(
       backgroundColor: const Color(0xFFFBF8F6),
@@ -297,10 +322,6 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                   ),
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                   children: [
-                    // Today Quick Status Card
-                    _buildTodayQuickCard(todayCount, todayLevel),
-                    const SizedBox(height: 14),
-
                     // Month Navigator & Metrics Card
                     _buildMonthOverviewCard(
                       monthTotalCompleted: monthTotalCompleted,
@@ -310,150 +331,12 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                     ),
                     const SizedBox(height: 14),
 
-                    // Strava Heatmap Calendar Card
+                    // Strava Heatmap Calendar Card with Inline Expandable Detail
                     _buildCalendarCard(),
-                    const SizedBox(height: 14),
-
-                    // Legend Classification Card
-                    _buildLegendCard(),
-                    const SizedBox(height: 14),
-
-                    // Selected Date Detail Card
-                    if (_selectedDateDetail != null) ...[
-                      _buildDateDetailCard(_selectedDateDetail!),
-                    ],
                   ],
                 ),
               ),
             ),
-    );
-  }
-
-  Widget _buildTodayQuickCard(int count, ProductivityLevel level) {
-    final cellColor = ProductivityHelper.getCellColor(level);
-    final isCrown = level == ProductivityLevel.crown;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isCrown
-              ? const Color(0xFFEAB308)
-              : (count > 0
-                  ? const Color(0xFF16A34A).withValues(alpha: 0.3)
-                  : const Color(0xFFE2E8F0)),
-          width: isCrown ? 2 : 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isCrown
-                ? const Color(0xFFEAB308).withValues(alpha: 0.15)
-                : Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              gradient: isCrown
-                  ? const LinearGradient(
-                      colors: [Color(0xFFCA8A04), Color(0xFF047857)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
-                  : null,
-              color: isCrown ? null : cellColor,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: isCrown
-                    ? const Color(0xFFFDE047)
-                    : (count > 0
-                        ? const Color(0xFF16A34A).withValues(alpha: 0.4)
-                        : const Color(0xFFCBD5E1)),
-                width: 1.2,
-              ),
-            ),
-            child: Center(
-              child: isCrown
-                  ? const Text('👑', style: TextStyle(fontSize: 24))
-                  : Icon(
-                      count > 0
-                          ? Icons.local_fire_department_rounded
-                          : Icons.hourglass_empty_rounded,
-                      color: count > 0
-                          ? ProductivityHelper.getTextColor(level)
-                          : const Color(0xFF94A3B8),
-                      size: 24,
-                    ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Text(
-                      'Produktivitas Hari Ini',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isCrown
-                            ? const Color(0xFFFEF08A)
-                            : (count > 0
-                                ? const Color(0xFFDCFCE7)
-                                : const Color(0xFFF1F5F9)),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        isCrown
-                            ? '👑 Mahkota'
-                            : '${ProductivityHelper.getLevelShortBadge(level)} Selesai',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: isCrown
-                              ? const Color(0xFF854D0E)
-                              : (count > 0
-                                  ? const Color(0xFF166534)
-                                  : const Color(0xFF64748B)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '$count Kegiatan Diselesaikan',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -562,7 +445,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
               ),
               const SizedBox(width: 8),
               _buildMiniMetric(
-                label: 'Hari Mahkota',
+                label: 'Juara & King',
                 value: '$monthCrownDays Hari',
                 icon: Icons.emoji_events_rounded,
                 color: const Color(0xFFCA8A04),
@@ -673,7 +556,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Intensitas warna diukur dari kegiatan to-do yang selesai tiap hari.',
+            'Klik tanggal untuk melihat pencapaian dan daftar aktivitas harian.',
             style: TextStyle(
               fontSize: 11.5,
               color: Color(0xFF64748B),
@@ -713,6 +596,12 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
             now: now,
             completedMap: completedMap,
           ),
+
+          // Selected Date Detail Section (Inline & Expandable)
+          if (_selectedDateDetail != null) ...[
+            const SizedBox(height: 14),
+            _buildDateDetailInline(_selectedDateDetail!),
+          ],
         ],
       ),
     );
@@ -808,7 +697,8 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
   }) {
     final cellColor = ProductivityHelper.getCellColor(level);
     final textColor = ProductivityHelper.getTextColor(level);
-    final isCrown = level == ProductivityLevel.crown;
+    final isCrown = level == ProductivityLevel.king;
+    final isOverload = level == ProductivityLevel.overload;
 
     return Padding(
       padding: const EdgeInsets.all(2.5),
@@ -828,7 +718,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
             decoration: BoxDecoration(
               gradient: isCrown
                   ? const LinearGradient(
-                      colors: [Color(0xFFCA8A04), Color(0xFF047857)],
+                      colors: [Color(0xFFF59E0B), Color(0xFFB45309)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     )
@@ -840,30 +730,40 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                     ? primaryTerracotta
                     : (isToday
                         ? const Color(0xFF2563EB)
-                        : (isCrown
-                            ? const Color(0xFFFDE047)
-                            : (count > 0
-                                ? const Color(0xFF16A34A).withValues(alpha: 0.3)
-                                : const Color(0xFFE2E8F0)))),
-                width: (isSelected || isToday || isCrown) ? 2 : 1,
+                        : (isOverload
+                            ? const Color(0xFFEF4444)
+                            : (isCrown
+                                ? const Color(0xFFFDE68A)
+                                : (count > 0
+                                    ? const Color(0xFF16A34A).withValues(alpha: 0.3)
+                                    : const Color(0xFFE2E8F0))))),
+                width: (isSelected || isToday || isCrown || isOverload) ? 2 : 1,
               ),
-              boxShadow: isCrown
+              boxShadow: isOverload
                   ? [
                       BoxShadow(
-                        color: const Color(0xFFCA8A04).withValues(alpha: 0.4),
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.35),
                         blurRadius: 4,
                         offset: const Offset(0, 1),
                       ),
                     ]
-                  : (isSelected
+                  : (isCrown
                       ? [
                           BoxShadow(
-                            color: primaryTerracotta.withValues(alpha: 0.3),
+                            color: const Color(0xFFD97706).withValues(alpha: 0.45),
                             blurRadius: 4,
                             offset: const Offset(0, 1),
                           ),
                         ]
-                      : null),
+                      : (isSelected
+                          ? [
+                              BoxShadow(
+                                color: primaryTerracotta.withValues(alpha: 0.3),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ]
+                          : null)),
             ),
             child: Stack(
               alignment: Alignment.center,
@@ -877,19 +777,37 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                           ? FontWeight.bold
                           : FontWeight.w500,
                       color: textColor,
+                      shadows: (isCrown || isOverload)
+                          ? [
+                              const Shadow(
+                                color: Colors.black38,
+                                blurRadius: 2,
+                                offset: Offset(0, 1),
+                              ),
+                            ]
+                          : null,
                     ),
                   ),
                 ),
                 if (isCrown)
                   const Positioned(
                     top: 1,
-                    right: 1,
+                    right: 1.5,
                     child: Text(
                       '👑',
                       style: TextStyle(fontSize: 10),
                     ),
                   ),
-                if (isToday && !isCrown)
+                if (isOverload)
+                  const Positioned(
+                    top: 1,
+                    right: 1.5,
+                    child: Text(
+                      '💀',
+                      style: TextStyle(fontSize: 9.5),
+                    ),
+                  ),
+                if (isToday && !isCrown && !isOverload)
                   Positioned(
                     bottom: 2.5,
                     child: Container(
@@ -909,165 +827,275 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
     );
   }
 
-  Widget _buildLegendCard() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.tune_rounded, size: 16, color: Color(0xFF64748B)),
-              SizedBox(width: 6),
-              Text(
-                'Klasifikasi Produktivitas',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF475569),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: [
-              _buildLegendItem(
-                level: ProductivityLevel.none,
-                label: '0',
-              ),
-              _buildLegendItem(
-                level: ProductivityLevel.low,
-                label: '1 - 2',
-              ),
-              _buildLegendItem(
-                level: ProductivityLevel.medium,
-                label: '3 - 5',
-              ),
-              _buildLegendItem(
-                level: ProductivityLevel.high,
-                label: '6 - 8',
-              ),
-              _buildLegendItem(
-                level: ProductivityLevel.veryHigh,
-                label: '8 - 10',
-              ),
-              _buildLegendItem(
-                level: ProductivityLevel.crown,
-                label: '>10 👑',
-                isCrown: true,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLegendItem({
-    required ProductivityLevel level,
-    required String label,
-    bool isCrown = false,
-  }) {
-    final cellColor = ProductivityHelper.getCellColor(level);
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 18,
-          height: 18,
-          decoration: BoxDecoration(
-            gradient: isCrown
-                ? const LinearGradient(
-                    colors: [Color(0xFFCA8A04), Color(0xFF047857)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                : null,
-            color: isCrown ? null : cellColor,
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(
-              color: isCrown
-                  ? const Color(0xFFFDE047)
-                  : const Color(0xFFCBD5E1),
-              width: 1,
-            ),
-          ),
-          child: isCrown
-              ? const Center(
-                  child: Text(
-                    '👑',
-                    style: TextStyle(fontSize: 9),
-                  ),
-                )
-              : null,
-        ),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: Color(0xFF475569),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDateDetailCard(DateTime date) {
+  Widget _buildDateDetailInline(DateTime date) {
     final count = _getCompletedCountForDate(date);
     final items = _getCompletedItemsForDate(date);
     final level = ProductivityHelper.getLevel(count);
-    final levelLabel = ProductivityHelper.getLevelLabel(level);
-    final isCrown = level == ProductivityLevel.crown;
+    final isCrown = level == ProductivityLevel.king;
+    final isOverload = level == ProductivityLevel.overload;
+    final praiseQuote = ProductivityHelper.getPraiseQuote(level);
 
     final dateStr =
         '${date.day} ${_namaBulan[date.month - 1]} ${date.year}';
 
+    if (isOverload) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF09090B), // Hitam pekat
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: const Color(0xFFEF4444), // Border merah
+            width: 1.8,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFEF4444).withValues(alpha: 0.22),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header Tanggal & Status
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF18181B),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: const Color(0xFFEF4444),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: const Text(
+                    '💀',
+                    style: TextStyle(fontSize: 18),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        dateStr,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        '$count Kegiatan Selesai',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFFCA5A5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF450A0A),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: const Color(0xFFEF4444).withValues(alpha: 0.6),
+                    ),
+                  ),
+                  child: const Text(
+                    '💀 >15',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFFCA5A5),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Kata-kata Pujian / Pesan Peduli
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF18181B),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFFDC2626).withValues(alpha: 0.5),
+                ),
+              ),
+              child: Text(
+                praiseQuote,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFFFECACA),
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                ),
+              ),
+            ),
+
+            if (items.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() {
+                    _isActivitiesExpanded = !_isActivitiesExpanded;
+                  });
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                  child: Row(
+                    children: [
+                      Text(
+                        '${items.length} Aktivitas Dikerjakan',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        _isActivitiesExpanded
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        size: 18,
+                        color: const Color(0xFFF87171),
+                      ),
+                      const Spacer(),
+                      Text(
+                        _isActivitiesExpanded ? 'Tutup' : 'Lihat Detail',
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          color: Color(0xFFF87171),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              AnimatedCrossFade(
+                firstChild: const SizedBox(width: double.infinity),
+                secondChild: Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Column(
+                    children: items.map(
+                      (item) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.only(top: 2),
+                              child: Icon(
+                                Icons.check_circle_rounded,
+                                size: 14,
+                                color: Color(0xFFEF4444),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                item.title,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ).toList(),
+                  ),
+                ),
+                crossFadeState: _isActivitiesExpanded
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+                duration: const Duration(milliseconds: 200),
+              ),
+            ] else ...[
+              const SizedBox(height: 6),
+              const Text(
+                'Belum ada kegiatan yang diselesaikan pada tanggal ini.',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: Color(0xFF94A3B8),
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: isCrown
+            ? const Color(0xFFFFFBEB)
+            : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isCrown
-              ? const Color(0xFFEAB308)
-              : primaryTerracotta.withValues(alpha: 0.3),
-          width: 1.5,
+              ? const Color(0xFFF59E0B)
+              : (count > 0
+                  ? primaryTerracotta.withValues(alpha: 0.3)
+                  : const Color(0xFFE2E8F0)),
+          width: isCrown ? 1.5 : 1.2,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: isCrown
-                ? const Color(0xFFEAB308).withValues(alpha: 0.15)
-                : Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: isCrown
+            ? [
+                BoxShadow(
+                  color: const Color(0xFFD97706).withValues(alpha: 0.15),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header Tanggal & Status
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
+                  gradient: isCrown
+                      ? const LinearGradient(
+                          colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
                   color: isCrown
-                      ? const Color(0xFFFEF08A)
+                      ? null
                       : (count > 0
                           ? const Color(0xFFDCFCE7)
                           : const Color(0xFFF1F5F9)),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   isCrown
@@ -1076,14 +1104,14 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                           ? Icons.task_alt_rounded
                           : Icons.event_busy_rounded),
                   color: isCrown
-                      ? const Color(0xFF854D0E)
+                      ? Colors.white
                       : (count > 0
                           ? const Color(0xFF16A34A)
                           : const Color(0xFF64748B)),
-                  size: 22,
+                  size: 18,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1091,18 +1119,21 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                     Text(
                       dateStr,
                       style: const TextStyle(
-                        fontSize: 15,
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF1E293B),
                       ),
                     ),
+                    const SizedBox(height: 1),
                     Text(
-                      levelLabel,
+                      count > 0
+                          ? '$count Kegiatan Selesai'
+                          : 'Belum ada kegiatan',
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: isCrown
-                            ? const Color(0xFF854D0E)
+                            ? const Color(0xFFB45309)
                             : (count > 0
                                 ? const Color(0xFF16A34A)
                                 : const Color(0xFF64748B)),
@@ -1111,61 +1142,157 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                   ],
                 ),
               ),
+              if (count > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isCrown
+                        ? const Color(0xFFFEF08A)
+                        : const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    isCrown
+                        ? '👑 11-15'
+                        : '${ProductivityHelper.getLevelShortBadge(level)} Selesai',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.bold,
+                      color: isCrown
+                          ? const Color(0xFF854D0E)
+                          : const Color(0xFF166534),
+                    ),
+                  ),
+                ),
             ],
           ),
-          const SizedBox(height: 12),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
-          const SizedBox(height: 12),
 
-          if (items.isEmpty) ...[
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
+          if (count > 0) ...[
+            const SizedBox(height: 10),
+            // Kata-kata Pujian
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: isCrown
+                    ? const Color(0xFFFEF3C7)
+                    : const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isCrown
+                      ? const Color(0xFFFDE68A)
+                      : const Color(0xFFBBF7D0),
+                ),
+              ),
               child: Text(
-                'Belum ada kegiatan yang diselesaikan pada tanggal ini.',
+                praiseQuote,
                 style: TextStyle(
-                  fontSize: 12.5,
-                  color: Color(0xFF94A3B8),
-                  fontStyle: FontStyle.italic,
+                  fontSize: 12,
+                  color: isCrown
+                      ? const Color(0xFF92400E)
+                      : const Color(0xFF166534),
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
                 ),
               ),
             ),
-          ] else ...[
-            Text(
-              '${items.length} Tugas Selesai:',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF475569),
-              ),
-            ),
+          ],
+
+          if (items.isNotEmpty) ...[
             const SizedBox(height: 8),
-            ...items.map(
-              (item) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+            InkWell(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() {
+                  _isActivitiesExpanded = !_isActivitiesExpanded;
+                });
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 2),
-                      child: Icon(
-                        Icons.check_circle_rounded,
-                        size: 15,
-                        color: Color(0xFF16A34A),
+                    Text(
+                      '${items.length} Aktivitas Dikerjakan',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF475569),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        item.title,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF1E293B),
-                          fontWeight: FontWeight.w500,
-                        ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      _isActivitiesExpanded
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: 18,
+                      color: primaryTerracotta,
+                    ),
+                    const Spacer(),
+                    Text(
+                      _isActivitiesExpanded ? 'Tutup' : 'Lihat Detail',
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        color: primaryTerracotta,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
+              ),
+            ),
+            AnimatedCrossFade(
+              firstChild: const SizedBox(width: double.infinity),
+              secondChild: Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Column(
+                  children: items.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.only(top: 2),
+                            child: Icon(
+                              Icons.check_circle_rounded,
+                              size: 14,
+                              color: Color(0xFF16A34A),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              item.title,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF1E293B),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ).toList(),
+                ),
+              ),
+              crossFadeState: _isActivitiesExpanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 200),
+            ),
+          ] else ...[
+            const SizedBox(height: 6),
+            const Text(
+              'Belum ada kegiatan yang diselesaikan pada tanggal ini.',
+              style: TextStyle(
+                fontSize: 11.5,
+                color: Color(0xFF94A3B8),
+                fontStyle: FontStyle.italic,
               ),
             ),
           ],
@@ -1174,3 +1301,5 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
     );
   }
 }
+
+
