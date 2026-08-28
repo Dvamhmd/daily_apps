@@ -941,7 +941,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
             children: [
               _buildLegendItem(
                 level: ProductivityLevel.none,
-                label: '0 (Kosong)',
+                label: '0',
               ),
               _buildLegendItem(
                 level: ProductivityLevel.low,

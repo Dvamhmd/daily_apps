@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:daily_apps/models/model_todo.dart';
-import 'package:daily_apps/pages/daily_productivity_page.dart';
 import 'package:daily_apps/pages/todo_riwayat_page.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/utils/todo_alarm_service.dart';
@@ -1278,19 +1277,6 @@ class _TodoPageState extends State<TodoPage> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.insights_rounded, color: Colors.white),
-            tooltip: 'Activity',
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (ctx) => const DailyProductivityPage(),
-                ),
-              );
-              _loadTodoData();
-            },
-          ),
           IconButton(
             icon: const Icon(Icons.history_rounded, color: Colors.white),
             tooltip: 'Riwayat Task',
