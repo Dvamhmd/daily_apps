@@ -14,34 +14,46 @@ class TodoAlarmPopupDialog extends StatefulWidget {
     this.onDismiss,
   });
 
+  static bool _isShowing = false;
+
   static Future<void> show(
     BuildContext context, {
     required TodoDateGroup group,
     VoidCallback? onDismiss,
-  }) {
-    return showGeneralDialog(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.black.withValues(alpha: 0.75),
-      barrierLabel: 'Alarm Reminder',
-      transitionDuration: const Duration(milliseconds: 350),
-      pageBuilder: (context, anim1, anim2) {
-        return TodoAlarmPopupDialog(
-          group: group,
-          onDismiss: onDismiss,
-        );
-      },
-      transitionBuilder: (context, anim1, anim2, child) {
-        final curved = CurvedAnimation(parent: anim1, curve: Curves.easeOutBack);
-        return ScaleTransition(
-          scale: curved,
-          child: FadeTransition(
-            opacity: anim1,
-            child: child,
-          ),
-        );
-      },
-    );
+  }) async {
+    if (_isShowing) return;
+    _isShowing = true;
+
+    try {
+      await showGeneralDialog(
+        context: context,
+        barrierDismissible: false,
+        barrierColor: Colors.black.withValues(alpha: 0.75),
+        barrierLabel: 'Alarm Reminder',
+        transitionDuration: const Duration(milliseconds: 350),
+        pageBuilder: (context, anim1, anim2) {
+          return TodoAlarmPopupDialog(
+            group: group,
+            onDismiss: () {
+              onDismiss?.call();
+            },
+          );
+        },
+        transitionBuilder: (context, anim1, anim2, child) {
+          final curved =
+              CurvedAnimation(parent: anim1, curve: Curves.easeOutBack);
+          return ScaleTransition(
+            scale: curved,
+            child: FadeTransition(
+              opacity: anim1,
+              child: child,
+            ),
+          );
+        },
+      );
+    } finally {
+      _isShowing = false;
+    }
   }
 
   @override

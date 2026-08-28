@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:daily_apps/models/model_todo.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -58,6 +57,10 @@ class TodoAlarmService {
   static bool _isInitialized = false;
   static bool _isPlayingAlarm = false;
   static Timer? _timeoutTimer;
+  static Timer? _foregroundTicker;
+
+  static final Map<String, TodoDateGroup> _registeredGroups = {};
+  static final Set<String> _triggeredKeys = {};
 
   static final ValueNotifier<AlarmTriggerPayload?> activeAlarmNotifier =
       ValueNotifier<AlarmTriggerPayload?>(null);
@@ -73,7 +76,10 @@ class TodoAlarmService {
   static Future<void> initialize({
     Function(AlarmTriggerPayload payload)? onNotificationClick,
   }) async {
-    if (_isInitialized) return;
+    if (_isInitialized) {
+      _startForegroundTicker();
+      return;
+    }
 
     try {
       tz.initializeTimeZones();
@@ -115,8 +121,32 @@ class TodoAlarmService {
         },
       );
 
+      // Buat Android Notification Channel dengan prioritas tertinggi untuk Alarm
+      try {
+        final androidPlatform = _notifications
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>();
+        if (androidPlatform != null) {
+          const alarmChannel = AndroidNotificationChannel(
+            _channelId,
+            _channelName,
+            description: _channelDesc,
+            importance: Importance.max,
+            playSound: true,
+            enableVibration: true,
+            enableLights: true,
+            showBadge: true,
+          );
+          await androidPlatform.createNotificationChannel(alarmChannel);
+        }
+      } catch (e) {
+        debugPrint('Error creating Android notification channel: $e');
+      }
+
       // Konfigurasi audio context alarm
       await _alarmPlayer.setReleaseMode(ReleaseMode.loop);
+
+      _startForegroundTicker();
 
       _isInitialized = true;
     } catch (e) {
@@ -146,6 +176,105 @@ class TodoAlarmService {
     } catch (e) {
       debugPrint('Request permissions error: $e');
     }
+  }
+
+  /// Real-time Ticker internal untuk memantau alarm saat aplikasi terbuka (foreground)
+  static void _startForegroundTicker() {
+    _foregroundTicker?.cancel();
+    _foregroundTicker = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final now = DateTime.now();
+
+      for (final group in _registeredGroups.values) {
+        if (!group.reminderEnabled || group.isArchived || group.isAllCompleted) {
+          continue;
+        }
+
+        final pendingItems = group.items.where((i) => !i.isCompleted).toList();
+        if (pendingItems.isEmpty) continue;
+
+        final targetTimes = _getScheduledTriggerTimes(group, now);
+        for (final target in targetTimes) {
+          final isSameDay = now.year == target.year &&
+              now.month == target.month &&
+              now.day == target.day;
+          final isSameMinute =
+              now.hour == target.hour && now.minute == target.minute;
+
+          if (isSameDay && isSameMinute) {
+            final key =
+                '${group.id}_${now.year}_${now.month}_${now.day}_${now.hour}_${now.minute}';
+            if (!_triggeredKeys.contains(key)) {
+              _triggeredKeys.add(key);
+              debugPrint(
+                  '🔔 [FOREGROUND ALARM TRIGGERED] Group: ${group.id} at ${now.hour}:${now.minute.toString().padLeft(2, '0')}');
+
+              final payload = AlarmTriggerPayload(
+                groupId: group.id,
+                date: group.date,
+                soundType: group.reminderSoundType,
+                defaultSound: group.reminderDefaultSound,
+                customSoundPath: group.reminderCustomSoundPath,
+                customSoundName: group.reminderCustomSoundName,
+              );
+              _handleAlarmTrigger(payload);
+            }
+          }
+        }
+      }
+    });
+  }
+
+  /// Helper untuk menghitung seluruh waktu trigger aktif untuk sebuah group
+  static List<DateTime> _getScheduledTriggerTimes(
+      TodoDateGroup group, DateTime now) {
+    final List<DateTime> times = [];
+    final today = DateTime(now.year, now.month, now.day);
+    final groupDate =
+        DateTime(group.date.year, group.date.month, group.date.day);
+
+    final baseDate = groupDate.isBefore(today) ? today : groupDate;
+
+    if (group.reminderType == 'interval') {
+      final startParts = _parseTimeString(group.reminderIntervalStartTime);
+      final endParts = _parseTimeString(group.reminderIntervalEndTime);
+
+      DateTime currentSlot = DateTime(
+        baseDate.year,
+        baseDate.month,
+        baseDate.day,
+        startParts.$1,
+        startParts.$2,
+      );
+
+      final endSlot = DateTime(
+        baseDate.year,
+        baseDate.month,
+        baseDate.day,
+        endParts.$1,
+        endParts.$2,
+      );
+
+      final intervalMins = group.reminderIntervalMinutes.clamp(1, 720);
+
+      while (!currentSlot.isAfter(endSlot)) {
+        times.add(currentSlot);
+        currentSlot = currentSlot.add(Duration(minutes: intervalMins));
+      }
+    } else {
+      for (final timeStr in group.reminderSpecificTimes) {
+        final parts = _parseTimeString(timeStr);
+        final trigger = DateTime(
+          baseDate.year,
+          baseDate.month,
+          baseDate.day,
+          parts.$1,
+          parts.$2,
+        );
+        times.add(trigger);
+      }
+    }
+
+    return times;
   }
 
   /// Trigger internal saat alarm aktif
@@ -199,7 +328,6 @@ class TodoAlarmService {
         if (await file.exists()) {
           await _alarmPlayer.play(DeviceFileSource(customPath));
         } else {
-          // Fallback ke default jika file kustom tidak ditemukan
           await _playDefaultAsset(defaultSound, _alarmPlayer);
         }
       } else {
@@ -218,7 +346,8 @@ class TodoAlarmService {
   }
 
   /// Helper memutar aset nada dering default
-  static Future<void> _playDefaultAsset(String defaultSound, AudioPlayer player) async {
+  static Future<void> _playDefaultAsset(
+      String defaultSound, AudioPlayer player) async {
     String assetFile;
     switch (defaultSound) {
       case 'alarm_digital':
@@ -289,17 +418,18 @@ class TodoAlarmService {
   static Future<void> scheduleGroupAlarm(TodoDateGroup group) async {
     await initialize();
 
+    // Daftarkan group ke memori internal
+    _registeredGroups[group.id] = group;
+
     // Batalkan jadwal lama terlebih dahulu untuk group ini
-    await cancelGroupAlarm(group.id);
+    await cancelGroupAlarm(group.id, unregister: false);
 
     // Jika reminder dimatikan atau semua tugas sudah selesai, jangan jadwalkan
     if (!group.reminderEnabled || group.isArchived || group.isAllCompleted) {
       return;
     }
 
-    final targetDate = group.date;
     final now = DateTime.now();
-
     final payload = AlarmTriggerPayload(
       groupId: group.id,
       date: group.date,
@@ -310,57 +440,13 @@ class TodoAlarmService {
     );
     final payloadJson = jsonEncode(payload.toJson());
 
-    final List<DateTime> triggerTimes = [];
+    final allTriggerTimes = _getScheduledTriggerTimes(group, now);
+    final futureTriggerTimes =
+        allTriggerTimes.where((t) => t.isAfter(now)).toList();
 
-    if (group.reminderType == 'interval') {
-      // Mode Interval
-      final startParts = _parseTimeString(group.reminderIntervalStartTime);
-      final endParts = _parseTimeString(group.reminderIntervalEndTime);
-
-      DateTime currentSlot = DateTime(
-        targetDate.year,
-        targetDate.month,
-        targetDate.day,
-        startParts.$1,
-        startParts.$2,
-      );
-
-      final endSlot = DateTime(
-        targetDate.year,
-        targetDate.month,
-        targetDate.day,
-        endParts.$1,
-        endParts.$2,
-      );
-
-      final intervalMins = group.reminderIntervalMinutes.clamp(5, 720);
-
-      while (!currentSlot.isAfter(endSlot)) {
-        if (currentSlot.isAfter(now)) {
-          triggerTimes.add(currentSlot);
-        }
-        currentSlot = currentSlot.add(Duration(minutes: intervalMins));
-      }
-    } else {
-      // Mode Specific Times
-      for (final timeStr in group.reminderSpecificTimes) {
-        final parts = _parseTimeString(timeStr);
-        final trigger = DateTime(
-          targetDate.year,
-          targetDate.month,
-          targetDate.day,
-          parts.$1,
-          parts.$2,
-        );
-        if (trigger.isAfter(now)) {
-          triggerTimes.add(trigger);
-        }
-      }
-    }
-
-    // Jadwalkan masing-masing waktu
-    for (int i = 0; i < triggerTimes.length; i++) {
-      final scheduledTime = triggerTimes[i];
+    // Jadwalkan masing-masing waktu ke OS notification
+    for (int i = 0; i < futureTriggerTimes.length; i++) {
+      final scheduledTime = futureTriggerTimes[i];
       final notifId = _generateNotificationId(group.id, i);
 
       await _scheduleSingleNotification(
@@ -401,11 +487,25 @@ class TodoAlarmService {
       } catch (_) {
         loc = tz.UTC;
       }
-      final tzScheduled = tz.TZDateTime.from(scheduledDate, loc);
+
+      tz.TZDateTime tzScheduled;
+      try {
+        tzScheduled = tz.TZDateTime(
+          loc,
+          scheduledDate.year,
+          scheduledDate.month,
+          scheduledDate.day,
+          scheduledDate.hour,
+          scheduledDate.minute,
+        );
+      } catch (_) {
+        tzScheduled = tz.TZDateTime.from(scheduledDate, loc);
+      }
 
       final pendingTasks = group.pendingItems;
       final pendingCount = pendingTasks.length;
-      final previewTasks = pendingTasks.take(3).map((t) => '• ${t.title}').join('\n');
+      final previewTasks =
+          pendingTasks.take(3).map((t) => '• ${t.title}').join('\n');
       final taskSummary = pendingCount > 3
           ? '$previewTasks\n...dan ${pendingCount - 3} tugas lainnya'
           : previewTasks.isNotEmpty
@@ -456,7 +556,8 @@ class TodoAlarmService {
       await _notifications.zonedSchedule(
         id: id,
         title: '🚨 Tugasmu ada yang belum selesai Nih',
-        body: '📅 ${group.formattedDateShort}: $pendingCount tugas belum selesai',
+        body:
+            '📅 ${group.formattedDateShort}: $pendingCount tugas belum selesai',
         scheduledDate: tzScheduled,
         notificationDetails: details,
         payload: payload,
@@ -468,8 +569,12 @@ class TodoAlarmService {
   }
 
   /// Batalkan semua alarm untuk group ID tertentu (maks 10 slot)
-  static Future<void> cancelGroupAlarm(String groupId) async {
+  static Future<void> cancelGroupAlarm(String groupId,
+      {bool unregister = true}) async {
     try {
+      if (unregister) {
+        _registeredGroups.remove(groupId);
+      }
       final baseHash = groupId.hashCode.abs() % 50000;
       for (int i = 0; i < 10; i++) {
         await _notifications.cancel(id: baseHash * 10 + i);
@@ -482,8 +587,10 @@ class TodoAlarmService {
   /// Sinkronisasi ulang semua alarm dari seluruh group aktif
   static Future<void> syncAllAlarms(List<TodoDateGroup> groups) async {
     try {
+      _registeredGroups.clear();
       await _notifications.cancelAll();
       for (final g in groups) {
+        _registeredGroups[g.id] = g;
         if (g.reminderEnabled && !g.isArchived && !g.isAllCompleted) {
           await scheduleGroupAlarm(g);
         }
