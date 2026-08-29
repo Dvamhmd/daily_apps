@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import '../models/model_sheets_config.dart';
 import '../models/model_struktur.dart';
 import '../utils/sheets_sync_service.dart';
+import 'sheets_risk_management_dialog.dart';
 
 class GoogleSheetsConfigModal extends StatefulWidget {
   final SheetsConfig initialConfig;
@@ -15,6 +16,7 @@ class GoogleSheetsConfigModal extends StatefulWidget {
   final int initialTab;
   final Function(SheetsConfig) onConfigSaved;
   final VoidCallback? onSyncCompleted;
+  final Function(List<StrukturTransaction>)? onImportFromSheets;
 
   const GoogleSheetsConfigModal({
     super.key,
@@ -24,6 +26,7 @@ class GoogleSheetsConfigModal extends StatefulWidget {
     this.initialTab = 0,
     required this.onConfigSaved,
     this.onSyncCompleted,
+    this.onImportFromSheets,
   });
 
   static Future<void> show({
@@ -34,6 +37,7 @@ class GoogleSheetsConfigModal extends StatefulWidget {
     int initialTab = 0,
     required Function(SheetsConfig) onConfigSaved,
     VoidCallback? onSyncCompleted,
+    Function(List<StrukturTransaction>)? onImportFromSheets,
     bool useRootNavigator = true,
   }) {
     return showModalBottomSheet(
@@ -48,6 +52,7 @@ class GoogleSheetsConfigModal extends StatefulWidget {
         initialTab: initialTab,
         onConfigSaved: onConfigSaved,
         onSyncCompleted: onSyncCompleted,
+        onImportFromSheets: onImportFromSheets,
       ),
     );
   }
@@ -66,6 +71,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
   late TextEditingController _urlCtrl;
   late TextEditingController _sheetNameCtrl;
   late TextEditingController _startRowCtrl;
+  late TextEditingController _startRowOnHandCtrl;
 
   static const List<Map<String, String>> dateFormatPresets = [
     {
@@ -123,15 +129,24 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
   String? _testMessage;
   bool? _testSuccess;
 
-  final List<Map<String, String>> _transactionFields = [
+  final List<Map<String, String>> _rekeningFields = [
     {'key': 'no', 'label': 'Nomor Urut', 'desc': '1, 2, 3, ...'},
     {'key': 'tanggal', 'label': 'Tanggal', 'desc': 'Format Tanggal Transaksi'},
     {'key': 'ku', 'label': 'Kode Unit (KU)', 'desc': 'KU-01, KU-02, dsb.'},
     {'key': 'kategori', 'label': 'Kategori', 'desc': 'Kategori Transaksi'},
     {'key': 'keterangan', 'label': 'Keterangan', 'desc': 'Judul & Rincian'},
-    {'key': 'jumlah', 'label': 'Jumlah', 'desc': 'Total Nominal Transaksi'},
     {'key': 'debit', 'label': 'Debit (Pemasukan)', 'desc': 'Nominal Masuk'},
     {'key': 'kredit', 'label': 'Kredit (Pengeluaran)', 'desc': 'Nominal Keluar'},
+  ];
+
+  final List<Map<String, String>> _onHandFields = [
+    {'key': 'no_onhand', 'label': 'Nomor Urut', 'desc': '1, 2, 3, ...'},
+    {'key': 'tanggal_onhand', 'label': 'Tanggal', 'desc': 'Format Tanggal Transaksi'},
+    {'key': 'ku_onhand', 'label': 'Kode Unit (KU)', 'desc': 'KU-01, KU-02, dsb.'},
+    {'key': 'kategori_onhand', 'label': 'Kategori', 'desc': 'Kategori Transaksi'},
+    {'key': 'keterangan_onhand', 'label': 'Keterangan', 'desc': 'Judul & Rincian'},
+    {'key': 'debit_onhand', 'label': 'Debit (Pemasukan)', 'desc': 'Nominal Masuk'},
+    {'key': 'kredit_onhand', 'label': 'Kredit (Pengeluaran)', 'desc': 'Nominal Keluar'},
   ];
 
   final List<Map<String, String>> _evidenceImageFields = [
@@ -173,7 +188,8 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
   ];
 
   List<Map<String, String>> get _fieldDefinitions => [
-        ..._transactionFields,
+        ..._rekeningFields,
+        ..._onHandFields,
         ..._evidenceImageFields,
       ];
 
@@ -214,6 +230,8 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     _urlCtrl = TextEditingController(text: _config.webAppUrl);
     _sheetNameCtrl = TextEditingController(text: _config.sheetName);
     _startRowCtrl = TextEditingController(text: _config.startRow.toString());
+    _startRowOnHandCtrl =
+        TextEditingController(text: _config.startRowOnHand.toString());
     _evidenceTargetRowCtrl =
         TextEditingController(text: _config.evidenceTargetRow.toString());
     _insertImageFormula = _config.insertImageFormula;
@@ -249,6 +267,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     _urlCtrl.dispose();
     _sheetNameCtrl.dispose();
     _startRowCtrl.dispose();
+    _startRowOnHandCtrl.dispose();
     _evidenceTargetRowCtrl.dispose();
     _customDateFormatCtrl.dispose();
     for (var c in _colControllers.values) {
@@ -299,7 +318,9 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
   void _saveCurrentState({bool markCellsConfigured = false}) {
     _config.webAppUrl = _urlCtrl.text.trim();
     _config.sheetName = _sheetNameCtrl.text.trim();
-    _config.startRow = int.tryParse(_startRowCtrl.text.trim()) ?? 2;
+    _config.startRow = int.tryParse(_startRowCtrl.text.trim()) ?? 4;
+    _config.startRowOnHand =
+        int.tryParse(_startRowOnHandCtrl.text.trim()) ?? 4;
     _config.evidenceTargetRow =
         int.tryParse(_evidenceTargetRowCtrl.text.trim()) ?? 60;
     _config.insertImageFormula = _insertImageFormula;
@@ -582,12 +603,31 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text(
-                              'Baris Mulai Data:',
+                              'Baris Mulai Rekening:',
                               style: TextStyle(
                                   fontSize: 11.5, color: Color(0xFF475569)),
                             ),
                             Text(
                               'Baris $startRow',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Baris Mulai Cash On Hand:',
+                              style: TextStyle(
+                                  fontSize: 11.5, color: Color(0xFF475569)),
+                            ),
+                            Text(
+                              'Baris ${_config.startRowOnHand}',
                               style: const TextStyle(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.bold,
@@ -621,9 +661,9 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                   ),
                   const SizedBox(height: 14),
 
-                  // Section Kolom Transaksi
+                  // Section 1: Kolom Transaksi Rekening
                   const Text(
-                    'Pemetaan Kolom Transaksi',
+                    '1. Pemetaan Kolom Transaksi Rekening',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -639,7 +679,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
                     child: Column(
-                      children: _transactionFields.map((f) {
+                      children: _rekeningFields.map((f) {
                         final key = f['key']!;
                         final label = f['label']!;
                         final isVisible = _fieldVisibility[key] ?? true;
@@ -681,6 +721,77 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                                     color: isExcluded
                                         ? const Color(0xFF94A3B8)
                                         : const Color(0xFF107C41),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Section 2: Kolom Transaksi Cash On Hand
+                  const Text(
+                    '2. Pemetaan Kolom Transaksi Cash On Hand',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      children: _onHandFields.map((f) {
+                        final key = f['key']!;
+                        final label = f['label']!;
+                        final isVisible = _fieldVisibility[key] ?? true;
+                        final colVal = isVisible
+                            ? (_colControllers[key]?.text.trim().toUpperCase() ??
+                                '-')
+                            : 'Dikecualikan';
+                        final isExcluded = !isVisible || colVal == '-';
+
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                label,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isExcluded
+                                      ? const Color(0xFF94A3B8)
+                                      : const Color(0xFF334155),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: isExcluded
+                                      ? const Color(0xFFF1F5F9)
+                                      : const Color(0xFF0D9488)
+                                          .withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                                child: Text(
+                                  isExcluded ? 'Dikecualikan' : 'Kolom $colVal',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: isExcluded
+                                        ? const Color(0xFF94A3B8)
+                                        : const Color(0xFF0D9488),
                                   ),
                                 ),
                               ),
@@ -902,6 +1013,70 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
       _isSyncing = true;
     });
 
+    // 1. Pra-sinkronisasi (Fetch data remote terlebih dahulu untuk Manajemen Risiko)
+    final fetchRes = await SheetsSyncService.fetchRemoteTransactions(
+      _config,
+      customRules: widget.customRules,
+    );
+
+    if (fetchRes.isSuccess && !fetchRes.isEmpty) {
+      final comparison = SheetsSyncService.compareData(
+        localTransactions: widget.transactions,
+        remoteFetchResult: fetchRes,
+      );
+
+      if (comparison.hasDiscrepancy) {
+        setState(() {
+          _isSyncing = false;
+        });
+
+        if (!mounted) return;
+        final choice = await SheetsRiskManagementDialog.show(
+          context,
+          comparison: comparison,
+          sheetName: _config.sheetName,
+        );
+
+        if (choice == null || choice == SheetsConflictChoice.cancel) {
+          return;
+        }
+
+        if (choice == SheetsConflictChoice.useSheetData) {
+          // Sesuaikan data dari Spreadsheet ke Aplikasi
+          if (widget.onImportFromSheets != null) {
+            widget.onImportFromSheets!(comparison.remoteTransactions);
+          }
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Berhasil menyesuaikan ${comparison.remoteTotalCount} transaksi dari Spreadsheet ke aplikasi!',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+                backgroundColor: const Color(0xFF059669),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          return;
+        }
+
+        // Jika choice == useAppData, lanjutkan mengirim data lokal ke Spreadsheet
+        setState(() {
+          _isSyncing = true;
+        });
+      }
+    }
+
+    // 2. Kirim data aplikasi ke Spreadsheet
     final res = await SheetsSyncService.syncAllTransactions(
       widget.transactions,
       _config,
@@ -1505,6 +1680,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     final defRows = SheetsConfig.defaultEvidenceRowMapping();
     setState(() {
       _startRowCtrl.text = '4';
+      _startRowOnHandCtrl.text = '4';
       _evidenceTargetRowCtrl.text = '60';
       _insertImageFormula = false;
       _selectedDateFormat = 'dd/MM/yyyy';
@@ -1535,7 +1711,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
   Widget _buildFieldRow(Map<String, String> f) {
     final key = f['key']!;
     final label = f['label']!;
-    final desc = key == 'tanggal'
+    final desc = (key == 'tanggal' || key == 'tanggal_onhand')
         ? 'Pola: $_selectedDateFormat (${_formatPreviewSample(_selectedDateFormat)})'
         : f['desc']!;
     final ctrl = _colControllers[key]!;
@@ -2511,12 +2687,12 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
           ),
           const SizedBox(height: 16),
 
-          // Header List Mapping Transaksi
+          // Header List Mapping Transaksi Rekening
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                '1. Kolom Data Transaksi',
+                '1. Kolom Transaksi Rekening',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
@@ -2538,7 +2714,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
           ),
           const SizedBox(height: 8),
 
-          // Baris Mulai Data
+          // Baris Mulai Data Rekening
           Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(12),
@@ -2554,7 +2730,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Baris Mulai Data Transaksi (Start Row)',
+                        'Baris Mulai Data Rekening (Start Row)',
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.bold,
@@ -2562,7 +2738,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                         ),
                       ),
                       Text(
-                        'Posisi awal baris penulisan data transaksi',
+                        'Posisi awal baris penulisan data transaksi rekening struktur',
                         style: TextStyle(
                           fontSize: 10.5,
                           color: Color(0xFF64748B),
@@ -2598,17 +2774,110 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
           // Pengaturan Format & Urutan Tanggal Spreadsheet
           _buildDateFormatSection(),
 
-          // Daftar Kolom Field Transaksi
-          ..._transactionFields.map((f) => _buildFieldRow(f)),
+          // Daftar Kolom Field Transaksi Rekening
+          ..._rekeningFields.map((f) => _buildFieldRow(f)),
 
           const SizedBox(height: 20),
 
-          // Section 2: Pemetaan Kolom & Baris Bukti Gambar
+          // Section 2: Pemetaan Kolom Transaksi Cash On Hand
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                '2. Kolom & Baris Gambar Bukti',
+                '2. Kolom Transaksi Cash On Hand',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCCFBF1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'Dana On Hand / Tunai',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F766E),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Baris Mulai Data Cash On Hand
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Baris Mulai Data On Hand (Start Row)',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                      Text(
+                        'Posisi awal baris penulisan data transaksi Cash On Hand',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 60,
+                  height: 38,
+                  child: TextField(
+                    controller: _startRowOnHandCtrl,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    onChanged: (v) => _saveCurrentState(),
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.bold),
+                    decoration: InputDecoration(
+                      contentPadding: EdgeInsets.zero,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Daftar Kolom Field Transaksi Cash On Hand
+          ..._onHandFields.map((f) => _buildFieldRow(f)),
+
+          const SizedBox(height: 20),
+
+          // Section 3: Pemetaan Kolom & Baris Bukti Gambar
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '3. Kolom & Baris Gambar Bukti',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,

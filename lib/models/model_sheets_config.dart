@@ -5,7 +5,8 @@ class SheetsConfig {
   String webAppUrl;
   String sheetName;
   bool autoSyncOnInput;
-  int startRow;
+  int startRow; // Start row untuk Transaksi Rekening
+  int startRowOnHand; // Start row untuk Transaksi Cash On Hand
   String dateFormat;
   Map<String, String> columnMapping;
   DateTime? lastSyncTime;
@@ -24,6 +25,7 @@ class SheetsConfig {
     this.sheetName = '',
     this.autoSyncOnInput = false,
     this.startRow = 4,
+    this.startRowOnHand = 4,
     this.dateFormat = 'dd/MM/yyyy',
     Map<String, String>? columnMapping,
     this.insertImageFormula = false,
@@ -37,14 +39,25 @@ class SheetsConfig {
         evidenceRowMapping = evidenceRowMapping ?? defaultEvidenceRowMapping();
 
   static Map<String, String> defaultColumnMapping() => {
+        // 1. Kolom Transaksi Rekening
         'no': 'A',
         'tanggal': 'B',
         'ku': 'C',
         'kategori': 'D',
         'keterangan': 'E',
-        'jumlah': '-',
         'debit': 'F',
         'kredit': 'G',
+
+        // 2. Kolom Transaksi Cash On Hand
+        'no_onhand': 'A',
+        'tanggal_onhand': 'B',
+        'ku_onhand': 'C',
+        'kategori_onhand': 'D',
+        'keterangan_onhand': 'E',
+        'debit_onhand': 'F',
+        'kredit_onhand': 'G',
+
+        // 3. Bukti Gambar
         'bukti_saldo_rekening': '-',
         'bukti_saldo_cash': '-',
         'bukti_mutasi_1': '-',
@@ -56,14 +69,25 @@ class SheetsConfig {
 
   static String suggestedColumn(String key) {
     const suggested = {
+      // Rekening
       'no': 'A',
       'tanggal': 'B',
       'ku': 'C',
       'kategori': 'D',
       'keterangan': 'E',
-      'jumlah': 'F',
       'debit': 'F',
       'kredit': 'G',
+
+      // Cash On Hand (sama seperti Rekening: A - G)
+      'no_onhand': 'A',
+      'tanggal_onhand': 'B',
+      'ku_onhand': 'C',
+      'kategori_onhand': 'D',
+      'keterangan_onhand': 'E',
+      'debit_onhand': 'F',
+      'kredit_onhand': 'G',
+
+      // Bukti Gambar
       'bukti_saldo_rekening': 'A',
       'bukti_saldo_cash': 'J',
       'bukti_mutasi_1': 'A',
@@ -99,6 +123,7 @@ class SheetsConfig {
         'sheetName': sheetName,
         'autoSyncOnInput': autoSyncOnInput,
         'startRow': startRow,
+        'startRowOnHand': startRowOnHand,
         'dateFormat': dateFormat,
         'columnMapping': columnMapping,
         'insertImageFormula': insertImageFormula,
@@ -116,7 +141,10 @@ class SheetsConfig {
       final raw = json['columnMapping'] as Map;
       raw.forEach((k, v) {
         if (k != null && v != null) {
-          mapping[k.toString()] = v.toString().toUpperCase().trim();
+          final keyStr = k.toString();
+          if (keyStr != 'jumlah') {
+            mapping[keyStr] = v.toString().toUpperCase().trim();
+          }
         }
       });
     }
@@ -135,11 +163,16 @@ class SheetsConfig {
       });
     }
 
+    final int parsedStartRow = (json['startRow'] as num?)?.toInt() ?? 4;
+    final int parsedStartRowOnHand =
+        (json['startRowOnHand'] as num?)?.toInt() ?? parsedStartRow;
+
     return SheetsConfig(
       webAppUrl: json['webAppUrl'] as String? ?? '',
       sheetName: (json['sheetName'] as String? ?? '').trim(),
       autoSyncOnInput: json['autoSyncOnInput'] as bool? ?? false,
-      startRow: (json['startRow'] as num?)?.toInt() ?? 4,
+      startRow: parsedStartRow,
+      startRowOnHand: parsedStartRowOnHand,
       dateFormat: json['dateFormat'] as String? ?? 'dd/MM/yyyy',
       columnMapping: mapping,
       insertImageFormula: json['insertImageFormula'] as bool? ?? false,

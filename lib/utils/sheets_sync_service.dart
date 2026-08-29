@@ -18,6 +18,74 @@ class SheetsSyncResult {
   });
 }
 
+class SheetsFetchResult {
+  final bool isSuccess;
+  final String message;
+  final List<Map<String, dynamic>> rekeningRows;
+  final List<Map<String, dynamic>> onHandRows;
+  final List<StrukturTransaction> rekeningTransactions;
+  final List<StrukturTransaction> onHandTransactions;
+  final List<StrukturTransaction> allTransactions;
+
+  SheetsFetchResult({
+    required this.isSuccess,
+    required this.message,
+    this.rekeningRows = const [],
+    this.onHandRows = const [],
+    this.rekeningTransactions = const [],
+    this.onHandTransactions = const [],
+    this.allTransactions = const [],
+  });
+
+  int get totalRowsCount => rekeningRows.length + onHandRows.length;
+  bool get isEmpty => rekeningRows.isEmpty && onHandRows.isEmpty;
+}
+
+class SheetsSyncComparison {
+  final int localRekeningCount;
+  final int localRekeningDebit;
+  final int localRekeningKredit;
+  final int localOnHandCount;
+  final int localOnHandDebit;
+  final int localOnHandKredit;
+
+  final int remoteRekeningCount;
+  final int remoteRekeningDebit;
+  final int remoteRekeningKredit;
+  final int remoteOnHandCount;
+  final int remoteOnHandDebit;
+  final int remoteOnHandKredit;
+
+  final bool hasDiscrepancy;
+  final List<String> discrepancyReasons;
+  final List<StrukturTransaction> remoteTransactions;
+
+  SheetsSyncComparison({
+    required this.localRekeningCount,
+    required this.localRekeningDebit,
+    required this.localRekeningKredit,
+    required this.localOnHandCount,
+    required this.localOnHandDebit,
+    required this.localOnHandKredit,
+    required this.remoteRekeningCount,
+    required this.remoteRekeningDebit,
+    required this.remoteRekeningKredit,
+    required this.remoteOnHandCount,
+    required this.remoteOnHandDebit,
+    required this.remoteOnHandKredit,
+    required this.hasDiscrepancy,
+    required this.discrepancyReasons,
+    required this.remoteTransactions,
+  });
+
+  int get localTotalCount => localRekeningCount + localOnHandCount;
+  int get remoteTotalCount => remoteRekeningCount + remoteOnHandCount;
+  int get localTotalDebit => localRekeningDebit + localOnHandDebit;
+  int get localTotalKredit => localRekeningKredit + localOnHandKredit;
+  int get remoteTotalDebit => remoteRekeningDebit + remoteOnHandDebit;
+  int get remoteTotalKredit => remoteRekeningKredit + remoteOnHandKredit;
+}
+
 class SheetsSyncService {
   /// Melakukan HTTP POST request ke Google Apps Script Web App dengan penanganan CORS Web & redirect 302 otomatis
   static Future<Map<String, dynamic>> _sendPostRequest(
@@ -221,18 +289,27 @@ class SheetsSyncService {
         (tx.isPengeluaran && tx.amount > 0) ? tx.amount : '';
 
     return {
+      // Field Kolom Transaksi Rekening
       'no': indexNumber,
       'tanggal': dateFormatted,
       'ku': ku,
       'kategori': kategori,
       'keterangan': fullKeterangan,
-      'jumlah': tx.amount,
       'debit': debit,
       'kredit': kredit,
+
+      // Field Kolom Transaksi Cash On Hand
+      'no_onhand': indexNumber,
+      'tanggal_onhand': dateFormatted,
+      'ku_onhand': ku,
+      'kategori_onhand': kategori,
+      'keterangan_onhand': fullKeterangan,
+      'debit_onhand': debit,
+      'kredit_onhand': kredit,
     };
   }
 
-  /// Melakukan sinkronisasi seluruh tabel transaksi bulan aktif ke Spreadsheet
+  /// Melakukan sinkronisasi seluruh tabel transaksi bulan aktif ke Spreadsheet (Tabel Rekening & Tabel Cash On Hand)
   /// Mendukung pengiriman bertahap (batching/chunking) otomatis untuk mencegah batas limit URL di browser/web
   static Future<SheetsSyncResult> syncAllTransactions(
     List<StrukturTransaction> transactions,
@@ -258,132 +335,80 @@ class SheetsSyncService {
       final sortedList = List<StrukturTransaction>.from(transactions)
         ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
-      final List<Map<String, dynamic>> rows = [];
-      for (int i = 0; i < sortedList.length; i++) {
-        rows.add(formatTransactionRow(
-          sortedList[i],
+      // Pisahkan transaksi Rekening vs Cash On Hand
+      final List<StrukturTransaction> rekeningTxList = sortedList.where((tx) {
+        if (tx.isPemasukan) {
+          return tx.targetAccount == 'rekening' || tx.targetAccount == null;
+        } else {
+          return tx.sourceAccount == 'rekening' || tx.sourceAccount == null;
+        }
+      }).toList();
+
+      final List<StrukturTransaction> onHandTxList = sortedList.where((tx) {
+        if (tx.isPemasukan) {
+          return tx.targetAccount == 'debit' || tx.targetAccount == 'cash';
+        } else {
+          return tx.sourceAccount == 'debit' || tx.sourceAccount == 'cash';
+        }
+      }).toList();
+
+      final List<Map<String, dynamic>> rekeningRows = [];
+      for (int i = 0; i < rekeningTxList.length; i++) {
+        rekeningRows.add(formatTransactionRow(
+          rekeningTxList[i],
           i + 1,
           customRules: customRules,
           dateFormat: config.dateFormat,
         ));
       }
 
-      // Jika data kosong, kirim sync_all untuk mengosongkan spreadsheet
-      if (rows.isEmpty) {
-        final payload = {
-          'action': 'sync_all',
-          'sheetName': config.sheetName.trim(),
-          'startRow': config.startRow,
-          'targetRow': config.evidenceTargetRow,
-          'rowMapping': config.evidenceRowMapping,
-          'mapping': config.columnMapping,
-          'rows': [],
-        };
-        final res = await _sendPostRequest(config.webAppUrl, payload);
-        final status = res['status'] as String?;
-        final msg = res['message'] as String? ?? 'Data spreadsheet berhasil dikosongkan.';
+      final List<Map<String, dynamic>> onHandRows = [];
+      for (int i = 0; i < onHandTxList.length; i++) {
+        onHandRows.add(formatTransactionRow(
+          onHandTxList[i],
+          i + 1,
+          customRules: customRules,
+          dateFormat: config.dateFormat,
+        ));
+      }
 
-        config.lastSyncStatus = status == 'success' ? 'success' : 'failed';
+      final totalCount = rekeningRows.length + onHandRows.length;
+
+      final payload = {
+        'action': 'sync_all',
+        'sheetName': config.sheetName.trim(),
+        'startRow': config.startRow,
+        'startRowRekening': config.startRow,
+        'startRowOnHand': config.startRowOnHand,
+        'targetRow': config.evidenceTargetRow,
+        'rowMapping': config.evidenceRowMapping,
+        'mapping': config.columnMapping,
+        'rekeningRows': rekeningRows,
+        'onHandRows': onHandRows,
+        'rows': rekeningRows, // Fallback legacy
+      };
+
+      final res = await _sendPostRequest(config.webAppUrl, payload);
+      final status = res['status'] as String?;
+      final msg = res['message'] as String? ??
+          'Berhasil sinkronisasi $totalCount data transaksi (Rekening: ${rekeningRows.length}, On Hand: ${onHandRows.length}).';
+
+      if (status == 'success' || status == null) {
+        config.lastSyncStatus = 'success';
         config.lastSyncMessage = msg;
         config.lastSyncTime = DateTime.now();
         await config.save();
         return SheetsSyncResult(
-          isSuccess: status == 'success' || status == null,
+          isSuccess: true,
           message: msg,
-          count: 0,
+          count: totalCount,
         );
+      } else {
+        config.lastSyncStatus = 'failed';
+        config.lastSyncMessage = msg;
+        await config.save();
+        return SheetsSyncResult(isSuccess: false, message: msg);
       }
-
-      // Kirim seluruh baris transaksi dalam 1 request POST instan (Single-Flight Direct Sync)
-      // Jauh lebih cepat (0.5 - 1 detik) dibandingkan multi-batching mikro
-      if (rows.length <= 150) {
-        final payload = {
-          'action': 'sync_all',
-          'sheetName': config.sheetName.trim(),
-          'startRow': config.startRow,
-          'targetRow': config.evidenceTargetRow,
-          'rowMapping': config.evidenceRowMapping,
-          'mapping': config.columnMapping,
-          'rows': rows,
-        };
-
-        final res = await _sendPostRequest(config.webAppUrl, payload);
-        final status = res['status'] as String?;
-        final msg = res['message'] as String? ??
-            'Berhasil sinkronisasi ${rows.length} data transaksi.';
-
-        if (status == 'success' || status == null) {
-          config.lastSyncStatus = 'success';
-          config.lastSyncMessage = msg;
-          config.lastSyncTime = DateTime.now();
-          await config.save();
-          return SheetsSyncResult(
-            isSuccess: true,
-            message: msg,
-            count: rows.length,
-          );
-        } else {
-          config.lastSyncStatus = 'failed';
-          config.lastSyncMessage = msg;
-          await config.save();
-          return SheetsSyncResult(isSuccess: false, message: msg);
-        }
-      }
-
-      // Jika data sangat besar (> 150 baris), bagi dengan ukuran batch besar (100 per batch)
-      const int batchSize = 100;
-      int totalSynced = 0;
-      final int totalChunks = (rows.length / batchSize).ceil();
-
-      for (int chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
-        final int startIdx = chunkIdx * batchSize;
-        final int endIdx = (startIdx + batchSize < rows.length)
-            ? startIdx + batchSize
-            : rows.length;
-        final chunkRows = rows.sublist(startIdx, endIdx);
-        final int chunkStartRow = config.startRow + startIdx;
-
-        final payload = {
-          'action': 'sync_batch',
-          'clearFirst': chunkIdx == 0,
-          'sheetName': config.sheetName.trim(),
-          'startRow': chunkStartRow,
-          'targetRow': config.evidenceTargetRow,
-          'rowMapping': config.evidenceRowMapping,
-          'mapping': config.columnMapping,
-          'rows': chunkRows,
-          'chunkIndex': chunkIdx,
-          'totalChunks': totalChunks,
-        };
-
-        final res = await _sendPostRequest(config.webAppUrl, payload);
-        final status = res['status'] as String?;
-        if (status == 'error') {
-          final errorMsg = res['message'] as String? ??
-              'Gagal pada batch ke-${chunkIdx + 1}';
-          config.lastSyncStatus = 'failed';
-          config.lastSyncMessage = errorMsg;
-          await config.save();
-          return SheetsSyncResult(
-            isSuccess: false,
-            message: 'Gagal sinkronisasi data: $errorMsg',
-          );
-        }
-        totalSynced += chunkRows.length;
-      }
-
-      final successMsg =
-          'Berhasil sinkronisasi seluruh $totalSynced data transaksi ke spreadsheet.';
-      config.lastSyncStatus = 'success';
-      config.lastSyncMessage = successMsg;
-      config.lastSyncTime = DateTime.now();
-      await config.save();
-
-      return SheetsSyncResult(
-        isSuccess: true,
-        message: successMsg,
-        count: totalSynced,
-      );
     } catch (e) {
       config.lastSyncStatus = 'failed';
       config.lastSyncMessage = e.toString();
@@ -413,6 +438,10 @@ class SheetsSyncService {
     }
 
     try {
+      final isOnHand = tx.isPemasukan
+          ? (tx.targetAccount == 'debit' || tx.targetAccount == 'cash')
+          : (tx.sourceAccount == 'debit' || tx.sourceAccount == 'cash');
+
       final rowData = formatTransactionRow(
         tx,
         rowNumber ?? 1,
@@ -423,7 +452,11 @@ class SheetsSyncService {
       final payload = {
         'action': 'add_row',
         'sheetName': config.sheetName.trim(),
-        'startRow': config.startRow,
+        'startRow': isOnHand ? config.startRowOnHand : config.startRow,
+        'startRowRekening': config.startRow,
+        'startRowOnHand': config.startRowOnHand,
+        'isOnHand': isOnHand,
+        'tableType': isOnHand ? 'onhand' : 'rekening',
         'mapping': config.columnMapping,
         'row': rowData,
       };
@@ -450,11 +483,14 @@ class SheetsSyncService {
   }
 
   /// Mengurungkan (Undo) data terakhir yang masuk ke spreadsheet
-  static Future<SheetsSyncResult> undoLastRow(SheetsConfig config) async {
-    if (!config.isConfigured) {
+  static Future<SheetsSyncResult> undoLastTransaction(
+    SheetsConfig config, {
+    bool isOnHand = false,
+  }) async {
+    if (!config.isConfigured || config.sheetName.trim().isEmpty) {
       return SheetsSyncResult(
         isSuccess: false,
-        message: 'URL Google Apps Script belum diatur.',
+        message: 'URL Google Apps Script belum diatur atau nama Tab Sheet kosong.',
       );
     }
 
@@ -462,7 +498,11 @@ class SheetsSyncService {
       final payload = {
         'action': 'undo_last',
         'sheetName': config.sheetName.trim(),
-        'startRow': config.startRow,
+        'startRow': isOnHand ? config.startRowOnHand : config.startRow,
+        'startRowRekening': config.startRow,
+        'startRowOnHand': config.startRowOnHand,
+        'isOnHand': isOnHand,
+        'tableType': isOnHand ? 'onhand' : 'rekening',
         'mapping': config.columnMapping,
       };
 
@@ -472,10 +512,6 @@ class SheetsSyncService {
           'Data terakhir di spreadsheet berhasil di-undo.';
 
       if (status == 'success' || status == null) {
-        config.lastSyncStatus = 'success';
-        config.lastSyncMessage = msg;
-        config.lastSyncTime = DateTime.now();
-        await config.save();
         return SheetsSyncResult(isSuccess: true, message: msg);
       } else {
         return SheetsSyncResult(isSuccess: false, message: msg);
@@ -489,18 +525,19 @@ class SheetsSyncService {
   }
 
   /// Mengunggah gambar bukti fisik / digital ke Google Drive & menaruh link/formula di Spreadsheet
-  /// Menggunakan metode Paralel Berkecepatan Tinggi (Concurrent Uploads) untuk performa instan tanpa menurunkan kualitas gambar
   static Future<SheetsSyncResult> uploadEvidenceImages({
+    List<Map<String, dynamic>>? images,
+    List<Map<String, dynamic>>? imagesPayload,
     required SheetsConfig config,
-    required List<Map<String, dynamic>> imagesPayload,
-    required String monthLabel,
+    String? monthLabel,
     int? targetRow,
-    Function(int completedCount, int totalCount, String currentKey, bool isSuccess, String message)? onProgress,
+    void Function(int completed, int total, String currentKey, bool isSuccess, String message)? onProgress,
   }) async {
+    final list = images ?? imagesPayload ?? [];
     if (!config.isConfigured) {
       return SheetsSyncResult(
         isSuccess: false,
-        message: 'URL Google Apps Script belum diatur.',
+        message: 'URL Google Apps Script belum diatur. Buka Pengaturan Spreadsheets.',
       );
     }
 
@@ -511,122 +548,360 @@ class SheetsSyncService {
       );
     }
 
-    if (imagesPayload.isEmpty) {
+    if (list.isEmpty) {
       return SheetsSyncResult(
         isSuccess: false,
         message: 'Tidak ada gambar bukti yang dipilih.',
       );
     }
 
-    final totalCount = imagesPayload.length;
-    int completedCount = 0;
     int successCount = 0;
     final List<String> errorMessages = [];
 
-    // Jika hanya 1 gambar, langsung kirim 1 request cepat
-    if (imagesPayload.length == 1) {
-      final img = imagesPayload.first;
-      final payload = {
-        'action': 'upload_evidence_images',
-        'sheetName': config.sheetName.trim(),
-        'startRow': config.startRow,
-        'targetRow': targetRow ?? config.evidenceTargetRow,
-        'mapping': config.columnMapping,
-        'rowMapping': config.evidenceRowMapping,
-        'useImageFormula': config.insertImageFormula,
-        'monthLabel': monthLabel,
-        'images': [img],
-      };
+    // Unggah gambar bukti per batch kecil (maksimal 2 gambar per request) untuk mencegah memory spike & timeout
+    const int batchSize = 2;
+    for (int i = 0; i < list.length; i += batchSize) {
+      final end = (i + batchSize < list.length) ? i + batchSize : list.length;
+      final chunk = list.sublist(i, end);
 
       try {
+        final payload = {
+          'action': 'upload_evidence_images',
+          'sheetName': config.sheetName.trim(),
+          'startRow': config.startRow,
+          'targetRow': targetRow ?? config.evidenceTargetRow,
+          'rowMapping': config.evidenceRowMapping,
+          'mapping': config.columnMapping,
+          'useImageFormula': config.insertImageFormula,
+          'monthLabel': monthLabel ?? '',
+          'images': chunk,
+        };
+
         final res = await _sendPostRequest(config.webAppUrl, payload);
         final status = res['status'] as String?;
-        final isOk = status == 'success' || status == null;
-        final msg = res['message'] as String? ?? (isOk ? 'Gambar berhasil diunggah.' : 'Gagal mengunggah.');
-        
-        onProgress?.call(1, 1, img['key'] as String? ?? '', isOk, msg);
-        if (isOk) {
-          config.lastSyncStatus = 'success';
-          config.lastSyncMessage = msg;
-          config.lastSyncTime = DateTime.now();
-          await config.save();
-          return SheetsSyncResult(isSuccess: true, message: msg, count: 1);
+        final isBatchSuccess = status == 'success' || status == null;
+        if (isBatchSuccess) {
+          final uploadedCount = (res['uploadedCount'] as num?)?.toInt() ?? chunk.length;
+          successCount += uploadedCount;
+          for (final img in chunk) {
+            final key = img['key'] as String? ?? '';
+            onProgress?.call(successCount, list.length, key, true, 'Berhasil diunggah');
+          }
         } else {
-          return SheetsSyncResult(isSuccess: false, message: msg);
+          final errMsg = res['message'] as String? ?? 'Gagal pada batch ${i ~/ batchSize + 1}';
+          errorMessages.add(errMsg);
+          for (final img in chunk) {
+            final key = img['key'] as String? ?? '';
+            onProgress?.call(successCount, list.length, key, false, errMsg);
+          }
         }
-      } catch (e) {
-        final err = 'Gagal mengunggah: ${e.toString()}';
-        onProgress?.call(1, 1, img['key'] as String? ?? '', false, err);
-        return SheetsSyncResult(isSuccess: false, message: err);
+      } catch (err) {
+        errorMessages.add(err.toString());
+        for (final img in chunk) {
+          final key = img['key'] as String? ?? '';
+          onProgress?.call(successCount, list.length, key, false, err.toString());
+        }
       }
     }
 
-    // Jika lebih dari 1 gambar, jalankan PARALEL (Concurrent Uploads) untuk kecepatan maksimal
-    // Setiap request memproses 1 file secara terisolasi dan simultan di cloud Google
-    final uploadFutures = imagesPayload.map((img) async {
-      final key = img['key'] as String? ?? '';
+    if (successCount > 0) {
+      final msg = (errorMessages.isEmpty)
+          ? 'Semua $successCount gambar bukti berhasil diunggah dengan kualitas penuh ke Google Drive & Spreadsheet!'
+          : 'Berhasil mengunggah $successCount gambar bukti (${errorMessages.length} kendala: ${errorMessages.first})';
+      config.lastSyncStatus = errorMessages.isEmpty ? 'success' : 'partial';
+      config.lastSyncMessage = msg;
+      config.lastSyncTime = DateTime.now();
+      await config.save();
+      return SheetsSyncResult(isSuccess: true, message: msg, count: successCount);
+    } else {
+      final errorDetail = errorMessages.isNotEmpty ? errorMessages.join(', ') : 'Gagal terhubung';
+      return SheetsSyncResult(
+        isSuccess: false,
+        message: 'Gagal mengunggah gambar bukti: $errorDetail',
+      );
+    }
+  }
+
+  /// Membaca data transaksi (Tabel Rekening & Tabel Cash On Hand) yang ada di Google Spreadsheet
+  static Future<SheetsFetchResult> fetchRemoteTransactions(
+    SheetsConfig config, {
+    DateTime? activeMonth,
+    List<CustomKodeRule>? customRules,
+  }) async {
+    if (!config.isConfigured) {
+      return SheetsFetchResult(
+        isSuccess: false,
+        message: 'URL Google Apps Script belum diatur.',
+      );
+    }
+
+    if (config.sheetName.trim().isEmpty) {
+      return SheetsFetchResult(
+        isSuccess: false,
+        message: 'Nama Tab Sheet belum di isi',
+      );
+    }
+
+    try {
       final payload = {
-        'action': 'upload_evidence_images',
+        'action': 'fetch_transactions',
         'sheetName': config.sheetName.trim(),
-        'startRow': config.startRow,
-        'targetRow': targetRow ?? config.evidenceTargetRow,
+        'startRowRekening': config.startRow,
+        'startRowOnHand': config.startRowOnHand,
         'mapping': config.columnMapping,
-        'rowMapping': config.evidenceRowMapping,
-        'useImageFormula': config.insertImageFormula,
-        'monthLabel': monthLabel,
-        'images': [img],
       };
 
-      try {
-        final res = await _sendPostRequest(config.webAppUrl, payload);
-        final status = res['status'] as String?;
-        final isOk = status == 'success' || status == null;
-        final msg = res['message'] as String? ?? (isOk ? 'Berhasil' : 'Gagal');
+      final res = await _sendPostRequest(config.webAppUrl, payload);
+      final status = res['status'] as String?;
+      if (status != 'success') {
+        return SheetsFetchResult(
+          isSuccess: false,
+          message: res['message'] as String? ?? 'Gagal membaca data dari spreadsheet.',
+        );
+      }
 
-        completedCount++;
-        if (isOk) {
-          successCount++;
-        } else {
-          errorMessages.add('$key: $msg');
-        }
+      final rawRekening = (res['rekeningRows'] as List?)
+              ?.map((e) => Map<String, dynamic>.from(e as Map))
+              .toList() ??
+          [];
+      final rawOnHand = (res['onHandRows'] as List?)
+              ?.map((e) => Map<String, dynamic>.from(e as Map))
+              .toList() ??
+          [];
 
-        onProgress?.call(completedCount, totalCount, key, isOk, msg);
-        return isOk;
-      } catch (e) {
-        completedCount++;
-        final err = e.toString();
-        errorMessages.add('$key: $err');
-        onProgress?.call(completedCount, totalCount, key, false, err);
-        return false;
+      final List<StrukturTransaction> rekeningTx = [];
+      final List<StrukturTransaction> onHandTx = [];
+      final fallbackDate = activeMonth ?? DateTime.now();
+
+      for (var r in rawRekening) {
+        final tx = parseSpreadsheetRowToTransaction(
+          r,
+          isRekening: true,
+          fallbackDate: fallbackDate,
+          customRules: customRules,
+          dateFormat: config.dateFormat,
+        );
+        if (tx != null) rekeningTx.add(tx);
+      }
+
+      for (var r in rawOnHand) {
+        final tx = parseSpreadsheetRowToTransaction(
+          r,
+          isRekening: false,
+          fallbackDate: fallbackDate,
+          customRules: customRules,
+          dateFormat: config.dateFormat,
+        );
+        if (tx != null) onHandTx.add(tx);
+      }
+
+      final allTx = [...rekeningTx, ...onHandTx]
+        ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+      return SheetsFetchResult(
+        isSuccess: true,
+        message: res['message'] as String? ?? 'Berhasil membaca data dari spreadsheet.',
+        rekeningRows: rawRekening,
+        onHandRows: rawOnHand,
+        rekeningTransactions: rekeningTx,
+        onHandTransactions: onHandTx,
+        allTransactions: allTx,
+      );
+    } catch (e) {
+      return SheetsFetchResult(
+        isSuccess: false,
+        message: 'Gagal mengambil data dari spreadsheet: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Membandingkan data lokal di aplikasi dengan data yang ada di Google Spreadsheet untuk deteksi risiko / konflik
+  static SheetsSyncComparison compareData({
+    required List<StrukturTransaction> localTransactions,
+    required SheetsFetchResult remoteFetchResult,
+  }) {
+    // 1. Hitung agregat lokal
+    final localRekening = localTransactions.where((tx) {
+      if (tx.isPemasukan) {
+        return tx.targetAccount == 'rekening' || tx.targetAccount == null;
+      } else {
+        return tx.sourceAccount == 'rekening' || tx.sourceAccount == null;
       }
     }).toList();
 
-    await Future.wait(uploadFutures);
+    final localOnHand = localTransactions.where((tx) {
+      if (tx.isPemasukan) {
+        return tx.targetAccount == 'debit' || tx.targetAccount == 'cash';
+      } else {
+        return tx.sourceAccount == 'debit' || tx.sourceAccount == 'cash';
+      }
+    }).toList();
 
-    if (successCount > 0) {
-      final successMsg = successCount == totalCount
-          ? 'Semua $successCount gambar bukti berhasil diunggah dengan kualitas penuh ke Google Drive & Spreadsheet!'
-          : 'Berhasil mengunggah $successCount dari $totalCount gambar bukti.${errorMessages.isNotEmpty ? " (${errorMessages.length} gagal)" : ""}';
-
-      config.lastSyncStatus = successCount == totalCount ? 'success' : 'partial';
-      config.lastSyncMessage = successMsg;
-      config.lastSyncTime = DateTime.now();
-      await config.save();
-
-      return SheetsSyncResult(
-        isSuccess: successCount == totalCount,
-        message: successMsg,
-        count: successCount,
-      );
-    } else {
-      final errorMsg = errorMessages.isNotEmpty
-          ? errorMessages.join(', ')
-          : 'Semua gambar bukti gagal diunggah. Periksa koneksi dan URL Google Apps Script.';
-      return SheetsSyncResult(
-        isSuccess: false,
-        message: errorMsg,
-      );
+    int localRekDebit = 0;
+    int localRekKredit = 0;
+    for (var tx in localRekening) {
+      if (tx.isPemasukan) {
+        localRekDebit += tx.amount;
+      } else {
+        localRekKredit += tx.amount;
+      }
     }
+
+    int localOnHandDebit = 0;
+    int localOnHandKredit = 0;
+    for (var tx in localOnHand) {
+      if (tx.isPemasukan) {
+        localOnHandDebit += tx.amount;
+      } else {
+        localOnHandKredit += tx.amount;
+      }
+    }
+
+    // 2. Hitung agregat remote (Spreadsheet)
+    int remoteRekDebit = 0;
+    int remoteRekKredit = 0;
+    for (var r in remoteFetchResult.rekeningRows) {
+      final d = (r['debit'] is num) ? (r['debit'] as num).toInt() : (int.tryParse(r['debit']?.toString() ?? '0') ?? 0);
+      final k = (r['kredit'] is num) ? (r['kredit'] as num).toInt() : (int.tryParse(r['kredit']?.toString() ?? '0') ?? 0);
+      remoteRekDebit += d;
+      remoteRekKredit += k;
+    }
+
+    int remoteOnHandDebit = 0;
+    int remoteOnHandKredit = 0;
+    for (var r in remoteFetchResult.onHandRows) {
+      final d = (r['debit_onhand'] is num)
+          ? (r['debit_onhand'] as num).toInt()
+          : (r['debit'] is num ? (r['debit'] as num).toInt() : (int.tryParse((r['debit_onhand'] ?? r['debit'])?.toString() ?? '0') ?? 0));
+      final k = (r['kredit_onhand'] is num)
+          ? (r['kredit_onhand'] as num).toInt()
+          : (r['kredit'] is num ? (r['kredit'] as num).toInt() : (int.tryParse((r['kredit_onhand'] ?? r['kredit'])?.toString() ?? '0') ?? 0));
+      remoteOnHandDebit += d;
+      remoteOnHandKredit += k;
+    }
+
+    final int remoteRekCount = remoteFetchResult.rekeningRows.length;
+    final int remoteOnHandCount = remoteFetchResult.onHandRows.length;
+
+    // 3. Deteksi apakah ada perbedaan
+    final List<String> reasons = [];
+
+    // Jika spreadsheet sama sekali kosong, tidak dianggap konflik
+    final isRemoteEmpty = remoteRekCount == 0 && remoteOnHandCount == 0;
+
+    if (!isRemoteEmpty) {
+      if (localRekening.length != remoteRekCount) {
+        reasons.add('Jumlah transaksi Rekening berbeda (Aplikasi: ${localRekening.length}, Sheets: $remoteRekCount)');
+      }
+      if (localOnHand.length != remoteOnHandCount) {
+        reasons.add('Jumlah transaksi On Hand berbeda (Aplikasi: ${localOnHand.length}, Sheets: $remoteOnHandCount)');
+      }
+      if (localRekDebit != remoteRekDebit || localRekKredit != remoteRekKredit) {
+        reasons.add('Total nominal transaksi Rekening berbeda');
+      }
+      if (localOnHandDebit != remoteOnHandDebit || localOnHandKredit != remoteOnHandKredit) {
+        reasons.add('Total nominal transaksi On Hand berbeda');
+      }
+    }
+
+    final hasDiscrepancy = reasons.isNotEmpty;
+
+    return SheetsSyncComparison(
+      localRekeningCount: localRekening.length,
+      localRekeningDebit: localRekDebit,
+      localRekeningKredit: localRekKredit,
+      localOnHandCount: localOnHand.length,
+      localOnHandDebit: localOnHandDebit,
+      localOnHandKredit: localOnHandKredit,
+      remoteRekeningCount: remoteRekCount,
+      remoteRekeningDebit: remoteRekDebit,
+      remoteRekeningKredit: remoteRekKredit,
+      remoteOnHandCount: remoteOnHandCount,
+      remoteOnHandDebit: remoteOnHandDebit,
+      remoteOnHandKredit: remoteOnHandKredit,
+      hasDiscrepancy: hasDiscrepancy,
+      discrepancyReasons: reasons,
+      remoteTransactions: remoteFetchResult.allTransactions,
+    );
+  }
+
+  /// Mengonversi baris mentah dari spreadsheet menjadi objek StrukturTransaction
+  static StrukturTransaction? parseSpreadsheetRowToTransaction(
+    Map<String, dynamic> row, {
+    required bool isRekening,
+    required DateTime fallbackDate,
+    List<CustomKodeRule>? customRules,
+    String dateFormat = 'dd/MM/yyyy',
+  }) {
+    final rawDateStr = (row['tanggal'] ?? row['tanggal_onhand'] ?? '').toString().trim();
+    DateTime parsedDate = fallbackDate;
+
+    if (rawDateStr.isNotEmpty) {
+      try {
+        parsedDate = DateFormat(dateFormat.trim()).parseLoose(rawDateStr);
+      } catch (_) {
+        try {
+          parsedDate = DateTime.parse(rawDateStr);
+        } catch (_) {
+          final parts = rawDateStr.split(RegExp(r'[/.-]'));
+          if (parts.length == 3) {
+            final p1 = int.tryParse(parts[0]) ?? 1;
+            final p2 = int.tryParse(parts[1]) ?? 1;
+            final p3 = int.tryParse(parts[2]) ?? fallbackDate.year;
+            if (p3 > 1000) {
+              parsedDate = DateTime(p3, p2, p1);
+            } else if (p1 > 1000) {
+              parsedDate = DateTime(p1, p2, p3);
+            }
+          }
+        }
+      }
+    }
+
+    final kuStr = (row['ku'] ?? row['ku_onhand'] ?? '').toString().trim();
+    final kategoriStr = (row['kategori'] ?? row['kategori_onhand'] ?? '').toString().trim();
+    final keteranganStr = (row['keterangan'] ?? row['keterangan_onhand'] ?? '').toString().trim();
+
+    final debitVal = (row['debit'] ?? row['debit_onhand']);
+    final kreditVal = (row['kredit'] ?? row['kredit_onhand']);
+
+    int debit = 0;
+    if (debitVal is num) {
+      debit = debitVal.toInt();
+    } else if (debitVal != null) {
+      debit = int.tryParse(debitVal.toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    }
+
+    int kredit = 0;
+    if (kreditVal is num) {
+      kredit = kreditVal.toInt();
+    } else if (kreditVal != null) {
+      kredit = int.tryParse(kreditVal.toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    }
+
+    if (debit == 0 && kredit == 0 && keteranganStr.isEmpty) {
+      return null;
+    }
+
+    final title = keteranganStr.isNotEmpty ? keteranganStr : 'Transaksi dari Spreadsheet';
+    final targetAcc = isRekening ? 'rekening' : 'debit';
+    final sourceAcc = isRekening ? 'rekening' : 'debit';
+
+    final isIncome = debit > 0;
+    final amount = isIncome ? debit : kredit;
+
+    return StrukturTransaction(
+      id: '${parsedDate.millisecondsSinceEpoch}_${row['no'] ?? row['no_onhand'] ?? DateTime.now().microsecondsSinceEpoch}',
+      title: title,
+      type: isIncome ? 'pemasukan' : 'pengeluaran',
+      amount: amount,
+      sourceAccount: isIncome ? null : sourceAcc,
+      targetAccount: isIncome ? targetAcc : null,
+      ku: kuStr.isNotEmpty && kuStr != '-' ? kuStr : null,
+      kode: kategoriStr.isNotEmpty && kategoriStr != '-' ? kategoriStr : null,
+      note: keteranganStr,
+      timestamp: parsedDate,
+    );
   }
 
   static String? _cachedScriptCode;
@@ -641,7 +916,7 @@ class SheetsSyncService {
  * 
  * FITUR DIDUKUNG:
  * 1. Tes Koneksi
- * 2. Sinkronisasi Data Transaksi (HANYA menulis ke kolom yang dipetakan & melindungi rumus/tabel lain)
+ * 2. Sinkronisasi Data Transaksi (Tabel Rekening & Tabel Cash On Hand terpisah)
  * 3. Catat Transaksi Baru Realtime (Append Row aman tanpa menimpa rumus/tabel lain)
  * 4. Undo Baris Terakhir (Undo Last Row)
  * 5. Upload Gambar Bukti (Saldo Rekening, Cash on Hand, Mutasi Rekening Maks 5 Gambar)
@@ -728,7 +1003,7 @@ function findOrCreateSheet(ss, rawName) {
   function normalizeStr(str) {
     if (str === undefined || str === null) return "";
     return str.toString()
-      .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, " ")
+      .replace(/[\\u200B-\\u200D\\uFEFF\\u00A0]/g, " ")
       .replace(/\\s+/g, " ")
       .trim()
       .toLowerCase();
@@ -808,16 +1083,23 @@ function processRequest(data) {
       });
     }
     
-    var startRow = parseInt(data.startRow) || 2;
+    var startRowRekening = parseInt(data.startRowRekening) || parseInt(data.startRow) || 4;
+    var startRowOnHand = parseInt(data.startRowOnHand) || startRowRekening || 4;
     var mapping = data.mapping || {
       no: "A",
       tanggal: "B",
       ku: "C",
       kategori: "D",
       keterangan: "E",
-      jumlah: "-",
       debit: "F",
       kredit: "G",
+      no_onhand: "A",
+      tanggal_onhand: "B",
+      ku_onhand: "C",
+      kategori_onhand: "D",
+      keterangan_onhand: "E",
+      debit_onhand: "F",
+      kredit_onhand: "G",
       bukti_saldo_rekening: "A",
       bukti_saldo_cash: "J",
       bukti_mutasi_1: "A",
@@ -827,11 +1109,11 @@ function processRequest(data) {
       bukti_mutasi_5: "N"
     };
 
-    var TRANSACTION_FIELDS = ['no', 'tanggal', 'ku', 'kategori', 'keterangan', 'jumlah', 'debit', 'kredit'];
+    var REKENING_FIELDS = ['no', 'tanggal', 'ku', 'kategori', 'keterangan', 'debit', 'kredit'];
+    var ONHAND_FIELDS = ['no_onhand', 'tanggal_onhand', 'ku_onhand', 'kategori_onhand', 'keterangan_onhand', 'debit_onhand', 'kredit_onhand'];
     var EVIDENCE_FIELDS = ['bukti_saldo_rekening', 'bukti_saldo_cash', 'bukti_mutasi_1', 'bukti_mutasi_2', 'bukti_mutasi_3', 'bukti_mutasi_4', 'bukti_mutasi_5'];
 
     // Helper konversi Huruf Kolom (cth: 'A', 'B', 'AA') menjadi indeks angka (1-based)
-    // Mengembalikan -1 jika kolom kosong, '-', 'OFF', atau tidak valid
     function colLetterToIndex(col) {
       if (!col) return -1;
       col = col.toString().toUpperCase().trim();
@@ -849,27 +1131,33 @@ function processRequest(data) {
       return result > 0 ? result : -1;
     }
 
-    // Ambil pemetaan aktif KHUSUS untuk field transaksi (Kolom tabel keuangan)
-    var activeTransactionMapping = {};
-    for (var i = 0; i < TRANSACTION_FIELDS.length; i++) {
-      var field = TRANSACTION_FIELDS[i];
+    // Pemetaan aktif Kolom Transaksi Rekening
+    var activeRekeningMapping = {};
+    for (var i = 0; i < REKENING_FIELDS.length; i++) {
+      var field = REKENING_FIELDS[i];
       if (mapping[field]) {
         var cIdx = colLetterToIndex(mapping[field]);
-        if (cIdx > 0) {
-          activeTransactionMapping[field] = cIdx;
-        }
+        if (cIdx > 0) activeRekeningMapping[field] = cIdx;
       }
     }
 
-    // Ambil pemetaan aktif KHUSUS untuk bukti gambar
+    // Pemetaan aktif Kolom Transaksi Cash On Hand
+    var activeOnHandMapping = {};
+    for (var i = 0; i < ONHAND_FIELDS.length; i++) {
+      var field = ONHAND_FIELDS[i];
+      if (mapping[field]) {
+        var cIdx = colLetterToIndex(mapping[field]);
+        if (cIdx > 0) activeOnHandMapping[field] = cIdx;
+      }
+    }
+
+    // Pemetaan aktif Gambar Bukti
     var activeEvidenceMapping = {};
     for (var i = 0; i < EVIDENCE_FIELDS.length; i++) {
       var field = EVIDENCE_FIELDS[i];
       if (mapping[field]) {
         var cIdx = colLetterToIndex(mapping[field]);
-        if (cIdx > 0) {
-          activeEvidenceMapping[field] = cIdx;
-        }
+        if (cIdx > 0) activeEvidenceMapping[field] = cIdx;
       }
     }
 
@@ -877,32 +1165,27 @@ function processRequest(data) {
     function matchDropdownValue(rule, incomingVal) {
       if (!incomingVal) return "";
       if (!rule) return incomingVal;
-      
       try {
         var criteriaType = rule.getCriteriaType();
         var criteriaValues = rule.getCriteriaValues();
         var targetLower = incomingVal.toString().trim().toLowerCase();
         
-        // 1. Dropdown dari daftar item teks (VALUE_IN_LIST)
         if (criteriaType === SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST) {
           var list = criteriaValues[0];
           if (list && list.length > 0) {
             for (var i = 0; i < list.length; i++) {
               var itemStr = list[i].toString().trim();
-              if (itemStr.toLowerCase() === targetLower) {
-                return itemStr; // Cocok persis dengan teks opsi dropdown
-              }
+              if (itemStr.toLowerCase() === targetLower) return itemStr;
             }
             for (var i = 0; i < list.length; i++) {
               var itemStr = list[i].toString().trim();
               if (itemStr.toLowerCase().indexOf(targetLower) !== -1 || targetLower.indexOf(itemStr.toLowerCase()) !== -1) {
-                return itemStr; // Cocok sebagian (substring)
+                return itemStr;
               }
             }
           }
         }
         
-        // 2. Dropdown dari rentang range sel (VALUE_IN_RANGE)
         if (criteriaType === SpreadsheetApp.DataValidationCriteria.VALUE_IN_RANGE) {
           var range = criteriaValues[0];
           if (range) {
@@ -910,45 +1193,28 @@ function processRequest(data) {
             for (var r = 0; r < rangeValues.length; r++) {
               for (var c = 0; c < rangeValues[r].length; c++) {
                 var itemVal = rangeValues[r][c];
-                if (itemVal) {
-                  var itemStr = itemVal.toString().trim();
-                  if (itemStr.toLowerCase() === targetLower) {
-                    return itemStr; // Cocok persis dari range dropdown
-                  }
-                }
-              }
-            }
-            for (var r = 0; r < rangeValues.length; r++) {
-              for (var c = 0; c < rangeValues[r].length; c++) {
-                var itemVal = rangeValues[r][c];
-                if (itemVal) {
-                  var itemStr = itemVal.toString().trim();
-                  if (itemStr.toLowerCase().indexOf(targetLower) !== -1 || targetLower.indexOf(itemStr.toLowerCase()) !== -1) {
-                    return itemStr;
-                  }
+                if (itemVal && itemVal.toString().trim().toLowerCase() === targetLower) {
+                  return itemVal.toString().trim();
                 }
               }
             }
           }
         }
       } catch (err) {}
-      
       return incomingVal;
     }
 
-    // Helper penulisan sel SATU KOLOM KHUSUS yang cepat & aman terhadap aturan Validasi TANPA menyentuh kolom lain
+    // Helper penulisan sel SATU KOLOM KHUSUS yang cepat & aman terhadap aturan Validasi
     function safeWriteSingleColumn(targetSheet, startRowIdx, colIdx, valuesArray) {
       if (!valuesArray || valuesArray.length === 0 || colIdx <= 0) return;
       var numRows = valuesArray.length;
       var range = targetSheet.getRange(startRowIdx, colIdx, numRows, 1);
 
-      // Fast-path: Tulis data batch langsung ke range kolom (paling cepat, 99% kasus sukses instan)
       try {
         range.setValues(valuesArray);
         return;
       } catch (err) {}
 
-      // Fallback: Tangani jika ada aturan validasi / dropdown yang ketat pada sel tujuan
       try {
         var validations = range.getDataValidations();
         if (validations && validations.length > 0) {
@@ -974,7 +1240,6 @@ function processRequest(data) {
         return;
       } catch (eRel) {}
 
-      // Fallback terakhir: tulis per-sel jika batch tetap terkendala
       for (var r = 0; r < numRows; r++) {
         var currentRow = startRowIdx + r;
         var val = valuesArray[r][0];
@@ -999,7 +1264,7 @@ function processRequest(data) {
       }
     }
 
-    // Helper membersihkan sisa data lama HANYA pada baris sisa tabel transaksi & TIDAK AKAN PERNAH menyentuh tabel/rumus di bawahnya
+    // Helper membersihkan sisa data lama HANYA pada tabel tertentu & TIDAK menyentuh rumus/header tabel lain
     function clearOldTransactionData(targetSheet, startRowIdx, activeMappingObj, newRowCount, evidenceRowMappingObj, defaultEvidenceRow) {
       var lastRow = targetSheet.getLastRow();
       if (lastRow < startRowIdx) return;
@@ -1008,7 +1273,6 @@ function processRequest(data) {
       var totalRowsBelow = lastRow - checkStartRow + 1;
       if (totalRowsBelow <= 0) return;
 
-      // Cari baris batas bukti gambar teratas (jika ada bukti gambar di bawah tabel transaksi)
       var minEvidenceRow = 999999;
       if (defaultEvidenceRow && defaultEvidenceRow > startRowIdx) {
         minEvidenceRow = defaultEvidenceRow;
@@ -1022,7 +1286,6 @@ function processRequest(data) {
         }
       }
 
-      // Kumpulkan indeks kolom transaksi yang aktif
       var colIndices = [];
       var minCol = 999999;
       var maxCol = 0;
@@ -1036,7 +1299,6 @@ function processRequest(data) {
       }
       if (colIndices.length === 0) return;
 
-      // Batasi rentang pengecekan maksimal 300 baris ke bawah
       var rowsToCheck = Math.min(totalRowsBelow, 300);
       var numCols = maxCol - minCol + 1;
       var blockRange = targetSheet.getRange(checkStartRow, minCol, rowsToCheck, numCols);
@@ -1047,11 +1309,7 @@ function processRequest(data) {
 
       for (var r = 0; r < rowsToCheck; r++) {
         var currentRowNum = checkStartRow + r;
-
-        // 1. Jika mencapai baris bukti gambar -> STOP
-        if (currentRowNum >= minEvidenceRow) {
-          break;
-        }
+        if (currentRowNum >= minEvidenceRow) break;
 
         var rowHasFormula = false;
         var rowHasNonEmpty = false;
@@ -1063,13 +1321,11 @@ function processRequest(data) {
             var fVal = blockFormulas[r][colOffset];
             var vVal = blockValues[r][colOffset];
 
-            // Cek jika sel berisi formula/rumus (misal =SUM(...))
             if (fVal && fVal.toString().trim() !== "") {
               rowHasFormula = true;
               break;
             }
 
-            // Cek jika sel berisi nilai teks
             if (vVal !== "" && vVal !== null && vVal !== undefined) {
               var strVal = vVal.toString().trim().toUpperCase();
               if (strVal === "TOTAL" || strVal === "JUMLAH TOTAL" || strVal.indexOf("SALDO") !== -1 ||
@@ -1084,17 +1340,10 @@ function processRequest(data) {
           }
         }
 
-        // Jika baris mengandung formula atau kata kunci header tabel lain -> STOP!
-        if (rowHasFormula || rowHasKeywordHeader) {
-          break;
-        }
-
-        if (rowHasNonEmpty) {
-          maxRowToClear = r + 1;
-        }
+        if (rowHasFormula || rowHasKeywordHeader) break;
+        if (rowHasNonEmpty) maxRowToClear = r + 1;
       }
 
-      // Bersihkan HANYA baris sisa data transaksi lama yang terdeteksi
       if (maxRowToClear > 0) {
         for (var j = 0; j < colIndices.length; j++) {
           var col = colIndices[j];
@@ -1105,71 +1354,95 @@ function processRequest(data) {
       }
     }
 
-    // --- AKSI 2: SINKRONISASI SEMUA / BATCH DATA (BATCH SYNC) ---
+    // --- AKSI 2: SINKRONISASI SEMUA DATA (TABEL REKENING & TABEL ON HAND) ---
     if (action === "sync_all" || action === "sync_batch") {
-      var rows = data.rows || [];
-      var targetStartRow = parseInt(data.startRow) || startRow || 2;
+      var rekeningRows = data.rekeningRows || data.rows || [];
+      var onHandRows = data.onHandRows || [];
+      var targetStartRowRekening = parseInt(data.startRowRekening) || parseInt(data.startRow) || startRowRekening || 4;
+      var targetStartRowOnHand = parseInt(data.startRowOnHand) || startRowOnHand || targetStartRowRekening;
       var clearFirst = (data.clearFirst === true || String(data.clearFirst) === "true") || (action === "sync_all" && data.chunkIndex === undefined);
       
-      // 1. Bersihkan HANYA sisa baris lama pada kolom transaksi tanpa merusak rumus atau tabel lain
+      // 1. Bersihkan sisa baris lama untuk kedua tabel
       if (clearFirst) {
-        var defaultEvRow = parseInt(data.targetRow) || targetEvidenceRow || 2;
-        var evRowMap = data.rowMapping || rowMapping || {};
-        clearOldTransactionData(sheet, targetStartRow, activeTransactionMapping, rows.length, evRowMap, defaultEvRow);
+        var defaultEvRow = parseInt(data.targetRow) || 60;
+        var evRowMap = data.rowMapping || {};
+        clearOldTransactionData(sheet, targetStartRowRekening, activeRekeningMapping, rekeningRows.length, evRowMap, defaultEvRow);
+        clearOldTransactionData(sheet, targetStartRowOnHand, activeOnHandMapping, onHandRows.length, evRowMap, defaultEvRow);
       }
       
-      // 2. Tulis data transaksi HANYA ke kolom-kolom yang dipetakan
-      if (rows.length > 0) {
-        for (var field in activeTransactionMapping) {
-          var colIdx = activeTransactionMapping[field];
+      // 2. Tulis data transaksi Rekening
+      if (rekeningRows.length > 0) {
+        for (var field in activeRekeningMapping) {
+          var colIdx = activeRekeningMapping[field];
           var colArray = [];
-          for (var r = 0; r < rows.length; r++) {
-            var item = rows[r];
+          for (var r = 0; r < rekeningRows.length; r++) {
+            var item = rekeningRows[r];
             var val = (item[field] !== undefined && item[field] !== null) ? item[field] : "";
             colArray.push([val]);
           }
-          safeWriteSingleColumn(sheet, targetStartRow, colIdx, colArray);
+          safeWriteSingleColumn(sheet, targetStartRowRekening, colIdx, colArray);
         }
       }
       
+      // 3. Tulis data transaksi Cash On Hand
+      if (onHandRows.length > 0) {
+        for (var field in activeOnHandMapping) {
+          var colIdx = activeOnHandMapping[field];
+          var colArray = [];
+          for (var r = 0; r < onHandRows.length; r++) {
+            var item = onHandRows[r];
+            var val = (item[field] !== undefined && item[field] !== null) ? item[field] : "";
+            colArray.push([val]);
+          }
+          safeWriteSingleColumn(sheet, targetStartRowOnHand, colIdx, colArray);
+        }
+      }
+      
+      var totalCount = rekeningRows.length + onHandRows.length;
       return jsonResponse({
         status: "success",
-        message: "Berhasil sinkronisasi " + rows.length + " baris data ke sheet '" + sheetName + "' pada kolom yang dikonfigurasi.",
-        count: rows.length,
-        startRow: targetStartRow
+        message: "Berhasil sinkronisasi " + totalCount + " baris data (Rekening: " + rekeningRows.length + ", On Hand: " + onHandRows.length + ") ke sheet '" + sheetName + "'.",
+        count: totalCount,
+        rekeningCount: rekeningRows.length,
+        onHandCount: onHandRows.length,
+        startRowRekening: targetStartRowRekening,
+        startRowOnHand: targetStartRowOnHand
       });
     }
 
     // --- AKSI 3: TAMBAH 1 BARIS REALTIME (ADD ROW) ---
     if (action === "add_row") {
       var item = data.row || {};
-      
-      // Cari kolom acuan utama transaksi
-      var checkCol = activeTransactionMapping['tanggal'] || activeTransactionMapping['no'] || 1;
-      for (var f in activeTransactionMapping) {
-        checkCol = activeTransactionMapping[f];
+      var isOnHand = (data.isOnHand === true || data.tableType === "onhand");
+      var targetMapping = isOnHand ? activeOnHandMapping : activeRekeningMapping;
+      var targetStart = isOnHand ? targetStartRowOnHand : targetStartRowRekening;
+
+      var checkCol = isOnHand 
+          ? (targetMapping['tanggal_onhand'] || targetMapping['no_onhand'] || 1)
+          : (targetMapping['tanggal'] || targetMapping['no'] || 1);
+
+      for (var f in targetMapping) {
+        checkCol = targetMapping[f];
         break;
       }
       
-      // Cari baris kosong pertama yang belum ada data dan bukan sel rumus
       var lastRow = sheet.getLastRow();
-      var nextRow = startRow;
-      if (lastRow >= startRow) {
-        var totalToCheck = lastRow - startRow + 1;
-        var rRange = sheet.getRange(startRow, checkCol, totalToCheck, 1);
+      var nextRow = targetStart;
+      if (lastRow >= targetStart) {
+        var totalToCheck = lastRow - targetStart + 1;
+        var rRange = sheet.getRange(targetStart, checkCol, totalToCheck, 1);
         var rFormulas = rRange.getFormulas();
         var rValues = rRange.getValues();
         
         var found = false;
         for (var i = 0; i < totalToCheck; i++) {
-          // Jika menemukan rumus, berarti tabel transaksi berakhir di sini (ada total/footer)
           if (rFormulas[i] && rFormulas[i][0] && rFormulas[i][0].toString().trim() !== "") {
-            nextRow = startRow + i;
+            nextRow = targetStart + i;
             found = true;
             break;
           }
           if (rValues[i][0] === "" || rValues[i][0] === null || rValues[i][0] === undefined) {
-            nextRow = startRow + i;
+            nextRow = targetStart + i;
             found = true;
             break;
           }
@@ -1179,50 +1452,54 @@ function processRequest(data) {
         }
       }
       
-      // Tulis data HANYA pada kolom yang dikonfigurasi pada nextRow
-      for (var field in activeTransactionMapping) {
-        var colIdx = activeTransactionMapping[field];
+      for (var field in targetMapping) {
+        var colIdx = targetMapping[field];
         var val = (item[field] !== undefined && item[field] !== null) ? item[field] : "";
         safeWriteSingleColumn(sheet, nextRow, colIdx, [[val]]);
       }
       
       return jsonResponse({
         status: "success",
-        message: "Berhasil menambahkan data ke baris " + nextRow + " pada kolom terkonfigurasi.",
+        message: "Berhasil menambahkan data ke baris " + nextRow + " (" + (isOnHand ? "Tabel On Hand" : "Tabel Rekening") + ").",
         rowNumber: nextRow
       });
     }
 
     // --- AKSI 4: URUNGKAN (UNDO) BARIS TERAKHIR ---
     if (action === "undo_last" || action === "delete_last_row") {
-      var checkCol = activeTransactionMapping['tanggal'] || activeTransactionMapping['no'] || 1;
-      for (var f in activeTransactionMapping) {
-        checkCol = activeTransactionMapping[f];
+      var isOnHand = (data.isOnHand === true || data.tableType === "onhand");
+      var targetMapping = isOnHand ? activeOnHandMapping : activeRekeningMapping;
+      var targetStart = isOnHand ? targetStartRowOnHand : targetStartRowRekening;
+
+      var checkCol = isOnHand 
+          ? (targetMapping['tanggal_onhand'] || targetMapping['no_onhand'] || 1)
+          : (targetMapping['tanggal'] || targetMapping['no'] || 1);
+
+      for (var f in targetMapping) {
+        checkCol = targetMapping[f];
         break;
       }
       
       var lastRow = sheet.getLastRow();
-      if (lastRow >= startRow) {
-        var totalToCheck = lastRow - startRow + 1;
-        var rRange = sheet.getRange(startRow, checkCol, totalToCheck, 1);
+      if (lastRow >= targetStart) {
+        var totalToCheck = lastRow - targetStart + 1;
+        var rRange = sheet.getRange(targetStart, checkCol, totalToCheck, 1);
         var rFormulas = rRange.getFormulas();
         var rValues = rRange.getValues();
         
-        // Cari baris data transaksi terakhir dari bawah yang BUKAN sel rumus
         var targetUndoRow = -1;
         for (var i = totalToCheck - 1; i >= 0; i--) {
           var hasFormula = (rFormulas[i] && rFormulas[i][0] && rFormulas[i][0].toString().trim() !== "");
           var hasValue = (rValues[i][0] !== "" && rValues[i][0] !== null && rValues[i][0] !== undefined);
           if (!hasFormula && hasValue) {
-            targetUndoRow = startRow + i;
+            targetUndoRow = targetStart + i;
             break;
           }
         }
         
-        if (targetUndoRow >= startRow) {
-          // Bersihkan HANYA kolom-kolom yang dipetakan pada baris tersebut
-          for (var field in activeTransactionMapping) {
-            var colIdx = activeTransactionMapping[field];
+        if (targetUndoRow >= targetStart) {
+          for (var field in targetMapping) {
+            var colIdx = targetMapping[field];
             var cell = sheet.getRange(targetUndoRow, colIdx);
             if (cell.getFormula() === "") {
               cell.clearContent();
@@ -1243,7 +1520,89 @@ function processRequest(data) {
       });
     }
 
-    // --- AKSI 5: UPLOAD GAMBAR BUKTI (SALDO REKENING, CASH ON HAND, MUTASI REKENING 1-4) ---
+    // --- AKSI 5: BACA / AMBIL DATA TRANSAKSI DARI SPREADSHEET (FETCH DATA) ---
+    if (action === "fetch_transactions" || action === "fetch_data" || action === "read_data") {
+      var targetStartRowRekening = parseInt(data.startRowRekening) || parseInt(data.startRow) || startRowRekening || 4;
+      var targetStartRowOnHand = parseInt(data.startRowOnHand) || startRowOnHand || targetStartRowRekening;
+
+      function readTableData(startRowIdx, activeMappingObj, fieldsList) {
+        var rows = [];
+        var lastRow = sheet.getLastRow();
+        if (lastRow < startRowIdx) return rows;
+
+        var numRows = Math.min(lastRow - startRowIdx + 1, 500);
+        if (numRows <= 0) return rows;
+
+        var maxCol = 0;
+        for (var f in activeMappingObj) {
+          if (activeMappingObj[f] > maxCol) maxCol = activeMappingObj[f];
+        }
+        if (maxCol <= 0) return rows;
+
+        var range = sheet.getRange(startRowIdx, 1, numRows, maxCol);
+        var values = range.getValues();
+        var formulas = range.getFormulas();
+
+        for (var r = 0; r < numRows; r++) {
+          var rowObj = {};
+          var hasAnyData = false;
+          var isTotalOrHeader = false;
+
+          for (var i = 0; i < fieldsList.length; i++) {
+            var field = fieldsList[i];
+            var colIdx = activeMappingObj[field];
+            if (colIdx && colIdx > 0 && colIdx <= maxCol) {
+              var val = values[r][colIdx - 1];
+              var formula = formulas[r][colIdx - 1];
+              if (formula && formula.toString().trim() !== "") {
+                isTotalOrHeader = true;
+                break;
+              }
+              if (val !== null && val !== undefined && val !== "") {
+                var strVal = val.toString().trim().toUpperCase();
+                if (strVal === "TOTAL" || strVal === "JUMLAH TOTAL" || strVal.indexOf("SALDO") !== -1 ||
+                    strVal.indexOf("BUKTI") !== -1 || strVal.indexOf("REKAP") !== -1 ||
+                    strVal.indexOf("MENGETAHUI") !== -1) {
+                  isTotalOrHeader = true;
+                  break;
+                }
+                hasAnyData = true;
+                if (val instanceof Date) {
+                  var d = val.getDate();
+                  var m = val.getMonth() + 1;
+                  var y = val.getFullYear();
+                  rowObj[field] = (d < 10 ? '0' + d : d) + '/' + (m < 10 ? '0' + m : m) + '/' + y;
+                } else {
+                  rowObj[field] = val;
+                }
+              } else {
+                rowObj[field] = "";
+              }
+            }
+          }
+
+          if (isTotalOrHeader) break;
+          if (hasAnyData) {
+            rows.push(rowObj);
+          }
+        }
+        return rows;
+      }
+
+      var fetchedRekening = readTableData(targetStartRowRekening, activeRekeningMapping, REKENING_FIELDS);
+      var fetchedOnHand = readTableData(targetStartRowOnHand, activeOnHandMapping, ONHAND_FIELDS);
+
+      return jsonResponse({
+        status: "success",
+        message: "Berhasil membaca " + (fetchedRekening.length + fetchedOnHand.length) + " baris data dari sheet '" + sheetName + "'.",
+        rekeningRows: fetchedRekening,
+        onHandRows: fetchedOnHand,
+        rekeningCount: fetchedRekening.length,
+        onHandCount: fetchedOnHand.length
+      });
+    }
+
+    // --- AKSI 6: UPLOAD GAMBAR BUKTI (SALDO REKENING, CASH ON HAND, MUTASI REKENING 1-5) ---
     if (action === "upload_evidence_images" || action === "upload_evidence_image" || action === "upload_evidence" || action === "upload_images" || action === "upload_image") {
       var images = data.images || [];
       var defaultTargetRow = parseInt(data.targetRow) || parseInt(data.startRow) || 2;
@@ -1258,7 +1617,6 @@ function processRequest(data) {
         });
       }
 
-      // Dapatkan atau buat folder penyimpanan otomatis di Google Drive
       var targetFolder = null;
       try {
         var folderName = "DailyApps_BuktiKeuangan";
@@ -1310,7 +1668,6 @@ function processRequest(data) {
         var fileUrl = driveFile.getUrl();
         var downloadDirectUrl = "https://lh3.googleusercontent.com/d/" + driveFile.getId();
 
-        // Tulis HANYA ke SATU SEL TERTENTU yang dikonfigurasi
         var colIndex = activeEvidenceMapping[fieldKey] || colLetterToIndex(mapping[fieldKey]);
         if (colIndex > 0) {
           var cell = sheet.getRange(itemTargetRow, colIndex);

@@ -186,7 +186,7 @@ class CustomKodeRule {
 class StrukturTransaction {
   final String id;
   final String title;
-  final String type; // 'transfer_debit', 'tarik_tunai', 'pemasukan', 'pengeluaran', etc.
+  final String type; // 'pemasukan', 'pengeluaran'
   final String? sourceAccount; // 'rekening', 'debit', 'cash'
   final String? targetAccount; // 'rekening', 'debit', 'cash'
   final String? manualSource; // Asal dana untuk pemasukan (cth: 'DP KK Angkatan')
@@ -196,13 +196,14 @@ class StrukturTransaction {
   final String? note;
   final String? ku;
   final String? kode; // Kategori
+  final bool isInternalTransfer; // true jika mutasi adalah alokasi/pindah dana internal antar wadah
 
   StrukturTransaction({
     required this.id,
     required this.title,
     required this.type,
     this.sourceAccount,
-     this.targetAccount,
+    this.targetAccount,
     this.manualSource,
     required this.amount,
     this.adminFee = 0,
@@ -210,13 +211,21 @@ class StrukturTransaction {
     this.note,
     this.ku,
     this.kode,
+    this.isInternalTransfer = false,
   }) : timestamp = timestamp ?? DateTime.now();
 
   int get totalDeduction => amount + adminFee;
 
   bool get isPemasukan => type == 'pemasukan';
   bool get isPengeluaran => type == 'pengeluaran';
-  bool get isAlokasiInternal => !isPemasukan && !isPengeluaran;
+  bool get isAlokasiInternal =>
+      isInternalTransfer || (!isPemasukan && !isPengeluaran);
+
+  /// Pemasukan murni dari luar yang menambah total saldo struktur
+  bool get isPurePemasukan => isPemasukan && !isInternalTransfer;
+
+  /// Pengeluaran murni ke luar yang mengurangi total saldo struktur
+  bool get isPurePengeluaran => isPengeluaran && !isInternalTransfer;
 
   /// Helper untuk auto-resolve KU transaksi berdasarkan kata kunci teks keterangan/judul dan daftar kustomisasi KU
   static String resolveKuFromText(String text,
@@ -332,14 +341,36 @@ class StrukturTransaction {
         'note': note,
         'ku': ku,
         'kode': kode,
+        'isInternalTransfer': isInternalTransfer,
       };
 
   factory StrukturTransaction.fromJson(Map<String, dynamic> json) {
+    final title = json['title'] as String? ?? '';
+    final note = json['note'] as String? ?? '';
+    final ku = json['ku'] as String? ?? '';
+    final kode = json['kode'] as String? ?? '';
+    final isExplicitInternal = json['isInternalTransfer'] as bool?;
+
+    bool isInternal = isExplicitInternal ?? false;
+    if (isExplicitInternal == null) {
+      final combined = '$title $note $ku $kode'.toLowerCase();
+      if (json['sourceAccount'] != null && json['targetAccount'] != null) {
+        isInternal = true;
+      } else if (combined.contains('tarik tunai') ||
+          combined.contains('setor tunai') ||
+          combined.contains('alokasi dana') ||
+          combined.contains('transfer ke on hand') ||
+          combined.contains('transfer dari rekening') ||
+          combined.contains('transfer on hand')) {
+        isInternal = true;
+      }
+    }
+
     return StrukturTransaction(
       id: json['id'] as String? ??
           DateTime.now().microsecondsSinceEpoch.toString(),
-      title: json['title'] as String? ?? '',
-      type: json['type'] as String? ?? 'transfer_debit',
+      title: title,
+      type: json['type'] as String? ?? 'pemasukan',
       sourceAccount: json['sourceAccount'] as String?,
       targetAccount: json['targetAccount'] as String?,
       manualSource: json['manualSource'] as String?,
@@ -351,6 +382,7 @@ class StrukturTransaction {
       note: json['note'] as String?,
       ku: json['ku'] as String?,
       kode: json['kode'] as String?,
+      isInternalTransfer: isInternal,
     );
   }
 }
@@ -378,16 +410,23 @@ class StrukturData {
         customKodeRules = customKodeRules ?? [],
         isSaldoRekeningUnlocked = isSaldoRekeningUnlocked ?? false;
 
-  int get totalOnHand => onHandDebit.balance + onHandCash.balance;
+  int get totalOnHand =>
+      (onHandDebit.balance + onHandCash.balance) < 0
+          ? 0
+          : (onHandDebit.balance + onHandCash.balance);
   int get totalDanaStruktur =>
-      rekeningStruktur.balance + onHandDebit.balance + onHandCash.balance;
+      (rekeningStruktur.balance + onHandDebit.balance + onHandCash.balance) < 0
+          ? 0
+          : (rekeningStruktur.balance +
+              onHandDebit.balance +
+              onHandCash.balance);
 
   int getTotalPemasukanDP({List<CustomKodeRule>? customRules}) {
     final rules = customRules ?? customKodeRules;
     int sum = 0;
     for (int i = 0; i < transactions.length; i++) {
       final t = transactions[i];
-      if (t.isPemasukan && t.isDPTransaction(customRules: rules)) {
+      if (t.isPurePemasukan && t.isDPTransaction(customRules: rules)) {
         sum += t.amount;
       }
     }
@@ -409,7 +448,7 @@ class StrukturData {
     int sum = 0;
     for (int i = 0; i < transactions.length; i++) {
       final t = transactions[i];
-      if (t.isPemasukan) sum += t.amount;
+      if (t.isPurePemasukan) sum += t.amount;
     }
     return sum;
   }
@@ -418,7 +457,7 @@ class StrukturData {
     int sum = 0;
     for (int i = 0; i < transactions.length; i++) {
       final t = transactions[i];
-      if (t.isPengeluaran) {
+      if (t.isPurePengeluaran) {
         sum += t.amount;
       }
     }

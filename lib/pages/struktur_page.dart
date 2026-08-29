@@ -5591,32 +5591,120 @@ class _StrukturPageState extends State<StrukturPage> {
                               _data.onHandCash.balance += nominal;
                             }
 
-                            // 3. Catat Pengeluaran untuk Admin Bank jika ada
+                            final noteText = noteCtrl.text.trim();
+
+                            // Penentuan deskripsi default untuk akun sumber (Kredit/Keluar) & target (Debit/Masuk)
+                            String defaultSourceTitle = '';
+                            String defaultTargetTitle = '';
+
+                            if (sourceAccount == 'rekening' && targetAccount == 'cash') {
+                              defaultSourceTitle = 'Tarik Tunai ke Kas (On Hand)';
+                              defaultTargetTitle = 'Tarik Tunai dari Rekening';
+                            } else if (sourceAccount == 'rekening' && targetAccount == 'debit') {
+                              defaultSourceTitle = 'Transfer ke On Hand Debit';
+                              defaultTargetTitle = 'Transfer dari Rekening Struktur';
+                            } else if (sourceAccount == 'cash' && targetAccount == 'rekening') {
+                              defaultSourceTitle = 'Setor Tunai ke Rekening Struktur';
+                              defaultTargetTitle = 'Setor Tunai dari Kas On Hand';
+                            } else if (sourceAccount == 'debit' && targetAccount == 'rekening') {
+                              defaultSourceTitle = 'Transfer On Hand Debit ke Rekening';
+                              defaultTargetTitle = 'Transfer dari On Hand Debit';
+                            } else if (sourceAccount == 'debit' && targetAccount == 'cash') {
+                              defaultSourceTitle = 'Tarik Tunai via ATM Debit';
+                              defaultTargetTitle = 'Terima Tunai dari ATM Debit';
+                            } else if (sourceAccount == 'cash' && targetAccount == 'debit') {
+                              defaultSourceTitle = 'Setor Tunai ke On Hand Debit';
+                              defaultTargetTitle = 'Top-up Debit dari Kas Tunai';
+                            } else {
+                              defaultSourceTitle = flowLabel;
+                              defaultTargetTitle = flowLabel;
+                            }
+
+                            final txSourceTitle = noteText.isNotEmpty ? noteText : defaultSourceTitle;
+                            final txTargetTitle = noteText.isNotEmpty ? noteText : defaultTargetTitle;
+
+                            final autoKuSource = StrukturTransaction.resolveKuFromText(
+                              txSourceTitle,
+                              customRules: _data.customKodeRules,
+                            );
+                            final autoKodeSource = StrukturTransaction.resolveKodeFromText(
+                              txSourceTitle,
+                              customRules: _data.customKodeRules,
+                            );
+
+                            final autoKuTarget = StrukturTransaction.resolveKuFromText(
+                              txTargetTitle,
+                              customRules: _data.customKodeRules,
+                            );
+                            final autoKodeTarget = StrukturTransaction.resolveKodeFromText(
+                              txTargetTitle,
+                              customRules: _data.customKodeRules,
+                            );
+
+                            final nowMicro = DateTime.now().microsecondsSinceEpoch;
+
+                            // 3. Catat Transaksi KREDIT (Pengeluaran / Keluar) pada Akun Sumber
+                            final kreditTx = StrukturTransaction(
+                              id: nowMicro.toString(),
+                              title: txSourceTitle,
+                              type: 'pengeluaran',
+                              sourceAccount: sourceAccount,
+                              targetAccount: targetAccount,
+                              amount: nominal,
+                              adminFee: 0,
+                              note: noteText.isNotEmpty ? noteText : defaultSourceTitle,
+                              ku: autoKuSource != '-' ? autoKuSource : null,
+                              kode: autoKodeSource != '-' ? autoKodeSource : null,
+                              timestamp: selectedDate,
+                              isInternalTransfer: true,
+                            );
+                            _data.transactions.add(kreditTx);
+
+                            // 4. Catat Transaksi DEBIT (Pemasukan / Masuk) pada Akun Tujuan
+                            final debitTx = StrukturTransaction(
+                              id: (nowMicro + 1).toString(),
+                              title: txTargetTitle,
+                              type: 'pemasukan',
+                              sourceAccount: sourceAccount,
+                              targetAccount: targetAccount,
+                              amount: nominal,
+                              adminFee: 0,
+                              note: noteText.isNotEmpty ? noteText : defaultTargetTitle,
+                              ku: autoKuTarget != '-' ? autoKuTarget : null,
+                              kode: autoKodeTarget != '-' ? autoKodeTarget : null,
+                              timestamp: selectedDate,
+                              isInternalTransfer: true,
+                            );
+                            _data.transactions.add(debitTx);
+
+                            // 5. Catat Pengeluaran untuk Admin Bank jika ada
                             if (adminFee > 0) {
+                              final feeKu = StrukturTransaction.resolveKuFromText('Admin bank', customRules: _data.customKodeRules);
+                              final feeKode = StrukturTransaction.resolveKodeFromText('Adm Bank/Pajak', customRules: _data.customKodeRules);
+
                               _data.transactions.add(
                                 StrukturTransaction(
-                                  id: DateTime.now()
-                                      .microsecondsSinceEpoch
-                                      .toString(),
+                                  id: (nowMicro + 2).toString(),
                                   title: 'Admin bank transfer beda bank',
                                   type: 'pengeluaran',
                                   sourceAccount: sourceAccount,
                                   amount: adminFee,
                                   adminFee: 0,
-                                  note: noteCtrl.text.trim().isNotEmpty
-                                      ? noteCtrl.text.trim()
-                                      : null,
+                                  note: noteText.isNotEmpty
+                                      ? 'Admin bank - $noteText'
+                                      : 'Admin bank transfer beda bank',
+                                  ku: feeKu != '-' ? feeKu : 'SDK',
+                                  kode: feeKode != '-' ? feeKode : 'Adm Bank/Pajak',
                                   timestamp: selectedDate,
                                 ),
                               );
-                              _data.transactions.sort((a, b) => a.timestamp.compareTo(b.timestamp));
                             }
+
+                            _data.transactions.sort((a, b) => a.timestamp.compareTo(b.timestamp));
                           });
 
                           _saveData();
-                          if (adminFee > 0) {
-                            _triggerAutoSyncSheets();
-                          }
+                          _triggerAutoSyncSheets();
                           Navigator.pop(ctx);
 
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -5759,7 +5847,7 @@ class _StrukturPageState extends State<StrukturPage> {
             int simulatedCashBalance = _data.onHandCash.balance;
 
             if (isPemasukan) {
-              if (tx.targetAccount == 'rekening') {
+              if (tx.targetAccount == 'rekening' || tx.targetAccount == null) {
                 simulatedRekeningBalance -= tx.amount;
               } else if (tx.targetAccount == 'debit') {
                 simulatedDebitBalance -= tx.amount;
@@ -5767,7 +5855,7 @@ class _StrukturPageState extends State<StrukturPage> {
                 simulatedCashBalance -= tx.amount;
               }
             } else if (isPengeluaran) {
-              if (tx.sourceAccount == 'rekening') {
+              if (tx.sourceAccount == 'rekening' || tx.sourceAccount == null) {
                 simulatedRekeningBalance += tx.totalDeduction;
               } else if (tx.sourceAccount == 'debit') {
                 simulatedDebitBalance += tx.totalDeduction;
@@ -5775,6 +5863,10 @@ class _StrukturPageState extends State<StrukturPage> {
                 simulatedCashBalance += tx.totalDeduction;
               }
             }
+
+            if (simulatedRekeningBalance < 0) simulatedRekeningBalance = 0;
+            if (simulatedDebitBalance < 0) simulatedDebitBalance = 0;
+            if (simulatedCashBalance < 0) simulatedCashBalance = 0;
 
             int availableBalance = 0;
             String accountName = '';
@@ -6427,7 +6519,7 @@ class _StrukturPageState extends State<StrukturPage> {
                           setState(() {
                             // 1. Rollback saldo transaksi lama
                             if (tx.isPemasukan) {
-                              if (tx.targetAccount == 'rekening') {
+                              if (tx.targetAccount == 'rekening' || tx.targetAccount == null) {
                                 _data.rekeningStruktur.balance -= tx.amount;
                               } else if (tx.targetAccount == 'debit') {
                                 _data.onHandDebit.balance -= tx.amount;
@@ -6435,7 +6527,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                 _data.onHandCash.balance -= tx.amount;
                               }
                             } else if (tx.isPengeluaran) {
-                              if (tx.sourceAccount == 'rekening') {
+                              if (tx.sourceAccount == 'rekening' || tx.sourceAccount == null) {
                                 _data.rekeningStruktur.balance += tx.totalDeduction;
                               } else if (tx.sourceAccount == 'debit') {
                                 _data.onHandDebit.balance += tx.totalDeduction;
@@ -6443,6 +6535,10 @@ class _StrukturPageState extends State<StrukturPage> {
                                 _data.onHandCash.balance += tx.totalDeduction;
                               }
                             }
+
+                            if (_data.rekeningStruktur.balance < 0) _data.rekeningStruktur.balance = 0;
+                            if (_data.onHandDebit.balance < 0) _data.onHandDebit.balance = 0;
+                            if (_data.onHandCash.balance < 0) _data.onHandCash.balance = 0;
 
                             // 2. Tambah/Kurangi saldo baru
                             if (isPemasukan) {
@@ -6480,6 +6576,7 @@ class _StrukturPageState extends State<StrukturPage> {
                               ku: resolvedKu,
                               kode: resolvedKode,
                               timestamp: selectedDate,
+                              isInternalTransfer: tx.isInternalTransfer,
                             );
 
                             final txIndex = _data.transactions.indexWhere((item) => item.id == tx.id);
@@ -6629,7 +6726,7 @@ class _StrukturPageState extends State<StrukturPage> {
                 setState(() {
                   // Rollback saldo
                   if (tx.isPemasukan) {
-                    if (tx.targetAccount == 'rekening') {
+                    if (tx.targetAccount == 'rekening' || tx.targetAccount == null) {
                       _data.rekeningStruktur.balance -= tx.amount;
                     } else if (tx.targetAccount == 'debit') {
                       _data.onHandDebit.balance -= tx.amount;
@@ -6637,7 +6734,7 @@ class _StrukturPageState extends State<StrukturPage> {
                       _data.onHandCash.balance -= tx.amount;
                     }
                   } else {
-                    if (tx.sourceAccount == 'rekening') {
+                    if (tx.sourceAccount == 'rekening' || tx.sourceAccount == null) {
                       _data.rekeningStruktur.balance += tx.totalDeduction;
                     } else if (tx.sourceAccount == 'debit') {
                       _data.onHandDebit.balance += tx.totalDeduction;
@@ -6645,6 +6742,10 @@ class _StrukturPageState extends State<StrukturPage> {
                       _data.onHandCash.balance += tx.totalDeduction;
                     }
                   }
+
+                  if (_data.rekeningStruktur.balance < 0) _data.rekeningStruktur.balance = 0;
+                  if (_data.onHandDebit.balance < 0) _data.onHandDebit.balance = 0;
+                  if (_data.onHandCash.balance < 0) _data.onHandCash.balance = 0;
 
                   _data.transactions.removeWhere((item) => item.id == tx.id);
                 });
@@ -6769,7 +6870,7 @@ class _StrukturPageState extends State<StrukturPage> {
                   // Rollback saldo semua transaksi
                   for (final tx in _data.transactions) {
                     if (tx.isPemasukan) {
-                      if (tx.targetAccount == 'rekening') {
+                      if (tx.targetAccount == 'rekening' || tx.targetAccount == null) {
                         _data.rekeningStruktur.balance -= tx.amount;
                       } else if (tx.targetAccount == 'debit') {
                         _data.onHandDebit.balance -= tx.amount;
@@ -6777,7 +6878,7 @@ class _StrukturPageState extends State<StrukturPage> {
                         _data.onHandCash.balance -= tx.amount;
                       }
                     } else if (tx.isPengeluaran) {
-                      if (tx.sourceAccount == 'rekening') {
+                      if (tx.sourceAccount == 'rekening' || tx.sourceAccount == null) {
                         _data.rekeningStruktur.balance += tx.totalDeduction;
                       } else if (tx.sourceAccount == 'debit') {
                         _data.onHandDebit.balance += tx.totalDeduction;
@@ -6786,6 +6887,11 @@ class _StrukturPageState extends State<StrukturPage> {
                       }
                     }
                   }
+
+                  // Pastikan saldo tidak bernilai minus setelah rollback
+                  if (_data.rekeningStruktur.balance < 0) _data.rekeningStruktur.balance = 0;
+                  if (_data.onHandDebit.balance < 0) _data.onHandDebit.balance = 0;
+                  if (_data.onHandCash.balance < 0) _data.onHandCash.balance = 0;
 
                   // Hapus semua transaksi
                   _data.transactions.clear();
@@ -8412,9 +8518,9 @@ class _StrukturPageState extends State<StrukturPage> {
               ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
             final pengeluaranList =
-                allMutasi.where((tx) => tx.isPengeluaran).toList();
+                allMutasi.where((tx) => tx.isPurePengeluaran).toList();
             final pemasukanList =
-                allMutasi.where((tx) => tx.isPemasukan).toList();
+                allMutasi.where((tx) => tx.isPurePemasukan).toList();
 
             final int totalPengeluaranNominal =
                 pengeluaranList.fold<int>(0, (sum, tx) => sum + tx.amount);
@@ -8429,9 +8535,9 @@ class _StrukturPageState extends State<StrukturPage> {
             // Filter data untuk Tab Laporan Keuangan
             List<StrukturTransaction> activeList;
             if (selectedSubTab == 'pengeluaran') {
-              activeList = pengeluaranList;
+              activeList = allMutasi.where((tx) => tx.isPengeluaran).toList();
             } else if (selectedSubTab == 'pemasukan') {
-              activeList = pemasukanList;
+              activeList = allMutasi.where((tx) => tx.isPemasukan).toList();
             } else {
               activeList = allMutasi;
             }
@@ -9016,9 +9122,800 @@ class _StrukturPageState extends State<StrukturPage> {
                     child: Builder(
                       builder: (context) {
                         // ------------------------------------
-                        // TAB 1: LAPORAN KEUANGAN (EXCEL-STYLE)
-                        // ------------------------------------
-                        if (mainTab == 'laporan') {
+                               if (mainTab == 'laporan') {
+                          // Filter data untuk Rekening & Cash On Hand
+                          final rekeningList = activeList.where((tx) {
+                            if (tx.isPemasukan) {
+                              return tx.targetAccount == 'rekening' ||
+                                  tx.targetAccount == null;
+                            } else {
+                              return tx.sourceAccount == 'rekening' ||
+                                  tx.sourceAccount == null;
+                            }
+                          }).toList();
+
+                          final onHandList = activeList.where((tx) {
+                            if (tx.isPemasukan) {
+                              return tx.targetAccount == 'debit' ||
+                                  tx.targetAccount == 'cash';
+                            } else {
+                              return tx.sourceAccount == 'debit' ||
+                                  tx.sourceAccount == 'cash';
+                            }
+                          }).toList();
+
+                          int rekeningDebit = 0;
+                          int rekeningKredit = 0;
+                          for (final tx in rekeningList) {
+                            if (tx.isPemasukan) {
+                              rekeningDebit += tx.amount;
+                            } else {
+                              rekeningKredit += tx.amount;
+                            }
+                          }
+
+                          int onHandDebit = 0;
+                          int onHandKredit = 0;
+                          for (final tx in onHandList) {
+                            if (tx.isPemasukan) {
+                              onHandDebit += tx.amount;
+                            } else {
+                              onHandKredit += tx.amount;
+                            }
+                          }
+
+                          Widget buildExcelAccountTable({
+                            required String title,
+                            required String subtitle,
+                            required IconData icon,
+                            required Color themeColor,
+                            required Color headerBgColor,
+                            required Color borderColor,
+                            required List<StrukturTransaction> list,
+                            required int debitTotal,
+                            required int kreditTotal,
+                            required bool isRekening,
+                          }) {
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: borderColor,
+                                  width: 1.2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: themeColor.withValues(alpha: 0.04),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // Card Header
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: headerBgColor,
+                                      borderRadius: const BorderRadius.only(
+                                        topLeft: Radius.circular(13),
+                                        topRight: Radius.circular(13),
+                                      ),
+                                      border: Border(
+                                        bottom: BorderSide(
+                                            color: borderColor, width: 1.2),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: borderColor,
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: Icon(
+                                            icon,
+                                            size: 16,
+                                            color: themeColor,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                title,
+                                                style: TextStyle(
+                                                  fontSize: 12.5,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: themeColor,
+                                                ),
+                                              ),
+                                              Text(
+                                                subtitle,
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: themeColor
+                                                      .withValues(alpha: 0.8),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        // Badges
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: borderColor,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            '${list.length} Data',
+                                            style: TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: themeColor,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  // Table Grid
+                                  if (list.isEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.all(20),
+                                      child: Center(
+                                        child: Text(
+                                          searchQuery.isNotEmpty
+                                              ? 'Tidak ada data $title yang cocok dengan pencarian'
+                                              : 'Belum ada transaksi ${isRekening ? "rekening struktur" : "cash on hand"} pada periode ini',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            color: themeColor
+                                                .withValues(alpha: 0.7),
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      physics: const BouncingScrollPhysics(),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          // EXCEL HEADER ROW
+                                          Container(
+                                            decoration: BoxDecoration(
+                                              color: headerBgColor
+                                                  .withValues(alpha: 0.5),
+                                              border: Border(
+                                                bottom: BorderSide(
+                                                    color: borderColor,
+                                                    width: 1.2),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                // No
+                                                SizedBox(
+                                                  width: 32,
+                                                  height: 38,
+                                                  child: Center(
+                                                    child: Text('No',
+                                                        style: headerStyle),
+                                                  ),
+                                                ),
+                                                Container(
+                                                    width: 1,
+                                                    height: 38,
+                                                    color: borderColor),
+                                                // Tanggal
+                                                SizedBox(
+                                                  width: 84,
+                                                  height: 38,
+                                                  child: Center(
+                                                    child: Text('Tanggal',
+                                                        style: headerStyle),
+                                                  ),
+                                                ),
+                                                Container(
+                                                    width: 1,
+                                                    height: 38,
+                                                    color: borderColor),
+                                                // KU
+                                                SizedBox(
+                                                  width: 95,
+                                                  height: 38,
+                                                  child: Center(
+                                                    child: Text('KU',
+                                                        style: headerStyle),
+                                                  ),
+                                                ),
+                                                Container(
+                                                    width: 1,
+                                                    height: 38,
+                                                    color: borderColor),
+                                                // Kategori
+                                                SizedBox(
+                                                  width: 140,
+                                                  height: 38,
+                                                  child: Center(
+                                                    child: Text('Kategori',
+                                                        style: headerStyle),
+                                                  ),
+                                                ),
+                                                Container(
+                                                    width: 1,
+                                                    height: 38,
+                                                    color: borderColor),
+                                                // Keterangan
+                                                SizedBox(
+                                                  width: 220,
+                                                  height: 38,
+                                                  child: Center(
+                                                    child: Text('Keterangan',
+                                                        style: headerStyle),
+                                                  ),
+                                                ),
+                                                Container(
+                                                    width: 1,
+                                                    height: 38,
+                                                    color: borderColor),
+                                                // Debit (Pemasukan)
+                                                const SizedBox(
+                                                  width: 110,
+                                                  height: 38,
+                                                  child: Center(
+                                                    child: Text(
+                                                      'Debit',
+                                                      style: TextStyle(
+                                                        fontSize: 11.5,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color:
+                                                            Color(0xFF047857),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                Container(
+                                                    width: 1,
+                                                    height: 38,
+                                                    color: borderColor),
+                                                // Kredit (Pengeluaran)
+                                                const SizedBox(
+                                                  width: 110,
+                                                  height: 38,
+                                                  child: Center(
+                                                    child: Text(
+                                                      'Kredit',
+                                                      style: TextStyle(
+                                                        fontSize: 11.5,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color:
+                                                            Color(0xFFBE123C),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                Container(
+                                                    width: 1,
+                                                    height: 38,
+                                                    color: borderColor),
+                                                // Aksi
+                                                SizedBox(
+                                                  width: 72,
+                                                  height: 38,
+                                                  child: Center(
+                                                    child: Text('Aksi',
+                                                        style: headerStyle),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+
+                                          // DATA ROWS
+                                          ...List.generate(
+                                            list.length,
+                                            (index) {
+                                              final tx = list[index];
+                                              final isEven = index % 2 == 0;
+                                              final dateFormatted =
+                                                  DateFormat('dd/MM/yyyy')
+                                                      .format(tx.timestamp);
+                                              final String displayKu =
+                                                  tx.getDisplayKu(
+                                                      customRules: _data
+                                                          .customKodeRules);
+                                              final String displayKategori =
+                                                  tx.getDisplayKode(
+                                                      customRules: _data
+                                                          .customKodeRules);
+                                              final bool isDebit =
+                                                  tx.isPemasukan;
+                                              final bool isKredit =
+                                                  tx.isPengeluaran;
+                                              final String itemTitle = tx.title
+                                                  .replaceFirst(
+                                                      RegExp(
+                                                          r'^(Pemasukan|Pengeluaran):\s*',
+                                                          caseSensitive: false),
+                                                      '');
+                                              final String? itemSubtitle =
+                                                  (tx.note != null &&
+                                                          tx.note!.isNotEmpty &&
+                                                          tx.note != tx.title &&
+                                                          tx.note != itemTitle)
+                                                      ? tx.note
+                                                      : null;
+
+                                              return Container(
+                                                height: 38,
+                                                decoration: BoxDecoration(
+                                                  color: isEven
+                                                      ? (isRekening
+                                                          ? const Color(
+                                                              0xFFFFFDF5)
+                                                          : const Color(
+                                                              0xFFF0FDF4))
+                                                      : (isRekening
+                                                          ? const Color(
+                                                              0xFFFFF7ED)
+                                                          : const Color(
+                                                              0xFFECFDF5)),
+                                                  border: Border(
+                                                    bottom: BorderSide(
+                                                      color: borderColor
+                                                          .withValues(
+                                                              alpha: 0.6),
+                                                      width: 0.8,
+                                                    ),
+                                                  ),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    // 1. No
+                                                    SizedBox(
+                                                      width: 32,
+                                                      height: 38,
+                                                      child: Center(
+                                                        child: Text(
+                                                          '${index + 1}',
+                                                          style: TextStyle(
+                                                            fontSize: 11,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            color: themeColor,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    Container(
+                                                        width: 1,
+                                                        height: 38,
+                                                        color: borderColor
+                                                            .withValues(
+                                                                alpha: 0.6)),
+                                                    // 2. Tanggal
+                                                    SizedBox(
+                                                      width: 84,
+                                                      height: 38,
+                                                      child: Center(
+                                                        child: Text(
+                                                          dateFormatted,
+                                                          style:
+                                                              const TextStyle(
+                                                            fontSize: 11,
+                                                            color: Color(
+                                                                0xFF451A03),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    Container(
+                                                        width: 1,
+                                                        height: 38,
+                                                        color: borderColor
+                                                            .withValues(
+                                                                alpha: 0.6)),
+                                                    // 3. KU
+                                                    Container(
+                                                      width: 95,
+                                                      height: 38,
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                          horizontal: 4),
+                                                      child: Center(
+                                                        child: _buildKuBadge(
+                                                            displayKu,
+                                                            isLarge: false),
+                                                      ),
+                                                    ),
+                                                    Container(
+                                                        width: 1,
+                                                        height: 38,
+                                                        color: borderColor
+                                                            .withValues(
+                                                                alpha: 0.6)),
+                                                    // 4. Kategori
+                                                    Container(
+                                                      width: 140,
+                                                      height: 38,
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                          horizontal: 4),
+                                                      child: Center(
+                                                        child: _buildKodeBadge(
+                                                            displayKategori,
+                                                            isLarge: false),
+                                                      ),
+                                                    ),
+                                                    Container(
+                                                        width: 1,
+                                                        height: 38,
+                                                        color: borderColor
+                                                            .withValues(
+                                                                alpha: 0.6)),
+                                                    // 5. Keterangan
+                                                    Container(
+                                                      width: 220,
+                                                      height: 38,
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                          horizontal: 6,
+                                                          vertical: 2),
+                                                      child: Column(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Text(
+                                                            itemTitle,
+                                                            style:
+                                                                const TextStyle(
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                              fontSize: 11.5,
+                                                              color: Color(
+                                                                  0xFF451A03),
+                                                            ),
+                                                            maxLines: 1,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                          ),
+                                                          if (itemSubtitle !=
+                                                                  null &&
+                                                              itemSubtitle
+                                                                  .isNotEmpty &&
+                                                              !itemTitle
+                                                                  .contains(
+                                                                      itemSubtitle))
+                                                            Text(
+                                                              itemSubtitle,
+                                                              style: TextStyle(
+                                                                fontSize: 10,
+                                                                fontStyle:
+                                                                    FontStyle
+                                                                        .italic,
+                                                                color: themeColor
+                                                                    .withValues(
+                                                                        alpha:
+                                                                            0.8),
+                                                              ),
+                                                              maxLines: 1,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                            ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    Container(
+                                                        width: 1,
+                                                        height: 38,
+                                                        color: borderColor
+                                                            .withValues(
+                                                                alpha: 0.6)),
+                                                    // 6. Debit (Masuk)
+                                                    Container(
+                                                      width: 110,
+                                                      height: 38,
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                          horizontal: 6),
+                                                      child: Align(
+                                                        alignment: Alignment
+                                                            .centerRight,
+                                                        child: isDebit
+                                                            ? Text(
+                                                                'Rp ${RupiahFormatter.format(tx.amount)}',
+                                                                style:
+                                                                    const TextStyle(
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                  fontSize:
+                                                                      11.5,
+                                                                  color: Color(
+                                                                      0xFF059669),
+                                                                ),
+                                                              )
+                                                            : const Text(
+                                                                '-',
+                                                                style:
+                                                                    TextStyle(
+                                                                  color: Color(
+                                                                      0xFF94A3B8),
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                  fontSize:
+                                                                      11.5,
+                                                                ),
+                                                              ),
+                                                      ),
+                                                    ),
+                                                    Container(
+                                                        width: 1,
+                                                        height: 38,
+                                                        color: borderColor
+                                                            .withValues(
+                                                                alpha: 0.6)),
+                                                    // 7. Kredit (Keluar)
+                                                    Container(
+                                                      width: 110,
+                                                      height: 38,
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                          horizontal: 6),
+                                                      child: Align(
+                                                        alignment: Alignment
+                                                            .centerRight,
+                                                        child: isKredit
+                                                            ? Text(
+                                                                'Rp ${RupiahFormatter.format(tx.amount)}',
+                                                                style:
+                                                                    const TextStyle(
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                  fontSize:
+                                                                      11.5,
+                                                                  color: Color(
+                                                                      0xFFE11D48),
+                                                                ),
+                                                              )
+                                                            : const Text(
+                                                                '-',
+                                                                style:
+                                                                    TextStyle(
+                                                                  color: Color(
+                                                                      0xFF94A3B8),
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                  fontSize:
+                                                                      11.5,
+                                                                ),
+                                                              ),
+                                                      ),
+                                                    ),
+                                                    Container(
+                                                        width: 1,
+                                                        height: 38,
+                                                        color: borderColor
+                                                            .withValues(
+                                                                alpha: 0.6)),
+                                                    // 8. Aksi
+                                                    SizedBox(
+                                                      width: 72,
+                                                      height: 38,
+                                                      child: Row(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          InkWell(
+                                                            onTap: () {
+                                                              _showEditTransactionModal(
+                                                                tx,
+                                                                () {
+                                                                  setModalState(
+                                                                      () {});
+                                                                },
+                                                              );
+                                                            },
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        6),
+                                                            child:
+                                                                const Padding(
+                                                              padding:
+                                                                  EdgeInsets
+                                                                      .all(4),
+                                                              child: Icon(
+                                                                Icons
+                                                                    .edit_outlined,
+                                                                color: Color(
+                                                                    0xFF0284C7),
+                                                                size: 16,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                              width: 2),
+                                                          InkWell(
+                                                            onTap: () {
+                                                              _confirmDeleteTransaction(
+                                                                tx,
+                                                                () {
+                                                                  setModalState(
+                                                                      () {});
+                                                                },
+                                                              );
+                                                            },
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        6),
+                                                            child:
+                                                                const Padding(
+                                                              padding:
+                                                                  EdgeInsets
+                                                                      .all(4),
+                                                              child: Icon(
+                                                                Icons
+                                                                    .delete_outline_rounded,
+                                                                color: Colors
+                                                                    .redAccent,
+                                                                size: 16,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            },
+                                          ),
+
+                                          // TOTAL ROW
+                                          Container(
+                                            height: 38,
+                                            decoration: BoxDecoration(
+                                              color: headerBgColor
+                                                  .withValues(alpha: 0.8),
+                                              borderRadius:
+                                                  const BorderRadius.only(
+                                                bottomLeft: Radius.circular(13),
+                                                bottomRight:
+                                                    Radius.circular(13),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                // Total Label spanning (32+1+84+1+95+1+140+1+220 = 575)
+                                                Container(
+                                                  width: 575,
+                                                  height: 38,
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 12),
+                                                  alignment:
+                                                      Alignment.centerLeft,
+                                                  child: Text(
+                                                    'TOTAL ${title.toUpperCase()}:',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 11,
+                                                      color: themeColor,
+                                                    ),
+                                                  ),
+                                                ),
+                                                Container(
+                                                    width: 1,
+                                                    height: 38,
+                                                    color: borderColor),
+                                                // Total Debit (110)
+                                                Container(
+                                                  width: 110,
+                                                  height: 38,
+                                                  padding: const EdgeInsets
+                                                      .symmetric(horizontal: 6),
+                                                  alignment:
+                                                      Alignment.centerRight,
+                                                  child: Text(
+                                                    'Rp ${RupiahFormatter.format(debitTotal)}',
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 11.5,
+                                                      color: Color(0xFF047857),
+                                                    ),
+                                                  ),
+                                                ),
+                                                Container(
+                                                    width: 1,
+                                                    height: 38,
+                                                    color: borderColor),
+                                                // Total Kredit (110)
+                                                Container(
+                                                  width: 110,
+                                                  height: 38,
+                                                  padding: const EdgeInsets
+                                                      .symmetric(horizontal: 6),
+                                                  alignment:
+                                                      Alignment.centerRight,
+                                                  child: Text(
+                                                    'Rp ${RupiahFormatter.format(kreditTotal)}',
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 11.5,
+                                                      color: Color(0xFFBE123C),
+                                                    ),
+                                                  ),
+                                                ),
+                                                Container(
+                                                    width: 1,
+                                                    height: 38,
+                                                    color: borderColor),
+                                                // Aksi Empty
+                                                const SizedBox(
+                                                  width: 72,
+                                                  height: 38,
+                                                  child: Center(
+                                                    child: Text('-',
+                                                        style: TextStyle(
+                                                            color: Color(
+                                                                0xFF94A3B8))),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            );
+                          }
+
                           return Column(
                             children: [
                               // Filter & Search Header Tab Laporan Keuangan
@@ -9028,8 +9925,8 @@ class _StrukturPageState extends State<StrukturPage> {
                                 decoration: const BoxDecoration(
                                   color: Color(0xFFFFFBEB),
                                   border: Border(
-                                    bottom: BorderSide(
-                                        color: Color(0xFFFDE68A)),
+                                    bottom:
+                                        BorderSide(color: Color(0xFFFDE68A)),
                                   ),
                                 ),
                                 child: Column(
@@ -9045,7 +9942,8 @@ class _StrukturPageState extends State<StrukturPage> {
                                               borderRadius:
                                                   BorderRadius.circular(10),
                                               border: Border.all(
-                                                  color: const Color(0xFFFDE68A)),
+                                                  color:
+                                                      const Color(0xFFFDE68A)),
                                             ),
                                             child: TextField(
                                               controller: searchCtrl,
@@ -9054,7 +9952,8 @@ class _StrukturPageState extends State<StrukturPage> {
                                                   searchQuery = val.trim();
                                                 });
                                               },
-                                              style: const TextStyle(fontSize: 12),
+                                              style:
+                                                  const TextStyle(fontSize: 12),
                                               decoration: InputDecoration(
                                                 hintText:
                                                     'Cari keterangan, KU, Kategori, nominal...',
@@ -9065,32 +9964,39 @@ class _StrukturPageState extends State<StrukturPage> {
                                                     Icons.search_rounded,
                                                     size: 18,
                                                     color: Color(0xFFB45309)),
-                                                suffixIcon: searchQuery.isNotEmpty
-                                                    ? IconButton(
-                                                        icon: const Icon(
-                                                            Icons.clear_rounded,
-                                                            size: 16,
-                                                            color: Color(0xFF94A3B8)),
-                                                        onPressed: () {
-                                                          searchCtrl.clear();
-                                                          setModalState(() {
-                                                            searchQuery = '';
-                                                          });
-                                                        },
-                                                      )
-                                                    : null,
+                                                suffixIcon:
+                                                    searchQuery.isNotEmpty
+                                                        ? IconButton(
+                                                            icon: const Icon(
+                                                                Icons
+                                                                    .clear_rounded,
+                                                                size: 16,
+                                                                color: Color(
+                                                                    0xFF94A3B8)),
+                                                            onPressed: () {
+                                                              searchCtrl
+                                                                  .clear();
+                                                              setModalState(() {
+                                                                searchQuery =
+                                                                    '';
+                                                              });
+                                                            },
+                                                          )
+                                                        : null,
                                                 border: InputBorder.none,
                                                 contentPadding:
                                                     const EdgeInsets.symmetric(
-                                                        horizontal: 10, vertical: 8),
+                                                        horizontal: 10,
+                                                        vertical: 8),
                                               ),
                                             ),
                                           ),
                                         ),
                                         const SizedBox(width: 8),
                                         InkWell(
-                                          onTap: () => _showUploadEvidenceModal(
-                                              targetContext: context),
+                                          onTap: () =>
+                                              _showUploadEvidenceModal(
+                                                  targetContext: context),
                                           borderRadius:
                                               BorderRadius.circular(10),
                                           child: Container(
@@ -9118,7 +10024,8 @@ class _StrukturPageState extends State<StrukturPage> {
                                                   'Upload Bukti',
                                                   style: TextStyle(
                                                     fontSize: 11,
-                                                    fontWeight: FontWeight.bold,
+                                                    fontWeight:
+                                                        FontWeight.bold,
                                                     color: Colors.white,
                                                   ),
                                                 ),
@@ -9136,10 +10043,12 @@ class _StrukturPageState extends State<StrukturPage> {
                                               BorderRadius.circular(10),
                                           child: Container(
                                             height: 38,
-                                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 10),
                                             decoration: BoxDecoration(
                                               color: Colors.white,
-                                              borderRadius: BorderRadius.circular(10),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
                                               border: Border.all(
                                                 color: const Color(0xFF107C41),
                                               ),
@@ -9157,7 +10066,8 @@ class _StrukturPageState extends State<StrukturPage> {
                                                   'Atur Sheets',
                                                   style: TextStyle(
                                                     fontSize: 11,
-                                                    fontWeight: FontWeight.bold,
+                                                    fontWeight:
+                                                        FontWeight.bold,
                                                     color: Color(0xFF107C41),
                                                   ),
                                                 ),
@@ -9174,14 +10084,17 @@ class _StrukturPageState extends State<StrukturPage> {
                                       children: [
                                         Expanded(
                                           child: _buildFilterChip(
-                                            label: 'Semua (${allMutasi.length})',
+                                            label:
+                                                'Semua (${allMutasi.length})',
                                             isSelected:
                                                 selectedSubTab == 'semua',
                                             activeColor:
                                                 const Color(0xFFB45309),
                                             fontSize: 10,
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 4, vertical: 5),
+                                            padding:
+                                                const EdgeInsets.symmetric(
+                                                    horizontal: 4,
+                                                    vertical: 5),
                                             onTap: () => setModalState(
                                                 () => selectedSubTab = 'semua'),
                                           ),
@@ -9196,8 +10109,10 @@ class _StrukturPageState extends State<StrukturPage> {
                                             activeColor:
                                                 const Color(0xFFE11D48),
                                             fontSize: 10,
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 4, vertical: 5),
+                                            padding:
+                                                const EdgeInsets.symmetric(
+                                                    horizontal: 4,
+                                                    vertical: 5),
                                             onTap: () => setModalState(() =>
                                                 selectedSubTab = 'pengeluaran'),
                                           ),
@@ -9212,8 +10127,10 @@ class _StrukturPageState extends State<StrukturPage> {
                                             activeColor:
                                                 const Color(0xFF059669),
                                             fontSize: 10,
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 4, vertical: 5),
+                                            padding:
+                                                const EdgeInsets.symmetric(
+                                                    horizontal: 4,
+                                                    vertical: 5),
                                             onTap: () => setModalState(() =>
                                                 selectedSubTab = 'pemasukan'),
                                           ),
@@ -9224,7 +10141,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                 ),
                               ),
 
-                              // Tabel Content Laporan Keuangan
+                              // Tabel Content Laporan Keuangan (2 Tabel: Atas Rekening, Bawah On Hand)
                               Expanded(
                                 child: activeList.isEmpty
                                     ? Center(
@@ -9266,689 +10183,56 @@ class _StrukturPageState extends State<StrukturPage> {
                                     : SingleChildScrollView(
                                         physics: const BouncingScrollPhysics(),
                                         padding: const EdgeInsets.all(12),
-                                        child: ClipRRect(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          child: Container(
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                              border: Border.all(
-                                                  color:
-                                                      const Color(0xFFFDE68A),
-                                                  width: 1.2),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            // 1. TABEL TRANSAKSI REKENING STRUKTUR (ATAS)
+                                            buildExcelAccountTable(
+                                              title:
+                                                  'Tabel Transaksi Rekening',
+                                              subtitle:
+                                                  'Mutasi Bank / Rekening Struktur Organisasi',
+                                              icon:
+                                                  Icons.account_balance_rounded,
+                                              themeColor:
+                                                  const Color(0xFF78350F),
+                                              headerBgColor:
+                                                  const Color(0xFFFEF3C7),
+                                              borderColor:
+                                                  const Color(0xFFFDE68A),
+                                              list: rekeningList,
+                                              debitTotal: rekeningDebit,
+                                              kreditTotal: rekeningKredit,
+                                              isRekening: true,
                                             ),
-                                            child: SingleChildScrollView(
-                                              scrollDirection: Axis.horizontal,
-                                              physics:
-                                                  const BouncingScrollPhysics(),
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  // --- EXCEL STYLE TWO-TIER HEADER ---
-                                                  Container(
-                                                    decoration:
-                                                        const BoxDecoration(
-                                                      color: Color(0xFFFEF3C7),
-                                                      border: Border(
-                                                        bottom: BorderSide(
-                                                            color: Color(
-                                                                0xFFFDE68A),
-                                                            width: 1.2),
-                                                      ),
-                                                    ),
-                                                    child: Row(
-                                                      children: [
-                                                        // 1. No (32)
-                                                        const SizedBox(
-                                                          width: 32,
-                                                          height: 42,
-                                                          child: Center(
-                                                            child: Text('No',
-                                                                style:
-                                                                    headerStyle),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                            width: 1,
-                                                            height: 42,
-                                                            color: const Color(
-                                                                0xFFFDE68A)),
-                                                        // 2. Tanggal (84)
-                                                        const SizedBox(
-                                                          width: 84,
-                                                          height: 42,
-                                                          child: Center(
-                                                            child: Text(
-                                                                'Tanggal',
-                                                                style:
-                                                                    headerStyle),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                            width: 1,
-                                                            height: 42,
-                                                            color: const Color(
-                                                                0xFFFDE68A)),
-                                                        // 3. KU (95)
-                                                        const SizedBox(
-                                                          width: 95,
-                                                          height: 42,
-                                                          child: Center(
-                                                            child: Text('KU',
-                                                                style:
-                                                                    headerStyle),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                            width: 1,
-                                                            height: 42,
-                                                            color: const Color(
-                                                                0xFFFDE68A)),
-                                                        // 4. Kategori (135)
-                                                        const SizedBox(
-                                                          width: 135,
-                                                          height: 42,
-                                                          child: Center(
-                                                            child: Text(
-                                                                'Kategori',
-                                                                style:
-                                                                    headerStyle),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                            width: 1,
-                                                            height: 42,
-                                                            color: const Color(
-                                                                0xFFFDE68A)),
-                                                        // 5. Keterangan (200)
-                                                        const SizedBox(
-                                                          width: 200,
-                                                          height: 42,
-                                                          child: Center(
-                                                            child: Text(
-                                                                'Keterangan',
-                                                                style:
-                                                                    headerStyle),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                            width: 1,
-                                                            height: 42,
-                                                            color: const Color(
-                                                                0xFFFDE68A)),
-                                                        // 6. Jumlah (100)
-                                                        const SizedBox(
-                                                          width: 100,
-                                                          height: 42,
-                                                          child: Center(
-                                                            child: Text(
-                                                                'Jumlah',
-                                                                style:
-                                                                    headerStyle),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                            width: 1,
-                                                            height: 42,
-                                                            color: const Color(
-                                                                0xFFFDE68A)),
-                                                        // 7. Nominal (Merged Debit & Kredit) (205)
-                                                        SizedBox(
-                                                          width: 205,
-                                                          height: 42,
-                                                          child: Column(
-                                                            children: [
-                                                              Container(
-                                                                height: 20,
-                                                                alignment:
-                                                                    Alignment
-                                                                        .center,
-                                                                decoration:
-                                                                    const BoxDecoration(
-                                                                  border: Border(
-                                                                    bottom:
-                                                                        BorderSide(
-                                                                      color: Color(
-                                                                          0xFFFDE68A),
-                                                                      width: 1,
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                                child:
-                                                                    const Text(
-                                                                  'Nominal',
-                                                                  style:
-                                                                      headerStyle,
-                                                                ),
-                                                              ),
-                                                              Row(
-                                                                children: [
-                                                                  const SizedBox(
-                                                                    width: 102,
-                                                                    height: 21,
-                                                                    child:
-                                                                        Center(
-                                                                      child:
-                                                                          Text(
-                                                                        'Debit',
-                                                                        style: TextStyle(
-                                                                          fontSize:
-                                                                              11.5,
-                                                                          fontWeight:
-                                                                              FontWeight.bold,
-                                                                          color: Color(
-                                                                              0xFF047857),
-                                                                        ),
-                                                                      ),
-                                                                    ),
-                                                                  ),
-                                                                  Container(
-                                                                    width: 1,
-                                                                    height: 21,
-                                                                    color: const Color(
-                                                                        0xFFFDE68A),
-                                                                  ),
-                                                                  const SizedBox(
-                                                                    width: 102,
-                                                                    height: 21,
-                                                                    child:
-                                                                        Center(
-                                                                      child:
-                                                                          Text(
-                                                                        'Kredit',
-                                                                        style: TextStyle(
-                                                                          fontSize:
-                                                                              11.5,
-                                                                          fontWeight:
-                                                                              FontWeight.bold,
-                                                                          color: Color(
-                                                                              0xFFBE123C),
-                                                                        ),
-                                                                      ),
-                                                                    ),
-                                                                  ),
-                                                                ],
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                            width: 1,
-                                                            height: 42,
-                                                            color: const Color(
-                                                                0xFFFDE68A)),
-                                                        // 8. Aksi (72)
-                                                        const SizedBox(
-                                                          width: 72,
-                                                          height: 42,
-                                                          child: Center(
-                                                            child: Text('Aksi',
-                                                                style:
-                                                                    headerStyle),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
 
-                                                  // --- DATA ROWS ---
-                                                  ...List.generate(
-                                                    activeList.length,
-                                                    (index) {
-                                                      final tx =
-                                                          activeList[index];
-                                                      final isEven =
-                                                          index % 2 == 0;
-                                                      final dateFormatted =
-                                                          DateFormat(
-                                                                  'dd/MM/yyyy')
-                                                              .format(
-                                                                  tx.timestamp);
-                                                      final String displayKu =
-                                                          tx.getDisplayKu(
-                                                              customRules: _data
-                                                                  .customKodeRules);
-                                                      final String
-                                                          displayKategori =
-                                                          tx.getDisplayKode(
-                                                              customRules: _data
-                                                                  .customKodeRules);
-                                                      final bool isDebit =
-                                                          tx.isPemasukan;
-                                                      final bool isKredit =
-                                                          tx.isPengeluaran;
-                                                      final String itemTitle =
-                                                          tx.title.replaceFirst(
-                                                              RegExp(r'^(Pemasukan|Pengeluaran):\s*',
-                                                                  caseSensitive:
-                                                                      false),
-                                                              '');
-                                                      final String? itemSubtitle =
-                                                          (tx.note != null &&
-                                                                  tx.note!
-                                                                      .isNotEmpty &&
-                                                                  tx.note !=
-                                                                      tx.title &&
-                                                                  tx.note !=
-                                                                      itemTitle)
-                                                          ? tx.note
-                                                          : null;
+                                            const SizedBox(height: 16),
 
-                                                      return Container(
-                                                        height: 38,
-                                                        decoration:
-                                                            BoxDecoration(
-                                                          color: isEven
-                                                              ? const Color(
-                                                                  0xFFFFFDF5)
-                                                              : const Color(
-                                                                  0xFFFFF7ED),
-                                                          border: Border(
-                                                            bottom: BorderSide(
-                                                              color: const Color(
-                                                                      0xFFFDE68A)
-                                                                  .withValues(
-                                                                      alpha:
-                                                                          0.6),
-                                                              width: 0.8,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        child: Row(
-                                                          children: [
-                                                            // 1. No
-                                                            SizedBox(
-                                                              width: 32,
-                                                              height: 38,
-                                                              child: Center(
-                                                                child: Text(
-                                                                  '${index + 1}',
-                                                                  style:
-                                                                      const TextStyle(
-                                                                    fontSize:
-                                                                        11,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .bold,
-                                                                    color: Color(
-                                                                        0xFF78350F),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                                width: 1,
-                                                                height: 38,
-                                                                color: const Color(
-                                                                        0xFFFDE68A)
-                                                                    .withValues(
-                                                                        alpha:
-                                                                            0.6)),
-                                                            // 2. Tanggal
-                                                            SizedBox(
-                                                              width: 84,
-                                                              height: 38,
-                                                              child: Center(
-                                                                child: Text(
-                                                                  dateFormatted,
-                                                                  style:
-                                                                      const TextStyle(
-                                                                    fontSize:
-                                                                        11,
-                                                                    color: Color(
-                                                                        0xFF451A03),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                                width: 1,
-                                                                height: 38,
-                                                                color: const Color(
-                                                                        0xFFFDE68A)
-                                                                    .withValues(
-                                                                        alpha:
-                                                                            0.6)),
-                                                            // 3. KU
-                                                            Container(
-                                                              width: 95,
-                                                              height: 38,
-                                                              padding:
-                                                                  const EdgeInsets
-                                                                      .symmetric(
-                                                                      horizontal:
-                                                                          4),
-                                                              child: Center(
-                                                                child:
-                                                                    _buildKuBadge(
-                                                                        displayKu,
-                                                                        isLarge:
-                                                                            false),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                                width: 1,
-                                                                height: 38,
-                                                                color: const Color(
-                                                                        0xFFFDE68A)
-                                                                    .withValues(
-                                                                        alpha:
-                                                                            0.6)),
-                                                            // 4. Kategori
-                                                            Container(
-                                                              width: 135,
-                                                              height: 38,
-                                                              padding:
-                                                                  const EdgeInsets
-                                                                      .symmetric(
-                                                                      horizontal:
-                                                                          4),
-                                                              child: Center(
-                                                                child:
-                                                                    _buildKodeBadge(
-                                                                        displayKategori,
-                                                                        isLarge:
-                                                                            false),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                                width: 1,
-                                                                height: 38,
-                                                                color: const Color(
-                                                                        0xFFFDE68A)
-                                                                    .withValues(
-                                                                        alpha:
-                                                                            0.6)),
-                                                            // 5. Keterangan
-                                                            Container(
-                                                              width: 200,
-                                                              height: 38,
-                                                              padding:
-                                                                  const EdgeInsets
-                                                                      .symmetric(
-                                                                      horizontal:
-                                                                          6,
-                                                                      vertical:
-                                                                          2),
-                                                              child: Column(
-                                                                mainAxisAlignment:
-                                                                    MainAxisAlignment
-                                                                        .center,
-                                                                crossAxisAlignment:
-                                                                    CrossAxisAlignment
-                                                                        .start,
-                                                                children: [
-                                                                  Text(
-                                                                    itemTitle,
-                                                                    style:
-                                                                        const TextStyle(
-                                                                      fontWeight:
-                                                                          FontWeight
-                                                                              .bold,
-                                                                      fontSize:
-                                                                          11.5,
-                                                                      color: Color(
-                                                                          0xFF451A03),
-                                                                    ),
-                                                                    maxLines: 1,
-                                                                    overflow:
-                                                                        TextOverflow
-                                                                            .ellipsis,
-                                                                  ),
-                                                                  if (itemSubtitle !=
-                                                                          null &&
-                                                                      itemSubtitle
-                                                                          .isNotEmpty &&
-                                                                      !itemTitle
-                                                                          .contains(
-                                                                              itemSubtitle))
-                                                                    Text(
-                                                                      itemSubtitle,
-                                                                      style:
-                                                                          const TextStyle(
-                                                                        fontSize:
-                                                                            10,
-                                                                        fontStyle:
-                                                                            FontStyle.italic,
-                                                                        color: Color(
-                                                                            0xFF92400E),
-                                                                      ),
-                                                                      maxLines:
-                                                                          1,
-                                                                      overflow:
-                                                                          TextOverflow
-                                                                              .ellipsis,
-                                                                    ),
-                                                                ],
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                                width: 1,
-                                                                height: 38,
-                                                                color: const Color(
-                                                                        0xFFFDE68A)
-                                                                    .withValues(
-                                                                        alpha:
-                                                                            0.6)),
-                                                            // 6. Jumlah
-                                                            Container(
-                                                              width: 100,
-                                                              height: 38,
-                                                              padding:
-                                                                  const EdgeInsets
-                                                                      .symmetric(
-                                                                      horizontal:
-                                                                          6),
-                                                              child: Align(
-                                                                alignment:
-                                                                    Alignment
-                                                                        .centerRight,
-                                                                child: Text(
-                                                                  'Rp ${RupiahFormatter.format(tx.amount)}',
-                                                                  style:
-                                                                      const TextStyle(
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .bold,
-                                                                    fontSize:
-                                                                        11.5,
-                                                                    color: Color(
-                                                                        0xFF451A03),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                                width: 1,
-                                                                height: 38,
-                                                                color: const Color(
-                                                                        0xFFFDE68A)
-                                                                    .withValues(
-                                                                        alpha:
-                                                                            0.6)),
-                                                            // 7. Sub-Kolom Debit
-                                                            Container(
-                                                              width: 102,
-                                                              height: 38,
-                                                              padding:
-                                                                  const EdgeInsets
-                                                                      .symmetric(
-                                                                      horizontal:
-                                                                          6),
-                                                              child: Align(
-                                                                alignment:
-                                                                    Alignment
-                                                                        .centerRight,
-                                                                child: isDebit
-                                                                    ? Text(
-                                                                        'Rp ${RupiahFormatter.format(tx.amount)}',
-                                                                        style:
-                                                                            const TextStyle(
-                                                                          fontWeight:
-                                                                              FontWeight.bold,
-                                                                          fontSize:
-                                                                              11.5,
-                                                                          color: Color(
-                                                                              0xFF059669),
-                                                                        ),
-                                                                      )
-                                                                    : const Text(
-                                                                        '-',
-                                                                        style:
-                                                                            TextStyle(
-                                                                          color: Color(
-                                                                              0xFF94A3B8),
-                                                                          fontWeight:
-                                                                              FontWeight.bold,
-                                                                          fontSize:
-                                                                              11.5,
-                                                                        ),
-                                                                      ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                                width: 1,
-                                                                height: 38,
-                                                                color: const Color(
-                                                                        0xFFFDE68A)
-                                                                    .withValues(
-                                                                        alpha:
-                                                                            0.6)),
-                                                            // 8. Sub-Kolom Kredit
-                                                            Container(
-                                                              width: 102,
-                                                              height: 38,
-                                                              padding:
-                                                                  const EdgeInsets
-                                                                      .symmetric(
-                                                                      horizontal:
-                                                                          6),
-                                                              child: Align(
-                                                                alignment:
-                                                                    Alignment
-                                                                        .centerRight,
-                                                                child: isKredit
-                                                                    ? Text(
-                                                                        'Rp ${RupiahFormatter.format(tx.amount)}',
-                                                                        style:
-                                                                            const TextStyle(
-                                                                          fontWeight:
-                                                                              FontWeight.bold,
-                                                                          fontSize:
-                                                                              11.5,
-                                                                          color: Color(
-                                                                              0xFFE11D48),
-                                                                        ),
-                                                                      )
-                                                                    : const Text(
-                                                                        '-',
-                                                                        style:
-                                                                            TextStyle(
-                                                                          color: Color(
-                                                                              0xFF94A3B8),
-                                                                          fontWeight:
-                                                                              FontWeight.bold,
-                                                                          fontSize:
-                                                                              11.5,
-                                                                        ),
-                                                                      ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                                width: 1,
-                                                                height: 38,
-                                                                color: const Color(
-                                                                        0xFFFDE68A)
-                                                                    .withValues(
-                                                                        alpha:
-                                                                            0.6)),
-                                                            // 9. Aksi
-                                                            SizedBox(
-                                                              width: 72,
-                                                              height: 38,
-                                                              child: Row(
-                                                                mainAxisAlignment:
-                                                                    MainAxisAlignment
-                                                                        .center,
-                                                                children: [
-                                                                  InkWell(
-                                                                    onTap: () {
-                                                                      _showEditTransactionModal(
-                                                                        tx,
-                                                                        () {
-                                                                          setModalState(
-                                                                              () {});
-                                                                        },
-                                                                      );
-                                                                    },
-                                                                    borderRadius:
-                                                                        BorderRadius
-                                                                            .circular(
-                                                                                6),
-                                                                    child:
-                                                                        const Padding(
-                                                                      padding:
-                                                                          EdgeInsets.all(
-                                                                              4),
-                                                                      child: Icon(
-                                                                        Icons
-                                                                            .edit_outlined,
-                                                                        color: Color(
-                                                                            0xFF0284C7),
-                                                                        size:
-                                                                            16,
-                                                                      ),
-                                                                    ),
-                                                                  ),
-                                                                  const SizedBox(
-                                                                      width: 2),
-                                                                  InkWell(
-                                                                    onTap: () {
-                                                                      _confirmDeleteTransaction(
-                                                                        tx,
-                                                                        () {
-                                                                          setModalState(
-                                                                              () {});
-                                                                        },
-                                                                      );
-                                                                    },
-                                                                    borderRadius:
-                                                                        BorderRadius
-                                                                            .circular(
-                                                                                6),
-                                                                    child:
-                                                                        const Padding(
-                                                                      padding:
-                                                                          EdgeInsets.all(
-                                                                              4),
-                                                                      child: Icon(
-                                                                        Icons
-                                                                            .delete_outline_rounded,
-                                                                        color: Colors
-                                                                            .redAccent,
-                                                                        size:
-                                                                            16,
-                                                                      ),
-                                                                    ),
-                                                                  ),
-                                                                ],
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      );
-                                                    },
-                                                  ),
-                                                ],
-                                              ),
+                                            // 2. TABEL TRANSAKSI CASH ON HAND (BAWAH)
+                                            buildExcelAccountTable(
+                                              title:
+                                                  'Tabel Transaksi Cash On Hand',
+                                              subtitle:
+                                                  'Kas Tunai & Transaksi Debit On Hand',
+                                              icon: Icons.payments_rounded,
+                                              themeColor:
+                                                  const Color(0xFF065F46),
+                                              headerBgColor:
+                                                  const Color(0xFFD1FAE5),
+                                              borderColor:
+                                                  const Color(0xFFA7F3D0),
+                                              list: onHandList,
+                                              debitTotal: onHandDebit,
+                                              kreditTotal: onHandKredit,
+                                              isRekening: false,
                                             ),
-                                          ),
+
+                                            const SizedBox(height: 10),
+                                          ],
                                         ),
                                       ),
-                                    ),
+                              ),
 
                               // Bottom Total Summary Bar Tab Laporan
                               Container(
