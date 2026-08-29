@@ -1,11 +1,8 @@
-import 'package:daily_apps/models/model_tagihan.dart';
-import 'package:daily_apps/pages/riwayat_page.dart';
+import 'package:daily_apps/pages/pribadi_page.dart';
 import 'package:daily_apps/pages/struktur_page.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:daily_apps/widgets/backup_restore_modal.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 
 enum StatusKesehatan { sehat, perhatian, kritis }
 
@@ -240,6 +237,21 @@ class AppDrawer extends StatelessWidget {
                 // Menu items
                 _buildMenuItem(
                   context: context,
+                  icon: Icons.wallet_rounded,
+                  iconColor: const Color(0xFF10B981),
+                  title: 'Pribadi',
+                  subtitle: 'Keuangan pribadi, on hand debit & cash',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const PribadiPage()),
+                    ).then((_) => onDataChanged());
+                  },
+                ),
+
+                _buildMenuItem(
+                  context: context,
                   icon: Icons.corporate_fare_rounded,
                   iconColor: const Color(0xFF5E35B1),
                   title: 'Struktur',
@@ -250,34 +262,6 @@ class AppDrawer extends StatelessWidget {
                       context,
                       MaterialPageRoute(builder: (_) => const StrukturPage()),
                     ).then((_) => onDataChanged());
-                  },
-                ),
-
-                _buildMenuItem(
-                  context: context,
-                  icon: Icons.history_rounded,
-                  iconColor: const Color(0xFF1976D2),
-                  title: 'Riwayat Keuangan',
-                  subtitle: 'Catatan seluruh transaksi & perubahan',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const RiwayatPage()),
-                    ).then((_) => onDataChanged());
-                  },
-                ),
-
-                _buildMenuItem(
-                  context: context,
-                  icon: Icons.check_circle_outline_rounded,
-                  iconColor: const Color(0xFF43A047),
-                  title: 'Arsip Tagihan Lunas',
-                  subtitle: 'Lihat daftar tagihan yang telah dibayar',
-                  onTap: () {
-                    final navContext = Navigator.of(context).context;
-                    Navigator.pop(context);
-                    _showArsipTagihanLunas(navContext);
                   },
                 ),
 
@@ -388,179 +372,6 @@ class AppDrawer extends StatelessWidget {
             ),
           ),
           trailing: const Icon(Icons.chevron_right_rounded, size: 20, color: Colors.grey),
-        ),
-      ),
-    );
-  }
-
-  void _showArsipTagihanLunas(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    final rawLunas = prefs.getStringList('tagihan_lunas') ?? [];
-    final listLunas = rawLunas.map((e) {
-      try {
-        final decoded = jsonDecode(e);
-        if (decoded is Map<String, dynamic>) {
-          return Tagihan.fromJson(decoded);
-        }
-      } catch (_) {}
-      return null;
-    }).whereType<Tagihan>().toList();
-
-    if (!context.mounted) return;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        height: MediaQuery.sizeOf(ctx).height * 0.75,
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2E7D32).withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check_circle_rounded,
-                    color: Color(0xFF2E7D32),
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Arsip Tagihan Lunas',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF1E293B),
-                        ),
-                      ),
-                      Text(
-                        'Daftar tagihan yang telah diselesaikan',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: listLunas.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.receipt_long_rounded,
-                            size: 48,
-                            color: Colors.grey[300],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Belum ada tagihan yang dibayar',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Klik tombol "Bayar" pada kartu Tagihan saat sudah melunasi.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[400],
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: listLunas.length,
-                      itemBuilder: (ctx, i) {
-                        final item = listLunas[i];
-                        final tglStr = item.tanggalLunas != null
-                            ? '${item.tanggalLunas!.day}/${item.tanggalLunas!.month}/${item.tanggalLunas!.year}'
-                            : '-';
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF7F9FC),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                                color: Colors.grey.withValues(alpha: 0.15)),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item.nama,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: const Color(0xFF1E293B),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Lunas: $tglStr ${item.dibayarDari != null ? '• dari ${item.dibayarDari}' : ''}',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey[500],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Text(
-                                RupiahFormatter.format(item.jumlah),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: const Color(0xFF2E7D32),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
         ),
       ),
     );

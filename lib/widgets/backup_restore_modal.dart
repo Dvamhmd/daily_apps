@@ -966,6 +966,13 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
                       '${summary.totalStrukturMonths} bulan (${summary.totalStrukturTransactions} transaksi)',
                 ),
                 _buildStatChip(
+                  icon: Icons.wallet_rounded,
+                  color: const Color(0xFF10B981),
+                  label: 'Keuangan Pribadi',
+                  value:
+                      '${summary.totalPribadiMonths} bulan (${summary.totalPribadiTransactions} transaksi)',
+                ),
+                _buildStatChip(
                   icon: Icons.view_timeline_rounded,
                   color: const Color(0xFF00897B),
                   label: 'Rundown',
@@ -1092,6 +1099,13 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
                 label: 'Struktur',
                 value:
                     '${data.summary.totalStrukturMonths} bulan (${data.summary.totalStrukturTransactions} transaksi)',
+              ),
+              _buildStatChip(
+                icon: Icons.wallet_rounded,
+                color: const Color(0xFF10B981),
+                label: 'Pribadi',
+                value:
+                    '${data.summary.totalPribadiMonths} bulan (${data.summary.totalPribadiTransactions} transaksi)',
               ),
               _buildStatChip(
                 icon: Icons.view_timeline_rounded,

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:daily_apps/models/model_pribadi.dart';
 import 'package:daily_apps/models/model_struktur.dart';
 import 'package:daily_apps/models/model_todo.dart';
 import 'package:daily_apps/utils/web_file_saver.dart';
@@ -19,6 +20,8 @@ class BackupSummary {
   final int totalRiwayatKeuangan;
   final int totalStrukturMonths;
   final int totalStrukturTransactions;
+  final int totalPribadiMonths;
+  final int totalPribadiTransactions;
   final int totalRundowns;
   final int totalTodoGroups;
   final int totalTodoActiveItems;
@@ -33,6 +36,8 @@ class BackupSummary {
     this.totalRiwayatKeuangan = 0,
     this.totalStrukturMonths = 0,
     this.totalStrukturTransactions = 0,
+    this.totalPribadiMonths = 0,
+    this.totalPribadiTransactions = 0,
     this.totalRundowns = 0,
     this.totalTodoGroups = 0,
     this.totalTodoActiveItems = 0,
@@ -48,6 +53,8 @@ class BackupSummary {
         'totalRiwayatKeuangan': totalRiwayatKeuangan,
         'totalStrukturMonths': totalStrukturMonths,
         'totalStrukturTransactions': totalStrukturTransactions,
+        'totalPribadiMonths': totalPribadiMonths,
+        'totalPribadiTransactions': totalPribadiTransactions,
         'totalRundowns': totalRundowns,
         'totalTodoGroups': totalTodoGroups,
         'totalTodoActiveItems': totalTodoActiveItems,
@@ -67,6 +74,10 @@ class BackupSummary {
           (json['totalStrukturMonths'] as num?)?.toInt() ?? 0,
       totalStrukturTransactions:
           (json['totalStrukturTransactions'] as num?)?.toInt() ?? 0,
+      totalPribadiMonths:
+          (json['totalPribadiMonths'] as num?)?.toInt() ?? 0,
+      totalPribadiTransactions:
+          (json['totalPribadiTransactions'] as num?)?.toInt() ?? 0,
       totalRundowns: (json['totalRundowns'] as num?)?.toInt() ?? 0,
       totalTodoGroups: (json['totalTodoGroups'] as num?)?.toInt() ?? 0,
       totalTodoActiveItems:
@@ -133,6 +144,8 @@ class BackupService {
         (prefs.getStringList('riwayat_keuangan_list') ?? []).length;
     int countStrukturMonths = 0;
     int countStrukturTransactions = 0;
+    int countPribadiMonths = 0;
+    int countPribadiTransactions = 0;
     int countRundowns = 0;
     int countTodoGroups = 0;
     int countTodoActiveItems = 0;
@@ -159,6 +172,18 @@ class BackupService {
             if (decoded is Map<String, dynamic>) {
               final data = StrukturData.fromJson(decoded);
               countStrukturTransactions += data.transactions.length;
+            }
+          } catch (_) {}
+        }
+      } else if (key.startsWith('pribadi_keuangan_data')) {
+        countPribadiMonths++;
+        final raw = prefs.getString(key);
+        if (raw != null) {
+          try {
+            final decoded = jsonDecode(raw);
+            if (decoded is Map<String, dynamic>) {
+              final data = PribadiData.fromJson(decoded);
+              countPribadiTransactions += data.transactions.length;
             }
           } catch (_) {}
         }
@@ -211,6 +236,8 @@ class BackupService {
       totalRiwayatKeuangan: countRiwayatKeuangan,
       totalStrukturMonths: countStrukturMonths,
       totalStrukturTransactions: countStrukturTransactions,
+      totalPribadiMonths: countPribadiMonths,
+      totalPribadiTransactions: countPribadiTransactions,
       totalRundowns: countRundowns,
       totalTodoGroups: countTodoGroups,
       totalTodoActiveItems: countTodoActiveItems,

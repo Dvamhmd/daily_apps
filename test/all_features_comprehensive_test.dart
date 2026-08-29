@@ -142,9 +142,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Daily Apps'), findsOneWidget);
+      expect(find.text('Pribadi'), findsOneWidget);
       expect(find.text('Struktur'), findsOneWidget);
-      expect(find.text('Riwayat Keuangan'), findsOneWidget);
-      expect(find.text('Arsip Tagihan Lunas'), findsOneWidget);
+      expect(find.text('Backup Data'), findsOneWidget);
     });
   });
 
