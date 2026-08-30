@@ -374,12 +374,35 @@ class SheetsSyncService {
 
       final totalCount = rekeningRows.length + onHandRows.length;
 
+      // Pengecekan Batas Maksimal Baris (End Row) sebelum pengiriman
+      final isRekExceeded = config.isRekeningExceeded(rekeningRows.length);
+      final isOnExceeded = config.isOnHandExceeded(onHandRows.length);
+      if (isRekExceeded || isOnExceeded) {
+        final List<String> details = [];
+        if (isRekExceeded) {
+          details.add(
+              'Rekening: ${rekeningRows.length} data (Batas Baris ${config.startRow} s/d ${config.endRow} = Kapasitas ${config.maxRekeningCapacity} baris)');
+        }
+        if (isOnExceeded) {
+          details.add(
+              'Cash On Hand: ${onHandRows.length} data (Batas Baris ${config.startRowOnHand} s/d ${config.endRowOnHand} = Kapasitas ${config.maxOnHandCapacity} baris)');
+        }
+        return SheetsSyncResult(
+          isSuccess: false,
+          message:
+              'Peringatan Batas Baris Terlampaui! ${details.join(" | ")}. Mohon sesuaikan End Row di Pengaturan Google Spreadsheets.',
+        );
+      }
+
       final payload = {
         'action': 'sync_all',
         'sheetName': config.sheetName.trim(),
         'startRow': config.startRow,
+        'endRow': config.endRow ?? 0,
         'startRowRekening': config.startRow,
+        'endRowRekening': config.endRow ?? 0,
         'startRowOnHand': config.startRowOnHand,
+        'endRowOnHand': config.endRowOnHand ?? 0,
         'targetRow': config.evidenceTargetRow,
         'rowMapping': config.evidenceRowMapping,
         'mapping': config.columnMapping,
@@ -453,8 +476,11 @@ class SheetsSyncService {
         'action': 'add_row',
         'sheetName': config.sheetName.trim(),
         'startRow': isOnHand ? config.startRowOnHand : config.startRow,
+        'endRow': isOnHand ? (config.endRowOnHand ?? 0) : (config.endRow ?? 0),
         'startRowRekening': config.startRow,
+        'endRowRekening': config.endRow ?? 0,
         'startRowOnHand': config.startRowOnHand,
+        'endRowOnHand': config.endRowOnHand ?? 0,
         'isOnHand': isOnHand,
         'tableType': isOnHand ? 'onhand' : 'rekening',
         'mapping': config.columnMapping,
@@ -499,8 +525,11 @@ class SheetsSyncService {
         'action': 'undo_last',
         'sheetName': config.sheetName.trim(),
         'startRow': isOnHand ? config.startRowOnHand : config.startRow,
+        'endRow': isOnHand ? (config.endRowOnHand ?? 0) : (config.endRow ?? 0),
         'startRowRekening': config.startRow,
+        'endRowRekening': config.endRow ?? 0,
         'startRowOnHand': config.startRowOnHand,
+        'endRowOnHand': config.endRowOnHand ?? 0,
         'isOnHand': isOnHand,
         'tableType': isOnHand ? 'onhand' : 'rekening',
         'mapping': config.columnMapping,
@@ -647,7 +676,9 @@ class SheetsSyncService {
         'action': 'fetch_transactions',
         'sheetName': config.sheetName.trim(),
         'startRowRekening': config.startRow,
+        'endRowRekening': config.endRow ?? 0,
         'startRowOnHand': config.startRowOnHand,
+        'endRowOnHand': config.endRowOnHand ?? 0,
         'mapping': config.columnMapping,
       };
 
@@ -904,11 +935,9 @@ class SheetsSyncService {
     );
   }
 
-  static String? _cachedScriptCode;
-
   /// Mengembalikan script Google Apps Script siap salin (Copy-Paste)
   static String getGoogleAppsScriptCode() {
-    return _cachedScriptCode ??= '''/**
+    return '''/**
  * =========================================================================
  * GOOGLE APPS SCRIPT - INTEGRASI TABEL LAP KEU & BUKTI GAMBAR KEUANGAN
  * Aplikasi: Daily Apps
@@ -928,6 +957,7 @@ class SheetsSyncService {
  * - Kolom/sel yang tidak dipetakan (misal kolom rumus, catatan, atau tabel di sebelah kanan/bawah)
  *   TIDAK AKAN PERNAH disentuh atau dihapus.
  * - Sel yang mengandung rumus (cth: =SUM(...), =TOTAL, rumus saldo) otomatis dilindungi dan tidak akan ditimpa.
+ * - Baris/tabel lain di bawah transaksi (catatan kaki, tanda tangan, saldo, rekap, bukti) 100% aman dan tidak akan terhapus.
  * 
  * MEMPERTAHANKAN FORMAT ASLI SPREADSHEET (Zero Style Overwrite):
  * - Script HANYA mengirim dan menulis nilai data mentah (raw values) tanpa memodifikasi format sel.
@@ -1084,7 +1114,9 @@ function processRequest(data) {
     }
     
     var startRowRekening = parseInt(data.startRowRekening) || parseInt(data.startRow) || 4;
+    var endRowRekening = parseInt(data.endRowRekening) || parseInt(data.endRow) || 0;
     var startRowOnHand = parseInt(data.startRowOnHand) || startRowRekening || 4;
+    var endRowOnHand = parseInt(data.endRowOnHand) || 0;
     var mapping = data.mapping || {
       no: "A",
       tanggal: "B",
@@ -1264,8 +1296,10 @@ function processRequest(data) {
       }
     }
 
-    // Helper membersihkan sisa data lama HANYA pada tabel tertentu & TIDAK menyentuh rumus/header tabel lain
-    function clearOldTransactionData(targetSheet, startRowIdx, activeMappingObj, newRowCount, evidenceRowMappingObj, defaultEvidenceRow) {
+    // Helper membersihkan sisa baris transaksi lama secara ketat dan aman
+    // HANYA menghapus baris transaksi lama yang tepat menyambung di bawah data baru
+    // Berhenti seketika jika menemukan baris kosong, baris rumus, header, catatan, bukti, atau batas End Row
+    function clearOldTransactionData(targetSheet, startRowIdx, activeMappingObj, newRowCount, evidenceRowMappingObj, defaultEvidenceRow, endRowLimit) {
       var lastRow = targetSheet.getLastRow();
       if (lastRow < startRowIdx) return;
 
@@ -1299,21 +1333,27 @@ function processRequest(data) {
       }
       if (colIndices.length === 0) return;
 
-      var rowsToCheck = Math.min(totalRowsBelow, 300);
+      // Batasi pemindaian maksimal sampai End Row (jika diatur)
+      var maxCheck = Math.min(totalRowsBelow, 100);
+      if (endRowLimit && endRowLimit >= checkStartRow) {
+        maxCheck = Math.min(maxCheck, (endRowLimit - checkStartRow + 1));
+      }
+
       var numCols = maxCol - minCol + 1;
-      var blockRange = targetSheet.getRange(checkStartRow, minCol, rowsToCheck, numCols);
+      var blockRange = targetSheet.getRange(checkStartRow, minCol, maxCheck, numCols);
       var blockFormulas = blockRange.getFormulas();
       var blockValues = blockRange.getValues();
 
-      var maxRowToClear = 0;
+      var consecutiveOldRowsToClear = 0;
 
-      for (var r = 0; r < rowsToCheck; r++) {
+      for (var r = 0; r < maxCheck; r++) {
         var currentRowNum = checkStartRow + r;
         if (currentRowNum >= minEvidenceRow) break;
+        if (endRowLimit && endRowLimit > 0 && currentRowNum > endRowLimit) break;
 
-        var rowHasFormula = false;
-        var rowHasNonEmpty = false;
-        var rowHasKeywordHeader = false;
+        var hasFormula = false;
+        var hasAnyValue = false;
+        var isHeaderOrFooter = false;
 
         for (var i = 0; i < colIndices.length; i++) {
           var colOffset = colIndices[i] - minCol;
@@ -1321,34 +1361,50 @@ function processRequest(data) {
             var fVal = blockFormulas[r][colOffset];
             var vVal = blockValues[r][colOffset];
 
+            // Jika ada formula di kolom manapun pada baris ini -> STOP total!
             if (fVal && fVal.toString().trim() !== "") {
-              rowHasFormula = true;
+              hasFormula = true;
               break;
             }
 
             if (vVal !== "" && vVal !== null && vVal !== undefined) {
               var strVal = vVal.toString().trim().toUpperCase();
-              if (strVal === "TOTAL" || strVal === "JUMLAH TOTAL" || strVal.indexOf("SALDO") !== -1 ||
-                  strVal.indexOf("BUKTI") !== -1 || strVal.indexOf("CATATAN") !== -1 ||
-                  strVal.indexOf("REKAP") !== -1 || strVal.indexOf("KAS") !== -1 ||
-                  strVal.indexOf("MENGETAHUI") !== -1 || strVal.indexOf("TANDA TANGAN") !== -1) {
-                rowHasKeywordHeader = true;
+              // Deteksi kata kunci ringkasan / footer / header / catatan / tanda tangan
+              if (strVal === "TOTAL" || strVal === "JUMLAH" || strVal === "JUMLAH TOTAL" ||
+                  strVal.indexOf("SALDO") !== -1 || strVal.indexOf("BUKTI") !== -1 ||
+                  strVal.indexOf("CATATAN") !== -1 || strVal.indexOf("REKAP") !== -1 ||
+                  strVal.indexOf("KAS") !== -1 || strVal.indexOf("MENGETAHUI") !== -1 ||
+                  strVal.indexOf("TANDA TANGAN") !== -1 || strVal.indexOf("KETUA") !== -1 ||
+                  strVal.indexOf("BENDAHARA") !== -1 || strVal.indexOf("PEMERIKSA") !== -1 ||
+                  strVal.indexOf("NOTE") !== -1 || strVal.indexOf("NB") !== -1) {
+                isHeaderOrFooter = true;
                 break;
               }
-              rowHasNonEmpty = true;
+              hasAnyValue = true;
             }
           }
         }
 
-        if (rowHasFormula || rowHasKeywordHeader) break;
-        if (rowHasNonEmpty) maxRowToClear = r + 1;
+        // Jika menemukan rumus atau footer/header -> STOP seketika, jangan hapus baris ini dan bawahnya
+        if (hasFormula || isHeaderOrFooter) break;
+
+        // KRUSIAL: Jika baris ini KOSONG (tidak ada data apapun di kolom yang dipetakan),
+        // berarti blok transaksi lama SUDAH SELESAI!
+        // STOP SEKETIKA! Jangan terus memeriksa ke bawah karena data di bawah baris kosong adalah bagian terpisah!
+        if (!hasAnyValue) {
+          break;
+        }
+
+        // Baris ini adalah baris data transaksi lama yang tersisa dari sync sebelumnya
+        consecutiveOldRowsToClear++;
       }
 
-      if (maxRowToClear > 0) {
+      // Hapus HANYA baris transaksi lama yang berurutan langsung di bawah data baru
+      if (consecutiveOldRowsToClear > 0) {
         for (var j = 0; j < colIndices.length; j++) {
           var col = colIndices[j];
           try {
-            targetSheet.getRange(checkStartRow, col, maxRowToClear, 1).clearContent();
+            targetSheet.getRange(checkStartRow, col, consecutiveOldRowsToClear, 1).clearContent();
           } catch (eC) {}
         }
       }
@@ -1359,15 +1415,35 @@ function processRequest(data) {
       var rekeningRows = data.rekeningRows || data.rows || [];
       var onHandRows = data.onHandRows || [];
       var targetStartRowRekening = parseInt(data.startRowRekening) || parseInt(data.startRow) || startRowRekening || 4;
+      var targetEndRowRekening = parseInt(data.endRowRekening) || parseInt(data.endRow) || endRowRekening || 0;
       var targetStartRowOnHand = parseInt(data.startRowOnHand) || startRowOnHand || targetStartRowRekening;
+      var targetEndRowOnHand = parseInt(data.endRowOnHand) || endRowOnHand || 0;
       var clearFirst = (data.clearFirst === true || String(data.clearFirst) === "true") || (action === "sync_all" && data.chunkIndex === undefined);
       
-      // 1. Bersihkan sisa baris lama untuk kedua tabel
+      // Validasi Kapasitas End Row Rekening
+      if (targetEndRowRekening > 0 && (targetStartRowRekening + rekeningRows.length - 1) > targetEndRowRekening) {
+        var capRek = targetEndRowRekening - targetStartRowRekening + 1;
+        return jsonResponse({
+          status: "error",
+          message: "Peringatan: Jumlah data transaksi Rekening (" + rekeningRows.length + " data) melebihi batas End Row baris " + targetEndRowRekening + ". Kapasitas dari baris " + targetStartRowRekening + " sampai " + targetEndRowRekening + " hanya " + capRek + " baris. Silakan sesuaikan End Row di aplikasi."
+        });
+      }
+
+      // Validasi Kapasitas End Row On Hand
+      if (targetEndRowOnHand > 0 && (targetStartRowOnHand + onHandRows.length - 1) > targetEndRowOnHand) {
+        var capOn = targetEndRowOnHand - targetStartRowOnHand + 1;
+        return jsonResponse({
+          status: "error",
+          message: "Peringatan: Jumlah data transaksi Cash On Hand (" + onHandRows.length + " data) melebihi batas End Row baris " + targetEndRowOnHand + ". Kapasitas dari baris " + targetStartRowOnHand + " sampai " + targetEndRowOnHand + " hanya " + capOn + " baris. Silakan sesuaikan End Row di aplikasi."
+        });
+      }
+
+      // 1. Bersihkan sisa baris lama untuk kedua tabel secara aman
       if (clearFirst) {
         var defaultEvRow = parseInt(data.targetRow) || 60;
         var evRowMap = data.rowMapping || {};
-        clearOldTransactionData(sheet, targetStartRowRekening, activeRekeningMapping, rekeningRows.length, evRowMap, defaultEvRow);
-        clearOldTransactionData(sheet, targetStartRowOnHand, activeOnHandMapping, onHandRows.length, evRowMap, defaultEvRow);
+        clearOldTransactionData(sheet, targetStartRowRekening, activeRekeningMapping, rekeningRows.length, evRowMap, defaultEvRow, targetEndRowRekening);
+        clearOldTransactionData(sheet, targetStartRowOnHand, activeOnHandMapping, onHandRows.length, evRowMap, defaultEvRow, targetEndRowOnHand);
       }
       
       // 2. Tulis data transaksi Rekening
@@ -1406,7 +1482,9 @@ function processRequest(data) {
         rekeningCount: rekeningRows.length,
         onHandCount: onHandRows.length,
         startRowRekening: targetStartRowRekening,
-        startRowOnHand: targetStartRowOnHand
+        endRowRekening: targetEndRowRekening,
+        startRowOnHand: targetStartRowOnHand,
+        endRowOnHand: targetEndRowOnHand
       });
     }
 
@@ -1416,46 +1494,97 @@ function processRequest(data) {
       var isOnHand = (data.isOnHand === true || data.tableType === "onhand");
       var targetMapping = isOnHand ? activeOnHandMapping : activeRekeningMapping;
       var targetStart = isOnHand ? targetStartRowOnHand : targetStartRowRekening;
+      var targetEnd = isOnHand 
+          ? (parseInt(data.endRowOnHand) || endRowOnHand || 0)
+          : (parseInt(data.endRowRekening) || parseInt(data.endRow) || endRowRekening || 0);
 
-      var checkCol = isOnHand 
-          ? (targetMapping['tanggal_onhand'] || targetMapping['no_onhand'] || 1)
-          : (targetMapping['tanggal'] || targetMapping['no'] || 1);
-
-      for (var f in targetMapping) {
-        checkCol = targetMapping[f];
-        break;
-      }
-      
       var lastRow = sheet.getLastRow();
       var nextRow = targetStart;
       if (lastRow >= targetStart) {
         var totalToCheck = lastRow - targetStart + 1;
-        var rRange = sheet.getRange(targetStart, checkCol, totalToCheck, 1);
+        var numCols = sheet.getLastColumn() || 26;
+        var rRange = sheet.getRange(targetStart, 1, totalToCheck, numCols);
         var rFormulas = rRange.getFormulas();
         var rValues = rRange.getValues();
         
         var found = false;
         for (var i = 0; i < totalToCheck; i++) {
-          if (rFormulas[i] && rFormulas[i][0] && rFormulas[i][0].toString().trim() !== "") {
-            nextRow = targetStart + i;
+          var rowNum = targetStart + i;
+          
+          // Cek apakah baris ini mengandung formula atau merupakan header/footer
+          var rowHasFormula = false;
+          var rowIsSummaryOrFooter = false;
+          var rowIsBlankInTable = true;
+
+          for (var field in targetMapping) {
+            var cIdx = targetMapping[field];
+            if (cIdx > 0 && cIdx <= numCols) {
+              var fVal = rFormulas[i][cIdx - 1];
+              var vVal = rValues[i][cIdx - 1];
+              if (fVal && fVal.toString().trim() !== "") {
+                rowHasFormula = true;
+              }
+              if (vVal !== "" && vVal !== null && vVal !== undefined) {
+                rowIsBlankInTable = false;
+                var strVal = vVal.toString().trim().toUpperCase();
+                if (strVal === "TOTAL" || strVal === "JUMLAH" || strVal === "JUMLAH TOTAL" ||
+                    strVal.indexOf("SALDO") !== -1 || strVal.indexOf("BUKTI") !== -1 ||
+                    strVal.indexOf("CATATAN") !== -1 || strVal.indexOf("REKAP") !== -1 ||
+                    strVal.indexOf("KAS") !== -1 || strVal.indexOf("MENGETAHUI") !== -1 ||
+                    strVal.indexOf("TANDA TANGAN") !== -1) {
+                  rowIsSummaryOrFooter = true;
+                }
+              }
+            }
+          }
+
+          // Jika baris ini adalah baris formula atau footer/summary (seperti TOTAL / SALDO),
+          // JANGAN TIMPA! Sisipkan baris baru di atasnya agar rumus dan footer tetap aman & bergeser ke bawah
+          if (rowHasFormula || rowIsSummaryOrFooter) {
+            // Cek apakah dengan menyisipkan baris akan melampaui End Row
+            if (targetEnd > 0 && rowNum > targetEnd) {
+              return jsonResponse({
+                status: "error",
+                message: "Peringatan: Tabel " + (isOnHand ? "Cash On Hand" : "Rekening") + " telah mencapai batas maksimal End Row (Baris ke-" + targetEnd + "). Penambahan transaksi dibatalkan agar tidak merusak baris di bawahnya."
+              });
+            }
+            sheet.insertRowBefore(rowNum);
+            nextRow = rowNum;
             found = true;
             break;
           }
-          if (rValues[i][0] === "" || rValues[i][0] === null || rValues[i][0] === undefined) {
-            nextRow = targetStart + i;
+
+          // Jika baris ini kosong di semua kolom tabel dan tidak memiliki formula, gunakan baris ini
+          if (rowIsBlankInTable && !rowHasFormula) {
+            nextRow = rowNum;
             found = true;
             break;
           }
         }
+
         if (!found) {
           nextRow = lastRow + 1;
         }
       }
       
+      // Validasi End Row sebelum menulis
+      if (targetEnd > 0 && nextRow > targetEnd) {
+        return jsonResponse({
+          status: "error",
+          message: "Peringatan: Baris ke-" + nextRow + " melebihi batas End Row (Baris ke-" + targetEnd + ") untuk " + (isOnHand ? "Cash On Hand" : "Rekening") + ". Penambahan transaksi dibatalkan."
+        });
+      }
+
       for (var field in targetMapping) {
         var colIdx = targetMapping[field];
-        var val = (item[field] !== undefined && item[field] !== null) ? item[field] : "";
-        safeWriteSingleColumn(sheet, nextRow, colIdx, [[val]]);
+        if (colIdx > 0) {
+          var val = (item[field] !== undefined && item[field] !== null) ? item[field] : "";
+          var cell = sheet.getRange(nextRow, colIdx);
+          // Lindungi rumus jika cell secara tak terduga memiliki rumus
+          if (cell.getFormula() === "") {
+            safeWriteSingleColumn(sheet, nextRow, colIdx, [[val]]);
+          }
+        }
       }
       
       return jsonResponse({
@@ -1471,27 +1600,41 @@ function processRequest(data) {
       var targetMapping = isOnHand ? activeOnHandMapping : activeRekeningMapping;
       var targetStart = isOnHand ? targetStartRowOnHand : targetStartRowRekening;
 
-      var checkCol = isOnHand 
-          ? (targetMapping['tanggal_onhand'] || targetMapping['no_onhand'] || 1)
-          : (targetMapping['tanggal'] || targetMapping['no'] || 1);
-
-      for (var f in targetMapping) {
-        checkCol = targetMapping[f];
-        break;
-      }
-      
       var lastRow = sheet.getLastRow();
       if (lastRow >= targetStart) {
         var totalToCheck = lastRow - targetStart + 1;
-        var rRange = sheet.getRange(targetStart, checkCol, totalToCheck, 1);
+        var numCols = sheet.getLastColumn() || 26;
+        var rRange = sheet.getRange(targetStart, 1, totalToCheck, numCols);
         var rFormulas = rRange.getFormulas();
         var rValues = rRange.getValues();
         
         var targetUndoRow = -1;
+        // Cari dari bawah ke atas baris transaksi yang memiliki nilai dan BUKAN baris formula/footer
         for (var i = totalToCheck - 1; i >= 0; i--) {
-          var hasFormula = (rFormulas[i] && rFormulas[i][0] && rFormulas[i][0].toString().trim() !== "");
-          var hasValue = (rValues[i][0] !== "" && rValues[i][0] !== null && rValues[i][0] !== undefined);
-          if (!hasFormula && hasValue) {
+          var hasFormula = false;
+          var hasValue = false;
+          var isFooter = false;
+
+          for (var field in targetMapping) {
+            var cIdx = targetMapping[field];
+            if (cIdx > 0 && cIdx <= numCols) {
+              var fVal = rFormulas[i][cIdx - 1];
+              var vVal = rValues[i][cIdx - 1];
+              if (fVal && fVal.toString().trim() !== "") {
+                hasFormula = true;
+              }
+              if (vVal !== "" && vVal !== null && vVal !== undefined) {
+                hasValue = true;
+                var strVal = vVal.toString().trim().toUpperCase();
+                if (strVal === "TOTAL" || strVal === "JUMLAH" || strVal.indexOf("SALDO") !== -1 ||
+                    strVal.indexOf("BUKTI") !== -1 || strVal.indexOf("CATATAN") !== -1) {
+                  isFooter = true;
+                }
+              }
+            }
+          }
+
+          if (!hasFormula && !isFooter && hasValue) {
             targetUndoRow = targetStart + i;
             break;
           }
@@ -1500,9 +1643,11 @@ function processRequest(data) {
         if (targetUndoRow >= targetStart) {
           for (var field in targetMapping) {
             var colIdx = targetMapping[field];
-            var cell = sheet.getRange(targetUndoRow, colIdx);
-            if (cell.getFormula() === "") {
-              cell.clearContent();
+            if (colIdx > 0) {
+              var cell = sheet.getRange(targetUndoRow, colIdx);
+              if (cell.getFormula() === "") {
+                cell.clearContent();
+              }
             }
           }
           
@@ -1523,14 +1668,19 @@ function processRequest(data) {
     // --- AKSI 5: BACA / AMBIL DATA TRANSAKSI DARI SPREADSHEET (FETCH DATA) ---
     if (action === "fetch_transactions" || action === "fetch_data" || action === "read_data") {
       var targetStartRowRekening = parseInt(data.startRowRekening) || parseInt(data.startRow) || startRowRekening || 4;
+      var targetEndRowRekening = parseInt(data.endRowRekening) || parseInt(data.endRow) || endRowRekening || 0;
       var targetStartRowOnHand = parseInt(data.startRowOnHand) || startRowOnHand || targetStartRowRekening;
+      var targetEndRowOnHand = parseInt(data.endRowOnHand) || endRowOnHand || 0;
 
-      function readTableData(startRowIdx, activeMappingObj, fieldsList) {
+      function readTableData(startRowIdx, activeMappingObj, fieldsList, endRowLimit) {
         var rows = [];
         var lastRow = sheet.getLastRow();
         if (lastRow < startRowIdx) return rows;
 
-        var numRows = Math.min(lastRow - startRowIdx + 1, 500);
+        var maxRows = (endRowLimit && endRowLimit >= startRowIdx) 
+            ? (endRowLimit - startRowIdx + 1)
+            : 500;
+        var numRows = Math.min(lastRow - startRowIdx + 1, maxRows);
         if (numRows <= 0) return rows;
 
         var maxCol = 0;
@@ -1589,8 +1739,8 @@ function processRequest(data) {
         return rows;
       }
 
-      var fetchedRekening = readTableData(targetStartRowRekening, activeRekeningMapping, REKENING_FIELDS);
-      var fetchedOnHand = readTableData(targetStartRowOnHand, activeOnHandMapping, ONHAND_FIELDS);
+      var fetchedRekening = readTableData(targetStartRowRekening, activeRekeningMapping, REKENING_FIELDS, targetEndRowRekening);
+      var fetchedOnHand = readTableData(targetStartRowOnHand, activeOnHandMapping, ONHAND_FIELDS, targetEndRowOnHand);
 
       return jsonResponse({
         status: "success",

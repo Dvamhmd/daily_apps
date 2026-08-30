@@ -6,7 +6,9 @@ class SheetsConfig {
   String sheetName;
   bool autoSyncOnInput;
   int startRow; // Start row untuk Transaksi Rekening
+  int? endRow; // End row (Batas akhir baris) untuk Transaksi Rekening (opsional/null jika tanpa batas)
   int startRowOnHand; // Start row untuk Transaksi Cash On Hand
+  int? endRowOnHand; // End row (Batas akhir baris) untuk Transaksi Cash On Hand (opsional/null jika tanpa batas)
   String dateFormat;
   Map<String, String> columnMapping;
   DateTime? lastSyncTime;
@@ -25,7 +27,9 @@ class SheetsConfig {
     this.sheetName = '',
     this.autoSyncOnInput = false,
     this.startRow = 4,
+    this.endRow,
     this.startRowOnHand = 4,
+    this.endRowOnHand,
     this.dateFormat = 'dd/MM/yyyy',
     Map<String, String>? columnMapping,
     this.insertImageFormula = false,
@@ -37,6 +41,24 @@ class SheetsConfig {
     this.lastSyncMessage,
   })  : columnMapping = columnMapping ?? defaultColumnMapping(),
         evidenceRowMapping = evidenceRowMapping ?? defaultEvidenceRowMapping();
+
+  /// Kapasitas maksimal baris Rekening (0 = tanpa batas)
+  int get maxRekeningCapacity =>
+      (endRow != null && endRow! >= startRow) ? (endRow! - startRow + 1) : 0;
+
+  /// Kapasitas maksimal baris Cash On Hand (0 = tanpa batas)
+  int get maxOnHandCapacity =>
+      (endRowOnHand != null && endRowOnHand! >= startRowOnHand)
+          ? (endRowOnHand! - startRowOnHand + 1)
+          : 0;
+
+  /// Cek apakah jumlah transaksi Rekening melebihi kapasitas
+  bool isRekeningExceeded(int count) =>
+      maxRekeningCapacity > 0 && count > maxRekeningCapacity;
+
+  /// Cek apakah jumlah transaksi Cash On Hand melebihi kapasitas
+  bool isOnHandExceeded(int count) =>
+      maxOnHandCapacity > 0 && count > maxOnHandCapacity;
 
   static Map<String, String> defaultColumnMapping() => {
         // 1. Kolom Transaksi Rekening
@@ -123,7 +145,9 @@ class SheetsConfig {
         'sheetName': sheetName,
         'autoSyncOnInput': autoSyncOnInput,
         'startRow': startRow,
+        'endRow': endRow,
         'startRowOnHand': startRowOnHand,
+        'endRowOnHand': endRowOnHand,
         'dateFormat': dateFormat,
         'columnMapping': columnMapping,
         'insertImageFormula': insertImageFormula,
@@ -164,15 +188,21 @@ class SheetsConfig {
     }
 
     final int parsedStartRow = (json['startRow'] as num?)?.toInt() ?? 4;
+    final int? parsedEndRow = (json['endRow'] as num?)?.toInt();
     final int parsedStartRowOnHand =
         (json['startRowOnHand'] as num?)?.toInt() ?? parsedStartRow;
+    final int? parsedEndRowOnHand = (json['endRowOnHand'] as num?)?.toInt();
 
     return SheetsConfig(
       webAppUrl: json['webAppUrl'] as String? ?? '',
       sheetName: (json['sheetName'] as String? ?? '').trim(),
       autoSyncOnInput: json['autoSyncOnInput'] as bool? ?? false,
       startRow: parsedStartRow,
+      endRow: (parsedEndRow != null && parsedEndRow > 0) ? parsedEndRow : null,
       startRowOnHand: parsedStartRowOnHand,
+      endRowOnHand: (parsedEndRowOnHand != null && parsedEndRowOnHand > 0)
+          ? parsedEndRowOnHand
+          : null,
       dateFormat: json['dateFormat'] as String? ?? 'dd/MM/yyyy',
       columnMapping: mapping,
       insertImageFormula: json['insertImageFormula'] as bool? ?? false,

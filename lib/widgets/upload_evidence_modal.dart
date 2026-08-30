@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/model_sheets_config.dart';
 import '../utils/sheets_sync_service.dart';
+import 'custom_toast.dart';
 import 'google_sheets_config_modal.dart';
 
 class UploadEvidenceModal extends StatefulWidget {
@@ -300,13 +301,10 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
 
   Future<void> _pickSingleImage(_EvidenceItem item) async {
     if (!_isCellConfigured(item.key)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              'Cell ${item.label} dinonaktifkan (-). Atur pemetaan cell terlebih dahulu di Pengaturan.'),
-          backgroundColor: const Color(0xFFD97706),
-          behavior: SnackBarBehavior.floating,
-        ),
+      CustomToast.showWarning(
+        context,
+        title: 'Cell Dinonaktifkan',
+        subtitle: 'Cell ${item.label} dinonaktifkan (-). Atur pemetaan cell di Pengaturan.',
       );
       return;
     }
@@ -344,11 +342,10 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal memilih gambar: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
+        CustomToast.showError(
+          context,
+          title: 'Gagal Memilih Gambar',
+          subtitle: '$e',
         );
       }
     }
@@ -358,13 +355,10 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
     final enabledMutasi =
         _mutasiList.where((m) => _isCellConfigured(m.key)).toList();
     if (enabledMutasi.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              'Semua cell mutasi dinonaktifkan (-). Atur pemetaan cell terlebih dahulu di Pengaturan.'),
-          backgroundColor: Color(0xFFD97706),
-          behavior: SnackBarBehavior.floating,
-        ),
+      CustomToast.showWarning(
+        context,
+        title: 'Semua Cell Mutasi Nonaktif',
+        subtitle: 'Semua cell mutasi dinonaktifkan (-). Atur pemetaan cell di Pengaturan.',
       );
       return;
     }
@@ -378,25 +372,29 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
       );
 
       if (result != null && result.files.isNotEmpty) {
-        final files = result.files.take(enabledMutasi.length).toList();
+        final files = result.files;
+        final countToProcess = files.length < enabledMutasi.length
+            ? files.length
+            : enabledMutasi.length;
 
         setState(() {
-          for (int i = 0; i < enabledMutasi.length; i++) {
-            if (i < files.length && files[i].bytes != null) {
-              final ext = files[i].extension?.toLowerCase() ?? 'jpg';
+          for (int i = 0; i < countToProcess; i++) {
+            final f = files[i];
+            if (f.bytes != null) {
+              final ext = f.extension?.toLowerCase() ?? 'jpg';
               String mime = 'image/jpeg';
               if (ext == 'png') mime = 'image/png';
               if (ext == 'webp') mime = 'image/webp';
 
-              enabledMutasi[i].bytes = files[i].bytes;
-              enabledMutasi[i].fileName = files[i].name;
+              enabledMutasi[i].bytes = f.bytes;
+              enabledMutasi[i].fileName = f.name;
               enabledMutasi[i].mimeType = mime;
               enabledMutasi[i].resetUploadState();
             }
           }
         });
 
-        for (int i = 0; i < files.length && i < enabledMutasi.length; i++) {
+        for (int i = 0; i < countToProcess; i++) {
           if (files[i].bytes != null) {
             final ext = files[i].extension?.toLowerCase() ?? 'jpg';
             String mime = 'image/jpeg';
@@ -414,11 +412,10 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal memilih gambar mutasi: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
+        CustomToast.showError(
+          context,
+          title: 'Gagal Memilih Gambar Mutasi',
+          subtitle: '$e',
         );
       }
     }
@@ -522,53 +519,41 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
 
   Future<void> _handleUploadToSheets() async {
     if (!_config.isConfigured) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-              'URL Google Apps Script belum diatur. Buka Pengaturan Spreadsheets.'),
-          backgroundColor: Colors.redAccent,
-          action: SnackBarAction(
-            label: 'Atur',
-            textColor: Colors.white,
-            onPressed: () {
-              GoogleSheetsConfigModal.show(
-                context: context,
-                config: _config,
-                initialTab: 0,
-                onConfigSaved: (newCfg) {
-                  setState(() => _config = newCfg);
-                  widget.onConfigChanged?.call(newCfg);
-                },
-              );
+      CustomToast.showError(
+        context,
+        title: 'URL Apps Script Belum Diatur',
+        subtitle: 'Buka Pengaturan Spreadsheets untuk mengatur URL script.',
+        onTap: () {
+          GoogleSheetsConfigModal.show(
+            context: context,
+            config: _config,
+            initialTab: 0,
+            onConfigSaved: (newCfg) {
+              setState(() => _config = newCfg);
+              widget.onConfigChanged?.call(newCfg);
             },
-          ),
-        ),
+          );
+        },
       );
       return;
     }
 
     if (!_config.hasConfiguredCells) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-              'Pemetaan cell belum dikonfigurasi. Atur pemetaan cell terlebih dahulu.'),
-          backgroundColor: const Color(0xFFD97706),
-          action: SnackBarAction(
-            label: 'Atur Cell',
-            textColor: Colors.white,
-            onPressed: () {
-              GoogleSheetsConfigModal.show(
-                context: context,
-                config: _config,
-                initialTab: 1,
-                onConfigSaved: (newCfg) {
-                  setState(() => _config = newCfg);
-                  widget.onConfigChanged?.call(newCfg);
-                },
-              );
+      CustomToast.showWarning(
+        context,
+        title: 'Pemetaan Cell Belum Ada',
+        subtitle: 'Atur pemetaan cell terlebih dahulu di Pengaturan Spreadsheets.',
+        onTap: () {
+          GoogleSheetsConfigModal.show(
+            context: context,
+            config: _config,
+            initialTab: 1,
+            onConfigSaved: (newCfg) {
+              setState(() => _config = newCfg);
+              widget.onConfigChanged?.call(newCfg);
             },
-          ),
-        ),
+          );
+        },
       );
       return;
     }
@@ -600,13 +585,10 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
     }
 
     if (payloadImages.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              'Tidak ada gambar pada cell yang aktif. Pastikan cell pemetaan sudah diatur (tidak bernilai "-") sebelum mengunggah.'),
-          backgroundColor: Color(0xFFD97706),
-          behavior: SnackBarBehavior.floating,
-        ),
+      CustomToast.showWarning(
+        context,
+        title: 'Tidak Ada Gambar Aktif',
+        subtitle: 'Pastikan cell pemetaan sudah diatur (tidak bernilai "-") sebelum mengunggah.',
       );
       return;
     }
@@ -664,27 +646,18 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
 
         if (!mounted) return;
         widget.onUploaded?.call();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.bolt_rounded, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Expanded(child: Text(result.message)),
-              ],
-            ),
-            backgroundColor: const Color(0xFF059669),
-            behavior: SnackBarBehavior.floating,
-          ),
+        CustomToast.showSuccess(
+          context,
+          title: 'Unggah Berhasil!',
+          subtitle: result.message,
+          icon: Icons.bolt_rounded,
         );
       } else {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result.message),
-            backgroundColor: const Color(0xFFDC2626),
-            behavior: SnackBarBehavior.floating,
-          ),
+        CustomToast.showError(
+          context,
+          title: 'Gagal Mengunggah',
+          subtitle: result.message,
         );
       }
     }
@@ -961,13 +934,10 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
           GestureDetector(
             onTap: !isCellEnabled
                 ? () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                            'Cell ${item.label} dinonaktifkan (-). Atur pemetaan cell di Pengaturan.'),
-                        backgroundColor: const Color(0xFFD97706),
-                        behavior: SnackBarBehavior.floating,
-                      ),
+                    CustomToast.showWarning(
+                      context,
+                      title: 'Cell Dinonaktifkan',
+                      subtitle: 'Cell ${item.label} dinonaktifkan (-). Atur pemetaan cell di Pengaturan.',
                     );
                   }
                 : (item.isUploading
@@ -1317,13 +1287,10 @@ class _UploadEvidenceModalState extends State<UploadEvidenceModal> {
                     child: GestureDetector(
                       onTap: !isCellEnabled
                           ? () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                      'Cell Mutasi ${index + 1} dinonaktifkan (-). Atur pemetaan cell di Pengaturan.'),
-                                  backgroundColor: const Color(0xFFD97706),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
+                              CustomToast.showWarning(
+                                context,
+                                title: 'Cell Mutasi Dinonaktifkan',
+                                subtitle: 'Cell Mutasi ${index + 1} dinonaktifkan (-). Atur pemetaan cell di Pengaturan.',
                               );
                             }
                           : (item.isUploading

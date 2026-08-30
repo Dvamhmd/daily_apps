@@ -9,17 +9,20 @@ enum ToastType {
 }
 
 class CustomToast {
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
   static OverlayEntry? _currentOverlayEntry;
   static _CustomToastWidgetState? _currentState;
 
   /// Menampilkan toast pesan dengan animasi masuk dan keluar yang halus,
-  /// dan otomatis menghilang setelah durasi yang ditentukan (default: 1.5 detik / 1500 ms).
+  /// selalu berada di top layer (root overlay) di atas modal / dialog / menu,
+  /// dan otomatis menghilang setelah durasi yang ditentukan (default: 1.5 - 2.5 detik).
   static void show(
-    BuildContext context, {
+    BuildContext? context, {
     required String title,
     String? subtitle,
     ToastType type = ToastType.success,
-    Duration duration = const Duration(milliseconds: 1500),
+    Duration duration = const Duration(milliseconds: 1800),
     Duration animationDuration = const Duration(milliseconds: 300),
     IconData? icon,
     VoidCallback? onTap,
@@ -27,7 +30,18 @@ class CustomToast {
     // Tutup toast sebelumnya secara langsung jika masih ada
     dismiss(immediate: true);
 
-    final overlay = Overlay.of(context, rootOverlay: true);
+    OverlayState? overlay;
+    if (context != null) {
+      try {
+        overlay = Overlay.maybeOf(context, rootOverlay: true);
+      } catch (_) {}
+    }
+    overlay ??= navigatorKey.currentState?.overlay;
+
+    if (overlay == null) {
+      debugPrint('CustomToast: OverlayState tidak ditemukan.');
+      return;
+    }
 
     final overlayEntry = OverlayEntry(
       builder: (ctx) => _CustomToastOverlay(
@@ -51,12 +65,12 @@ class CustomToast {
     overlay.insert(overlayEntry);
   }
 
-  /// Shortcut khusus untuk pesan sukses (seperti file cadangan berhasil disimpan)
+  /// Shortcut pesan sukses
   static void showSuccess(
-    BuildContext context, {
+    BuildContext? context, {
     required String title,
     String? subtitle,
-    Duration duration = const Duration(milliseconds: 1500),
+    Duration duration = const Duration(milliseconds: 1800),
     IconData icon = Icons.check_circle_rounded,
     VoidCallback? onTap,
   }) {
@@ -71,9 +85,9 @@ class CustomToast {
     );
   }
 
-  /// Shortcut khusus untuk pesan error/gagal
+  /// Shortcut pesan error/gagal
   static void showError(
-    BuildContext context, {
+    BuildContext? context, {
     required String title,
     String? subtitle,
     Duration duration = const Duration(milliseconds: 2500),
@@ -88,6 +102,67 @@ class CustomToast {
       duration: duration,
       icon: icon,
       onTap: onTap,
+    );
+  }
+
+  /// Shortcut pesan warning/peringatan
+  static void showWarning(
+    BuildContext? context, {
+    required String title,
+    String? subtitle,
+    Duration duration = const Duration(milliseconds: 2200),
+    IconData icon = Icons.warning_amber_rounded,
+    VoidCallback? onTap,
+  }) {
+    show(
+      context,
+      title: title,
+      subtitle: subtitle,
+      type: ToastType.warning,
+      duration: duration,
+      icon: icon,
+      onTap: onTap,
+    );
+  }
+
+  /// Shortcut pesan info
+  static void showInfo(
+    BuildContext? context, {
+    required String title,
+    String? subtitle,
+    Duration duration = const Duration(milliseconds: 2000),
+    IconData icon = Icons.info_outline_rounded,
+    VoidCallback? onTap,
+  }) {
+    show(
+      context,
+      title: title,
+      subtitle: subtitle,
+      type: ToastType.info,
+      duration: duration,
+      icon: icon,
+      onTap: onTap,
+    );
+  }
+
+  /// Shortcut umum untuk menampilkan toast sederhana berdasarkan pesan teks
+  static void showToast(
+    BuildContext? context,
+    String message, {
+    bool isSuccess = true,
+    ToastType? type,
+    String? subtitle,
+    Duration? duration,
+    IconData? icon,
+  }) {
+    final resolvedType = type ?? (isSuccess ? ToastType.success : ToastType.info);
+    show(
+      context,
+      title: message,
+      subtitle: subtitle,
+      type: resolvedType,
+      duration: duration ?? const Duration(milliseconds: 1800),
+      icon: icon,
     );
   }
 

@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import '../models/model_sheets_config.dart';
 import '../models/model_struktur.dart';
 import '../utils/sheets_sync_service.dart';
+import 'custom_toast.dart';
 import 'sheets_risk_management_dialog.dart';
 
 class GoogleSheetsConfigModal extends StatefulWidget {
@@ -71,7 +72,9 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
   late TextEditingController _urlCtrl;
   late TextEditingController _sheetNameCtrl;
   late TextEditingController _startRowCtrl;
+  late TextEditingController _endRowCtrl;
   late TextEditingController _startRowOnHandCtrl;
+  late TextEditingController _endRowOnHandCtrl;
 
   static const List<Map<String, String>> dateFormatPresets = [
     {
@@ -230,8 +233,16 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     _urlCtrl = TextEditingController(text: _config.webAppUrl);
     _sheetNameCtrl = TextEditingController(text: _config.sheetName);
     _startRowCtrl = TextEditingController(text: _config.startRow.toString());
+    _endRowCtrl = TextEditingController(
+        text: (_config.endRow != null && _config.endRow! > 0)
+            ? _config.endRow.toString()
+            : '');
     _startRowOnHandCtrl =
         TextEditingController(text: _config.startRowOnHand.toString());
+    _endRowOnHandCtrl = TextEditingController(
+        text: (_config.endRowOnHand != null && _config.endRowOnHand! > 0)
+            ? _config.endRowOnHand.toString()
+            : '');
     _evidenceTargetRowCtrl =
         TextEditingController(text: _config.evidenceTargetRow.toString());
     _insertImageFormula = _config.insertImageFormula;
@@ -267,7 +278,9 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     _urlCtrl.dispose();
     _sheetNameCtrl.dispose();
     _startRowCtrl.dispose();
+    _endRowCtrl.dispose();
     _startRowOnHandCtrl.dispose();
+    _endRowOnHandCtrl.dispose();
     _evidenceTargetRowCtrl.dispose();
     _customDateFormatCtrl.dispose();
     for (var c in _colControllers.values) {
@@ -292,6 +305,18 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
   }
 
   String? _getMappingValidationError() {
+    final startRow = int.tryParse(_startRowCtrl.text.trim()) ?? 4;
+    final endRow = int.tryParse(_endRowCtrl.text.trim());
+    if (endRow != null && endRow > 0 && endRow < startRow) {
+      return 'End Row Rekening ($endRow) tidak boleh lebih kecil dari Start Row ($startRow).';
+    }
+
+    final startRowOnHand = int.tryParse(_startRowOnHandCtrl.text.trim()) ?? 4;
+    final endRowOnHand = int.tryParse(_endRowOnHandCtrl.text.trim());
+    if (endRowOnHand != null && endRowOnHand > 0 && endRowOnHand < startRowOnHand) {
+      return 'End Row Cash On Hand ($endRowOnHand) tidak boleh lebih kecil dari Start Row ($startRowOnHand).';
+    }
+
     for (var f in _fieldDefinitions) {
       final key = f['key']!;
       final isVisible = _fieldVisibility[key] ?? true;
@@ -319,8 +344,12 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     _config.webAppUrl = _urlCtrl.text.trim();
     _config.sheetName = _sheetNameCtrl.text.trim();
     _config.startRow = int.tryParse(_startRowCtrl.text.trim()) ?? 4;
+    final eRow = int.tryParse(_endRowCtrl.text.trim());
+    _config.endRow = (eRow != null && eRow > 0) ? eRow : null;
     _config.startRowOnHand =
         int.tryParse(_startRowOnHandCtrl.text.trim()) ?? 4;
+    final eRowOnHand = int.tryParse(_endRowOnHandCtrl.text.trim());
+    _config.endRowOnHand = (eRowOnHand != null && eRowOnHand > 0) ? eRowOnHand : null;
     _config.evidenceTargetRow =
         int.tryParse(_evidenceTargetRowCtrl.text.trim()) ?? 60;
     _config.insertImageFormula = _insertImageFormula;
@@ -362,48 +391,29 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     final mappingError = _getMappingValidationError();
     if (mappingError != null) {
       _switchTab(1);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.warning_amber_rounded,
-                  color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Expanded(child: Text(mappingError)),
-            ],
-          ),
-          backgroundColor: const Color(0xFFDC2626),
-          behavior: SnackBarBehavior.floating,
-        ),
+      CustomToast.showError(
+        context,
+        title: 'Pemetaan Cell Tidak Valid',
+        subtitle: mappingError,
       );
       return;
     }
 
     _saveCurrentState();
     if (!_config.isConfigured) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content:
-              Text('Masukkan URL Web App Google Apps Script terlebih dahulu.'),
-          backgroundColor: Colors.redAccent,
-        ),
+      CustomToast.showError(
+        context,
+        title: 'URL Apps Script Kosong',
+        subtitle: 'Masukkan URL Web App Google Apps Script terlebih dahulu.',
       );
       return;
     }
 
     if (_sheetNameCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
-              SizedBox(width: 8),
-              Expanded(child: Text('Nama Tab Sheet belum di isi')),
-            ],
-          ),
-          backgroundColor: Color(0xFFDC2626),
-          behavior: SnackBarBehavior.floating,
-        ),
+      CustomToast.showError(
+        context,
+        title: 'Nama Sheet Kosong',
+        subtitle: 'Nama Tab Sheet belum diisi.',
       );
       return;
     }
@@ -432,71 +442,68 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     final mappingError = _getMappingValidationError();
     if (mappingError != null) {
       _switchTab(1);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.warning_amber_rounded,
-                  color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Expanded(child: Text(mappingError)),
-            ],
-          ),
-          backgroundColor: const Color(0xFFDC2626),
-          behavior: SnackBarBehavior.floating,
-        ),
+      CustomToast.showError(
+        context,
+        title: 'Pemetaan Cell Tidak Valid',
+        subtitle: mappingError,
       );
       return;
     }
 
     _saveCurrentState();
     if (!_config.isConfigured) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content:
-              Text('Masukkan URL Web App Google Apps Script terlebih dahulu.'),
-          backgroundColor: Colors.redAccent,
-        ),
+      CustomToast.showError(
+        context,
+        title: 'URL Apps Script Kosong',
+        subtitle: 'Masukkan URL Web App Google Apps Script terlebih dahulu.',
       );
       return;
     }
 
     if (_sheetNameCtrl.text.trim().isEmpty) {
       _switchTab(0);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
-              SizedBox(width: 8),
-              Expanded(child: Text('Nama Tab Sheet belum di isi')),
-            ],
-          ),
-          backgroundColor: Color(0xFFDC2626),
-          behavior: SnackBarBehavior.floating,
-        ),
+      CustomToast.showError(
+        context,
+        title: 'Nama Sheet Kosong',
+        subtitle: 'Nama Tab Sheet belum diisi.',
       );
       return;
     }
 
     if (!_config.hasConfiguredCells) {
       _switchTab(1);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.info_outline_rounded, color: Colors.white, size: 20),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Pemetaan cell belum pernah dikonfigurasi. Silakan periksa dan simpan pemetaan cell terlebih dahulu.',
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: Color(0xFFD97706),
-          behavior: SnackBarBehavior.floating,
-        ),
+      CustomToast.showWarning(
+        context,
+        title: 'Pemetaan Cell Belum Ada',
+        subtitle: 'Silakan periksa dan simpan pemetaan cell terlebih dahulu.',
+      );
+      return;
+    }
+
+    // Pengecekan Kapasitas Data vs End Row
+    final rekeningTx = widget.transactions.where((tx) {
+      final isOnHand = tx.isPemasukan
+          ? (tx.targetAccount == 'debit' || tx.targetAccount == 'cash')
+          : (tx.sourceAccount == 'debit' || tx.sourceAccount == 'cash');
+      return !isOnHand;
+    }).toList();
+
+    final onHandTx = widget.transactions.where((tx) {
+      final isOnHand = tx.isPemasukan
+          ? (tx.targetAccount == 'debit' || tx.targetAccount == 'cash')
+          : (tx.sourceAccount == 'debit' || tx.sourceAccount == 'cash');
+      return isOnHand;
+    }).toList();
+
+    final isRekExceeded = _config.isRekeningExceeded(rekeningTx.length);
+    final isOnExceeded = _config.isOnHandExceeded(onHandTx.length);
+
+    if (isRekExceeded || isOnExceeded) {
+      _showCapacityExceededWarningDialog(
+        rekeningCount: rekeningTx.length,
+        onHandCount: onHandTx.length,
+        isRekExceeded: isRekExceeded,
+        isOnExceeded: isOnExceeded,
       );
       return;
     }
@@ -504,8 +511,183 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     _showMappingConfirmationDialog();
   }
 
+  /// Menampilkan dialog peringatan khusus jika jumlah data transaksi melebihi kapasitas End Row
+  Future<void> _showCapacityExceededWarningDialog({
+    required int rekeningCount,
+    required int onHandCount,
+    required bool isRekExceeded,
+    required bool isOnExceeded,
+  }) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDC2626).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.warning_rounded,
+                  color: Color(0xFFDC2626),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Peringatan Batas Baris',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF991B1B),
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Data melebihi batas End Row spreadsheet',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFECACA)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Pengiriman data dibatalkan demi keamanan spreadsheet Anda. Data transaksi di aplikasi melebihi rentang baris (End Row) yang ditentukan:',
+                      style: TextStyle(fontSize: 11.5, color: Color(0xFF7F1D1D), height: 1.4),
+                    ),
+                    const SizedBox(height: 10),
+                    if (isRekExceeded) ...[
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFCA5A5)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.account_balance_rounded, size: 16, color: Color(0xFFDC2626)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Rekening: $rekeningCount data (Kapasitas Baris ${_config.startRow} s/d ${_config.endRow} = ${_config.maxRekeningCapacity} baris)',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF991B1B),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                    ],
+                    if (isOnExceeded) ...[
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFCA5A5)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.payments_rounded, size: 16, color: Color(0xFFDC2626)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Cash On Hand: $onHandCount data (Kapasitas Baris ${_config.startRowOnHand} s/d ${_config.endRowOnHand} = ${_config.maxOnHandCapacity} baris)',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF991B1B),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Solusi: Buka Tab "Atur Cell", lalu perbesar nilai End Row atau kosongkan End Row jika tabel Anda tidak memiliki batas akhir.',
+                style: TextStyle(fontSize: 11, color: Color(0xFF475569), height: 1.35),
+              ),
+            ],
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          actions: [
+            Row(
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text(
+                    'Tutup',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
+                ),
+                const Spacer(),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _switchTab(1);
+                  },
+                  icon: const Icon(Icons.tune_rounded, size: 16),
+                  label: const Text(
+                    'Sesuaikan End Row di Atur Cell',
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFDC2626),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _showMappingConfirmationDialog() async {
     final startRow = _config.startRow;
+    final endRow = _config.endRow;
+    final startRowOnHand = _config.startRowOnHand;
+    final endRowOnHand = _config.endRowOnHand;
     final sheetName = _config.sheetName;
     final dateFormat = _config.dateFormat;
     final dateSample = _formatPreviewSample(dateFormat);
@@ -603,14 +785,16 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text(
-                              'Baris Mulai Rekening:',
+                              'Rentang Baris Rekening:',
                               style: TextStyle(
                                   fontSize: 11.5, color: Color(0xFF475569)),
                             ),
                             Text(
-                              'Baris $startRow',
+                              (endRow != null && endRow > 0)
+                                  ? 'Baris $startRow - $endRow (Maks ${_config.maxRekeningCapacity} data)'
+                                  : 'Baris $startRow s/d Selesai (Tanpa Batas)',
                               style: const TextStyle(
-                                fontSize: 11.5,
+                                fontSize: 11,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF0F172A),
                               ),
@@ -622,14 +806,16 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text(
-                              'Baris Mulai Cash On Hand:',
+                              'Rentang Baris On Hand:',
                               style: TextStyle(
                                   fontSize: 11.5, color: Color(0xFF475569)),
                             ),
                             Text(
-                              'Baris ${_config.startRowOnHand}',
+                              (endRowOnHand != null && endRowOnHand > 0)
+                                  ? 'Baris $startRowOnHand - $endRowOnHand (Maks ${_config.maxOnHandCapacity} data)'
+                                  : 'Baris $startRowOnHand s/d Selesai (Tanpa Batas)',
                               style: const TextStyle(
-                                fontSize: 11.5,
+                                fontSize: 11,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF0F172A),
                               ),
@@ -1047,23 +1233,10 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
             widget.onImportFromSheets!(comparison.remoteTransactions);
           }
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    const Icon(Icons.check_circle, color: Colors.white, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Berhasil menyesuaikan ${comparison.remoteTotalCount} transaksi dari Spreadsheet ke aplikasi!',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ],
-                ),
-                backgroundColor: const Color(0xFF059669),
-                behavior: SnackBarBehavior.floating,
-              ),
+            CustomToast.showSuccess(
+              context,
+              title: 'Data Disesuaikan',
+              subtitle: 'Berhasil menyesuaikan ${comparison.remoteTotalCount} transaksi dari Spreadsheet ke aplikasi!',
             );
           }
           return;
@@ -1088,24 +1261,19 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
         _isSyncing = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(
-                res.isSuccess ? Icons.check_circle : Icons.error_outline,
-                color: Colors.white,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Expanded(child: Text(res.message)),
-            ],
-          ),
-          backgroundColor:
-              res.isSuccess ? const Color(0xFF059669) : const Color(0xFFDC2626),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      if (res.isSuccess) {
+        CustomToast.showSuccess(
+          context,
+          title: 'Sinkronisasi Berhasil',
+          subtitle: res.message,
+        );
+      } else {
+        CustomToast.showError(
+          context,
+          title: 'Sinkronisasi Gagal',
+          subtitle: res.message,
+        );
+      }
 
       if (res.isSuccess && widget.onSyncCompleted != null) {
         widget.onSyncCompleted!();
@@ -1680,7 +1848,9 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     final defRows = SheetsConfig.defaultEvidenceRowMapping();
     setState(() {
       _startRowCtrl.text = '4';
+      _endRowCtrl.text = '';
       _startRowOnHandCtrl.text = '4';
+      _endRowOnHandCtrl.text = '';
       _evidenceTargetRowCtrl.text = '60';
       _insertImageFormula = false;
       _selectedDateFormat = 'dd/MM/yyyy';
@@ -1700,11 +1870,10 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
       }
     });
     _saveCurrentState();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Pemetaan kolom & baris dikembalikan ke pengaturan standar.'),
-        duration: Duration(seconds: 2),
-      ),
+    CustomToast.showSuccess(
+      context,
+      title: 'Pengaturan Standar',
+      subtitle: 'Pemetaan kolom & baris dikembalikan ke pengaturan standar.',
     );
   }
 
@@ -2599,12 +2768,15 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
 
   // --- TAB 2: PEMETAAN KOLOM ---
   Widget _buildColumnMappingTab() {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
           if (!_config.hasConfiguredCells) ...[
             Container(
               margin: const EdgeInsets.only(bottom: 14),
@@ -2714,58 +2886,219 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
           ),
           const SizedBox(height: 8),
 
-          // Baris Mulai Data Rekening
+          // Rentang Baris Data Transaksi Rekening (Start Row & End Row)
           Container(
             margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Baris Mulai Data Rekening (Start Row)',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
-                        ),
-                      ),
-                      Text(
-                        'Posisi awal baris penulisan data transaksi rekening struktur',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFCBD5E1)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
                 ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 60,
-                  height: 38,
-                  child: TextField(
-                    controller: _startRowCtrl,
-                    keyboardType: TextInputType.number,
-                    textAlign: TextAlign.center,
-                    onChanged: (v) => _saveCurrentState(),
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.bold),
-                    decoration: InputDecoration(
-                      contentPadding: EdgeInsets.zero,
-                      border: OutlineInputBorder(
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF107C41).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                      ),
+                      child: const Icon(
+                        Icons.table_rows_rounded,
+                        color: Color(0xFF107C41),
+                        size: 18,
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Rentang Baris Rekening (Start & End Row)',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E293B),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Tentukan baris mulai dan batas akhir tabel transaksi rekening agar tidak menimpa baris catatan/rumus di bawahnya.',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              color: const Color(0xFF64748B),
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    // Start Row
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Start Row (Mulai)',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF334155),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          TextField(
+                            controller: _startRowCtrl,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            onChanged: (v) {
+                              setState(() {});
+                              _saveCurrentState();
+                            },
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'monospace',
+                            ),
+                            decoration: InputDecoration(
+                              hintText: '4',
+                              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // End Row
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              Text(
+                                'End Row (Batas Akhir)',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF334155),
+                                ),
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                '(Opsional)',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          TextField(
+                            controller: _endRowCtrl,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            onChanged: (v) {
+                              setState(() {});
+                              _saveCurrentState();
+                            },
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'monospace',
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Tanpa batas',
+                              hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Live Capacity Badge
+                Builder(
+                  builder: (context) {
+                    final start = int.tryParse(_startRowCtrl.text.trim()) ?? 4;
+                    final end = int.tryParse(_endRowCtrl.text.trim());
+                    final hasEnd = end != null && end > 0;
+                    final isInvalid = hasEnd && end < start;
+                    final capacity = hasEnd ? (end - start + 1) : null;
+
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isInvalid
+                            ? const Color(0xFFFEF2F2)
+                            : (hasEnd ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC)),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isInvalid
+                              ? const Color(0xFFFECACA)
+                              : (hasEnd ? const Color(0xFFBBF7D0) : const Color(0xFFE2E8F0)),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isInvalid
+                                ? Icons.error_outline_rounded
+                                : (hasEnd ? Icons.check_circle_outline_rounded : Icons.all_inclusive_rounded),
+                            size: 15,
+                            color: isInvalid
+                                ? const Color(0xFFDC2626)
+                                : (hasEnd ? const Color(0xFF16A34A) : const Color(0xFF64748B)),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              isInvalid
+                                  ? 'End Row ($end) tidak boleh lebih kecil dari Start Row ($start)'
+                                  : (hasEnd
+                                      ? 'Kapasitas Tabel: $capacity baris data (Baris $start s/d $end)'
+                                      : 'Kapasitas: Bebas / Tanpa Batas Akhir (Mulai Baris $start)'),
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: isInvalid
+                                    ? const Color(0xFFDC2626)
+                                    : (hasEnd ? const Color(0xFF15803D) : const Color(0xFF475569)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -2810,58 +3143,219 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
           ),
           const SizedBox(height: 8),
 
-          // Baris Mulai Data Cash On Hand
+          // Rentang Baris Data Transaksi Cash On Hand (Start Row & End Row)
           Container(
             margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Baris Mulai Data On Hand (Start Row)',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
-                        ),
-                      ),
-                      Text(
-                        'Posisi awal baris penulisan data transaksi Cash On Hand',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFCBD5E1)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
                 ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 60,
-                  height: 38,
-                  child: TextField(
-                    controller: _startRowOnHandCtrl,
-                    keyboardType: TextInputType.number,
-                    textAlign: TextAlign.center,
-                    onChanged: (v) => _saveCurrentState(),
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.bold),
-                    decoration: InputDecoration(
-                      contentPadding: EdgeInsets.zero,
-                      border: OutlineInputBorder(
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0D9488).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                      ),
+                      child: const Icon(
+                        Icons.table_rows_rounded,
+                        color: Color(0xFF0D9488),
+                        size: 18,
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Rentang Baris Cash On Hand (Start & End Row)',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E293B),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Tentukan baris mulai dan batas akhir tabel Cash On Hand agar tidak menimpa data di bawahnya.',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              color: const Color(0xFF64748B),
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    // Start Row On Hand
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Start Row (Mulai)',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF334155),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          TextField(
+                            controller: _startRowOnHandCtrl,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            onChanged: (v) {
+                              setState(() {});
+                              _saveCurrentState();
+                            },
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'monospace',
+                            ),
+                            decoration: InputDecoration(
+                              hintText: '4',
+                              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // End Row On Hand
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              Text(
+                                'End Row (Batas Akhir)',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF334155),
+                                ),
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                '(Opsional)',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          TextField(
+                            controller: _endRowOnHandCtrl,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            onChanged: (v) {
+                              setState(() {});
+                              _saveCurrentState();
+                            },
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'monospace',
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Tanpa batas',
+                              hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Live Capacity Badge On Hand
+                Builder(
+                  builder: (context) {
+                    final start = int.tryParse(_startRowOnHandCtrl.text.trim()) ?? 4;
+                    final end = int.tryParse(_endRowOnHandCtrl.text.trim());
+                    final hasEnd = end != null && end > 0;
+                    final isInvalid = hasEnd && end < start;
+                    final capacity = hasEnd ? (end - start + 1) : null;
+
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isInvalid
+                            ? const Color(0xFFFEF2F2)
+                            : (hasEnd ? const Color(0xFFF0FDFA) : const Color(0xFFF8FAFC)),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isInvalid
+                              ? const Color(0xFFFECACA)
+                              : (hasEnd ? const Color(0xFF99F6E4) : const Color(0xFFE2E8F0)),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isInvalid
+                                ? Icons.error_outline_rounded
+                                : (hasEnd ? Icons.check_circle_outline_rounded : Icons.all_inclusive_rounded),
+                            size: 15,
+                            color: isInvalid
+                                ? const Color(0xFFDC2626)
+                                : (hasEnd ? const Color(0xFF0F766E) : const Color(0xFF64748B)),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              isInvalid
+                                  ? 'End Row ($end) tidak boleh lebih kecil dari Start Row ($start)'
+                                  : (hasEnd
+                                      ? 'Kapasitas Tabel: $capacity baris data (Baris $start s/d $end)'
+                                      : 'Kapasitas: Bebas / Tanpa Batas Akhir (Mulai Baris $start)'),
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: isInvalid
+                                    ? const Color(0xFFDC2626)
+                                    : (hasEnd ? const Color(0xFF0F766E) : const Color(0xFF475569)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -2960,77 +3454,70 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
 
           // Daftar Kolom & Baris Field Gambar Bukti
           ..._evidenceImageFields.map((f) => _buildEvidenceFieldRow(f)),
-
-          const SizedBox(height: 20),
-
-          // Action Button: Simpan Pemetaan Cell
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                final err = _getMappingValidationError();
-                if (err != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Row(
-                        children: [
-                          const Icon(Icons.warning_amber_rounded,
-                              color: Colors.white, size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(child: Text(err)),
-                        ],
-                      ),
-                      backgroundColor: const Color(0xFFDC2626),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                  return;
-                }
-                _saveCurrentState(markCellsConfigured: true);
-                final messenger = ScaffoldMessenger.of(context);
-                Navigator.pop(context);
-                messenger.showSnackBar(
-                  const SnackBar(
-                    content: Row(
-                      children: [
-                        Icon(Icons.check_circle_rounded,
-                            color: Colors.white, size: 18),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Konfigurasi cell berhasil',
-                            style: TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
-                    ),
-                    backgroundColor: Color(0xFF059669),
-                    behavior: SnackBarBehavior.floating,
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.check_circle_rounded, size: 18),
-              label: const Text(
-                'Simpan Pemetaan Cell',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF107C41),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 13),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                elevation: 0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
         ],
       ),
-    );
-  }
+    ),
+  ),
+
+  // Sticky Bottom Footer: Simpan Pemetaan Cell
+  Container(
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: const Border(
+        top: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.05),
+          blurRadius: 10,
+          offset: const Offset(0, -4),
+        ),
+      ],
+    ),
+    child: SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () {
+          final err = _getMappingValidationError();
+          if (err != null) {
+            CustomToast.showError(
+              context,
+              title: 'Pemetaan Cell Tidak Valid',
+              subtitle: err,
+            );
+            return;
+          }
+          setState(() {
+            _saveCurrentState(markCellsConfigured: true);
+          });
+          CustomToast.showSuccess(
+            context,
+            title: 'Konfigurasi Berhasil',
+            subtitle: 'Konfigurasi pemetaan cell berhasil disimpan.',
+          );
+        },
+        icon: const Icon(Icons.check_circle_rounded, size: 18),
+        label: const Text(
+          'Simpan Pemetaan Cell',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF107C41),
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          elevation: 0,
+        ),
+      ),
+    ),
+  ),
+],
+);
+}
 
   Future<void> _shareScriptFile(String scriptCode) async {
     final box = context.findRenderObject() as RenderBox?;
@@ -3059,12 +3546,10 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal membagikan file script: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
+        CustomToast.showError(
+          context,
+          title: 'Gagal Membagikan File',
+          subtitle: '$e',
         );
       }
     }
@@ -3164,13 +3649,10 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                       child: OutlinedButton.icon(
                         onPressed: () {
                           Clipboard.setData(ClipboardData(text: scriptCode));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                  'Kode Google Apps Script berhasil disalin ke Clipboard!'),
-                              backgroundColor: Color(0xFF107C41),
-                              behavior: SnackBarBehavior.floating,
-                            ),
+                          CustomToast.showSuccess(
+                            context,
+                            title: 'Tersalin ke Clipboard',
+                            subtitle: 'Kode Google Apps Script berhasil disalin.',
                           );
                         },
                         icon: const Icon(Icons.copy_rounded,

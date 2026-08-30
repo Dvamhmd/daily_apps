@@ -992,12 +992,10 @@ class _PribadiPageState extends State<PribadiPage> {
                       setState(() {});
                       if (mounted) {
                         Navigator.pop(dlgCtx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                                'Berhasil mengimpor ${parseRes.rules.length} aturan!'),
-                            backgroundColor: primaryGreen,
-                          ),
+                        CustomToast.showSuccess(
+                          context,
+                          title: 'Impor Berhasil',
+                          subtitle: 'Berhasil mengimpor ${parseRes.rules.length} aturan!',
                         );
                       }
                     }
@@ -1032,12 +1030,10 @@ class _PribadiPageState extends State<PribadiPage> {
                 setState(() {});
                 if (mounted) {
                   Navigator.pop(dlgCtx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                          'Berhasil mengimpor ${parseRes.rules.length} aturan!'),
-                      backgroundColor: primaryGreen,
-                    ),
+                  CustomToast.showSuccess(
+                    context,
+                    title: 'Impor Berhasil',
+                    subtitle: 'Berhasil mengimpor ${parseRes.rules.length} aturan!',
                   );
                 }
               }

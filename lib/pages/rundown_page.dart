@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:daily_apps/models/model_rundown.dart';
 import 'package:daily_apps/pages/rundown_detail_page.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
+import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:daily_apps/widgets/dialog_tambah_rundown.dart';
 import 'package:daily_apps/widgets/gta_switch_wheel.dart';
 import 'package:flutter/material.dart';
@@ -60,27 +61,10 @@ class _RundownPageState extends State<RundownPage> {
       await _saveRundowns();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle_rounded,
-                    color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Rundown "${newRundown.title}" berhasil dibuat!',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: primaryTeal,
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            duration: const Duration(seconds: 2),
-          ),
+        CustomToast.showSuccess(
+          context,
+          title: 'Rundown Dibuat',
+          subtitle: 'Rundown "${newRundown.title}" berhasil dibuat!',
         );
 
         // Langsung arahkan ke rincian rundown yang baru dibuat
@@ -99,27 +83,10 @@ class _RundownPageState extends State<RundownPage> {
       await _saveRundowns();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle_rounded,
-                    color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Rundown "${updated.title}" berhasil diperbarui!',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: primaryTeal,
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            duration: const Duration(seconds: 2),
-          ),
+        CustomToast.showSuccess(
+          context,
+          title: 'Rundown Diperbarui',
+          subtitle: 'Rundown "${updated.title}" berhasil diperbarui!',
         );
       }
     }

@@ -1,6 +1,7 @@
 import 'package:daily_apps/models/model_riwayat.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/utils/riwayat_service.dart';
+import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -155,18 +156,10 @@ class _RiwayatPageState extends State<RiwayatPage> {
               await RiwayatService.hapusSemuaRiwayat();
               await _loadRiwayat();
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Semua riwayat berhasil dihapus',
-                      style: TextStyle(),
-                    ),
-                    backgroundColor: const Color(0xFF5E35B1),
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
+                CustomToast.showSuccess(
+                  context,
+                  title: 'Riwayat Dihapus',
+                  subtitle: 'Semua riwayat berhasil dihapus.',
                 );
               }
             },
@@ -187,19 +180,10 @@ class _RiwayatPageState extends State<RiwayatPage> {
     await RiwayatService.hapusItemRiwayat(item.id);
     await _loadRiwayat();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '1 riwayat dihapus',
-            style: TextStyle(),
-          ),
-          backgroundColor: const Color(0xFF5E35B1),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
+      CustomToast.showSuccess(
+        context,
+        title: 'Riwayat Dihapus',
+        subtitle: '1 item riwayat telah dihapus.',
       );
     }
   }

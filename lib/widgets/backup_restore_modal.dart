@@ -188,14 +188,10 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
       await BackupService.exportAndShareBackup();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFFD32F2F),
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            content: Text('Gagal membagikan file: $e'),
-          ),
+        CustomToast.showError(
+          context,
+          title: 'Gagal Membagikan File',
+          subtitle: '$e',
         );
       }
     } finally {
@@ -314,26 +310,11 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
 
         widget.onDataRestored?.call();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFF2E7D32),
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            duration: const Duration(seconds: 4),
-            content: const Row(
-              children: [
-                Icon(Icons.check_circle_rounded, color: Colors.white),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Seluruh data berhasil dipulihkan dari cadangan!',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-          ),
+        CustomToast.showSuccess(
+          context,
+          title: 'Pemulihan Berhasil!',
+          subtitle: 'Seluruh data berhasil dipulihkan dari cadangan.',
+          duration: const Duration(seconds: 3),
         );
       }
     } catch (e) {
@@ -341,11 +322,10 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
         setState(() {
           _isImporting = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFFD32F2F),
-            content: Text('Gagal memulihkan data: $e'),
-          ),
+        CustomToast.showError(
+          context,
+          title: 'Gagal Memulihkan Data',
+          subtitle: '$e',
         );
       }
     }

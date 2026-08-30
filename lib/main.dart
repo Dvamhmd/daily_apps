@@ -13,6 +13,7 @@ import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:daily_apps/utils/todo_alarm_service.dart';
 import 'package:daily_apps/widgets/app_drawer.dart';
+import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:daily_apps/widgets/gta_switch_wheel.dart';
 import 'package:daily_apps/widgets/menu_transition_overlay.dart';
 import 'package:daily_apps/widgets/todo_alarm_popup_dialog.dart';
@@ -39,6 +40,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: CustomToast.navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Daily Apps',
       theme: ThemeData(

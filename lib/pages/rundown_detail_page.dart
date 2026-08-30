@@ -1,5 +1,6 @@
 import 'package:daily_apps/models/model_rundown.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
+import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:daily_apps/widgets/dialog_tambah_rundown.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -263,14 +264,10 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
       _notifyChange();
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-            '$countToAdd baris baru ditambahkan (Waktu mulai terhubung otomatis)!'),
-        backgroundColor: primaryTeal,
-        duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-      ),
+    CustomToast.showSuccess(
+      context,
+      title: 'Baris Ditambahkan',
+      subtitle: '$countToAdd baris baru ditambahkan (Waktu terhubung otomatis)!',
     );
   }
 
@@ -306,14 +303,10 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
       _notifyChange();
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$deleteCount baris berhasil dihapus!'),
-        backgroundColor: Colors.redAccent,
-        duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
+    CustomToast.showSuccess(
+      context,
+      title: 'Baris Dihapus',
+      subtitle: '$deleteCount baris berhasil dihapus.',
     );
   }
 
@@ -625,12 +618,10 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
       final activeDay = _rundown.days[_selectedDayIndex];
       if (activeDay.customColumns.contains(colName)) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Kolom "$colName" sudah ada!'),
-              backgroundColor: Colors.orange,
-              behavior: SnackBarBehavior.floating,
-            ),
+          CustomToast.showWarning(
+            context,
+            title: 'Kolom Sudah Ada',
+            subtitle: 'Kolom "$colName" sudah ada di daftar.',
           );
         }
         return;
@@ -648,13 +639,10 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
       _notifyChange();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Kolom "$colName" berhasil ditambahkan!'),
-            backgroundColor: primaryTeal,
-            duration: const Duration(seconds: 1),
-            behavior: SnackBarBehavior.floating,
-          ),
+        CustomToast.showSuccess(
+          context,
+          title: 'Kolom Ditambahkan',
+          subtitle: 'Kolom "$colName" berhasil ditambahkan!',
         );
       }
     }
@@ -733,27 +721,10 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
       _notifyChange();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle_rounded,
-                    color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'Informasi rundown berhasil diperbarui!',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: primaryTeal,
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            duration: const Duration(seconds: 2),
-          ),
+        CustomToast.showSuccess(
+          context,
+          title: 'Rundown Diperbarui',
+          subtitle: 'Informasi rundown berhasil diperbarui!',
         );
       }
     }

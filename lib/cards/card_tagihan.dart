@@ -3,6 +3,7 @@ import 'package:daily_apps/models/model_uangku.dart';
 import 'package:daily_apps/utils/notification_service.dart';
 import 'package:daily_apps/utils/riwayat_service.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
+import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -505,14 +506,10 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
     if (!mounted) return;
 
     if (listUangku.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Belum ada pos Uangku untuk membayar tagihan ini.',
-            style: TextStyle(),
-          ),
-          backgroundColor: const Color(0xFFD46A6A),
-        ),
+      CustomToast.showError(
+        context,
+        title: 'Belum ada pos Uangku',
+        subtitle: 'Tidak ada pos Uangku untuk membayar tagihan ini.',
       );
       return;
     }
@@ -775,15 +772,10 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                   final chosenUangku = listUangku[selectedUangkuIndex];
 
                   if (chosenUangku.jumlah <= 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Saldo "${chosenUangku.nama}" Rp 0, tidak ada saldo yang dapat digunakan untuk membayar.',
-                          style: TextStyle(),
-                        ),
-                        backgroundColor: const Color(0xFFD46A6A),
-                        behavior: SnackBarBehavior.floating,
-                      ),
+                    CustomToast.showError(
+                      context,
+                      title: 'Saldo Rp 0',
+                      subtitle: 'Saldo "${chosenUangku.nama}" Rp 0, tidak dapat digunakan.',
                     );
                     return;
                   }
@@ -792,29 +784,19 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                   final nominalBayarTarget = int.tryParse(jumlahClean) ?? 0;
 
                   if (nominalBayarTarget <= 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Masukkan nominal pembayaran yang valid (lebih dari 0).',
-                          style: TextStyle(),
-                        ),
-                        backgroundColor: const Color(0xFFD46A6A),
-                        behavior: SnackBarBehavior.floating,
-                      ),
+                    CustomToast.showWarning(
+                      context,
+                      title: 'Nominal Tidak Valid',
+                      subtitle: 'Masukkan nominal pembayaran yang lebih dari 0.',
                     );
                     return;
                   }
 
                   if (nominalBayarTarget > item.jumlah) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Nominal pembayaran tidak boleh melebihi sisa tagihan (${RupiahFormatter.format(item.jumlah)}).',
-                          style: TextStyle(),
-                        ),
-                        backgroundColor: const Color(0xFFD46A6A),
-                        behavior: SnackBarBehavior.floating,
-                      ),
+                    CustomToast.showWarning(
+                      context,
+                      title: 'Melebihi Tagihan',
+                      subtitle: 'Nominal pembayaran tidak boleh melebihi sisa tagihan (${RupiahFormatter.format(item.jumlah)}).',
                     );
                     return;
                   }
@@ -877,18 +859,13 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                     if (context.mounted) {
                       Navigator.pop(context);
                       final isSaldoHabis = nominalBayar < nominalBayarTarget;
-                      final msg = isSaldoHabis
-                          ? 'Membayar ${RupiahFormatter.format(nominalBayar)} (seluruh saldo $sumberFormat). Sisa tagihan "$namaFormat": ${RupiahFormatter.format(sisaTagihan)}'
-                          : 'Dibayar sebagian! Sisa tagihan "$namaFormat": ${RupiahFormatter.format(sisaTagihan)}';
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            msg,
-                            style: TextStyle(),
-                          ),
-                          backgroundColor: const Color(0xFFE65100),
-                          behavior: SnackBarBehavior.floating,
-                        ),
+                      final subMsg = isSaldoHabis
+                          ? 'Membayar ${RupiahFormatter.format(nominalBayar)} (seluruh saldo $sumberFormat). Sisa tagihan: ${RupiahFormatter.format(sisaTagihan)}'
+                          : 'Sisa tagihan "$namaFormat": ${RupiahFormatter.format(sisaTagihan)}';
+                      CustomToast.showSuccess(
+                        context,
+                        title: 'Dibayar Sebagian',
+                        subtitle: subMsg,
                       );
                     }
                   } else {
@@ -936,15 +913,10 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                     widget.onChanged();
                     if (context.mounted) {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Tagihan "$namaFormat" berhasil dilunasi!',
-                            style: TextStyle(),
-                          ),
-                          backgroundColor: const Color(0xFF2E7D32),
-                          behavior: SnackBarBehavior.floating,
-                        ),
+                      CustomToast.showSuccess(
+                        context,
+                        title: 'Tagihan Lunas!',
+                        subtitle: 'Tagihan "$namaFormat" berhasil dilunasi.',
                       );
                     }
                   }

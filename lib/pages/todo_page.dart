@@ -3,6 +3,7 @@ import 'package:daily_apps/models/model_todo.dart';
 import 'package:daily_apps/pages/todo_riwayat_page.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/utils/todo_alarm_service.dart';
+import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:daily_apps/widgets/gta_switch_wheel.dart';
 import 'package:daily_apps/widgets/todo_alarm_popup_dialog.dart';
 import 'package:daily_apps/widgets/todo_alarm_setup_sheet.dart';
@@ -199,36 +200,17 @@ class _TodoPageState extends State<TodoPage> {
   }
 
   void _showToast(BuildContext context, String message, {bool isSuccess = true}) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              isSuccess ? Icons.check_circle_rounded : Icons.info_outline_rounded,
-              color: Colors.white,
-              size: 20,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                message,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13.5,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: isSuccess ? primaryTerracotta : const Color(0xFF1E293B),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    if (isSuccess) {
+      CustomToast.showSuccess(
+        context,
+        title: message,
+      );
+    } else {
+      CustomToast.showInfo(
+        context,
+        title: message,
+      );
+    }
   }
 
   Future<void> _showConfigureAlarmDialog(TodoDateGroup group) async {
@@ -970,11 +952,10 @@ class _TodoPageState extends State<TodoPage> {
                         onPressed: () {
                           final text = taskController.text.trim();
                           if (text.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Tolong isi nama tugas!'),
-                                duration: Duration(seconds: 1),
-                              ),
+                            CustomToast.showWarning(
+                              context,
+                              title: 'Nama Tugas Kosong',
+                              subtitle: 'Tolong isi nama tugas terlebih dahulu.',
                             );
                             return;
                           }

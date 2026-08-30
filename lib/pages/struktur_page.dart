@@ -6,6 +6,7 @@ import 'package:daily_apps/models/model_struktur.dart';
 import 'package:daily_apps/utils/custom_rule_import_helper.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:daily_apps/utils/sheets_sync_service.dart';
+import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:daily_apps/widgets/google_sheets_config_modal.dart';
 import 'package:daily_apps/widgets/upload_evidence_modal.dart';
 import 'package:file_picker/file_picker.dart';
@@ -549,6 +550,192 @@ class _StrukturPageState extends State<StrukturPage> {
       onUploaded: () {
         setState(() {});
       },
+    );
+  }
+
+  int get _currentRekeningCount {
+    return _data.transactions
+        .where((tx) =>
+            (tx.isPemasukan || tx.isPengeluaran) &&
+            !(tx.isPemasukan
+                ? (tx.targetAccount == 'debit' || tx.targetAccount == 'cash')
+                : (tx.sourceAccount == 'debit' || tx.sourceAccount == 'cash')))
+        .length;
+  }
+
+  int get _currentOnHandCount {
+    return _data.transactions
+        .where((tx) =>
+            (tx.isPemasukan || tx.isPengeluaran) &&
+            (tx.isPemasukan
+                ? (tx.targetAccount == 'debit' || tx.targetAccount == 'cash')
+                : (tx.sourceAccount == 'debit' || tx.sourceAccount == 'cash')))
+        .length;
+  }
+
+  bool _isAccountExceeded(String account, {int additionalCount = 1}) {
+    if (!_sheetsConfig.isConfigured || !_sheetsConfig.hasConfiguredCells) {
+      return false;
+    }
+    final isOnHand = account == 'debit' || account == 'cash' || account == 'onhand';
+    if (isOnHand) {
+      return _sheetsConfig.isOnHandExceeded(_currentOnHandCount + additionalCount);
+    } else {
+      return _sheetsConfig.isRekeningExceeded(_currentRekeningCount + additionalCount);
+    }
+  }
+
+  Future<void> _showCapacityExceededDialog({
+    required String accountType,
+    required int currentCount,
+    required BuildContext targetContext,
+  }) async {
+    final isOnHand = accountType == 'debit' || accountType == 'cash' || accountType == 'onhand';
+    final tableName = isOnHand ? 'Cash On Hand' : 'Rekening';
+    final startRow = isOnHand ? _sheetsConfig.startRowOnHand : _sheetsConfig.startRow;
+    final endRow = isOnHand ? _sheetsConfig.endRowOnHand : _sheetsConfig.endRow;
+    final maxCapacity = isOnHand ? _sheetsConfig.maxOnHandCapacity : _sheetsConfig.maxRekeningCapacity;
+
+    await showDialog(
+      context: targetContext,
+      useRootNavigator: true,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDC2626).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.warning_rounded,
+                color: Color(0xFFDC2626),
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Batas Baris Tercapai',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF991B1B),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Kapasitas $tableName sudah penuh',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Pencatatan transaksi baru tidak dapat dilakukan karena telah mencapai batas maksimal End Row pada tabel $tableName:',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: Color(0xFF7F1D1D),
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFCA5A5)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isOnHand ? Icons.payments_rounded : Icons.account_balance_rounded,
+                          size: 18,
+                          color: const Color(0xFFDC2626),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '$tableName: $currentCount data (Rentang Baris $startRow s/d $endRow = Kapasitas $maxCapacity baris)',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF991B1B),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Agar dapat mencatat transaksi kembali, silakan sesuaikan atau perbesar nilai End Row pada tab "Atur Cell" di Pengaturan Google Spreadsheets.',
+              style: TextStyle(fontSize: 11, color: Color(0xFF475569), height: 1.35),
+            ),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          Row(
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  'Tutup',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                ),
+              ),
+              const Spacer(),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _showGoogleSheetsConfigModal(initialTab: 1);
+                },
+                icon: const Icon(Icons.tune_rounded, size: 16),
+                label: const Text(
+                  'Atur Ulang End Row',
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFDC2626),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -1263,15 +1450,10 @@ class _StrukturPageState extends State<StrukturPage> {
                                         });
                                         _saveData();
                                         setModalState(() {});
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                                'Aturan untuk "${rule.keyword}" berhasil dihapus'),
-                                            behavior: SnackBarBehavior.floating,
-                                            duration:
-                                                const Duration(seconds: 2),
-                                          ),
+                                        CustomToast.showSuccess(
+                                          context,
+                                          title: 'Aturan Dihapus',
+                                          subtitle: 'Aturan untuk "${rule.keyword}" berhasil dihapus.',
                                         );
                                       },
                                     ),
@@ -1293,7 +1475,7 @@ class _StrukturPageState extends State<StrukturPage> {
   // --- DIALOG FORM TAMBAH / EDIT KUSTOM ATURAN (KU / KATEGORI) ---
   void _showFormKustomKodeDialog(
     CustomKodeRule? existingRule,
-    String targetType, // 'ku' atau 'kategori'
+    String targetType,
     VoidCallback onSaved,
   ) {
     final isEdit = existingRule != null;
@@ -1427,30 +1609,25 @@ class _StrukturPageState extends State<StrukturPage> {
                 final val = valueCtrl.text.trim();
 
                 if (key.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('⚠️ Kata kunci pemicu wajib diisi!'),
-                      backgroundColor: Colors.redAccent,
-                      behavior: SnackBarBehavior.floating,
-                    ),
+                  CustomToast.showWarning(
+                    context,
+                    title: 'Kata Kunci Kosong',
+                    subtitle: 'Kata kunci pemicu wajib diisi.',
                   );
                   return;
                 }
 
                 if (val.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                          '⚠️ ${isKu ? "Nilai KU" : "Kategori"} wajib diisi!'),
-                      backgroundColor: Colors.redAccent,
-                      behavior: SnackBarBehavior.floating,
-                    ),
+                  CustomToast.showWarning(
+                    context,
+                    title: 'Nilai Kosong',
+                    subtitle: '${isKu ? "Nilai KU" : "Kategori"} wajib diisi.',
                   );
                   return;
                 }
 
                 setState(() {
-                  if (isEdit) {
+                  if (existingRule != null) {
                     existingRule.keyword = key;
                     existingRule.kode = val;
                     existingRule.type = type;
@@ -1465,16 +1642,12 @@ class _StrukturPageState extends State<StrukturPage> {
                 onSaved();
                 Navigator.pop(dialogCtx);
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      isEdit
-                          ? 'Aturan "$key" -> "$val" berhasil diperbarui!'
-                          : 'Aturan baru "$key" -> "$val" berhasil ditambahkan!',
-                    ),
-                    backgroundColor: const Color(0xFF059669),
-                    behavior: SnackBarBehavior.floating,
-                  ),
+                CustomToast.showSuccess(
+                  context,
+                  title: isEdit ? 'Aturan Diperbarui' : 'Aturan Ditambahkan',
+                  subtitle: isEdit
+                      ? 'Aturan "$key" -> "$val" berhasil diperbarui!'
+                      : 'Aturan baru "$key" -> "$val" berhasil ditambahkan!',
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -1529,13 +1702,10 @@ class _StrukturPageState extends State<StrukturPage> {
                 _saveData();
                 onReset();
                 Navigator.pop(dialogCtx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                        'Semua aturan ${isKu ? "KU" : "Kategori"} berhasil dikosongkan!'),
-                    backgroundColor: const Color(0xFF059669),
-                    behavior: SnackBarBehavior.floating,
-                  ),
+                CustomToast.showSuccess(
+                  context,
+                  title: 'Aturan Dikosongkan',
+                  subtitle: 'Semua aturan ${isKu ? "KU" : "Kategori"} berhasil dikosongkan.',
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -1796,11 +1966,10 @@ class _StrukturPageState extends State<StrukturPage> {
                 textCtrl.text = data.text!;
                 handleProcessText();
               } else {
-                ScaffoldMessenger.of(sbContext).showSnackBar(
-                  const SnackBar(
-                    content: Text('Clipboard masih kosong atau tidak berisi teks.'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
+                CustomToast.showWarning(
+                  sbContext,
+                  title: 'Clipboard Kosong',
+                  subtitle: 'Clipboard masih kosong atau tidak berisi teks.',
                 );
               }
             }
@@ -2358,15 +2527,10 @@ class _StrukturPageState extends State<StrukturPage> {
                                           .getK12ImportResult();
                                     });
                                     if (sbContext.mounted) {
-                                      ScaffoldMessenger.of(sbContext)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                              '✅ Sandi terverifikasi! Profil aturan Admin dipilih.'),
-                                          backgroundColor: Color(0xFF059669),
-                                          behavior: SnackBarBehavior.floating,
-                                          duration: Duration(seconds: 2),
-                                        ),
+                                      CustomToast.showSuccess(
+                                        sbContext,
+                                        title: 'Sandi Terverifikasi',
+                                        subtitle: 'Profil aturan Admin dipilih.',
                                       );
                                     }
                                   }
@@ -2773,13 +2937,10 @@ class _StrukturPageState extends State<StrukturPage> {
                                 '\n🔒 Mode General diterapkan: Saldo rekening terkunci otomatis.';
                           }
 
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(successMsg),
-                              backgroundColor: const Color(0xFF059669),
-                              behavior: SnackBarBehavior.floating,
-                              duration: const Duration(seconds: 3),
-                            ),
+                          CustomToast.showSuccess(
+                            context,
+                            title: 'Impor Berhasil',
+                            subtitle: successMsg,
                           );
                         }
                       : null,
@@ -3135,27 +3296,12 @@ class _StrukturPageState extends State<StrukturPage> {
                                       : '$bank - $noRek';
                                   Clipboard.setData(
                                       ClipboardData(text: copyText));
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Row(
-                                        children: [
-                                          const Icon(
-                                              Icons.check_circle_rounded,
-                                              color: Colors.white,
-                                              size: 18),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              holder.isNotEmpty
-                                                  ? '$bank - $noRek (A.N $holder) berhasil disalin!'
-                                                  : '$bank - $noRek berhasil disalin!',
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      behavior: SnackBarBehavior.floating,
-                                      duration: const Duration(seconds: 2),
-                                    ),
+                                  CustomToast.showSuccess(
+                                    context,
+                                    title: 'Nomor Rekening Disalin',
+                                    subtitle: holder.isNotEmpty
+                                        ? '$bank - $noRek (A.N $holder) berhasil disalin!'
+                                        : '$bank - $noRek berhasil disalin!',
                                   );
                                 },
                               )
@@ -3192,23 +3338,10 @@ class _StrukturPageState extends State<StrukturPage> {
                           final noRek = noRekCtrl.text.trim();
                           final holder = holderCtrl.text.trim();
                           if (noRek.isNotEmpty && holder.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Row(
-                                  children: [
-                                    Icon(Icons.warning_amber_rounded,
-                                        color: Colors.white, size: 20),
-                                    SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                          '⚠️ Nama Pemilik Rekening (Atas Nama) wajib diisi!'),
-                                    ),
-                                  ],
-                                ),
-                                backgroundColor: Colors.redAccent,
-                                behavior: SnackBarBehavior.floating,
-                                duration: Duration(seconds: 2),
-                              ),
+                            CustomToast.showWarning(
+                              context,
+                              title: 'Atas Nama Kosong',
+                              subtitle: 'Nama Pemilik Rekening (Atas Nama) wajib diisi!',
                             );
                             return;
                           }
@@ -3228,13 +3361,10 @@ class _StrukturPageState extends State<StrukturPage> {
                           _saveData();
                           Navigator.pop(ctx);
 
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                  'Rekening Struktur berhasil diperbarui!'),
-                              backgroundColor: primaryPurple,
-                              behavior: SnackBarBehavior.floating,
-                            ),
+                          CustomToast.showSuccess(
+                            context,
+                            title: 'Rekening Diperbarui',
+                            subtitle: 'Rekening Struktur berhasil diperbarui!',
                           );
                         },
                         style: ElevatedButton.styleFrom(
@@ -3641,13 +3771,10 @@ class _StrukturPageState extends State<StrukturPage> {
                           _saveData();
                           Navigator.pop(ctx);
 
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                  'Data On Hand berhasil diperbarui!'),
-                              backgroundColor: primaryTeal,
-                              behavior: SnackBarBehavior.floating,
-                            ),
+                          CustomToast.showSuccess(
+                            context,
+                            title: 'On Hand Diperbarui',
+                            subtitle: 'Data On Hand berhasil diperbarui!',
                           );
                         },
                         style: ElevatedButton.styleFrom(
@@ -3898,6 +4025,35 @@ class _StrukturPageState extends State<StrukturPage> {
                       ],
                     ),
 
+                    if (_isAccountExceeded(targetWadah, additionalCount: 1)) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.warning_amber_rounded, size: 18, color: Color(0xFFDC2626)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Batas baris tabel ${targetWadah == 'rekening' ? 'Rekening' : 'Cash On Hand'} sudah penuh (${targetWadah == 'rekening' ? 'End Row ${_sheetsConfig.endRow}' : 'End Row ${_sheetsConfig.endRowOnHand}'}). Transaksi tidak dapat disimpan sampai batas baris diatur ulang.',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF991B1B),
+                                  height: 1.3,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
                     const SizedBox(height: 14),
 
                     // 3. Jumlah Dana (Nominal Rp)
@@ -4113,13 +4269,10 @@ class _StrukturPageState extends State<StrukturPage> {
                               );
                             }
                             amountFocus.requestFocus();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('⚠️ Silakan masukkan Jumlah Dana (Rp)!'),
-                                backgroundColor: Colors.redAccent,
-                                behavior: SnackBarBehavior.floating,
-                                duration: Duration(seconds: 2),
-                              ),
+                            CustomToast.showWarning(
+                              context,
+                              title: 'Jumlah Dana Kosong',
+                              subtitle: 'Silakan masukkan Jumlah Dana (Rp)!',
                             );
                             return;
                           }
@@ -4135,13 +4288,20 @@ class _StrukturPageState extends State<StrukturPage> {
                               );
                             }
                             noteFocus.requestFocus();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('⚠️ Keterangan pemasukan wajib diisi!'),
-                                backgroundColor: Colors.redAccent,
-                                behavior: SnackBarBehavior.floating,
-                                duration: Duration(seconds: 2),
-                              ),
+                            CustomToast.showWarning(
+                              context,
+                              title: 'Keterangan Kosong',
+                              subtitle: 'Keterangan pemasukan wajib diisi!',
+                            );
+                            return;
+                          }
+
+                          if (_isAccountExceeded(targetWadah, additionalCount: 1)) {
+                            final isOnHand = targetWadah == 'debit' || targetWadah == 'cash';
+                            _showCapacityExceededDialog(
+                              accountType: targetWadah,
+                              currentCount: isOnHand ? _currentOnHandCount : _currentRekeningCount,
+                              targetContext: context,
                             );
                             return;
                           }
@@ -4190,14 +4350,10 @@ class _StrukturPageState extends State<StrukturPage> {
                           _triggerAutoSyncSheets();
                           Navigator.pop(ctx);
 
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Pemasukan Rp ${RupiahFormatter.format(nominal)} berhasil dicatat!',
-                              ),
-                              backgroundColor: const Color(0xFF059669),
-                              behavior: SnackBarBehavior.floating,
-                            ),
+                          CustomToast.showSuccess(
+                            context,
+                            title: 'Pemasukan Dicatat',
+                            subtitle: 'Pemasukan Rp ${RupiahFormatter.format(nominal)} berhasil dicatat!',
                           );
                         },
                         style: ElevatedButton.styleFrom(
@@ -4454,6 +4610,35 @@ class _StrukturPageState extends State<StrukturPage> {
                       ],
                     ),
 
+                    if (_isAccountExceeded(sourceAccount, additionalCount: 1)) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.warning_amber_rounded, size: 18, color: Color(0xFFDC2626)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Batas baris tabel ${sourceAccount == 'rekening' ? 'Rekening' : 'Cash On Hand'} sudah penuh (${sourceAccount == 'rekening' ? 'End Row ${_sheetsConfig.endRow}' : 'End Row ${_sheetsConfig.endRowOnHand}'}). Transaksi tidak dapat disimpan sampai batas baris diatur ulang.',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF991B1B),
+                                  height: 1.3,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
                     const SizedBox(height: 14),
 
                     // 3. Jumlah Dana (Nominal Rp)
@@ -4706,13 +4891,10 @@ class _StrukturPageState extends State<StrukturPage> {
                               );
                             }
                             amountFocus.requestFocus();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('⚠️ Silakan masukkan Jumlah Pengeluaran (Rp)!'),
-                                backgroundColor: Colors.redAccent,
-                                behavior: SnackBarBehavior.floating,
-                                duration: Duration(seconds: 2),
-                              ),
+                            CustomToast.showWarning(
+                              context,
+                              title: 'Nominal Kosong',
+                              subtitle: 'Silakan masukkan Jumlah Pengeluaran (Rp)!',
                             );
                             return;
                           }
@@ -4728,13 +4910,10 @@ class _StrukturPageState extends State<StrukturPage> {
                               );
                             }
                             amountFocus.requestFocus();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('⚠️ Saldo $sourceName tidak mencukupi! (Saldo: Rp ${RupiahFormatter.format(sourceBalance)})'),
-                                backgroundColor: Colors.redAccent,
-                                behavior: SnackBarBehavior.floating,
-                                duration: Duration(seconds: 2),
-                              ),
+                            CustomToast.showError(
+                              context,
+                              title: 'Saldo Tidak Cukup',
+                              subtitle: 'Saldo $sourceName tidak mencukupi! (Saldo: Rp ${RupiahFormatter.format(sourceBalance)})',
                             );
                             return;
                           }
@@ -4750,13 +4929,20 @@ class _StrukturPageState extends State<StrukturPage> {
                               );
                             }
                             noteFocus.requestFocus();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('⚠️ Keterangan Keperluan wajib diisi!'),
-                                backgroundColor: Colors.redAccent,
-                                behavior: SnackBarBehavior.floating,
-                                duration: Duration(seconds: 2),
-                              ),
+                            CustomToast.showWarning(
+                              context,
+                              title: 'Keperluan Kosong',
+                              subtitle: 'Keterangan Keperluan wajib diisi!',
+                            );
+                            return;
+                          }
+
+                          if (_isAccountExceeded(sourceAccount, additionalCount: 1)) {
+                            final isOnHand = sourceAccount == 'debit' || sourceAccount == 'cash';
+                            _showCapacityExceededDialog(
+                              accountType: sourceAccount,
+                              currentCount: isOnHand ? _currentOnHandCount : _currentRekeningCount,
+                              targetContext: context,
                             );
                             return;
                           }
@@ -4805,14 +4991,10 @@ class _StrukturPageState extends State<StrukturPage> {
                           _triggerAutoSyncSheets();
                           Navigator.pop(ctx);
 
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Pengeluaran Rp ${RupiahFormatter.format(nominal)} berhasil dicatat!',
-                              ),
-                              backgroundColor: const Color(0xFFE11D48),
-                              behavior: SnackBarBehavior.floating,
-                            ),
+                          CustomToast.showSuccess(
+                            context,
+                            title: 'Pengeluaran Dicatat',
+                            subtitle: 'Pengeluaran Rp ${RupiahFormatter.format(nominal)} berhasil dicatat!',
                           );
                         },
                         style: ElevatedButton.styleFrom(
@@ -5539,13 +5721,10 @@ class _StrukturPageState extends State<StrukturPage> {
                               );
                             }
                             amountFocus.requestFocus();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('⚠️ Silakan masukkan Nominal Alokasi (Rp)!'),
-                                backgroundColor: Colors.redAccent,
-                                behavior: SnackBarBehavior.floating,
-                                duration: Duration(seconds: 2),
-                              ),
+                            CustomToast.showWarning(
+                              context,
+                              title: 'Nominal Kosong',
+                              subtitle: 'Silakan masukkan Nominal Alokasi (Rp)!',
                             );
                             return;
                           }
@@ -5561,13 +5740,43 @@ class _StrukturPageState extends State<StrukturPage> {
                               );
                             }
                             amountFocus.requestFocus();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('⚠️ Saldo $sourceName tidak mencukupi untuk distribusi ini! (Saldo: Rp ${RupiahFormatter.format(sourceBalance)})'),
-                                backgroundColor: Colors.redAccent,
-                                behavior: SnackBarBehavior.floating,
-                                duration: Duration(seconds: 2),
-                              ),
+                            CustomToast.showError(
+                              context,
+                              title: 'Saldo Tidak Cukup',
+                              subtitle: 'Saldo $sourceName tidak mencukupi untuk distribusi ini! (Saldo: Rp ${RupiahFormatter.format(sourceBalance)})',
+                            );
+                            return;
+                          }
+
+                          int addedToRekening = 0;
+                          int addedToOnHand = 0;
+
+                          if (sourceAccount == 'rekening') {
+                            addedToRekening += (adminFee > 0 ? 2 : 1);
+                          } else {
+                            addedToOnHand += (adminFee > 0 ? 2 : 1);
+                          }
+
+                          if (targetAccount == 'rekening') {
+                            addedToRekening += 1;
+                          } else {
+                            addedToOnHand += 1;
+                          }
+
+                          if (addedToRekening > 0 && _sheetsConfig.isRekeningExceeded(_currentRekeningCount + addedToRekening)) {
+                            _showCapacityExceededDialog(
+                              accountType: 'rekening',
+                              currentCount: _currentRekeningCount,
+                              targetContext: context,
+                            );
+                            return;
+                          }
+
+                          if (addedToOnHand > 0 && _sheetsConfig.isOnHandExceeded(_currentOnHandCount + addedToOnHand)) {
+                            _showCapacityExceededDialog(
+                              accountType: 'onhand',
+                              currentCount: _currentOnHandCount,
+                              targetContext: context,
                             );
                             return;
                           }
@@ -5707,14 +5916,10 @@ class _StrukturPageState extends State<StrukturPage> {
                           _triggerAutoSyncSheets();
                           Navigator.pop(ctx);
 
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Alokasi dana berhasil ($flowLabel)!',
-                              ),
-                              backgroundColor: primaryPurple,
-                              behavior: SnackBarBehavior.floating,
-                            ),
+                          CustomToast.showSuccess(
+                            context,
+                            title: 'Alokasi Berhasil',
+                            subtitle: 'Alokasi dana berhasil ($flowLabel)!',
                           );
                         },
                         style: ElevatedButton.styleFrom(
@@ -6459,13 +6664,10 @@ class _StrukturPageState extends State<StrukturPage> {
                               );
                             }
                             amountFocus.requestFocus();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('⚠️ Silakan masukkan Jumlah Nominal (Rp)!'),
-                                backgroundColor: Colors.redAccent,
-                                behavior: SnackBarBehavior.floating,
-                                duration: Duration(seconds: 2),
-                              ),
+                            CustomToast.showWarning(
+                              context,
+                              title: 'Nominal Kosong',
+                              subtitle: 'Silakan masukkan Jumlah Nominal (Rp)!',
                             );
                             return;
                           }
@@ -6481,13 +6683,10 @@ class _StrukturPageState extends State<StrukturPage> {
                               );
                             }
                             amountFocus.requestFocus();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('⚠️ Saldo $accountName tidak mencukupi! (Tersedia: Rp ${RupiahFormatter.format(availableBalance)})'),
-                                backgroundColor: Colors.redAccent,
-                                behavior: SnackBarBehavior.floating,
-                                duration: Duration(seconds: 2),
-                              ),
+                            CustomToast.showError(
+                              context,
+                              title: 'Saldo Tidak Cukup',
+                              subtitle: 'Saldo $accountName tidak mencukupi! (Tersedia: Rp ${RupiahFormatter.format(availableBalance)})',
                             );
                             return;
                           }
@@ -6503,15 +6702,37 @@ class _StrukturPageState extends State<StrukturPage> {
                               );
                             }
                             noteFocus.requestFocus();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('⚠️ Keterangan transaksi wajib diisi!'),
-                                backgroundColor: Colors.redAccent,
-                                behavior: SnackBarBehavior.floating,
-                                duration: Duration(seconds: 2),
-                              ),
+                            CustomToast.showWarning(
+                              context,
+                              title: 'Keterangan Kosong',
+                              subtitle: 'Keterangan transaksi wajib diisi!',
                             );
                             return;
+                          }
+
+                          final bool oldIsOnHand = tx.isPemasukan
+                              ? (tx.targetAccount == 'debit' || tx.targetAccount == 'cash')
+                              : (tx.sourceAccount == 'debit' || tx.sourceAccount == 'cash');
+                          final bool newIsOnHand = selectedAccount == 'debit' || selectedAccount == 'cash';
+
+                          if (!oldIsOnHand && newIsOnHand) {
+                            if (_isAccountExceeded(selectedAccount, additionalCount: 1)) {
+                              _showCapacityExceededDialog(
+                                accountType: selectedAccount,
+                                currentCount: _currentOnHandCount,
+                                targetContext: context,
+                              );
+                              return;
+                            }
+                          } else if (oldIsOnHand && !newIsOnHand) {
+                            if (_isAccountExceeded(selectedAccount, additionalCount: 1)) {
+                              _showCapacityExceededDialog(
+                                accountType: selectedAccount,
+                                currentCount: _currentRekeningCount,
+                                targetContext: context,
+                              );
+                              return;
+                            }
                           }
 
                           final noteText = noteCtrl.text.trim();
@@ -6613,25 +6834,12 @@ class _StrukturPageState extends State<StrukturPage> {
                           onSaved?.call();
                           Navigator.pop(ctx);
 
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      _sheetsConfig.isConfigured
-                                          ? 'Transaksi berhasil diperbarui & disinkronkan ke Spreadsheets!'
-                                          : 'Transaksi berhasil diperbarui!',
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              backgroundColor: const Color(0xFF059669),
-                              behavior: SnackBarBehavior.floating,
-                              duration: const Duration(seconds: 3),
-                            ),
+                          CustomToast.showSuccess(
+                            context,
+                            title: 'Transaksi Diperbarui',
+                            subtitle: _sheetsConfig.isConfigured
+                                ? 'Transaksi berhasil diperbarui & disinkronkan ke Spreadsheets!'
+                                : 'Transaksi berhasil diperbarui!',
                           );
                         },
                         icon: const Icon(Icons.cloud_sync_rounded, size: 18),
@@ -6752,25 +6960,12 @@ class _StrukturPageState extends State<StrukturPage> {
                 _saveData();
                 _triggerAutoSyncSheets(force: true);
                 onDeleted?.call();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Row(
-                      children: [
-                        const Icon(Icons.check_circle_rounded,
-                            color: Colors.white, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _sheetsConfig.isConfigured
-                                ? 'Transaksi dibatalkan, saldo dipulihkan & dihapus dari Spreadsheet.'
-                                : 'Transaksi berhasil dibatalkan dan saldo telah dipulihkan.',
-                          ),
-                        ),
-                      ],
-                    ),
-                    backgroundColor: Colors.blueGrey.shade800,
-                    behavior: SnackBarBehavior.floating,
-                  ),
+                CustomToast.showSuccess(
+                  context,
+                  title: 'Transaksi Dibatalkan',
+                  subtitle: _sheetsConfig.isConfigured
+                      ? 'Transaksi dibatalkan, saldo dipulihkan & dihapus dari Spreadsheet.'
+                      : 'Transaksi berhasil dibatalkan dan saldo telah dipulihkan.',
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -6794,12 +6989,10 @@ class _StrukturPageState extends State<StrukturPage> {
         .toList();
 
     if (txList.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tidak ada data transaksi yang perlu dihapus pada bulan ini.'),
-          backgroundColor: Colors.blueGrey,
-          behavior: SnackBarBehavior.floating,
-        ),
+      CustomToast.showInfo(
+        context,
+        title: 'Tidak Ada Transaksi',
+        subtitle: 'Tidak ada data transaksi yang perlu dihapus pada bulan ini.',
       );
       return;
     }
@@ -6899,25 +7092,12 @@ class _StrukturPageState extends State<StrukturPage> {
                 _saveData();
                 _triggerAutoSyncSheets(force: true);
                 onDeleted?.call();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Row(
-                      children: [
-                        const Icon(Icons.delete_sweep_rounded,
-                            color: Colors.white, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _sheetsConfig.isConfigured
-                                ? '${txList.length} transaksi dibatalkan, saldo dipulihkan & Spreadsheet dikosongkan.'
-                                : '${txList.length} transaksi berhasil dihapus dan saldo telah dipulihkan.',
-                          ),
-                        ),
-                      ],
-                    ),
-                    backgroundColor: const Color(0xFFDC2626),
-                    behavior: SnackBarBehavior.floating,
-                  ),
+                CustomToast.showSuccess(
+                  context,
+                  title: 'Semua Transaksi Dihapus',
+                  subtitle: _sheetsConfig.isConfigured
+                      ? '${txList.length} transaksi dibatalkan, saldo dipulihkan & Spreadsheet dikosongkan.'
+                      : '${txList.length} transaksi berhasil dihapus dan saldo telah dipulihkan.',
                 );
               },
               icon: const Icon(Icons.delete_forever_rounded, size: 16),
@@ -7712,28 +7892,12 @@ class _StrukturPageState extends State<StrukturPage> {
                                     : '$bankName - $noRek';
                                 Clipboard.setData(
                                     ClipboardData(text: copyText));
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Row(
-                                      children: [
-                                        const Icon(Icons.check_circle_rounded,
-                                            color: Colors.white, size: 16),
-                                        const SizedBox(width: 6),
-                                        Expanded(
-                                          child: Text(
-                                            holder.isNotEmpty
-                                                ? '$bankName - $noRek (A.N $holder) berhasil disalin!'
-                                                : '$bankName - $noRek berhasil disalin!',
-                                            style:
-                                                const TextStyle(fontSize: 12),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    behavior: SnackBarBehavior.floating,
-                                    backgroundColor: const Color(0xFF059669),
-                                    duration: const Duration(seconds: 2),
-                                  ),
+                                CustomToast.showSuccess(
+                                  context,
+                                  title: 'Nomor Rekening Disalin',
+                                  subtitle: holder.isNotEmpty
+                                      ? '$bankName - $noRek (A.N $holder) berhasil disalin!'
+                                      : '$bankName - $noRek berhasil disalin!',
                                 );
                               },
                               borderRadius: BorderRadius.circular(4),

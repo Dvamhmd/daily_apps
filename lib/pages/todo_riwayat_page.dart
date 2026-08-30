@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:daily_apps/models/model_todo.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
+import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -176,15 +177,9 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
       });
       _saveData();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Riwayat to-do berhasil dihapus'),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
+        CustomToast.showSuccess(
+          context,
+          title: 'Riwayat to-do berhasil dihapus',
         );
       }
     }
