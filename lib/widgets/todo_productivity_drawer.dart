@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:daily_apps/models/model_todo.dart';
 import 'package:daily_apps/pages/daily_productivity_page.dart';
 import 'package:daily_apps/pages/todo_riwayat_page.dart';
+import 'package:daily_apps/pages/tugas_harian_page.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -139,7 +140,30 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
                       ),
                       const SizedBox(height: 8),
 
-                      // Menu 1: Activity
+                      // Menu 1: Tugas Harian (Set Up Grup Aktivitas)
+                      _buildMenuItem(
+                        context: context,
+                        icon: Icons.event_repeat_rounded,
+                        iconColor: const Color(0xFFE65100),
+                        title: 'Tugas Harian',
+                        subtitle: 'Set up grup aktivitas & terapkan ke section',
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const TugasHarianPage(),
+                            ),
+                          ).then((_) {
+                            if (widget.onDataChanged != null) {
+                              widget.onDataChanged!();
+                            }
+                            _loadAllTodoData();
+                          });
+                        },
+                      ),
+
+                      // Menu 2: Activity
                       _buildMenuItem(
                         context: context,
                         icon: Icons.insights_rounded,
@@ -162,7 +186,7 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
                         },
                       ),
 
-                      // Menu 2: Riwayat Task
+                      // Menu 3: Riwayat Task
                       _buildMenuItem(
                         context: context,
                         icon: Icons.history_rounded,
