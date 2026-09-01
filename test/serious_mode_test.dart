@@ -352,5 +352,35 @@ void main() {
       expect(current?.displayName, 'New Hero Name');
       expect(current?.username, 'new_hero_username');
     });
+
+    test('updateUserProfile migrates local todo groups and punishment states to new username key', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final user = SeriousUser(
+        id: 'usr_migrate_test',
+        username: 'old_player',
+        password: '123',
+        displayName: 'Old Player',
+      );
+      await SeriousModeService.saveCurrentUser(user);
+
+      final oldKey = SeriousModeService.getSeriousTodoGroupsKey('old_player');
+      final newKey = SeriousModeService.getSeriousTodoGroupsKey('new_player');
+      await prefs.setString(oldKey, '[{"id":"group_123","title":"Daily Quest"}]');
+
+      final oldPunishKey = SeriousModeService.getPunishmentStatesKey('old_player');
+      final newPunishKey = SeriousModeService.getPunishmentStatesKey('new_player');
+      await prefs.setString(oldPunishKey, '{"group_123":{"groupId":"group_123"}}');
+
+      final res = await SeriousModeService.updateUserProfile(
+        newDisplayName: 'New Player',
+        newUsername: 'new_player',
+      );
+
+      expect(res['success'], true);
+      expect(prefs.containsKey(newKey), true);
+      expect(prefs.getString(newKey), contains('Daily Quest'));
+      expect(prefs.containsKey(newPunishKey), true);
+      expect(prefs.getString(newPunishKey), contains('group_123'));
+    });
   });
 }

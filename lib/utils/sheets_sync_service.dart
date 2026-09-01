@@ -1991,6 +1991,7 @@ function handleSeriousModeActions(data, ss) {
     var u = data.user || {};
     var username = (u.username || "").toString().trim();
     var cleanUsername = username.toLowerCase();
+    var oldUsername = (data.oldUsername || u.oldUsername || "").toString().trim().toLowerCase();
     
     if (!username) {
       return jsonResponse({ status: "error", message: "Username tidak boleh kosong" });
@@ -2002,7 +2003,7 @@ function handleSeriousModeActions(data, ss) {
     for (var r = 1; r < values.length; r++) {
       var existingUn = (values[r][1] || "").toString().trim().toLowerCase();
       var existingId = (values[r][0] || "").toString().trim();
-      if (existingUn === cleanUsername || (u.id && existingId === u.id.toString())) {
+      if (existingUn === cleanUsername || (oldUsername && existingUn === oldUsername) || (u.id && existingId === u.id.toString())) {
         foundRowIndex = r + 1; // 1-based row index
         break;
       }
@@ -2016,37 +2017,65 @@ function handleSeriousModeActions(data, ss) {
       });
     }
 
+    var existingRow = (foundRowIndex !== -1 && values[foundRowIndex - 1]) ? values[foundRowIndex - 1] : null;
+
+    var finalId = u.id || (existingRow ? existingRow[0] : ("usr_" + new Date().getTime()));
+    var finalPass = (u.password !== undefined && u.password !== null && u.password !== "")
+        ? u.password
+        : (existingRow ? existingRow[2] : "");
+    var finalDisplayName = u.displayName || (existingRow ? existingRow[3] : username);
+    var finalAvatarIndex = (u.avatarIndex !== undefined && u.avatarIndex !== null)
+        ? (parseInt(u.avatarIndex) || 0)
+        : (existingRow ? (parseInt(existingRow[4]) || 0) : 0);
+    var finalAvatarBase64 = (u.avatarBase64 !== undefined && u.avatarBase64 !== null && u.avatarBase64 !== "")
+        ? u.avatarBase64
+        : (existingRow ? existingRow[5] : "");
+    var finalRegisteredAt = u.registeredAt || (existingRow ? existingRow[9] : new Date().toISOString());
+
     var rowData = [
-      u.id || ("usr_" + new Date().getTime()),
+      finalId,
       username,
-      u.password || "",
-      u.displayName || username,
-      parseInt(u.avatarIndex) || 0,
-      u.avatarBase64 || "",
+      finalPass,
+      finalDisplayName,
+      finalAvatarIndex,
+      finalAvatarBase64,
       parseInt(u.totalPoints) || 0,
       parseInt(u.totalTasksCompleted) || 0,
       parseInt(u.totalPunishmentsTaken) || 0,
-      u.registeredAt || new Date().toISOString(),
+      finalRegisteredAt,
       new Date().toISOString()
     ];
 
     if (foundRowIndex !== -1) {
       // Update existing user row
       sheet.getRange(foundRowIndex, 1, 1, rowData.length).setValues([rowData]);
-      return jsonResponse({
-        status: "success",
-        action: "updated",
-        message: "Data user '" + username + "' berhasil diperbarui di Spreadsheet."
-      });
     } else {
       // Append new user row
       sheet.appendRow(rowData);
-      return jsonResponse({
-        status: "success",
-        action: "created",
-        message: "Akun user '" + username + "' berhasil didaftarkan di Spreadsheet."
-      });
     }
+
+    // Jika username berubah, perbarui juga username di tab Tasks_Mode_Serius
+    if (oldUsername && oldUsername !== cleanUsername) {
+      var taskSheetName = "Tasks_Mode_Serius";
+      var taskSheet = ss.getSheetByName(taskSheetName);
+      if (taskSheet) {
+        var tValues = taskSheet.getDataRange().getValues();
+        for (var tr = 1; tr < tValues.length; tr++) {
+          var taskUn = (tValues[tr][0] || "").toString().trim().toLowerCase();
+          if (taskUn === oldUsername) {
+            taskSheet.getRange(tr + 1, 1).setValue(username);
+            taskSheet.getRange(tr + 1, 3).setValue(new Date().toISOString());
+            break;
+          }
+        }
+      }
+    }
+
+    return jsonResponse({
+      status: "success",
+      action: (foundRowIndex !== -1) ? "updated" : "created",
+      message: "Data user '" + username + "' berhasil disimpan di Spreadsheet."
+    });
   }
 
   // 4. GET USER TASKS (FOR MULTI-DEVICE CLOUD SYNC)
@@ -2094,6 +2123,7 @@ function handleSeriousModeActions(data, ss) {
   if (action === "sync_serious_tasks" || action === "save_serious_tasks") {
     var username = (data.username || (data.user && data.user.username) || "").toString().trim();
     var cleanUsername = username.toLowerCase();
+    var oldUsername = (data.oldUsername || (data.user && data.user.oldUsername) || "").toString().trim().toLowerCase();
     var tasksJson = data.tasksJson || (data.tasks ? JSON.stringify(data.tasks) : "[]");
     
     if (!username) {
@@ -2116,7 +2146,7 @@ function handleSeriousModeActions(data, ss) {
     
     for (var r = 1; r < values.length; r++) {
       var un = (values[r][0] || "").toString().trim().toLowerCase();
-      if (un === cleanUsername) {
+      if (un === cleanUsername || (oldUsername && un === oldUsername)) {
         foundRow = r + 1;
         break;
       }

@@ -566,6 +566,7 @@ class SeriousModeService {
     );
 
     final prefs = await SharedPreferences.getInstance();
+    String? userTodoData;
 
     // Jika username berubah, migrasikan data tasks & punishment lokal ke key username baru
     if (cleanNewUsername != oldUsername) {
@@ -574,7 +575,14 @@ class SeriousModeService {
       if (prefs.containsKey(oldTodoKey)) {
         final todoData = prefs.getString(oldTodoKey);
         if (todoData != null && todoData.isNotEmpty) {
+          userTodoData = todoData;
           await prefs.setString(newTodoKey, todoData);
+        }
+      }
+      if (userTodoData == null || userTodoData.isEmpty) {
+        userTodoData = await findExistingUserTodoData(prefs, currentUser);
+        if (userTodoData != null && userTodoData.isNotEmpty) {
+          await prefs.setString(newTodoKey, userTodoData);
         }
       }
 
@@ -586,6 +594,20 @@ class SeriousModeService {
           await prefs.setString(newPunishmentKey, punishmentData);
         }
       }
+
+      final oldProcessedKey = getProcessedGroupsKey(oldUsername);
+      final newProcessedKey = getProcessedGroupsKey(cleanNewUsername);
+      if (prefs.containsKey(oldProcessedKey)) {
+        final processedData = prefs.getString(oldProcessedKey);
+        if (processedData != null && processedData.isNotEmpty) {
+          await prefs.setString(newProcessedKey, processedData);
+        }
+      }
+
+      // Reset hash agar background sync langsung aktif dengan username baru
+      _lastSyncedTasksHash = '';
+    } else {
+      userTodoData = await findExistingUserTodoData(prefs, updatedUser);
     }
 
     // Simpan ke lokal
@@ -600,10 +622,25 @@ class SeriousModeService {
     }
 
     // Sinkronisasi data user terupdate ke Google Spreadsheet
+    final userPayload = updatedUser.toJson();
+    if (cleanNewUsername != oldUsername) {
+      userPayload['oldUsername'] = oldUsername;
+    }
     await _sendSpreadsheetRequest({
       'action': 'sync_serious_user',
-      'user': updatedUser.toJson(),
+      'user': userPayload,
+      'oldUsername': oldUsername,
     });
+
+    // Jika username berubah, sinkronkan juga tab Tasks_Mode_Serius secara langsung agar username di tab task ikut terupdate
+    if (cleanNewUsername != oldUsername) {
+      await _sendSpreadsheetRequest({
+        'action': 'sync_serious_tasks',
+        'username': cleanNewUsername,
+        'oldUsername': oldUsername,
+        'tasksJson': userTodoData ?? '[]',
+      });
+    }
 
     return {'success': true, 'user': updatedUser};
   }
@@ -1437,6 +1474,7 @@ function handleSeriousModeActions(data, ss) {
     var u = data.user || {};
     var username = (u.username || "").toString().trim();
     var cleanUsername = username.toLowerCase();
+    var oldUsername = (data.oldUsername || u.oldUsername || "").toString().trim().toLowerCase();
     
     if (!username) {
       return jsonResponse({ status: "error", message: "Username tidak boleh kosong" });
@@ -1448,7 +1486,7 @@ function handleSeriousModeActions(data, ss) {
     for (var r = 1; r < values.length; r++) {
       var existingUn = (values[r][1] || "").toString().trim().toLowerCase();
       var existingId = (values[r][0] || "").toString().trim();
-      if (existingUn === cleanUsername || (u.id && existingId === u.id.toString())) {
+      if (existingUn === cleanUsername || (oldUsername && existingUn === oldUsername) || (u.id && existingId === u.id.toString())) {
         foundRowIndex = r + 1; // 1-based row index
         break;
       }
@@ -1494,20 +1532,33 @@ function handleSeriousModeActions(data, ss) {
     if (foundRowIndex !== -1) {
       // Update existing user row
       sheet.getRange(foundRowIndex, 1, 1, rowData.length).setValues([rowData]);
-      return jsonResponse({
-        status: "success",
-        action: "updated",
-        message: "Data user '" + username + "' berhasil diperbarui di Spreadsheet."
-      });
     } else {
       // Append new user row
       sheet.appendRow(rowData);
-      return jsonResponse({
-        status: "success",
-        action: "created",
-        message: "Akun user '" + username + "' berhasil didaftarkan di Spreadsheet."
-      });
     }
+
+    // Jika username berubah, perbarui juga username di tab Tasks_Mode_Serius
+    if (oldUsername && oldUsername !== cleanUsername) {
+      var taskSheetName = "Tasks_Mode_Serius";
+      var taskSheet = ss.getSheetByName(taskSheetName);
+      if (taskSheet) {
+        var tValues = taskSheet.getDataRange().getValues();
+        for (var tr = 1; tr < tValues.length; tr++) {
+          var taskUn = (tValues[tr][0] || "").toString().trim().toLowerCase();
+          if (taskUn === oldUsername) {
+            taskSheet.getRange(tr + 1, 1).setValue(username);
+            taskSheet.getRange(tr + 1, 3).setValue(new Date().toISOString());
+            break;
+          }
+        }
+      }
+    }
+
+    return jsonResponse({
+      status: "success",
+      action: (foundRowIndex !== -1) ? "updated" : "created",
+      message: "Data user '" + username + "' berhasil disimpan di Spreadsheet."
+    });
   }
 
   // 4. GET USER TASKS (FOR MULTI-DEVICE CLOUD SYNC)
@@ -1555,6 +1606,7 @@ function handleSeriousModeActions(data, ss) {
   if (action === "sync_serious_tasks" || action === "save_serious_tasks") {
     var username = (data.username || (data.user && data.user.username) || "").toString().trim();
     var cleanUsername = username.toLowerCase();
+    var oldUsername = (data.oldUsername || (data.user && data.user.oldUsername) || "").toString().trim().toLowerCase();
     var tasksJson = data.tasksJson || (data.tasks ? JSON.stringify(data.tasks) : "[]");
     
     if (!username) {
@@ -1577,7 +1629,7 @@ function handleSeriousModeActions(data, ss) {
     
     for (var r = 1; r < values.length; r++) {
       var un = (values[r][0] || "").toString().trim().toLowerCase();
-      if (un === cleanUsername) {
+      if (un === cleanUsername || (oldUsername && un === oldUsername)) {
         foundRow = r + 1;
         break;
       }
