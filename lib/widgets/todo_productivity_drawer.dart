@@ -68,7 +68,8 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
       _seriousUser = await SeriousModeService.getCurrentUser();
 
       final String prefsKey = _isSeriousMode && _seriousUser != null
-          ? SeriousModeService.getSeriousTodoGroupsKey(_seriousUser!.id)
+          ? SeriousModeService.getSeriousTodoGroupsKey(
+              SeriousModeService.getUserStorageIdentifier(_seriousUser))
           : (_isSeriousMode
               ? SeriousModeService.prefKeySeriousTodoGroups
               : SeriousModeService.prefKeyNormalTodoGroups);

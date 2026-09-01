@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/model_serious_mode.dart';
+import '../models/model_sheets_config.dart';
 import '../models/model_todo.dart';
 
 class SeriousModeService {
@@ -14,29 +16,84 @@ class SeriousModeService {
   static const String prefKeyNormalTodoGroups = 'daily_apps_todo_groups_v1';
   static const String prefKeySeriousTodoGroups = 'daily_apps_serious_todo_groups_v1';
   static const String prefKeyPunishmentStates = 'daily_apps_serious_punishment_states_v1';
+  static const String prefKeyHideCommitmentWarning = 'daily_apps_serious_hide_commitment_warning';
+
+  /// Generator key SharedPreferences spesifik per user untuk status jangan tampilkan peringatan komitmen
+  static Future<bool> isHideCommitmentWarning([String? userId]) async {
+    final prefs = await SharedPreferences.getInstance();
+    final uid = userId ?? (await getCurrentUser())?.id;
+    final key = uid != null ? '${prefKeyHideCommitmentWarning}_$uid' : prefKeyHideCommitmentWarning;
+    return prefs.getBool(key) ?? false;
+  }
+
+  static Future<void> setHideCommitmentWarning(bool hide, [String? userId]) async {
+    final prefs = await SharedPreferences.getInstance();
+    final uid = userId ?? (await getCurrentUser())?.id;
+    final key = uid != null ? '${prefKeyHideCommitmentWarning}_$uid' : prefKeyHideCommitmentWarning;
+    await prefs.setBool(key, hide);
+  }
 
   /// Generator key SharedPreferences spesifik per user untuk mengisolasi data task Mode Serius
-  static String getSeriousTodoGroupsKey([String? userId]) {
-    if (userId != null && userId.trim().isNotEmpty) {
-      return 'daily_apps_serious_todo_groups_v1_${userId.trim()}';
+  static String getSeriousTodoGroupsKey([String? userIdentifier]) {
+    if (userIdentifier != null && userIdentifier.trim().isNotEmpty) {
+      final clean = userIdentifier.trim().toLowerCase().replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+      return 'daily_apps_serious_todo_groups_v1_$clean';
     }
     return prefKeySeriousTodoGroups;
   }
 
+  /// Mencari data Todo lokal pengguna dari berbagai kemungkinan key (Username, ID, atau Legacy)
+  static Future<String?> findExistingUserTodoData(
+    SharedPreferences prefs,
+    SeriousUser user,
+  ) async {
+    // 1. Cek key berdasarkan username
+    final usernameKey = getSeriousTodoGroupsKey(user.username);
+    if (prefs.containsKey(usernameKey)) {
+      final data = prefs.getString(usernameKey);
+      if (data != null && data.isNotEmpty) return data;
+    }
+
+    // 2. Cek key berdasarkan user.id
+    final idKey = getSeriousTodoGroupsKey(user.id);
+    if (prefs.containsKey(idKey)) {
+      final data = prefs.getString(idKey);
+      if (data != null && data.isNotEmpty) return data;
+    }
+
+    // 3. Cek legacy global key
+    if (prefs.containsKey(prefKeySeriousTodoGroups)) {
+      final data = prefs.getString(prefKeySeriousTodoGroups);
+      if (data != null && data.isNotEmpty) return data;
+    }
+
+    return null;
+  }
+
   /// Generator key SharedPreferences spesifik per user untuk status hukuman
-  static String getPunishmentStatesKey([String? userId]) {
-    if (userId != null && userId.trim().isNotEmpty) {
-      return 'daily_apps_serious_punishment_states_v1_${userId.trim()}';
+  static String getPunishmentStatesKey([String? userIdentifier]) {
+    if (userIdentifier != null && userIdentifier.trim().isNotEmpty) {
+      final clean = userIdentifier.trim().toLowerCase().replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+      return 'daily_apps_serious_punishment_states_v1_$clean';
     }
     return prefKeyPunishmentStates;
   }
 
   /// Generator key SharedPreferences spesifik per user untuk section yang telah diproses
-  static String getProcessedGroupsKey([String? userId]) {
-    if (userId != null && userId.trim().isNotEmpty) {
-      return 'daily_apps_serious_processed_groups_${userId.trim()}';
+  static String getProcessedGroupsKey([String? userIdentifier]) {
+    if (userIdentifier != null && userIdentifier.trim().isNotEmpty) {
+      final clean = userIdentifier.trim().toLowerCase().replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+      return 'daily_apps_serious_processed_groups_$clean';
     }
     return prefKeyProcessedGroups;
+  }
+
+  /// Identifier unik & stabil untuk penyimpanan lokal (mengutamakan username)
+  static String getUserStorageIdentifier(SeriousUser? user) {
+    if (user == null) return '';
+    final username = user.username.trim();
+    if (username.isNotEmpty) return username;
+    return user.id.trim();
   }
 
   /// Ambil key aktif saat ini sesuai mode dan akun yang login
@@ -44,7 +101,7 @@ class SeriousModeService {
     final isSerious = await isSeriousModeActive();
     if (isSerious) {
       final user = await getCurrentUser();
-      return getSeriousTodoGroupsKey(user?.id);
+      return getSeriousTodoGroupsKey(getUserStorageIdentifier(user));
     }
     return prefKeyNormalTodoGroups;
   }
@@ -194,13 +251,32 @@ class SeriousModeService {
   static DateTime? _lastFetchTime;
   static const Duration _cacheTtl = Duration(seconds: 20);
 
+  static const String prefKeySeriousWebAppUrl = 'daily_apps_serious_webapp_url';
+
+  /// URL Spreadsheet Web App terpusat khusus untuk Mode Serius To Do List
+  static Future<String> getEffectiveSpreadsheetUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    final customUrl = prefs.getString(prefKeySeriousWebAppUrl);
+    if (customUrl != null && customUrl.trim().isNotEmpty) {
+      return customUrl.trim();
+    }
+    return defaultSeriousWebAppUrl;
+  }
+
+  static Future<void> setSeriousWebAppUrl(String url) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(prefKeySeriousWebAppUrl, url.trim());
+  }
+
   /// Helper untuk mengirim HTTP Request ke Google Apps Script Web App (Mendukung Flutter Web & Mobile)
   static Future<Map<String, dynamic>?> _sendSpreadsheetRequest(
     Map<String, dynamic> payload, {
     Duration timeout = const Duration(seconds: 6),
   }) async {
+    final targetUrl = await getEffectiveSpreadsheetUrl();
+    if (targetUrl.isEmpty) return null;
     final bodyJson = jsonEncode(payload);
-    final uri = Uri.parse(defaultSeriousWebAppUrl);
+    final uri = Uri.parse(targetUrl);
     final action = payload['action']?.toString() ?? 'get_leaderboard';
 
     // 1. Pada Flutter Web atau Read Request: gunakan GET query parameter (paling cepat & anti-CORS preflight)
@@ -474,7 +550,13 @@ class SeriousModeService {
     final user = targetUser ?? await getCurrentUser();
     if (user == null) return;
 
-    final allStates = await _getAllPunishmentStates(user.id);
+    // Jika groups kosong (misal saat login akun yang belum punya task lokal di HP ini),
+    // jangan menghapus total points & tasks yang sudah ada dari spreadsheet.
+    if (groups.isEmpty) {
+      return;
+    }
+
+    final allStates = await _getAllPunishmentStates(getUserStorageIdentifier(user));
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
@@ -779,14 +861,14 @@ class SeriousModeService {
   ];
 
   /// 6. Manajemen State Hukuman Per Section (Acak Otomatis Deterministik, Checklist & Menyerah)
-  static Future<Map<String, SeriousGroupPunishmentState>> _getAllPunishmentStates([String? userId]) async {
+  static Future<Map<String, SeriousGroupPunishmentState>> _getAllPunishmentStates([String? userIdentifier]) async {
     final prefs = await SharedPreferences.getInstance();
-    final effectiveUserId = userId ?? (await getCurrentUser())?.id;
-    final key = getPunishmentStatesKey(effectiveUserId);
+    final effectiveIdentifier = userIdentifier ?? getUserStorageIdentifier(await getCurrentUser());
+    final key = getPunishmentStatesKey(effectiveIdentifier);
 
     String? raw = prefs.getString(key);
     // Legacy migration: jika key spesifik user belum ada tapi key legacy ada
-    if ((raw == null || raw.isEmpty) && effectiveUserId != null && prefs.containsKey(prefKeyPunishmentStates)) {
+    if ((raw == null || raw.isEmpty) && effectiveIdentifier.isNotEmpty && prefs.containsKey(prefKeyPunishmentStates)) {
       raw = prefs.getString(prefKeyPunishmentStates);
       if (raw != null && raw.isNotEmpty) {
         await prefs.setString(key, raw);
@@ -810,11 +892,11 @@ class SeriousModeService {
   }
 
   static Future<void> _saveAllPunishmentStates(
-      Map<String, SeriousGroupPunishmentState> states, [String? userId]) async {
+      Map<String, SeriousGroupPunishmentState> states, [String? userIdentifier]) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final effectiveUserId = userId ?? (await getCurrentUser())?.id;
-      final key = getPunishmentStatesKey(effectiveUserId);
+      final effectiveIdentifier = userIdentifier ?? getUserStorageIdentifier(await getCurrentUser());
+      final key = getPunishmentStatesKey(effectiveIdentifier);
       final map = states.map((k, v) => MapEntry(k, v.toJson()));
       await prefs.setString(key, jsonEncode(map));
     } catch (e) {
@@ -990,12 +1072,14 @@ class SeriousModeService {
     if (_syncingUserKeys.contains(syncKey)) return;
     _syncingUserKeys.add(syncKey);
 
+    final targetUrl = await getEffectiveSpreadsheetUrl();
+    if (targetUrl.isEmpty) return;
     final payload = {
       'action': 'sync_serious_user',
       'user': user.toJson(),
     };
     final bodyJson = jsonEncode(payload);
-    final uri = Uri.parse(defaultSeriousWebAppUrl);
+    final uri = Uri.parse(targetUrl);
 
     try {
       if (kIsWeb) {
@@ -1031,10 +1115,88 @@ class SeriousModeService {
     }
   }
 
+  static Timer? _tasksSyncDebounceTimer;
+  static String _lastSyncedTasksHash = '';
+
+  /// Mengambil seluruh daftar task pengguna dari Spreadsheet (untuk login di HP baru / sinkronisasi multi-device)
+  static Future<List<TodoDateGroup>> fetchUserTasksFromSpreadsheet(String username) async {
+    final cleanUsername = username.trim().toLowerCase();
+    if (cleanUsername.isEmpty) return [];
+
+    try {
+      final res = await _sendSpreadsheetRequest({
+        'action': 'get_serious_tasks',
+        'username': cleanUsername,
+      });
+
+      if (res != null && res['status'] == 'success') {
+        final tasksRaw = res['tasks'] ?? res['data'];
+        if (tasksRaw is List) {
+          final List<TodoDateGroup> groups = [];
+          for (final item in tasksRaw) {
+            if (item is Map<String, dynamic>) {
+              groups.add(TodoDateGroup.fromJson(item));
+            } else if (item is Map) {
+              groups.add(TodoDateGroup.fromJson(Map<String, dynamic>.from(item)));
+            }
+          }
+          return groups;
+        } else if (res['rawTasksJson'] is String && (res['rawTasksJson'] as String).isNotEmpty) {
+          final decoded = jsonDecode(res['rawTasksJson'] as String);
+          if (decoded is List) {
+            return decoded
+                .map((item) => TodoDateGroup.fromJson(item as Map<String, dynamic>))
+                .toList();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching user tasks from spreadsheet: $e');
+    }
+    return [];
+  }
+
+  /// Ambil dan simpan cache task user ke SharedPreferences saat login
+  static Future<List<TodoDateGroup>> fetchAndCacheUserTasksFromSpreadsheet(SeriousUser user) async {
+    final groups = await fetchUserTasksFromSpreadsheet(user.username);
+    if (groups.isNotEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      final userKey = getSeriousTodoGroupsKey(getUserStorageIdentifier(user));
+      final encoded = jsonEncode(groups.map((g) => g.toJson()).toList());
+      await prefs.setString(userKey, encoded);
+    }
+    return groups;
+  }
+
+  /// Sinkronisasi daftar task ke Cloud Spreadsheet dengan Debounce Non-Blocking (Tanpa lag di UI)
+  static void scheduleTasksCloudSync(SeriousUser? user, List<TodoDateGroup> groups) {
+    if (user == null || user.username.trim().isEmpty) return;
+
+    _tasksSyncDebounceTimer?.cancel();
+    _tasksSyncDebounceTimer = Timer(const Duration(milliseconds: 1500), () async {
+      final encoded = jsonEncode(groups.map((g) => g.toJson()).toList());
+      final hash = '${user.username}_${encoded.hashCode}';
+      if (_lastSyncedTasksHash == hash) return;
+      _lastSyncedTasksHash = hash;
+
+      final payload = {
+        'action': 'sync_serious_tasks',
+        'username': user.username.trim().toLowerCase(),
+        'tasksJson': encoded,
+      };
+
+      try {
+        await _sendSpreadsheetRequest(payload);
+      } catch (e) {
+        debugPrint('Schedule tasks cloud sync error: $e');
+      }
+    });
+  }
+
   /// Template Kode Google Apps Script untuk penanganan Mode Serius di Spreadsheet
   static String getSeriousModeAppsScriptCode() {
     return '''
-// === HANDLER GOOGLE APPS SCRIPT UNTUK MODE SERIUS (USERS & TOP 3 LEADERBOARD) ===
+// === HANDLER GOOGLE APPS SCRIPT UNTUK MODE SERIUS (USERS, LEADERBOARD & CLOUD TASKS) ===
 function handleSeriousModeActions(data, ss) {
   var action = data.action;
   var userSheetName = "Users_Mode_Serius";
@@ -1189,6 +1351,95 @@ function handleSeriousModeActions(data, ss) {
         message: "Akun user '" + username + "' berhasil didaftarkan di Spreadsheet."
       });
     }
+  }
+
+  // 4. GET USER TASKS (FOR MULTI-DEVICE CLOUD SYNC)
+  if (action === "get_serious_tasks") {
+    var checkUsername = (data.username || (data.user && data.user.username) || "").toString().trim().toLowerCase();
+    if (!checkUsername) {
+      return jsonResponse({ status: "error", message: "Username wajib disertakan" });
+    }
+    
+    var taskSheetName = "Tasks_Mode_Serius";
+    var taskSheet = ss.getSheetByName(taskSheetName);
+    if (!taskSheet) {
+      return jsonResponse({ status: "success", username: checkUsername, tasks: [] });
+    }
+    
+    var values = taskSheet.getDataRange().getValues();
+    var foundTasksJson = "";
+    
+    for (var r = 1; r < values.length; r++) {
+      var un = (values[r][0] || "").toString().trim().toLowerCase();
+      if (un === checkUsername) {
+        foundTasksJson = values[r][1] ? values[r][1].toString() : "";
+        break;
+      }
+    }
+    
+    var tasksData = [];
+    if (foundTasksJson) {
+      try {
+        tasksData = JSON.parse(foundTasksJson);
+      } catch (e) {
+        tasksData = [];
+      }
+    }
+    
+    return jsonResponse({
+      status: "success",
+      username: checkUsername,
+      tasks: tasksData,
+      rawTasksJson: foundTasksJson
+    });
+  }
+
+  // 5. SYNC / SAVE USER TASKS (FOR MULTI-DEVICE CLOUD SYNC)
+  if (action === "sync_serious_tasks" || action === "save_serious_tasks") {
+    var username = (data.username || (data.user && data.user.username) || "").toString().trim();
+    var cleanUsername = username.toLowerCase();
+    var tasksJson = data.tasksJson || (data.tasks ? JSON.stringify(data.tasks) : "[]");
+    
+    if (!username) {
+      return jsonResponse({ status: "error", message: "Username tidak boleh kosong" });
+    }
+    
+    var taskSheetName = "Tasks_Mode_Serius";
+    var taskSheet = ss.getSheetByName(taskSheetName);
+    var taskHeaders = ["Username", "Tasks JSON", "Last Updated"];
+    
+    if (!taskSheet) {
+      taskSheet = ss.insertSheet(taskSheetName);
+      taskSheet.appendRow(taskHeaders);
+      taskSheet.getRange("A1:C1").setFontWeight("bold").setBackground("#1E293B").setFontColor("#F59E0B");
+      taskSheet.setFrozenRows(1);
+    }
+    
+    var values = taskSheet.getDataRange().getValues();
+    var foundRow = -1;
+    
+    for (var r = 1; r < values.length; r++) {
+      var un = (values[r][0] || "").toString().trim().toLowerCase();
+      if (un === cleanUsername) {
+        foundRow = r + 1;
+        break;
+      }
+    }
+    
+    var rowData = [username, tasksJson, new Date().toISOString()];
+    
+    if (foundRow !== -1) {
+      taskSheet.getRange(foundRow, 1, 1, 3).setValues([rowData]);
+    } else {
+      taskSheet.appendRow(rowData);
+    }
+    
+    return jsonResponse({
+      status: "success",
+      action: "tasks_synced",
+      username: username,
+      message: "Daftar task berhasil disinkronkan ke Spreadsheet."
+    });
   }
 
   return null;

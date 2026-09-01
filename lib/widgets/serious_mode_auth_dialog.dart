@@ -217,8 +217,8 @@ class _SeriousModeAuthDialogState extends State<SeriousModeAuthDialog> {
     setState(() {
       _isLoading = true;
       _loadingMessage = _isLoginMode
-          ? 'Menerima & mencocokkan akun dari Spreadsheet...'
-          : 'Mendaftar & menyimpan akun ke Spreadsheet...';
+          ? 'Masuk ke Akun'
+          : 'Mendaftarkan Akun';
     });
 
     HapticFeedback.mediumImpact();
@@ -235,6 +235,7 @@ class _SeriousModeAuthDialogState extends State<SeriousModeAuthDialog> {
         });
         if (res['success'] == true) {
           final user = res['user'] as SeriousUser;
+          await SeriousModeService.fetchAndCacheUserTasksFromSpreadsheet(user);
           await SeriousModeService.setSeriousModeActive(true);
           if (mounted) {
             CustomToast.showSuccess(
@@ -694,47 +695,6 @@ class _SeriousModeAuthDialogState extends State<SeriousModeAuthDialog> {
                     ),
 
                     const SizedBox(height: 20),
-
-                    if (_isLoading) ...[
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: accentGold.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: accentGold.withValues(alpha: 0.4),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: accentGold,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                _loadingMessage.isNotEmpty
-                                    ? _loadingMessage
-                                    : 'Memproses ke Spreadsheet...',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFFFEF3C7),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
 
                     // Submit Button
                     SizedBox(

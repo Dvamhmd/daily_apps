@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../utils/serious_mode_service.dart';
 
-class SeriousConfirmAddDialog extends StatelessWidget {
+class SeriousConfirmAddDialog extends StatefulWidget {
   final String taskTitle;
 
   const SeriousConfirmAddDialog({
@@ -10,6 +11,13 @@ class SeriousConfirmAddDialog extends StatelessWidget {
   });
 
   static Future<bool> show(BuildContext context, {required String taskTitle}) async {
+    final isHidden = await SeriousModeService.isHideCommitmentWarning();
+    if (isHidden) {
+      return true;
+    }
+
+    if (!context.mounted) return true;
+
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -17,6 +25,13 @@ class SeriousConfirmAddDialog extends StatelessWidget {
     );
     return result ?? false;
   }
+
+  @override
+  State<SeriousConfirmAddDialog> createState() => _SeriousConfirmAddDialogState();
+}
+
+class _SeriousConfirmAddDialogState extends State<SeriousConfirmAddDialog> {
+  bool _dontShowAgain = false;
 
   @override
   Widget build(BuildContext context) {
@@ -98,7 +113,7 @@ class SeriousConfirmAddDialog extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          taskTitle.isNotEmpty ? taskTitle : '(Tugas Baru)',
+                          widget.taskTitle.isNotEmpty ? widget.taskTitle : '(Tugas Baru)',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,
@@ -126,7 +141,67 @@ class SeriousConfirmAddDialog extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 16),
+
+                  // Toggle "Jangan tampilkan lagi"
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      setState(() {
+                        _dontShowAgain = !_dontShowAgain;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _dontShowAgain
+                            ? const Color(0xFFEF4444).withValues(alpha: 0.12)
+                            : const Color(0xFF1E293B).withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _dontShowAgain
+                              ? const Color(0xFFEF4444).withValues(alpha: 0.4)
+                              : Colors.white12,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: Checkbox(
+                              value: _dontShowAgain,
+                              activeColor: const Color(0xFFEF4444),
+                              checkColor: Colors.white,
+                              side: const BorderSide(color: Colors.white38, width: 1.5),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              onChanged: (val) {
+                                HapticFeedback.selectionClick();
+                                setState(() {
+                                  _dontShowAgain = val ?? false;
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              'Jangan tampilkan peringatan ini lagi',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
 
                   // Action buttons
                   Row(
@@ -163,9 +238,14 @@ class SeriousConfirmAddDialog extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             elevation: 2,
                           ),
-                          onPressed: () {
+                          onPressed: () async {
                             HapticFeedback.mediumImpact();
-                            Navigator.of(context).pop(true);
+                            if (_dontShowAgain) {
+                              await SeriousModeService.setHideCommitmentWarning(true);
+                            }
+                            if (context.mounted) {
+                              Navigator.of(context).pop(true);
+                            }
                           },
                           child: const Text(
                             'Ya, Tambahkan!',

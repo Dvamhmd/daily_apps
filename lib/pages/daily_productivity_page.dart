@@ -189,7 +189,9 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
   Future<String> _getEffectiveKey() async {
     if (widget.isSeriousMode) {
       final user = await SeriousModeService.getCurrentUser();
-      return SeriousModeService.getSeriousTodoGroupsKey(user?.id);
+      return SeriousModeService.getSeriousTodoGroupsKey(
+        SeriousModeService.getUserStorageIdentifier(user),
+      );
     }
     return SeriousModeService.prefKeyNormalTodoGroups;
   }

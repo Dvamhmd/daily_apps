@@ -1092,10 +1092,11 @@ function processRequest(data) {
     var action = data.action || "test_connection";
     var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    // --- AKSI MODE SERIUS (USERS, LEADERBOARD, CEK USERNAME, REGISTRASI/LOGIN) ---
+    // --- AKSI MODE SERIUS (USERS, LEADERBOARD, CEK USERNAME, REGISTRASI/LOGIN, CLOUD TASKS) ---
     if (action === "get_serious_users" || action === "get_leaderboard" || 
         action === "check_username" || action === "register_serious_user" || 
-        action === "sync_serious_user") {
+        action === "sync_serious_user" || action === "get_serious_tasks" || 
+        action === "sync_serious_tasks" || action === "save_serious_tasks") {
       var seriousRes = handleSeriousModeActions(data, ss);
       if (seriousRes) return seriousRes;
     }
@@ -2046,6 +2047,95 @@ function handleSeriousModeActions(data, ss) {
         message: "Akun user '" + username + "' berhasil didaftarkan di Spreadsheet."
       });
     }
+  }
+
+  // 4. GET USER TASKS (FOR MULTI-DEVICE CLOUD SYNC)
+  if (action === "get_serious_tasks") {
+    var checkUsername = (data.username || (data.user && data.user.username) || "").toString().trim().toLowerCase();
+    if (!checkUsername) {
+      return jsonResponse({ status: "error", message: "Username wajib disertakan" });
+    }
+    
+    var taskSheetName = "Tasks_Mode_Serius";
+    var taskSheet = ss.getSheetByName(taskSheetName);
+    if (!taskSheet) {
+      return jsonResponse({ status: "success", username: checkUsername, tasks: [] });
+    }
+    
+    var values = taskSheet.getDataRange().getValues();
+    var foundTasksJson = "";
+    
+    for (var r = 1; r < values.length; r++) {
+      var un = (values[r][0] || "").toString().trim().toLowerCase();
+      if (un === checkUsername) {
+        foundTasksJson = values[r][1] ? values[r][1].toString() : "";
+        break;
+      }
+    }
+    
+    var tasksData = [];
+    if (foundTasksJson) {
+      try {
+        tasksData = JSON.parse(foundTasksJson);
+      } catch (e) {
+        tasksData = [];
+      }
+    }
+    
+    return jsonResponse({
+      status: "success",
+      username: checkUsername,
+      tasks: tasksData,
+      rawTasksJson: foundTasksJson
+    });
+  }
+
+  // 5. SYNC / SAVE USER TASKS (FOR MULTI-DEVICE CLOUD SYNC)
+  if (action === "sync_serious_tasks" || action === "save_serious_tasks") {
+    var username = (data.username || (data.user && data.user.username) || "").toString().trim();
+    var cleanUsername = username.toLowerCase();
+    var tasksJson = data.tasksJson || (data.tasks ? JSON.stringify(data.tasks) : "[]");
+    
+    if (!username) {
+      return jsonResponse({ status: "error", message: "Username tidak boleh kosong" });
+    }
+    
+    var taskSheetName = "Tasks_Mode_Serius";
+    var taskSheet = ss.getSheetByName(taskSheetName);
+    var taskHeaders = ["Username", "Tasks JSON", "Last Updated"];
+    
+    if (!taskSheet) {
+      taskSheet = ss.insertSheet(taskSheetName);
+      taskSheet.appendRow(taskHeaders);
+      taskSheet.getRange("A1:C1").setFontWeight("bold").setBackground("#1E293B").setFontColor("#F59E0B");
+      taskSheet.setFrozenRows(1);
+    }
+    
+    var values = taskSheet.getDataRange().getValues();
+    var foundRow = -1;
+    
+    for (var r = 1; r < values.length; r++) {
+      var un = (values[r][0] || "").toString().trim().toLowerCase();
+      if (un === cleanUsername) {
+        foundRow = r + 1;
+        break;
+      }
+    }
+    
+    var rowData = [username, tasksJson, new Date().toISOString()];
+    
+    if (foundRow !== -1) {
+      taskSheet.getRange(foundRow, 1, 1, 3).setValues([rowData]);
+    } else {
+      taskSheet.appendRow(rowData);
+    }
+    
+    return jsonResponse({
+      status: "success",
+      action: "tasks_synced",
+      username: username,
+      message: "Daftar task berhasil disinkronkan ke Spreadsheet."
+    });
   }
 
   return null;

@@ -272,5 +272,59 @@ void main() {
       expect(prefs.getString(keyUser1), isNotNull);
       expect(prefs.getString(keyUser1)!.contains('Task Budi'), isTrue);
     });
+
+    test('Commitment warning preference toggle can be saved and retrieved per user', () async {
+      expect(await SeriousModeService.isHideCommitmentWarning('usr_test'), isFalse);
+      await SeriousModeService.setHideCommitmentWarning(true, 'usr_test');
+      expect(await SeriousModeService.isHideCommitmentWarning('usr_test'), isTrue);
+      // Other user still false
+      expect(await SeriousModeService.isHideCommitmentWarning('usr_other'), isFalse);
+    });
+
+    test('Login with existing user preserves spreadsheet points when local groups is empty', () async {
+      final user = SeriousUser(
+        id: 'usr_chandra',
+        username: 'chandra',
+        password: '123',
+        displayName: 'Chandra',
+        totalPoints: 45,
+        totalTasksCompleted: 30,
+      );
+      await SeriousModeService.saveCurrentUser(user);
+
+      // Calling recalculate with empty groups must NOT reset points to 0
+      await SeriousModeService.recalculateAndSyncUserProgress([], targetUser: user);
+      final refreshed = await SeriousModeService.getCurrentUser();
+      expect(refreshed?.totalPoints, 45);
+      expect(refreshed?.totalTasksCompleted, 30);
+    });
+
+    test('findExistingUserTodoData reliably recovers tasks across legacy or username keys', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final user = SeriousUser(
+        id: 'usr_999',
+        username: 'player_one',
+        password: '123',
+        displayName: 'Player One',
+      );
+
+      // Save under legacy key
+      await prefs.setString(SeriousModeService.prefKeySeriousTodoGroups, '[{"id":"legacy_group"}]');
+      final found1 = await SeriousModeService.findExistingUserTodoData(prefs, user);
+      expect(found1, contains('legacy_group'));
+
+      // Save under username key
+      final userKey = SeriousModeService.getSeriousTodoGroupsKey(SeriousModeService.getUserStorageIdentifier(user));
+      await prefs.setString(userKey, '[{"id":"user_group"}]');
+      final found2 = await SeriousModeService.findExistingUserTodoData(prefs, user);
+      expect(found2, contains('user_group'));
+    });
+
+    test('Apps Script template code provides get_serious_tasks and sync_serious_tasks', () {
+      final code = SeriousModeService.getSeriousModeAppsScriptCode();
+      expect(code, contains('get_serious_tasks'));
+      expect(code, contains('sync_serious_tasks'));
+      expect(code, contains('Tasks_Mode_Serius'));
+    });
   });
 }

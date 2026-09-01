@@ -46,7 +46,9 @@ class _TodoPageState extends State<TodoPage> {
 
   String get _prefsKey {
     if (_isSeriousMode && _seriousUser != null) {
-      return SeriousModeService.getSeriousTodoGroupsKey(_seriousUser!.id);
+      return SeriousModeService.getSeriousTodoGroupsKey(
+        SeriousModeService.getUserStorageIdentifier(_seriousUser),
+      );
     } else if (_isSeriousMode) {
       return _prefsKeySerious;
     }
@@ -125,13 +127,15 @@ class _TodoPageState extends State<TodoPage> {
       _isSeriousMode = await SeriousModeService.isSeriousModeActive();
       _seriousUser = await SeriousModeService.getCurrentUser();
 
-      // Legacy migration: Jika Mode Serius aktif untuk user ini tapi key user belum ada sedangkan key legacy ada
+      // Pemulihan data lokal multi-akun: pastikan data user ditemukan dari berbagai key yang pernah dipakai
       if (_isSeriousMode && _seriousUser != null) {
-        final userKey = SeriousModeService.getSeriousTodoGroupsKey(_seriousUser!.id);
-        if (!prefs.containsKey(userKey) && prefs.containsKey(_prefsKeySerious)) {
-          final legacyData = prefs.getString(_prefsKeySerious);
-          if (legacyData != null && legacyData.isNotEmpty) {
-            await prefs.setString(userKey, legacyData);
+        final userKey = SeriousModeService.getSeriousTodoGroupsKey(
+          SeriousModeService.getUserStorageIdentifier(_seriousUser),
+        );
+        if (!prefs.containsKey(userKey)) {
+          final existingData = await SeriousModeService.findExistingUserTodoData(prefs, _seriousUser!);
+          if (existingData != null && existingData.isNotEmpty) {
+            await prefs.setString(userKey, existingData);
           }
         }
       }
@@ -151,6 +155,17 @@ class _TodoPageState extends State<TodoPage> {
         }
       } else {
         _dateGroups = [];
+      }
+
+      // Jika _dateGroups kosong pada Mode Serius (misal HP baru yang baru login),
+      // coba ambil daftar tugas dari cloud spreadsheet
+      if (_isSeriousMode && _seriousUser != null && _dateGroups.isEmpty) {
+        final remoteGroups = await SeriousModeService.fetchUserTasksFromSpreadsheet(_seriousUser!.username);
+        if (remoteGroups.isNotEmpty) {
+          _dateGroups = remoteGroups;
+          final String encoded = jsonEncode(_dateGroups.map((g) => g.toJson()).toList());
+          await prefs.setString(currentKey, encoded);
+        }
       }
 
       if (_isSeriousMode && _seriousUser != null) {
@@ -182,6 +197,8 @@ class _TodoPageState extends State<TodoPage> {
       if (_isSeriousMode) {
         await SeriousModeService.recalculateAndSyncUserProgress(_dateGroups, targetUser: _seriousUser);
         _seriousUser = await SeriousModeService.getCurrentUser();
+        // Sinkronisasi daftar task ke cloud spreadsheet di background secara non-blocking
+        SeriousModeService.scheduleTasksCloudSync(_seriousUser, _dateGroups);
         if (mounted) {
           setState(() {});
         }

@@ -41,16 +41,21 @@ class SeriousUser {
       };
 
   factory SeriousUser.fromJson(Map<String, dynamic> json) {
+    final rawUsername = (json['username'] ?? '').toString().trim();
+    final rawId = (json['id'] ?? '').toString().trim();
+    final stableId = rawId.isNotEmpty
+        ? rawId
+        : (rawUsername.isNotEmpty ? 'usr_${rawUsername.toLowerCase()}' : 'usr_player');
+
     return SeriousUser(
-      id: json['id'] as String? ??
-          DateTime.now().microsecondsSinceEpoch.toString(),
-      username: json['username'] as String? ?? '',
-      password: json['password'] as String? ?? '',
-      displayName: json['displayName'] as String? ??
-          json['username'] as String? ??
-          'Player',
+      id: stableId,
+      username: rawUsername,
+      password: (json['password'] ?? '').toString(),
+      displayName: (json['displayName'] ?? '').toString().isNotEmpty
+          ? json['displayName'].toString()
+          : (rawUsername.isNotEmpty ? rawUsername : 'Player'),
       avatarBase64: json['avatarBase64'] as String?,
-      avatarIndex: json['avatarIndex'] as int? ?? 0,
+      avatarIndex: (json['avatarIndex'] as num?)?.toInt() ?? 0,
       totalPoints: (json['totalPoints'] as num?)?.toInt() ?? 0,
       totalTasksCompleted:
           (json['totalTasksCompleted'] as num?)?.toInt() ?? 0,
