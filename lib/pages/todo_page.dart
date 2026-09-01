@@ -30,7 +30,19 @@ class TodoPage extends StatefulWidget {
   State<TodoPage> createState() => _TodoPageState();
 }
 
-class _TodoPageState extends State<TodoPage> {
+class _TodoUndoAction {
+  final String title;
+  final String subtitle;
+  final VoidCallback onUndo;
+
+  _TodoUndoAction({
+    required this.title,
+    required this.subtitle,
+    required this.onUndo,
+  });
+}
+
+class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
   static const Color primaryTerracotta = Color(0xFFBA5A3A);
   static const Color darkTerracotta = Color(0xFF8C3E26);
   static const Color accentCompleted = Color(0xFF2E7D32);
@@ -65,6 +77,10 @@ class _TodoPageState extends State<TodoPage> {
   SeriousUser? _seriousUser;
   bool _isManualSyncing = false;
 
+  // State untuk Undo Mode Biasa (5 Detik Cooldown)
+  AnimationController? _undoController;
+  _TodoUndoAction? _activeUndo;
+
   @override
   void initState() {
     super.initState();
@@ -75,6 +91,7 @@ class _TodoPageState extends State<TodoPage> {
   @override
   void dispose() {
     TodoAlarmService.activeAlarmNotifier.removeListener(_onActiveAlarmChanged);
+    _undoController?.dispose();
     super.dispose();
   }
 
@@ -236,6 +253,7 @@ class _TodoPageState extends State<TodoPage> {
   }
 
   Future<void> _handleOpenSeriousMode() async {
+    _dismissUndo();
     final curUser = await SeriousModeService.getCurrentUser();
     if (!mounted) return;
     if (curUser == null) {
@@ -297,7 +315,7 @@ class _TodoPageState extends State<TodoPage> {
           ),
         );
       } catch (_) {
-        final idx = (user?.avatarIndex ?? 0)
+        final idx = user.avatarIndex
             .clamp(0, SeriousModeAuthDialog.presetAvatars.length - 1);
         avatarContent = Text(
           SeriousModeAuthDialog.presetAvatars[idx]['emoji'] as String,
@@ -409,6 +427,7 @@ class _TodoPageState extends State<TodoPage> {
     );
 
     if (confirm == true) {
+      _dismissUndo();
       await SeriousModeService.setSeriousModeActive(false);
       if (mounted) {
         setState(() {
@@ -1584,6 +1603,271 @@ class _TodoPageState extends State<TodoPage> {
     _saveTodoData();
   }
 
+  // --- UNDO HELPER METHODS (MODE BIASA) ---
+  void _showTopUndoBanner({
+    required String title,
+    required String subtitle,
+    required VoidCallback onUndo,
+  }) {
+    if (_isSeriousMode) return;
+
+    _undoController?.stop();
+    _undoController?.dispose();
+
+    _undoController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 5),
+    );
+
+    _undoController!.addListener(() {
+      if (mounted) setState(() {});
+    });
+
+    _undoController!.addStatusListener((status) {
+      if (status == AnimationStatus.completed && mounted) {
+        _dismissUndo();
+      }
+    });
+
+    setState(() {
+      _activeUndo = _TodoUndoAction(
+        title: title,
+        subtitle: subtitle,
+        onUndo: onUndo,
+      );
+    });
+
+    _undoController!.forward(from: 0.0);
+  }
+
+  void _dismissUndo() {
+    _undoController?.stop();
+    if (mounted) {
+      setState(() {
+        _activeUndo = null;
+      });
+    }
+  }
+
+  void _handleUndo() {
+    final action = _activeUndo;
+    _dismissUndo();
+    if (action != null) {
+      HapticFeedback.mediumImpact();
+      action.onUndo();
+    }
+  }
+
+  Widget _buildTopUndoBanner() {
+    if (_activeUndo == null || _undoController == null) {
+      return const SizedBox.shrink();
+    }
+
+    final remainingProgress =
+        (1.0 - _undoController!.value).clamp(0.0, 1.0);
+    final remainingSeconds =
+        (remainingProgress * 5).ceil().clamp(1, 5);
+
+    return Material(
+      color: Colors.transparent,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, -0.8),
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(
+            parent: _undoController!,
+            curve: const Interval(0.0, 0.08, curve: Curves.easeOutCubic),
+          ),
+        ),
+        child: FadeTransition(
+          opacity: Tween<double>(begin: 0.0, end: 1.0).animate(
+            CurvedAnimation(
+              parent: _undoController!,
+              curve: const Interval(0.0, 0.06, curve: Curves.easeIn),
+            ),
+          ),
+          child: GestureDetector(
+            onVerticalDragUpdate: (details) {
+              if (details.primaryDelta != null && details.primaryDelta! < -4) {
+                _dismissUndo();
+              }
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF1E293B),
+                    Color(0xFF0F172A),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: primaryTerracotta.withValues(alpha: 0.6),
+                  width: 1.4,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.4),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
+                  ),
+                  BoxShadow(
+                    color: primaryTerracotta.withValues(alpha: 0.18),
+                    blurRadius: 12,
+                    spreadRadius: -2,
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(15),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+                      child: Row(
+                        children: [
+                          // Icon badge with animated timer
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: primaryTerracotta.withValues(alpha: 0.2),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: primaryTerracotta.withValues(alpha: 0.45),
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.delete_outline_rounded,
+                              color: Color(0xFFFF8A65),
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Text info
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        _activeUndo!.title,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.2,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 1.5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: primaryTerracotta.withValues(alpha: 0.35),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        '${remainingSeconds}s',
+                                        style: const TextStyle(
+                                          color: Color(0xFFFFCC80),
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (_activeUndo!.subtitle.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _activeUndo!.subtitle,
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.75),
+                                      fontSize: 11.5,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Action Undo button
+                          ElevatedButton.icon(
+                            onPressed: _handleUndo,
+                            icon: const Icon(Icons.undo_rounded, size: 15),
+                            label: const Text(
+                              'BATALKAN',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryTerracotta,
+                              foregroundColor: Colors.white,
+                              elevation: 2,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          // Dismiss button
+                          InkWell(
+                            onTap: _dismissUndo,
+                            borderRadius: BorderRadius.circular(12),
+                            child: Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: Icon(
+                                Icons.close_rounded,
+                                size: 16,
+                                color: Colors.white.withValues(alpha: 0.5),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Linear Cooldown Progress bar
+                    LinearProgressIndicator(
+                      value: remainingProgress,
+                      minHeight: 3,
+                      backgroundColor: Colors.white.withValues(alpha: 0.08),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Color(0xFFFF8A65),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _deleteTask(TodoDateGroup group, TodoItem item) {
     if (_isSeriousMode) {
       CustomToast.showError(
@@ -1593,6 +1877,12 @@ class _TodoPageState extends State<TodoPage> {
       );
       return;
     }
+
+    final int originalIndex = group.items.indexOf(item);
+    final TodoItem deletedItem = item;
+    final String groupId = group.id;
+
+    HapticFeedback.selectionClick();
     setState(() {
       group.items.removeWhere((i) => i.id == item.id);
     });
@@ -1604,7 +1894,32 @@ class _TodoPageState extends State<TodoPage> {
       }
     }
     _saveTodoData();
-    _showToast(context, 'Tugas berhasil dihapus');
+
+    _showTopUndoBanner(
+      title: 'Tugas Dihapus',
+      subtitle: deletedItem.title,
+      onUndo: () {
+        final targetGroup = _dateGroups.firstWhere(
+          (g) => g.id == groupId,
+          orElse: () => group,
+        );
+        final insertIndex = (originalIndex >= 0 && originalIndex <= targetGroup.items.length)
+            ? originalIndex
+            : targetGroup.items.length;
+        setState(() {
+          targetGroup.items.insert(insertIndex, deletedItem);
+        });
+        if (targetGroup.reminderEnabled) {
+          TodoAlarmService.scheduleGroupAlarm(targetGroup);
+        }
+        _saveTodoData();
+        CustomToast.showSuccess(
+          context,
+          title: 'Tugas Dikembalikan',
+          subtitle: deletedItem.title,
+        );
+      },
+    );
   }
 
   Future<void> _confirmDeleteGroup(TodoDateGroup group) async {
@@ -1680,14 +1995,38 @@ class _TodoPageState extends State<TodoPage> {
     );
 
     if (confirm == true) {
+      final int originalIndex = _dateGroups.indexOf(group);
+      final TodoDateGroup deletedGroup = group;
+
       TodoAlarmService.cancelGroupAlarm(group.id);
       setState(() {
         _dateGroups.removeWhere((g) => g.id == group.id);
       });
       _saveTodoData();
-      if (mounted) {
-        _showToast(context, 'Section berhasil dihapus');
-      }
+
+      _showTopUndoBanner(
+        title: 'Section Dihapus',
+        subtitle: '${deletedGroup.formattedFullDate} (${deletedGroup.totalCount} tugas)',
+        onUndo: () {
+          final insertIndex = (originalIndex >= 0 && originalIndex <= _dateGroups.length)
+              ? originalIndex
+              : _dateGroups.length;
+          setState(() {
+            _dateGroups.insert(insertIndex, deletedGroup);
+          });
+          if (deletedGroup.reminderEnabled &&
+              !deletedGroup.isAllCompleted &&
+              deletedGroup.items.isNotEmpty) {
+            TodoAlarmService.scheduleGroupAlarm(deletedGroup);
+          }
+          _saveTodoData();
+          CustomToast.showSuccess(
+            context,
+            title: 'Section Dikembalikan',
+            subtitle: deletedGroup.formattedFullDate,
+          );
+        },
+      );
     }
   }
 
@@ -1837,156 +2176,172 @@ class _TodoPageState extends State<TodoPage> {
               child: CircularProgressIndicator(
                   color: _isSeriousMode ? seriousGold : primaryTerracotta),
             )
-          : RefreshIndicator(
-              onRefresh: _loadTodoData,
-              color: _isSeriousMode ? seriousGold : primaryTerracotta,
-              child: ResponsiveContentWrapper(
-                maxWidth: 720,
-                child: CustomScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(
-                    parent: BouncingScrollPhysics(),
-                  ),
-                  slivers: [
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                      sliver: SliverToBoxAdapter(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildHeaderBanner(),
-                            const SizedBox(height: 14),
-                            _buildSearchAndFilterBar(),
-                            const SizedBox(height: 14),
-
-                            // Section Title
-                            Wrap(
-                              alignment: WrapAlignment.spaceBetween,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              spacing: 8,
-                              runSpacing: 6,
+          : Stack(
+              children: [
+                RefreshIndicator(
+                  onRefresh: _loadTodoData,
+                  color: _isSeriousMode ? seriousGold : primaryTerracotta,
+                  child: ResponsiveContentWrapper(
+                    maxWidth: 720,
+                    child: CustomScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
+                      ),
+                      slivers: [
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                          sliver: SliverToBoxAdapter(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  _isSeriousMode
-                                      ? 'Misi & Target Harian'
-                                      : 'Daftar Rencana & Tugas',
-                                  style: TextStyle(
-                                    fontSize: 15.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: _isSeriousMode
-                                        ? Colors.white
-                                        : const Color(0xFF1E293B),
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: (_isSeriousMode
-                                            ? seriousGold
-                                            : primaryTerracotta)
-                                        .withValues(alpha: 0.15),
-                                    borderRadius:
-                                        BorderRadius.circular(10),
-                                  ),
-                                  child: Text(
-                                    '${_activeDateGroups.length} Hari',
-                                    style: TextStyle(
-                                      color: _isSeriousMode
-                                          ? seriousGold
-                                          : primaryTerracotta,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                if (filtered.length > 1)
-                                  const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.drag_indicator_rounded,
-                                        size: 14,
-                                        color: Color(0xFF94A3B8),
+                                _buildHeaderBanner(),
+                                const SizedBox(height: 14),
+                                _buildSearchAndFilterBar(),
+                                const SizedBox(height: 14),
+
+                                // Section Title
+                                Wrap(
+                                  alignment: WrapAlignment.spaceBetween,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 8,
+                                  runSpacing: 6,
+                                  children: [
+                                    Text(
+                                      _isSeriousMode
+                                          ? 'Misi & Target Harian'
+                                          : 'Daftar Rencana & Tugas',
+                                      style: TextStyle(
+                                        fontSize: 15.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: _isSeriousMode
+                                            ? Colors.white
+                                            : const Color(0xFF1E293B),
                                       ),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'Tahan & Geser',
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: (_isSeriousMode
+                                                ? seriousGold
+                                                : primaryTerracotta)
+                                            .withValues(alpha: 0.15),
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        '${_activeDateGroups.length} Hari',
                                         style: TextStyle(
+                                          color: _isSeriousMode
+                                              ? seriousGold
+                                              : primaryTerracotta,
                                           fontSize: 11,
-                                          color: Color(0xFF94A3B8),
-                                          fontWeight: FontWeight.w500,
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                    if (filtered.length > 1)
+                                      const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.drag_indicator_rounded,
+                                            size: 14,
+                                            color: Color(0xFF94A3B8),
+                                          ),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'Tahan & Geser',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Color(0xFF94A3B8),
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 8),
                               ],
                             ),
-
-                            const SizedBox(height: 8),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
 
-                    // REORDERABLE LIST OF DATE SECTIONS
-                    if (filtered.isEmpty)
-                      SliverPadding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        sliver: SliverToBoxAdapter(
-                          child: _buildEmptyState(),
-                        ),
-                      )
-                    else
-                      SliverPadding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        sliver: SliverReorderableList(
-                          itemCount: filtered.length,
-                          // ignore: deprecated_member_use
-                          onReorder: _onReorderGroups,
-                          proxyDecorator:
-                              (Widget child, int index, Animation<double> animation) {
-                            return AnimatedBuilder(
-                              animation: animation,
-                              builder: (context, _) {
-                                final elevation = 4.0 + 8.0 * animation.value;
-                                return Material(
-                                  color: Colors.transparent,
-                                  elevation: elevation,
-                                  shadowColor: Colors.black38,
-                                  borderRadius: BorderRadius.circular(20),
-                                  child: child,
+                        // REORDERABLE LIST OF DATE SECTIONS
+                        if (filtered.isEmpty)
+                          SliverPadding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            sliver: SliverToBoxAdapter(
+                              child: _buildEmptyState(),
+                            ),
+                          )
+                        else
+                          SliverPadding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            sliver: SliverReorderableList(
+                              itemCount: filtered.length,
+                              // ignore: deprecated_member_use
+                              onReorder: _onReorderGroups,
+                              proxyDecorator:
+                                  (Widget child, int index, Animation<double> animation) {
+                                return AnimatedBuilder(
+                                  animation: animation,
+                                  builder: (context, _) {
+                                    final elevation = 4.0 + 8.0 * animation.value;
+                                    return Material(
+                                      color: Colors.transparent,
+                                      elevation: elevation,
+                                      shadowColor: Colors.black38,
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: child,
+                                    );
+                                  },
                                 );
                               },
-                            );
-                          },
-                          itemBuilder: (context, index) {
-                            final group = filtered[index];
-                            return ReorderableDelayedDragStartListener(
-                              key: ValueKey(group.id),
-                              index: index,
-                              child: _buildDateGroupSection(group, index),
-                            );
-                          },
-                        ),
-                      ),
+                              itemBuilder: (context, index) {
+                                final group = filtered[index];
+                                return ReorderableDelayedDragStartListener(
+                                  key: ValueKey(group.id),
+                                  index: index,
+                                  child: _buildDateGroupSection(group, index),
+                                );
+                              },
+                            ),
+                          ),
 
-                    // FOOTER / ADD BUTTON
-                    if (filtered.isNotEmpty)
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
-                        sliver: SliverToBoxAdapter(
-                          child: _buildAddNewSectionButton(),
-                        ),
-                      ),
+                        // FOOTER / ADD BUTTON
+                        if (filtered.isNotEmpty)
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
+                            sliver: SliverToBoxAdapter(
+                              child: _buildAddNewSectionButton(),
+                            ),
+                          ),
 
-                    const SliverToBoxAdapter(
-                      child: SizedBox(height: 100),
+                        const SliverToBoxAdapter(
+                          child: SizedBox(height: 100),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+                if (!_isSeriousMode && _activeUndo != null)
+                  Positioned(
+                    top: 10,
+                    left: 16,
+                    right: 16,
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 580),
+                        child: _buildTopUndoBanner(),
+                      ),
+                    ),
+                  ),
+              ],
             ),
     );
   }
@@ -2945,10 +3300,36 @@ class _TodoPageState extends State<TodoPage> {
                             TodoAlarmService.cancelGroupAlarm(group.id);
                             _saveTodoData();
                           } else if (val == 'clear_completed') {
+                            final completedItems = group.items.where((i) => i.isCompleted).toList();
+                            if (completedItems.isEmpty) return;
+
+                            final allOriginalItems = List<TodoItem>.from(group.items);
+                            final groupId = group.id;
+
                             setState(() {
                               group.items.removeWhere((i) => i.isCompleted);
                             });
                             _saveTodoData();
+
+                            _showTopUndoBanner(
+                              title: 'Tugas Selesai Dihapus',
+                              subtitle: '${completedItems.length} tugas selesai dihapus dari section',
+                              onUndo: () {
+                                final targetGroup = _dateGroups.firstWhere(
+                                  (g) => g.id == groupId,
+                                  orElse: () => group,
+                                );
+                                setState(() {
+                                  targetGroup.items = List<TodoItem>.from(allOriginalItems);
+                                });
+                                _saveTodoData();
+                                CustomToast.showSuccess(
+                                  context,
+                                  title: 'Tugas Selesai Dikembalikan',
+                                  subtitle: '${completedItems.length} tugas dipulihkan',
+                                );
+                              },
+                            );
                           } else if (val == 'delete_section') {
                             _confirmDeleteGroup(group);
                           }
@@ -2966,14 +3347,16 @@ class _TodoPageState extends State<TodoPage> {
                                       : primaryTerracotta,
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  'Tambah Tugas',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: _isSeriousMode
-                                        ? Colors.white
-                                        : const Color(0xFF1E293B),
+                                Flexible(
+                                  child: Text(
+                                    'Tambah Tugas',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: _isSeriousMode
+                                          ? Colors.white
+                                          : const Color(0xFF1E293B),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -2993,16 +3376,18 @@ class _TodoPageState extends State<TodoPage> {
                                       : primaryTerracotta,
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  group.reminderEnabled
-                                      ? 'Atur Pengingat Alarm'
-                                      : 'Nyalakan Pengingat Alarm',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: _isSeriousMode
-                                        ? Colors.white
-                                        : const Color(0xFF1E293B),
+                                Flexible(
+                                  child: Text(
+                                    group.reminderEnabled
+                                        ? 'Atur Pengingat Alarm'
+                                        : 'Nyalakan Pengingat Alarm',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: _isSeriousMode
+                                          ? Colors.white
+                                          : const Color(0xFF1E293B),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -3027,22 +3412,24 @@ class _TodoPageState extends State<TodoPage> {
                                           : const Color(0xFF94A3B8)),
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  (group.isAllCompleted &&
-                                          group.items.isNotEmpty)
-                                      ? 'Arsipkan Section'
-                                      : 'Arsipkan (Belum Selesai)',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: (group.isAllCompleted &&
+                                Flexible(
+                                  child: Text(
+                                    (group.isAllCompleted &&
                                             group.items.isNotEmpty)
-                                        ? (_isSeriousMode
-                                            ? Colors.white
-                                            : const Color(0xFF1E293B))
-                                        : (_isSeriousMode
-                                            ? Colors.white38
-                                            : const Color(0xFF94A3B8)),
+                                        ? 'Arsipkan Section'
+                                        : 'Arsipkan (Belum Selesai)',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: (group.isAllCompleted &&
+                                              group.items.isNotEmpty)
+                                          ? (_isSeriousMode
+                                              ? Colors.white
+                                              : const Color(0xFF1E293B))
+                                          : (_isSeriousMode
+                                              ? Colors.white38
+                                              : const Color(0xFF94A3B8)),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -3062,16 +3449,18 @@ class _TodoPageState extends State<TodoPage> {
                                       : const Color(0xFF64748B),
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  isCollapsed
-                                      ? 'Buka Section'
-                                      : 'Tutup Section',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: _isSeriousMode
-                                        ? Colors.white
-                                        : const Color(0xFF1E293B),
+                                Flexible(
+                                  child: Text(
+                                    isCollapsed
+                                        ? 'Buka Section'
+                                        : 'Tutup Section',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: _isSeriousMode
+                                          ? Colors.white
+                                          : const Color(0xFF1E293B),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -3090,14 +3479,16 @@ class _TodoPageState extends State<TodoPage> {
                                       : accentCompleted,
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  'Tandai Semua Selesai',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: _isSeriousMode
-                                        ? Colors.white
-                                        : const Color(0xFF1E293B),
+                                Flexible(
+                                  child: Text(
+                                    'Tandai Semua Selesai',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: _isSeriousMode
+                                          ? Colors.white
+                                          : const Color(0xFF1E293B),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -3115,14 +3506,16 @@ class _TodoPageState extends State<TodoPage> {
                                       : Colors.orange,
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  'Hapus Tugas Selesai',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: _isSeriousMode
-                                        ? Colors.white
-                                        : const Color(0xFF1E293B),
+                                Flexible(
+                                  child: Text(
+                                    'Hapus Tugas Selesai',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: _isSeriousMode
+                                          ? Colors.white
+                                          : const Color(0xFF1E293B),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -3141,14 +3534,16 @@ class _TodoPageState extends State<TodoPage> {
                                       : Colors.red,
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  'Hapus Section Ini',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: _isSeriousMode
-                                        ? seriousFire
-                                        : Colors.red,
+                                Flexible(
+                                  child: Text(
+                                    'Hapus Section Ini',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: _isSeriousMode
+                                          ? seriousFire
+                                          : Colors.red,
+                                    ),
                                   ),
                                 ),
                               ],
