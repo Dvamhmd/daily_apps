@@ -5,6 +5,7 @@ import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/utils/todo_alarm_service.dart';
 import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:daily_apps/widgets/daily_task_form_sheet.dart';
+import 'package:daily_apps/widgets/todo_mode_transition_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -433,16 +434,27 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
           ),
         ],
       ),
-      body: _isLoading
-          ? Center(
-              child: CircularProgressIndicator(
-                color: isDark ? seriousGold : primaryTerracotta,
-              ),
-            )
-          : ResponsiveContentWrapper(
-              maxWidth: 720,
-              child: RefreshIndicator(
-                onRefresh: _loadDailyTaskGroups,
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: _isLoading
+            ? TodoModeTransitionWidget(
+                key: const ValueKey('tugas_harian_loading_view'),
+                transitionType: widget.isSeriousMode
+                    ? TodoTransitionType.toSerious
+                    : TodoTransitionType.loading,
+                customTitle: widget.isSeriousMode
+                    ? 'Memuat Template Misi Serius 🔥'
+                    : 'Memuat Tugas Harian 📋',
+                customSubtitle: 'Menyiapkan preset grup aktivitas...',
+                isDarkMode: isDark,
+              )
+            : ResponsiveContentWrapper(
+                key: const ValueKey('tugas_harian_content_view'),
+                maxWidth: 720,
+                child: RefreshIndicator(
+                  onRefresh: _loadDailyTaskGroups,
                 color: isDark ? seriousGold : primaryTerracotta,
                 child: CustomScrollView(
                   physics: const AlwaysScrollableScrollPhysics(
@@ -545,6 +557,7 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
                 ),
               ),
             ),
+      ),
     );
   }
 

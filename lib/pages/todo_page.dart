@@ -13,6 +13,7 @@ import 'package:daily_apps/widgets/serious_mode_auth_dialog.dart';
 import 'package:daily_apps/widgets/serious_punishment_dialog.dart';
 import 'package:daily_apps/widgets/todo_alarm_popup_dialog.dart';
 import 'package:daily_apps/widgets/todo_alarm_setup_sheet.dart';
+import 'package:daily_apps/widgets/todo_mode_transition_overlay.dart';
 import 'package:daily_apps/widgets/todo_productivity_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -70,6 +71,9 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
   List<TodoDateGroup> _dateGroups = [];
   final Set<String> _collapsedGroupIds = {};
   bool _isLoading = true;
+  TodoTransitionType _transitionType = TodoTransitionType.loading;
+  SeriousUser? _transitionUser;
+  String? _transitionSubtitle;
   String _searchQuery = '';
   String _selectedFilter = 'all'; // 'all', 'pending', 'completed'
 
@@ -129,11 +133,33 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _loadTodoData() async {
+  Future<void> _loadTodoData({
+    TodoTransitionType? transitionType,
+    SeriousUser? transitionUser,
+    String? transitionSubtitle,
+    bool showTransition = false,
+  }) async {
+    final startTime = DateTime.now();
+    if (showTransition) {
+      if (mounted) {
+        setState(() {
+          _isLoading = true;
+          if (transitionType != null) _transitionType = transitionType;
+          _transitionUser = transitionUser ?? _seriousUser;
+          _transitionSubtitle = transitionSubtitle;
+        });
+      }
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       _isSeriousMode = await SeriousModeService.isSeriousModeActive();
       _seriousUser = await SeriousModeService.getCurrentUser();
+
+      if (_transitionType == TodoTransitionType.loading) {
+        _transitionType = _isSeriousMode
+            ? TodoTransitionType.toSerious
+            : TodoTransitionType.toNormal;
+      }
 
       // Pemulihan data lokal multi-akun: pastikan data user ditemukan dari berbagai key yang pernah dipakai
       if (_isSeriousMode && _seriousUser != null) {
@@ -186,6 +212,13 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
     } catch (e) {
       debugPrint('Error loading todos: $e');
     } finally {
+      if (showTransition) {
+        final elapsed = DateTime.now().difference(startTime).inMilliseconds;
+        const minDisplayDuration = 600;
+        if (elapsed < minDisplayDuration) {
+          await Future.delayed(Duration(milliseconds: minDisplayDuration - elapsed));
+        }
+      }
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -264,8 +297,14 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
           _seriousUser = user;
           _dateGroups = [];
           _isLoading = true;
+          _transitionType = TodoTransitionType.toSerious;
+          _transitionUser = user;
         });
-        await _loadTodoData();
+        await _loadTodoData(
+          transitionType: TodoTransitionType.toSerious,
+          transitionUser: user,
+          showTransition: true,
+        );
       }
     } else {
       await SeriousModeService.setSeriousModeActive(true);
@@ -275,13 +314,19 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
           _seriousUser = curUser;
           _dateGroups = [];
           _isLoading = true;
+          _transitionType = TodoTransitionType.toSerious;
+          _transitionUser = curUser;
         });
         CustomToast.showSuccess(
           context,
           title: 'Mode Serius Aktif 🔥',
           subtitle: 'Anti-Hapus, sistem poin & hukuman aktif',
         );
-        await _loadTodoData();
+        await _loadTodoData(
+          transitionType: TodoTransitionType.toSerious,
+          transitionUser: curUser,
+          showTransition: true,
+        );
       }
     }
   }
@@ -292,8 +337,15 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
     if (updated != null && mounted) {
       setState(() {
         _seriousUser = updated;
+        _isLoading = true;
+        _transitionType = TodoTransitionType.switchAccount;
+        _transitionUser = updated;
       });
-      await _loadTodoData();
+      await _loadTodoData(
+        transitionType: TodoTransitionType.switchAccount,
+        transitionUser: updated,
+        showTransition: true,
+      );
     }
   }
 
@@ -435,13 +487,18 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
           _seriousUser = null;
           _dateGroups = [];
           _isLoading = true;
+          _transitionType = TodoTransitionType.toNormal;
+          _transitionUser = null;
         });
         CustomToast.showInfo(
           context,
           title: 'Mode Normal',
           subtitle: 'Beralih ke To-Do List Mode Normal',
         );
-        _loadTodoData();
+        _loadTodoData(
+          transitionType: TodoTransitionType.toNormal,
+          showTransition: true,
+        );
       }
     }
   }
@@ -2081,7 +2138,26 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
         onOpenSeriousMode: _handleOpenSeriousMode,
         onExitSeriousMode: _handleExitSeriousMode,
         onDataChanged: () async {
-          await _loadTodoData();
+          final isSerious = await SeriousModeService.isSeriousModeActive();
+          final user = await SeriousModeService.getCurrentUser();
+          if (mounted) {
+            setState(() {
+              _isSeriousMode = isSerious;
+              _seriousUser = user;
+              _transitionType = isSerious
+                  ? TodoTransitionType.switchAccount
+                  : TodoTransitionType.toNormal;
+              _transitionUser = user;
+              _isLoading = true;
+            });
+            await _loadTodoData(
+              transitionType: isSerious
+                  ? TodoTransitionType.switchAccount
+                  : TodoTransitionType.toNormal,
+              transitionUser: user,
+              showTransition: true,
+            );
+          }
         },
       ),
       appBar: AppBar(
@@ -2171,17 +2247,25 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
         currentIndex: 2,
         onPageSelected: widget.onPageSelected,
       ),
-      body: _isLoading
-          ? Center(
-              child: CircularProgressIndicator(
-                  color: _isSeriousMode ? seriousGold : primaryTerracotta),
-            )
-          : Stack(
-              children: [
-                RefreshIndicator(
-                  onRefresh: _loadTodoData,
-                  color: _isSeriousMode ? seriousGold : primaryTerracotta,
-                  child: ResponsiveContentWrapper(
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 320),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: _isLoading
+            ? TodoModeTransitionWidget(
+                key: const ValueKey('todo_transition_loading_view'),
+                transitionType: _transitionType,
+                user: _transitionUser ?? _seriousUser,
+                customSubtitle: _transitionSubtitle,
+                isDarkMode: _isSeriousMode,
+              )
+            : Stack(
+                key: const ValueKey('todo_main_content_view'),
+                children: [
+                  RefreshIndicator(
+                    onRefresh: _loadTodoData,
+                    color: _isSeriousMode ? seriousGold : primaryTerracotta,
+                    child: ResponsiveContentWrapper(
                     maxWidth: 720,
                     child: CustomScrollView(
                       physics: const AlwaysScrollableScrollPhysics(
@@ -2343,6 +2427,7 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                   ),
               ],
             ),
+      ),
     );
   }
 

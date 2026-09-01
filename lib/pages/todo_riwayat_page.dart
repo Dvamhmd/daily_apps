@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:daily_apps/models/model_todo.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/widgets/custom_toast.dart';
+import 'package:daily_apps/widgets/todo_mode_transition_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -336,16 +337,27 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
             ),
         ],
       ),
-      body: _isLoading
-          ? Center(
-              child: CircularProgressIndicator(
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: _isLoading
+            ? TodoModeTransitionWidget(
+                key: const ValueKey('todo_riwayat_loading_view'),
+                transitionType: widget.isSeriousMode
+                    ? TodoTransitionType.toSerious
+                    : TodoTransitionType.loading,
+                customTitle: widget.isSeriousMode
+                    ? 'Memuat Riwayat Misi Serius 🔥'
+                    : 'Memuat Riwayat Tugas 📜',
+                customSubtitle: 'Mengambil arsip tugas selesai...',
+                isDarkMode: isDark,
+              )
+            : RefreshIndicator(
+                key: const ValueKey('todo_riwayat_content_view'),
+                onRefresh: _loadData,
                 color: isDark ? seriousGold : primaryTerracotta,
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              color: isDark ? seriousGold : primaryTerracotta,
-              child: ResponsiveContentWrapper(
+                child: ResponsiveContentWrapper(
                 maxWidth: 720,
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(
@@ -528,6 +540,7 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                 ),
               ),
             ),
+      ),
     );
   }
 

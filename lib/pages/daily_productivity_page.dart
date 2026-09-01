@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:daily_apps/models/model_todo.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/utils/serious_mode_service.dart';
+import 'package:daily_apps/widgets/todo_mode_transition_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -340,16 +341,27 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
           ],
         ),
       ),
-      body: _isLoading
-          ? Center(
-              child: CircularProgressIndicator(
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: _isLoading
+            ? TodoModeTransitionWidget(
+                key: const ValueKey('daily_productivity_loading_view'),
+                transitionType: widget.isSeriousMode
+                    ? TodoTransitionType.toSerious
+                    : TodoTransitionType.loading,
+                customTitle: widget.isSeriousMode
+                    ? 'Memuat Activity Serius 🔥'
+                    : 'Memuat Activity 📊',
+                customSubtitle: 'Menghitung statistik & kalender produktivitas...',
+                isDarkMode: isDark,
+              )
+            : RefreshIndicator(
+                key: const ValueKey('daily_productivity_content_view'),
+                onRefresh: _loadAllTodoData,
                 color: isDark ? seriousGold : primaryTerracotta,
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: _loadAllTodoData,
-              color: isDark ? seriousGold : primaryTerracotta,
-              child: ResponsiveContentWrapper(
+                child: ResponsiveContentWrapper(
                 maxWidth: 680,
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(
@@ -378,6 +390,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                 ),
               ),
             ),
+      ),
     );
   }
 

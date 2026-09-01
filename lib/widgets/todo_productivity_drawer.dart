@@ -242,12 +242,9 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
                               'Ganti akun, buat pemain baru atau lihat profil',
                           onTap: () async {
                             Navigator.pop(context);
-                            final updated =
-                                await SeriousModeAuthDialog.show(context);
-                            if (updated != null) {
-                              widget.onDataChanged?.call();
-                              _loadAllTodoData();
-                            }
+                            await SeriousModeAuthDialog.show(context);
+                            widget.onDataChanged?.call();
+                            _loadAllTodoData();
                           },
                         ),
                       ] else ...[
