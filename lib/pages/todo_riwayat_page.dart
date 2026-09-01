@@ -27,14 +27,7 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
   static const Color seriousCardBg = Color(0xFF1E293B);
   static const Color seriousCardBorder = Color(0xFF334155);
   static const Color seriousGold = Color(0xFFF59E0B);
-  static const Color seriousFire = Color(0xFFEF4444);
   static const Color accentCompleted = Color(0xFF2E7D32);
-
-  static const String _prefsKeyNormal = SeriousModeService.prefKeyNormalTodoGroups;
-  static const String _prefsKeySerious = SeriousModeService.prefKeySeriousTodoGroups;
-
-  String get _prefsKey =>
-      widget.isSeriousMode ? _prefsKeySerious : _prefsKeyNormal;
 
   List<TodoDateGroup> _allGroups = [];
   final Set<String> _collapsedGroupIds = {};

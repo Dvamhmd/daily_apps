@@ -145,9 +145,9 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogCtx) {
         return StatefulBuilder(
-          builder: (context, setLocalState) {
+          builder: (dialogCtx, setLocalState) {
             return AlertDialog(
               scrollable: true,
               shape: RoundedRectangleBorder(
@@ -283,9 +283,8 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                     ),
                   ),
                   onPressed: () async {
-                    final cleanTarget =
-                        targetCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
-                    final newTarget = int.tryParse(cleanTarget) ?? 0;
+                    final newTarget = RupiahFormatter.parse(targetCtrl.text);
+                    Navigator.pop(dialogCtx);
 
                     final prefs = await SharedPreferences.getInstance();
                     await prefs.setInt('target_amount', newTarget);
@@ -296,13 +295,14 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                       await prefs.remove('target_date');
                     }
 
-                    setState(() {
-                      _localTargetAmount = newTarget;
-                      _localTargetDate = tempTargetDate;
-                    });
+                    if (mounted) {
+                      setState(() {
+                        _localTargetAmount = newTarget;
+                        _localTargetDate = tempTargetDate;
+                      });
+                    }
 
                     widget.onChanged();
-                    if (mounted) Navigator.pop(context);
                   },
                   child: const Text('Simpan'),
                 ),

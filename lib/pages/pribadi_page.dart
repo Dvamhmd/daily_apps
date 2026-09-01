@@ -986,12 +986,12 @@ class _PribadiPageState extends State<PribadiPage> {
                     final parseRes =
                         CustomRuleImportHelper.parseExcelBytes(bytes);
                     if (parseRes.isSuccess && parseRes.rules.isNotEmpty) {
+                      if (!dlgCtx.mounted) return;
+                      Navigator.pop(dlgCtx);
                       _data.customKodeRules.addAll(parseRes.rules);
                       await _saveData();
-                      setModalState(() {});
-                      setState(() {});
                       if (mounted) {
-                        Navigator.pop(dlgCtx);
+                        setState(() {});
                         CustomToast.showSuccess(
                           context,
                           title: 'Impor Berhasil',
@@ -1024,12 +1024,11 @@ class _PribadiPageState extends State<PribadiPage> {
               if (raw.isEmpty) return;
               final parseRes = CustomRuleImportHelper.parseText(raw);
               if (parseRes.isSuccess && parseRes.rules.isNotEmpty) {
+                Navigator.pop(dlgCtx);
                 _data.customKodeRules.addAll(parseRes.rules);
                 await _saveData();
-                setModalState(() {});
-                setState(() {});
                 if (mounted) {
-                  Navigator.pop(dlgCtx);
+                  setState(() {});
                   CustomToast.showSuccess(
                     context,
                     title: 'Impor Berhasil',
@@ -1489,10 +1488,10 @@ class _PribadiPageState extends State<PribadiPage> {
                           );
 
                           _data.transactions.add(tx);
+                          Navigator.pop(ctx);
                           await _saveData();
                           if (mounted) {
                             setState(() {});
-                            Navigator.of(context).pop();
                           }
                         },
                         style: ElevatedButton.styleFrom(
@@ -2031,10 +2030,10 @@ class _PribadiPageState extends State<PribadiPage> {
                           );
 
                           _data.transactions.add(tx);
+                          Navigator.pop(ctx);
                           await _saveData();
                           if (mounted) {
                             setState(() {});
-                            Navigator.of(context).pop();
                           }
                         },
                         style: ElevatedButton.styleFrom(
@@ -2367,10 +2366,10 @@ class _PribadiPageState extends State<PribadiPage> {
                           );
 
                           _data.transactions.add(tx);
+                          Navigator.pop(ctx);
                           await _saveData();
                           if (mounted) {
                             setState(() {});
-                            Navigator.of(context).pop();
                           }
                         },
                         style: ElevatedButton.styleFrom(
@@ -3879,9 +3878,9 @@ class _PribadiPageState extends State<PribadiPage> {
                   );
                 }
 
+                Navigator.pop(ctx);
                 await _saveData();
                 if (mounted) {
-                  Navigator.pop(ctx);
                   onSaved?.call();
                 }
               },

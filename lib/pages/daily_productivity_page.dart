@@ -141,12 +141,6 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
   static const Color seriousGold = Color(0xFFF59E0B);
   static const Color seriousBorder = Color(0xFF334155);
 
-  static const String _prefsKeyNormal = SeriousModeService.prefKeyNormalTodoGroups;
-  static const String _prefsKeySerious = SeriousModeService.prefKeySeriousTodoGroups;
-
-  String get _prefsKey =>
-      widget.isSeriousMode ? _prefsKeySerious : _prefsKeyNormal;
-
   late DateTime _selectedMonth;
   DateTime? _selectedDateDetail;
   List<TodoDateGroup> _allGroups = [];

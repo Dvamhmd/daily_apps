@@ -627,7 +627,7 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return StatefulBuilder(
-          builder: (context, setModalState) {
+          builder: (sheetCtx, setModalState) {
             final now = DateTime.now();
             final isDateToday = selectedDate.year == now.year &&
                 selectedDate.month == now.month &&
@@ -636,7 +636,7 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
 
             return Padding(
               padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
+                bottom: MediaQuery.of(sheetCtx).viewInsets.bottom,
               ),
               child: Container(
                 decoration: BoxDecoration(
@@ -983,10 +983,10 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                                   if (val) {
                                     await TodoAlarmService
                                         .requestOverlayPermissionWithDialog(
-                                            context);
-                                    if (!context.mounted) return;
+                                            sheetCtx);
+                                    if (!sheetCtx.mounted) return;
                                     final res = await TodoAlarmSetupSheet.show(
-                                      context,
+                                      sheetCtx,
                                       initialConfig: alarmConfig,
                                       dateTitle: TodoDateGroup(
                                         id: '',
@@ -999,9 +999,9 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                                         alarmConfig = res;
                                         alarmConfig.enabled = true;
                                       });
-                                      if (context.mounted) {
+                                      if (sheetCtx.mounted) {
                                         _showToast(
-                                            context, 'Berhasil atur pengingat');
+                                            sheetCtx, 'Berhasil atur pengingat');
                                       }
                                     }
                                   } else {
@@ -1043,7 +1043,7 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                                 TextButton.icon(
                                   onPressed: () async {
                                     final res = await TodoAlarmSetupSheet.show(
-                                      context,
+                                      sheetCtx,
                                       initialConfig: alarmConfig,
                                       dateTitle: TodoDateGroup(
                                         id: '',
@@ -1056,8 +1056,8 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                                         alarmConfig = res;
                                         alarmConfig.enabled = true;
                                       });
-                                      if (context.mounted) {
-                                        _showToast(context, 'Berhasil atur pengingat');
+                                      if (sheetCtx.mounted) {
+                                        _showToast(sheetCtx, 'Berhasil atur pengingat');
                                       }
                                     }
                                   },
@@ -1138,6 +1138,7 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                                   taskTitle: taskTitle,
                                 );
                                 if (!confirmed) return;
+                                if (!mounted) return;
                               }
 
                               final existingIndex = _dateGroups.indexWhere(
@@ -1208,9 +1209,13 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                                 TodoAlarmService.scheduleGroupAlarm(targetGroup);
                               }
 
+                              if (ctx.mounted) {
+                                Navigator.pop(ctx);
+                              }
+                              if (mounted) {
+                                _showToast(context, 'To-Do List berhasil dibuat!');
+                              }
                               _saveTodoData();
-                              Navigator.pop(context);
-                              _showToast(context, 'To-Do List berhasil dibuat!');
                               HapticFeedback.mediumImpact();
                             },
                             style: ElevatedButton.styleFrom(
@@ -1464,6 +1469,7 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                               taskTitle: text,
                             );
                             if (!confirmed) return;
+                            if (!mounted) return;
                           }
 
                           setState(() {
@@ -1486,8 +1492,10 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                             TodoAlarmService.scheduleGroupAlarm(group);
                           }
 
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx);
+                          }
                           _saveTodoData();
-                          Navigator.pop(context);
                           HapticFeedback.lightImpact();
                         },
                         style: ElevatedButton.styleFrom(

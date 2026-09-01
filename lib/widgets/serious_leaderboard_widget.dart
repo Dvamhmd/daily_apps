@@ -97,32 +97,36 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
   @override
   Widget build(BuildContext context) {
     final top3 = _users.take(3).toList();
-    final remaining = _users.skip(3).toList();
+    final top10 = _users.take(10).toList();
+    final beyondTop10 = _users.length > 10 ? _users.skip(10).toList() : <SeriousUser>[];
+    
+    final myRankIndex = _users.indexWhere((u) => u.id == _currentUser?.id || u.username.toLowerCase() == _currentUser?.username.toLowerCase());
+    final isMeOutsideTop10 = _currentUser != null && myRankIndex >= 10;
+    final myUserInList = myRankIndex != -1 ? _users[myRankIndex] : _currentUser;
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
+      height: MediaQuery.of(context).size.height * 0.90,
       decoration: const BoxDecoration(
         color: darkBg,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black54,
-            blurRadius: 20,
-            offset: Offset(0, -4),
+            color: Colors.black87,
+            blurRadius: 25,
+            offset: Offset(0, -6),
           ),
         ],
       ),
       child: Column(
         children: [
-          // Drag Handle & Header
           Center(
             child: Container(
               margin: const EdgeInsets.only(top: 12, bottom: 8),
-              width: 40,
-              height: 4,
+              width: 44,
+              height: 4.5,
               decoration: BoxDecoration(
                 color: Colors.white24,
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(3),
               ),
             ),
           ),
@@ -131,32 +135,70 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(9),
                   decoration: BoxDecoration(
-                    color: accentGold.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: accentGold.withValues(alpha: 0.35),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
                   child: const Icon(Icons.emoji_events_rounded,
-                      color: accentGold, size: 24),
+                      color: Colors.black87, size: 24),
                 ),
-                const SizedBox(width: 12),
-                const Expanded(
+                const SizedBox(width: 14),
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'LEADERBOARD TOP 3',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1,
-                        ),
+                      Row(
+                        children: [
+                          const Text(
+                            'LEADERBOARD',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: accentGold.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: accentGold.withValues(alpha: 0.4),
+                                width: 1,
+                              ),
+                            ),
+                            child: const Text(
+                              'TOP 10',
+                              style: TextStyle(
+                                color: accentGold,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 2),
                       Text(
-                        'Peringkat pemain paling produktif terintegrasi',
+                        'Peringkat produktivitas pemain Mode Serius realtime',
                         style: TextStyle(
-                          color: Colors.white60,
+                          color: Colors.white.withValues(alpha: 0.6),
                           fontSize: 11.5,
                         ),
                       ),
@@ -172,7 +214,7 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
                   },
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white60),
+                  icon: const Icon(Icons.close_rounded, color: Colors.white60),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -188,133 +230,28 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
                 : (_users.isEmpty
                     ? _buildEmptyState()
                     : SingleChildScrollView(
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // PODIUM TOP 3
-                            if (top3.isNotEmpty)
+                            if (top3.isNotEmpty) ...[
                               _buildTop3Podium(top3),
+                              const SizedBox(height: 28),
+                            ],
 
-                            const SizedBox(height: 24),
+                            _buildTop10TableHeader(totalUsers: _users.length),
+                            const SizedBox(height: 12),
 
-                            // Section List Peringkat Lainnya
-                            if (remaining.isNotEmpty) ...[
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  'PESERTA LAINNYA (${remaining.length})',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF94A3B8),
-                                    letterSpacing: 0.8,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              ...remaining.asMap().entries.map((entry) {
-                                final rank = entry.key + 4;
-                                final user = entry.value;
-                                final isMe = _currentUser?.id == user.id;
+                            _buildTop10Table(top10),
 
-                                return Container(
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: isMe
-                                        ? accentGold.withValues(alpha: 0.1)
-                                        : cardBg,
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                      color: isMe ? accentGold : Colors.white10,
-                                      width: isMe ? 1.5 : 1,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Text(
-                                        '#$rank',
-                                        style: TextStyle(
-                                          color: isMe
-                                              ? accentGold
-                                              : const Color(0xFF94A3B8),
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      _buildAvatar(user, size: 36),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    user.displayName,
-                                                    style: const TextStyle(
-                                                      color: Colors.white,
-                                                      fontWeight: FontWeight.w600,
-                                                      fontSize: 13,
-                                                    ),
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                                if (isMe)
-                                                  Container(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                            horizontal: 6,
-                                                            vertical: 2),
-                                                    decoration: BoxDecoration(
-                                                      color: accentGold,
-                                                      borderRadius:
-                                                          BorderRadius.circular(6),
-                                                    ),
-                                                    child: const Text(
-                                                      'KAMU',
-                                                      style: TextStyle(
-                                                        fontSize: 9,
-                                                        fontWeight: FontWeight.bold,
-                                                        color: Colors.black,
-                                                      ),
-                                                    ),
-                                                  ),
-                                              ],
-                                            ),
-                                            Text(
-                                              '${user.totalTasksCompleted} Task Selesai',
-                                              style: const TextStyle(
-                                                color: Colors.white54,
-                                                fontSize: 11,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
-                                        children: [
-                                          Text(
-                                            '${user.totalPoints} PTS',
-                                            style: TextStyle(
-                                              color: isMe
-                                                  ? accentGold
-                                                  : Colors.white,
-                                              fontWeight: FontWeight.w800,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }),
+                            if (isMeOutsideTop10 && myUserInList != null) ...[
+                              const SizedBox(height: 16),
+                              _buildMyPinnedRankCard(myUserInList, myRankIndex + 1),
+                            ],
+
+                            if (beyondTop10.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              _buildBeyondTop10Expansion(beyondTop10),
                             ],
                           ],
                         ),
@@ -507,6 +444,547 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
           ),
         ),
       ],
+    );
+  }
+
+  /// Header Section untuk Tabel Top 10
+  Widget _buildTop10TableHeader({required int totalUsers}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B).withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF334155), width: 1),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.table_chart_rounded, color: accentGold, size: 16),
+          const SizedBox(width: 8),
+          const Text(
+            'TABEL TOP 10 PENGGUNA',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '$totalUsers Peserta Terdaftar',
+              style: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Tabel Top 10 Pemain (Menampilkan Rank, Profil, Nama Panggilan, Username, Task Selesai, Total Point)
+  Widget _buildTop10Table(List<SeriousUser> topUsers) {
+    return Container(
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF334155), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          // Header Bar Kolom Tabel
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            color: const Color(0xFF0B132B),
+            child: const Row(
+              children: [
+                SizedBox(
+                  width: 38,
+                  child: Text(
+                    'RANK',
+                    style: TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  flex: 5,
+                  child: Text(
+                    'PEMAIN & USERNAME',
+                    style: TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    'TASK',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    'POIN',
+                    textAlign: TextAlign.end,
+                    style: TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFF334155)),
+
+          // Baris-baris Data Pengguna (Rank 1 - 10)
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: topUsers.length,
+            separatorBuilder: (_, __) => const Divider(
+              height: 1,
+              color: Color(0xFF1E293B),
+              indent: 12,
+              endIndent: 12,
+            ),
+            itemBuilder: (context, index) {
+              final rank = index + 1;
+              final user = topUsers[index];
+              final isMe = _currentUser != null &&
+                  (_currentUser?.id == user.id ||
+                      _currentUser?.username.toLowerCase() ==
+                          user.username.toLowerCase());
+
+              return _buildTableRowItem(
+                rank: rank,
+                user: user,
+                isMe: isMe,
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Desain Baris Individual Tabel
+  Widget _buildTableRowItem({
+    required int rank,
+    required SeriousUser user,
+    required bool isMe,
+  }) {
+    // Styling rank medal / badge
+    Color rankColor;
+    String? medalEmoji;
+    if (rank == 1) {
+      rankColor = const Color(0xFFF59E0B);
+      medalEmoji = '🥇';
+    } else if (rank == 2) {
+      rankColor = const Color(0xFFCBD5E1);
+      medalEmoji = '🥈';
+    } else if (rank == 3) {
+      rankColor = const Color(0xFFD97706);
+      medalEmoji = '🥉';
+    } else {
+      rankColor = const Color(0xFF94A3B8);
+    }
+
+    final rowBg = isMe
+        ? accentGold.withValues(alpha: 0.12)
+        : (rank <= 3
+            ? rankColor.withValues(alpha: 0.04)
+            : Colors.transparent);
+
+    return Container(
+      color: rowBg,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9.5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // 1. RANK BADGE
+          SizedBox(
+            width: 38,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (medalEmoji != null) ...[
+                  Text(medalEmoji, style: const TextStyle(fontSize: 13)),
+                  const SizedBox(width: 2),
+                ],
+                Text(
+                  '#$rank',
+                  style: TextStyle(
+                    color: isMe ? accentGold : rankColor,
+                    fontWeight: FontWeight.w900,
+                    fontSize: rank <= 3 ? 12 : 11.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // 2. PROFIL, NAMA PANGGILAN & USERNAME
+          Expanded(
+            flex: 5,
+            child: Row(
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isMe
+                              ? accentGold
+                              : (rank <= 3 ? rankColor : Colors.white24),
+                          width: isMe ? 1.8 : 1.2,
+                        ),
+                      ),
+                      child: _buildAvatar(user, size: 34),
+                    ),
+                    if (isMe)
+                      Positioned(
+                        right: -2,
+                        bottom: -2,
+                        child: Container(
+                          padding: const EdgeInsets.all(1.5),
+                          decoration: const BoxDecoration(
+                            color: accentGold,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.star,
+                              size: 8, color: Colors.black),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              user.displayName.isNotEmpty
+                                  ? user.displayName
+                                  : user.username,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: isMe ? accentGold : Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                          ),
+                          if (isMe) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 4.5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: accentGold,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'KAMU',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 1.5),
+                      Text(
+                        '@${user.username}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // 3. TASK SELESAI
+          Expanded(
+            flex: 3,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3.5),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                  width: 0.8,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.check_circle_rounded,
+                      color: Color(0xFF10B981), size: 11),
+                  const SizedBox(width: 3.5),
+                  Flexible(
+                    child: Text(
+                      '${user.totalTasksCompleted}',
+                      style: const TextStyle(
+                        color: Color(0xFF34D399),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // 4. TOTAL POINT
+          Expanded(
+            flex: 3,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    accentGold.withValues(alpha: isMe ? 0.35 : 0.2),
+                    const Color(0xFFD97706).withValues(alpha: isMe ? 0.35 : 0.2),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: accentGold.withValues(alpha: isMe ? 0.8 : 0.4),
+                  width: 0.8,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  const Icon(Icons.bolt_rounded, color: accentGold, size: 12),
+                  const SizedBox(width: 2),
+                  Text(
+                    '${user.totalPoints}',
+                    style: TextStyle(
+                      color: isMe ? Colors.white : accentGold,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Kartu Pinned Posisi Pengguna jika Berada di Luar Top 10
+  Widget _buildMyPinnedRankCard(SeriousUser user, int myRank) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            accentGold.withValues(alpha: 0.18),
+            cardBg,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accentGold, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: accentGold.withValues(alpha: 0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+            decoration: BoxDecoration(
+              color: accentGold,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '#$myRank',
+              style: const TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.w900,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          _buildAvatar(user, size: 36),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        user.displayName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    const Text(
+                      '(Posisi Kamu)',
+                      style: TextStyle(
+                        color: accentGold,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  '@${user.username} • ${user.totalTasksCompleted} Task Selesai',
+                  style: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 10.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: accentGold.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: accentGold.withValues(alpha: 0.5)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.bolt_rounded, color: accentGold, size: 13),
+                Text(
+                  '${user.totalPoints} PTS',
+                  style: const TextStyle(
+                    color: accentGold,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Section Expandable untuk Peserta di Luar Top 10 (Rank 11+)
+  Widget _buildBeyondTop10Expansion(List<SeriousUser> remaining) {
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B).withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF334155), width: 0.8),
+        ),
+        child: ExpansionTile(
+          collapsedIconColor: const Color(0xFF94A3B8),
+          iconColor: accentGold,
+          title: Text(
+            'Lihat Peserta Lainnya (+${remaining.length} Pemain)',
+            style: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: Column(
+                children: remaining.asMap().entries.map((entry) {
+                  final rank = entry.key + 11;
+                  final user = entry.value;
+                  final isMe = _currentUser != null &&
+                      (_currentUser?.id == user.id ||
+                          _currentUser?.username.toLowerCase() ==
+                              user.username.toLowerCase());
+                  return _buildTableRowItem(
+                    rank: rank,
+                    user: user,
+                    isMe: isMe,
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

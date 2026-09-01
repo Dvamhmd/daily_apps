@@ -100,7 +100,6 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
   static const Color seriousCardBg = Color(0xFF1E293B);
   static const Color seriousCardBorder = Color(0xFF334155);
   static const Color seriousGold = Color(0xFFF59E0B);
-  static const Color seriousFire = Color(0xFFEF4444);
 
   late String _type; // 'interval' | 'specific'
   late int _intervalMinutes;

@@ -33,13 +33,6 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
   static const Color seriousFire = Color(0xFFEF4444);
 
   static const String _prefsGroupsKey = 'daily_apps_daily_task_groups_v1';
-  static const String _prefsTodoKeyNormal =
-      SeriousModeService.prefKeyNormalTodoGroups;
-  static const String _prefsTodoKeySerious =
-      SeriousModeService.prefKeySeriousTodoGroups;
-
-  String get _prefsTodoKey =>
-      widget.isSeriousMode ? _prefsTodoKeySerious : _prefsTodoKeyNormal;
 
   List<DailyTaskGroup> _taskGroups = [];
   bool _isLoading = true;
