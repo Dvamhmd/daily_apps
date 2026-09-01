@@ -382,5 +382,106 @@ void main() {
       expect(prefs.containsKey(newPunishKey), true);
       expect(prefs.getString(newPunishKey), contains('group_123'));
     });
+
+    test('Custom punishment CRUD works properly per user', () async {
+      const userId = 'usr_custom_tester';
+
+      // Initially empty
+      final initial = await SeriousModeService.getCustomPunishments(userId);
+      expect(initial.isEmpty, true);
+
+      // Add custom item
+      const item1 = SeriousPunishmentItem(
+        id: 'c1',
+        title: 'Membaca Buku 15 Menit',
+        description: 'Baca buku non-fiksi 15 menit',
+        emoji: '📚',
+        category: 'Edukasi',
+        repsOrDuration: '15 Menit',
+        targetMuscle: 'Fokus & Otak',
+        isCustom: true,
+      );
+      await SeriousModeService.addCustomPunishment(item1, userId);
+
+      final listAfterAdd = await SeriousModeService.getCustomPunishments(userId);
+      expect(listAfterAdd.length, 1);
+      expect(listAfterAdd.first.title, 'Membaca Buku 15 Menit');
+      expect(listAfterAdd.first.isCustom, true);
+
+      // Update custom item
+      final updated = item1.copyWith(title: 'Membaca Buku 30 Menit', repsOrDuration: '30 Menit');
+      await SeriousModeService.updateCustomPunishment(updated, userId);
+
+      final listAfterUpdate = await SeriousModeService.getCustomPunishments(userId);
+      expect(listAfterUpdate.first.title, 'Membaca Buku 30 Menit');
+      expect(listAfterUpdate.first.repsOrDuration, '30 Menit');
+
+      // Delete custom item
+      await SeriousModeService.deleteCustomPunishment('c1', userId);
+      final listAfterDelete = await SeriousModeService.getCustomPunishments(userId);
+      expect(listAfterDelete.isEmpty, true);
+    });
+
+    test('Punishment mode options (default, mandiri, campuran) properly configure active pool', () async {
+      const userId = 'usr_mode_tester';
+
+      // Default mode (initially default)
+      final initialMode = await SeriousModeService.getPunishmentMode(userId);
+      expect(initialMode, SeriousPunishmentMode.defaultMode);
+
+      final defaultPool = await SeriousModeService.getActivePunishmentPool(userId);
+      expect(defaultPool.length, 20); // 20 default physical workouts
+
+      // Add 2 custom punishments
+      const c1 = SeriousPunishmentItem(
+        id: 'c_pushup',
+        title: 'Push Up 50x',
+        description: 'Tantangan pushup super',
+        emoji: '💪',
+        category: 'Fisik',
+        isCustom: true,
+      );
+      const c2 = SeriousPunishmentItem(
+        id: 'c_clean',
+        title: 'Bersih-bersih Kamar',
+        description: 'Rapikan kamar tidur',
+        emoji: '🧹',
+        category: 'Kebersihan',
+        isCustom: true,
+      );
+      await SeriousModeService.addCustomPunishment(c1, userId);
+      await SeriousModeService.addCustomPunishment(c2, userId);
+
+      // Switch to Mandiri mode
+      await SeriousModeService.setPunishmentMode(SeriousPunishmentMode.mandiri, userId);
+      expect(await SeriousModeService.getPunishmentMode(userId), SeriousPunishmentMode.mandiri);
+
+      final mandiriPool = await SeriousModeService.getActivePunishmentPool(userId);
+      expect(mandiriPool.length, 2);
+      expect(mandiriPool.map((p) => p.id), containsAll(['c_pushup', 'c_clean']));
+
+      // Switch to Campuran mode
+      await SeriousModeService.setPunishmentMode(SeriousPunishmentMode.campuran, userId);
+      expect(await SeriousModeService.getPunishmentMode(userId), SeriousPunishmentMode.campuran);
+
+      final campuranPool = await SeriousModeService.getActivePunishmentPool(userId);
+      expect(campuranPool.length, 22); // 20 default + 2 custom
+
+      // Verify getPunishmentItemsByIdsAsync resolves both custom and default IDs
+      final resolvedItems = await SeriousModeService.getPunishmentItemsByIdsAsync(['w1', 'c_clean'], userId);
+      expect(resolvedItems.length, 2);
+      expect(resolvedItems[0].title, 'Push Up 20x');
+      expect(resolvedItems[1].title, 'Bersih-bersih Kamar');
+    });
+
+    test('SeriousPunishmentMode helpers return proper human-readable labels', () {
+      expect(SeriousPunishmentMode.getLabel(SeriousPunishmentMode.defaultMode), contains('Default'));
+      expect(SeriousPunishmentMode.getLabel(SeriousPunishmentMode.mandiri), contains('Mandiri'));
+      expect(SeriousPunishmentMode.getLabel(SeriousPunishmentMode.campuran), contains('Campuran'));
+
+      expect(SeriousPunishmentMode.getShortLabel(SeriousPunishmentMode.defaultMode), 'Default');
+      expect(SeriousPunishmentMode.getShortLabel(SeriousPunishmentMode.mandiri), 'Mandiri');
+      expect(SeriousPunishmentMode.getShortLabel(SeriousPunishmentMode.campuran), 'Campuran');
+    });
   });
 }

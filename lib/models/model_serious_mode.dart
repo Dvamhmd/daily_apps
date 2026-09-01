@@ -130,15 +130,73 @@ class SeriousSectionEvaluation {
   bool get hasIncompleteTasks => pendingCount > 0;
 }
 
-/// Pilihan hukuman olahraga fisik
+/// Pilihan mode penerapan hukuman di Mode Serius
+class SeriousPunishmentMode {
+  static const String defaultMode = 'default';
+  static const String mandiri = 'mandiri';
+  static const String campuran = 'campuran';
+
+  static const List<String> allModes = [defaultMode, mandiri, campuran];
+
+  static String getLabel(String mode) {
+    switch (mode) {
+      case mandiri:
+        return 'Mandiri';
+      case campuran:
+        return 'Campuran';
+      case defaultMode:
+      default:
+        return 'Default';
+    }
+  }
+
+  static String getShortLabel(String mode) {
+    switch (mode) {
+      case mandiri:
+        return 'Mandiri';
+      case campuran:
+        return 'Campuran';
+      case defaultMode:
+      default:
+        return 'Default';
+    }
+  }
+
+  static String getDescription(String mode) {
+    switch (mode) {
+      case mandiri:
+        return 'Hanya menerapkan hukuman yang kamu tulis dan buat sendiri.';
+      case campuran:
+        return 'Menggabungkan hukuman default aplikasi dan hukuman buatanmu secara acak.';
+      case defaultMode:
+      default:
+        return 'Menerapkan 20 daftar hukuman olahraga fisik bawaan aplikasi.';
+    }
+  }
+
+  static String getEmoji(String mode) {
+    switch (mode) {
+      case mandiri:
+        return '✍️';
+      case campuran:
+        return '🎲';
+      case defaultMode:
+      default:
+        return '🏋️';
+    }
+  }
+}
+
+/// Pilihan hukuman olahraga fisik / tugas kedisiplinan
 class SeriousPunishmentItem {
   final String id;
   final String title;
   final String description;
   final String emoji;
-  final String category; // 'Fisik'
+  final String category; // 'Fisik', 'Mental', 'Disiplin', 'Kustom', dll.
   final String repsOrDuration;
   final String targetMuscle;
+  final bool isCustom;
 
   const SeriousPunishmentItem({
     required this.id,
@@ -148,6 +206,7 @@ class SeriousPunishmentItem {
     this.category = 'Fisik',
     this.repsOrDuration = '',
     this.targetMuscle = 'Full Body',
+    this.isCustom = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -158,6 +217,7 @@ class SeriousPunishmentItem {
         'category': category,
         'repsOrDuration': repsOrDuration,
         'targetMuscle': targetMuscle,
+        'isCustom': isCustom,
       };
 
   factory SeriousPunishmentItem.fromJson(Map<String, dynamic> json) {
@@ -169,6 +229,29 @@ class SeriousPunishmentItem {
       category: json['category'] as String? ?? 'Fisik',
       repsOrDuration: json['repsOrDuration'] as String? ?? '',
       targetMuscle: json['targetMuscle'] as String? ?? 'Full Body',
+      isCustom: json['isCustom'] as bool? ?? false,
+    );
+  }
+
+  SeriousPunishmentItem copyWith({
+    String? id,
+    String? title,
+    String? description,
+    String? emoji,
+    String? category,
+    String? repsOrDuration,
+    String? targetMuscle,
+    bool? isCustom,
+  }) {
+    return SeriousPunishmentItem(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      emoji: emoji ?? this.emoji,
+      category: category ?? this.category,
+      repsOrDuration: repsOrDuration ?? this.repsOrDuration,
+      targetMuscle: targetMuscle ?? this.targetMuscle,
+      isCustom: isCustom ?? this.isCustom,
     );
   }
 }

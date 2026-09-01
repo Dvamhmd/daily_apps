@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/model_serious_mode.dart';
 import '../models/model_todo.dart';
+import '../pages/serious_punishment_config_page.dart';
 import '../utils/serious_mode_service.dart';
 import 'custom_toast.dart';
 
@@ -64,6 +65,7 @@ class _SeriousPunishmentDialogState extends State<SeriousPunishmentDialog> {
 
   SeriousGroupPunishmentState? _punishmentState;
   List<SeriousPunishmentItem> _assignedItems = [];
+  String _punishmentMode = SeriousPunishmentMode.defaultMode;
   bool _isLoading = true;
 
   @override
@@ -78,13 +80,16 @@ class _SeriousPunishmentDialogState extends State<SeriousPunishmentDialog> {
       eval.groupId,
       eval.pendingCount,
     );
+    final assignedItems = await SeriousModeService.getPunishmentItemsByIdsAsync(
+      state.assignedPunishmentIds,
+    );
+    final mode = await SeriousModeService.getPunishmentMode();
 
     if (mounted) {
       setState(() {
         _punishmentState = state;
-        _assignedItems = SeriousModeService.getPunishmentItemsByIds(
-          state.assignedPunishmentIds,
-        );
+        _assignedItems = assignedItems;
+        _punishmentMode = mode;
         _isLoading = false;
       });
     }
@@ -502,28 +507,69 @@ class _SeriousPunishmentDialogState extends State<SeriousPunishmentDialog> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  'DAFTAR LATIHAN OLAHRAGA (${_assignedItems.length})',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF94A3B8),
-                                    letterSpacing: 0.8,
+                                Expanded(
+                                  child: Text(
+                                    'DAFTAR HUKUMAN (${_assignedItems.length})',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF94A3B8),
+                                      letterSpacing: 0.8,
+                                    ),
                                   ),
                                 ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: accentFire.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Text(
-                                    'Diacak Otomatis',
-                                    style: TextStyle(
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: accentFire,
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(6),
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const SeriousPunishmentConfigPage(),
+                                      ),
+                                    ).then((_) => _loadPunishmentState());
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 7, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: _punishmentMode == SeriousPunishmentMode.mandiri
+                                          ? const Color(0xFF0369A1).withValues(alpha: 0.3)
+                                          : (_punishmentMode == SeriousPunishmentMode.campuran
+                                              ? const Color(0xFF6B21A8).withValues(alpha: 0.3)
+                                              : accentFire.withValues(alpha: 0.15)),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: _punishmentMode == SeriousPunishmentMode.mandiri
+                                            ? const Color(0xFF38BDF8).withValues(alpha: 0.4)
+                                            : (_punishmentMode == SeriousPunishmentMode.campuran
+                                                ? const Color(0xFFA855F7).withValues(alpha: 0.4)
+                                                : accentFire.withValues(alpha: 0.4)),
+                                        width: 0.8,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          '${SeriousPunishmentMode.getEmoji(_punishmentMode)} ${SeriousPunishmentMode.getShortLabel(_punishmentMode)}',
+                                          style: TextStyle(
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: _punishmentMode == SeriousPunishmentMode.mandiri
+                                                ? const Color(0xFF7DD3FC)
+                                                : (_punishmentMode == SeriousPunishmentMode.campuran
+                                                    ? const Color(0xFFD8B4FE)
+                                                    : accentFire),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 3),
+                                        const Icon(
+                                          Icons.tune_rounded,
+                                          size: 10,
+                                          color: Colors.white70,
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),

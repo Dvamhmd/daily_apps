@@ -16,6 +16,8 @@ class SeriousModeService {
   static const String prefKeySeriousTodoGroups = 'daily_apps_serious_todo_groups_v1';
   static const String prefKeyPunishmentStates = 'daily_apps_serious_punishment_states_v1';
   static const String prefKeyHideCommitmentWarning = 'daily_apps_serious_hide_commitment_warning';
+  static const String prefKeyCustomPunishments = 'daily_apps_serious_custom_punishments_v1';
+  static const String prefKeyPunishmentMode = 'daily_apps_serious_punishment_mode_v1';
 
   /// Generator key SharedPreferences spesifik per user untuk status jangan tampilkan peringatan komitmen
   static Future<bool> isHideCommitmentWarning([String? userId]) async {
@@ -76,6 +78,24 @@ class SeriousModeService {
       return 'daily_apps_serious_punishment_states_v1_$clean';
     }
     return prefKeyPunishmentStates;
+  }
+
+  /// Generator key SharedPreferences spesifik per user untuk hukuman kustom
+  static String getCustomPunishmentsKey([String? userIdentifier]) {
+    if (userIdentifier != null && userIdentifier.trim().isNotEmpty) {
+      final clean = userIdentifier.trim().toLowerCase().replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+      return 'daily_apps_serious_custom_punishments_v1_$clean';
+    }
+    return prefKeyCustomPunishments;
+  }
+
+  /// Generator key SharedPreferences spesifik per user untuk mode penerapan hukuman (default, mandiri, campuran)
+  static String getPunishmentModeKey([String? userIdentifier]) {
+    if (userIdentifier != null && userIdentifier.trim().isNotEmpty) {
+      final clean = userIdentifier.trim().toLowerCase().replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+      return 'daily_apps_serious_punishment_mode_v1_$clean';
+    }
+    return prefKeyPunishmentMode;
   }
 
   /// Generator key SharedPreferences spesifik per user untuk section yang telah diproses
@@ -1026,7 +1046,91 @@ class SeriousModeService {
     ),
   ];
 
-  /// 6. Manajemen State Hukuman Per Section (Acak Otomatis Deterministik, Checklist & Menyerah)
+  /// 6. Manajemen Kustom Hukuman & Mode Penerapan Hukuman
+  static Future<String> getPunishmentMode([String? userIdentifier]) async {
+    final prefs = await SharedPreferences.getInstance();
+    final effectiveIdentifier = userIdentifier ?? getUserStorageIdentifier(await getCurrentUser());
+    final key = getPunishmentModeKey(effectiveIdentifier);
+    return prefs.getString(key) ?? SeriousPunishmentMode.defaultMode;
+  }
+
+  static Future<void> setPunishmentMode(String mode, [String? userIdentifier]) async {
+    final prefs = await SharedPreferences.getInstance();
+    final effectiveIdentifier = userIdentifier ?? getUserStorageIdentifier(await getCurrentUser());
+    final key = getPunishmentModeKey(effectiveIdentifier);
+    await prefs.setString(key, mode);
+  }
+
+  static Future<List<SeriousPunishmentItem>> getCustomPunishments([String? userIdentifier]) async {
+    final prefs = await SharedPreferences.getInstance();
+    final effectiveIdentifier = userIdentifier ?? getUserStorageIdentifier(await getCurrentUser());
+    final key = getCustomPunishmentsKey(effectiveIdentifier);
+    final raw = prefs.getString(key);
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final List<dynamic> decoded = jsonDecode(raw);
+        return decoded
+            .map((item) => SeriousPunishmentItem.fromJson(item as Map<String, dynamic>))
+            .toList();
+      } catch (e) {
+        debugPrint('Error reading custom punishments: $e');
+      }
+    }
+    return [];
+  }
+
+  static Future<void> saveCustomPunishments(List<SeriousPunishmentItem> items, [String? userIdentifier]) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final effectiveIdentifier = userIdentifier ?? getUserStorageIdentifier(await getCurrentUser());
+      final key = getCustomPunishmentsKey(effectiveIdentifier);
+      final raw = jsonEncode(items.map((i) => i.toJson()).toList());
+      await prefs.setString(key, raw);
+    } catch (e) {
+      debugPrint('Error saving custom punishments: $e');
+    }
+  }
+
+  static Future<void> addCustomPunishment(SeriousPunishmentItem item, [String? userIdentifier]) async {
+    final list = await getCustomPunishments(userIdentifier);
+    list.insert(0, item);
+    await saveCustomPunishments(list, userIdentifier);
+  }
+
+  static Future<void> updateCustomPunishment(SeriousPunishmentItem item, [String? userIdentifier]) async {
+    final list = await getCustomPunishments(userIdentifier);
+    final idx = list.indexWhere((i) => i.id == item.id);
+    if (idx != -1) {
+      list[idx] = item;
+      await saveCustomPunishments(list, userIdentifier);
+    }
+  }
+
+  static Future<void> deleteCustomPunishment(String id, [String? userIdentifier]) async {
+    final list = await getCustomPunishments(userIdentifier);
+    list.removeWhere((i) => i.id == id);
+    await saveCustomPunishments(list, userIdentifier);
+  }
+
+  /// Menghasilkan pool hukuman aktif berdasarkan mode penerapan saat ini
+  static Future<List<SeriousPunishmentItem>> getActivePunishmentPool([String? userIdentifier]) async {
+    final mode = await getPunishmentMode(userIdentifier);
+    final customList = await getCustomPunishments(userIdentifier);
+
+    if (mode == SeriousPunishmentMode.mandiri) {
+      if (customList.isNotEmpty) {
+        return customList;
+      }
+      // Fallback jika belum ada hukuman kustom
+      return punishmentList;
+    } else if (mode == SeriousPunishmentMode.campuran) {
+      return [...customList, ...punishmentList];
+    }
+    // Default mode
+    return punishmentList;
+  }
+
+  /// 7. Manajemen State Hukuman Per Section (Acak Otomatis Deterministik, Checklist & Menyerah)
   static Future<Map<String, SeriousGroupPunishmentState>> _getAllPunishmentStates([String? userIdentifier]) async {
     final prefs = await SharedPreferences.getInstance();
     final effectiveIdentifier = userIdentifier ?? getUserStorageIdentifier(await getCurrentUser());
@@ -1070,7 +1174,7 @@ class SeriousModeService {
     }
   }
 
-  /// Ambil atau buat daftar hukuman olahraga otomatis sebanyak jumlah checklist yang tidak tercentang
+  /// Ambil atau buat daftar hukuman otomatis sebanyak jumlah checklist yang tidak tercentang
   static Future<SeriousGroupPunishmentState> getOrCreatePunishmentState(
     String groupId,
     int pendingCount, {
@@ -1084,7 +1188,8 @@ class SeriousModeService {
       }
     }
 
-    final assignedIds = _generateRandomWorkoutIds(groupId, pendingCount);
+    final pool = await getActivePunishmentPool(userId);
+    final assignedIds = _generateRandomWorkoutIds(groupId, pendingCount, pool);
     final newState = SeriousGroupPunishmentState(
       groupId: groupId,
       assignedPunishmentIds: assignedIds,
@@ -1099,11 +1204,16 @@ class SeriousModeService {
     return newState;
   }
 
-  /// Generator acak unik dari 20 hukuman olahraga fisik (Stabil berdasarkan groupId)
-  static List<String> _generateRandomWorkoutIds(String groupId, int count) {
+  /// Generator acak unik dari pool hukuman aktif (Stabil berdasarkan groupId)
+  static List<String> _generateRandomWorkoutIds(
+    String groupId,
+    int count, [
+    List<SeriousPunishmentItem>? pool,
+  ]) {
     if (count <= 0) return [];
+    final effectivePool = (pool != null && pool.isNotEmpty) ? pool : punishmentList;
     final random = Random(groupId.hashCode.abs());
-    final allIds = punishmentList.map((p) => p.id).toList();
+    final allIds = effectivePool.map((p) => p.id).toList();
     allIds.shuffle(random);
 
     final List<String> result = [];
@@ -1113,10 +1223,28 @@ class SeriousModeService {
     return result;
   }
 
-  /// Ambil daftar objek [SeriousPunishmentItem] berdasarkan ID yang ditugaskan
-  static List<SeriousPunishmentItem> getPunishmentItemsByIds(List<String> ids) {
+  /// Ambil daftar objek [SeriousPunishmentItem] berdasarkan ID yang ditugaskan (Mendukung default & kustom)
+  static Future<List<SeriousPunishmentItem>> getPunishmentItemsByIdsAsync(
+    List<String> ids, [
+    String? userIdentifier,
+  ]) async {
+    final customList = await getCustomPunishments(userIdentifier);
     final Map<String, SeriousPunishmentItem> map = {
-      for (final p in punishmentList) p.id: p
+      for (final p in punishmentList) p.id: p,
+      for (final c in customList) c.id: c,
+    };
+    return ids.map((id) => map[id] ?? (customList.isNotEmpty ? customList.first : punishmentList.first)).toList();
+  }
+
+  /// Ambil daftar objek [SeriousPunishmentItem] sinkronus dengan fallback cache / default
+  static List<SeriousPunishmentItem> getPunishmentItemsByIds(
+    List<String> ids, [
+    List<SeriousPunishmentItem>? extraCustomItems,
+  ]) {
+    final Map<String, SeriousPunishmentItem> map = {
+      for (final p in punishmentList) p.id: p,
+      if (extraCustomItems != null)
+        for (final c in extraCustomItems) c.id: c,
     };
     return ids.map((id) => map[id] ?? punishmentList.first).toList();
   }

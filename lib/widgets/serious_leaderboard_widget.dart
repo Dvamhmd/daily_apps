@@ -154,26 +154,33 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
                   child: const Icon(Icons.emoji_events_rounded,
                       color: Colors.black87, size: 24),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Row(
                         children: [
-                          const Text(
-                            'LEADERBOARD',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16.5,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.2,
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: const Text(
+                                'LEADERBOARD',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16.5,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 7, vertical: 2),
+                                horizontal: 6, vertical: 1.5),
                             decoration: BoxDecoration(
                               color: accentGold.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(6),
@@ -186,7 +193,7 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
                               'TOP 10',
                               style: TextStyle(
                                 color: accentGold,
-                                fontSize: 10,
+                                fontSize: 9.5,
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: 0.5,
                               ),
@@ -197,24 +204,33 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
                       const SizedBox(height: 2),
                       Text(
                         'Peringkat produktivitas pemain Mode Serius realtime',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.6),
-                          fontSize: 11.5,
+                          fontSize: 11,
                         ),
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(width: 4),
                 IconButton(
                   tooltip: 'Segarkan Data',
-                  icon: const Icon(Icons.refresh_rounded, color: accentGold),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                  icon: const Icon(Icons.refresh_rounded, color: accentGold, size: 20),
                   onPressed: () {
                     setState(() => _isLoading = true);
                     _loadLeaderboard();
                   },
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close_rounded, color: Colors.white60),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                  icon: const Icon(Icons.close_rounded, color: Colors.white60, size: 20),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -450,7 +466,7 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
   /// Header Section untuk Tabel Top 10
   Widget _buildTop10TableHeader({required int totalUsers}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
         color: const Color(0xFF1E293B).withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(12),
@@ -460,27 +476,31 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
         children: [
           const Icon(Icons.table_chart_rounded, color: accentGold, size: 16),
           const SizedBox(width: 8),
-          const Text(
-            'TABEL TOP 10 PENGGUNA',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.8,
+          const Expanded(
+            child: Text(
+              'TABEL TOP 10 PENGGUNA',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+              ),
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              '$totalUsers Peserta Terdaftar',
+              '$totalUsers Peserta',
               style: const TextStyle(
                 color: Color(0xFF94A3B8),
-                fontSize: 11,
+                fontSize: 10.5,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -510,35 +530,36 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
         children: [
           // Header Bar Kolom Tabel
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
             color: const Color(0xFF0B132B),
             child: const Row(
               children: [
                 SizedBox(
-                  width: 38,
+                  width: 44,
                   child: Text(
                     'RANK',
                     style: TextStyle(
                       color: Color(0xFF94A3B8),
-                      fontSize: 10.5,
+                      fontSize: 10,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.5,
                     ),
                   ),
                 ),
-                SizedBox(width: 8),
+                SizedBox(width: 6),
                 Expanded(
                   flex: 5,
                   child: Text(
-                    'PEMAIN & USERNAME',
+                    'PEMAIN',
                     style: TextStyle(
                       color: Color(0xFF94A3B8),
-                      fontSize: 10.5,
+                      fontSize: 10,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.5,
                     ),
                   ),
                 ),
+                SizedBox(width: 6),
                 Expanded(
                   flex: 3,
                   child: Text(
@@ -546,12 +567,13 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Color(0xFF94A3B8),
-                      fontSize: 10.5,
+                      fontSize: 10,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.5,
                     ),
                   ),
                 ),
+                SizedBox(width: 6),
                 Expanded(
                   flex: 3,
                   child: Text(
@@ -559,7 +581,7 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
                     textAlign: TextAlign.end,
                     style: TextStyle(
                       color: Color(0xFF94A3B8),
-                      fontSize: 10.5,
+                      fontSize: 10,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.5,
                     ),
@@ -578,8 +600,8 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
             separatorBuilder: (_, __) => const Divider(
               height: 1,
               color: Color(0xFF1E293B),
-              indent: 12,
-              endIndent: 12,
+              indent: 10,
+              endIndent: 10,
             ),
             itemBuilder: (context, index) {
               final rank = index + 1;
@@ -631,32 +653,36 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
 
     return Container(
       color: rowBg,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9.5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8.5),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // 1. RANK BADGE
           SizedBox(
-            width: 38,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (medalEmoji != null) ...[
-                  Text(medalEmoji, style: const TextStyle(fontSize: 13)),
-                  const SizedBox(width: 2),
-                ],
-                Text(
-                  '#$rank',
-                  style: TextStyle(
-                    color: isMe ? accentGold : rankColor,
-                    fontWeight: FontWeight.w900,
-                    fontSize: rank <= 3 ? 12 : 11.5,
+            width: 44,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (medalEmoji != null) ...[
+                    Text(medalEmoji, style: const TextStyle(fontSize: 12.5)),
+                    const SizedBox(width: 2),
+                  ],
+                  Text(
+                    '#$rank',
+                    style: TextStyle(
+                      color: isMe ? accentGold : rankColor,
+                      fontWeight: FontWeight.w900,
+                      fontSize: rank <= 3 ? 12 : 11,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
 
           // 2. PROFIL, NAMA PANGGILAN & USERNAME
           Expanded(
@@ -676,7 +702,7 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
                           width: isMe ? 1.8 : 1.2,
                         ),
                       ),
-                      child: _buildAvatar(user, size: 34),
+                      child: _buildAvatar(user, size: 32),
                     ),
                     if (isMe)
                       Positioned(
@@ -689,12 +715,12 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(Icons.star,
-                              size: 8, color: Colors.black),
+                              size: 7.5, color: Colors.black),
                         ),
                       ),
                   ],
                 ),
-                const SizedBox(width: 9),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -712,23 +738,23 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
                               style: TextStyle(
                                 color: isMe ? accentGold : Colors.white,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 12.5,
+                                fontSize: 12,
                               ),
                             ),
                           ),
                           if (isMe) ...[
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 3),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 4.5, vertical: 1),
+                                  horizontal: 3.5, vertical: 1),
                               decoration: BoxDecoration(
                                 color: accentGold,
-                                borderRadius: BorderRadius.circular(4),
+                                borderRadius: BorderRadius.circular(3),
                               ),
                               child: const Text(
                                 'KAMU',
                                 style: TextStyle(
-                                  fontSize: 8,
+                                  fontSize: 7.5,
                                   fontWeight: FontWeight.w900,
                                   color: Colors.black,
                                 ),
@@ -737,16 +763,16 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
                           ],
                         ],
                       ),
-                      const SizedBox(height: 1.5),
+                      const SizedBox(height: 1),
                       Text(
                         '@${user.username}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Color(0xFF94A3B8),
-                          fontSize: 10.5,
+                          fontSize: 10,
                           fontWeight: FontWeight.w500,
-                          letterSpacing: 0.2,
+                          letterSpacing: 0.1,
                         ),
                       ),
                     ],
@@ -755,12 +781,13 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
               ],
             ),
           ),
+          const SizedBox(width: 6),
 
           // 3. TASK SELESAI
           Expanded(
             flex: 3,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3.5),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
               decoration: BoxDecoration(
                 color: const Color(0xFF10B981).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(6),
@@ -774,30 +801,32 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.check_circle_rounded,
-                      color: Color(0xFF10B981), size: 11),
-                  const SizedBox(width: 3.5),
+                      color: Color(0xFF10B981), size: 10),
+                  const SizedBox(width: 2.5),
                   Flexible(
-                    child: Text(
-                      '${user.totalTasksCompleted}',
-                      style: const TextStyle(
-                        color: Color(0xFF34D399),
-                        fontWeight: FontWeight.w800,
-                        fontSize: 11,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '${user.totalTasksCompleted}',
+                        style: const TextStyle(
+                          color: Color(0xFF34D399),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 10.5,
+                        ),
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
 
           // 4. TOTAL POINT
           Expanded(
             flex: 3,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
@@ -813,16 +842,21 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.bolt_rounded, color: accentGold, size: 12),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${user.totalPoints}',
-                    style: TextStyle(
-                      color: isMe ? Colors.white : accentGold,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 11.5,
+                  const Icon(Icons.bolt_rounded, color: accentGold, size: 11),
+                  const SizedBox(width: 1.5),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '${user.totalPoints}',
+                        style: TextStyle(
+                          color: isMe ? Colors.white : accentGold,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 10.5,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -908,6 +942,8 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
                 ),
                 Text(
                   '@${user.username} • ${user.totalTasksCompleted} Task Selesai',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Color(0xFF94A3B8),
                     fontSize: 10.5,

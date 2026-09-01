@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:daily_apps/models/model_serious_mode.dart';
 import 'package:daily_apps/models/model_todo.dart';
 import 'package:daily_apps/pages/daily_productivity_page.dart';
+import 'package:daily_apps/pages/serious_punishment_config_page.dart';
 import 'package:daily_apps/pages/todo_riwayat_page.dart';
 import 'package:daily_apps/pages/tugas_harian_page.dart';
 import 'package:daily_apps/utils/serious_mode_service.dart';
@@ -42,6 +43,7 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
   bool _isLoading = true;
   bool _isSeriousMode = false;
   SeriousUser? _seriousUser;
+  String _punishmentMode = SeriousPunishmentMode.defaultMode;
 
   @override
   void initState() {
@@ -64,6 +66,7 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
       final prefs = await SharedPreferences.getInstance();
       _isSeriousMode = widget.isSeriousMode;
       _seriousUser = await SeriousModeService.getCurrentUser();
+      _punishmentMode = await SeriousModeService.getPunishmentMode();
 
       final String prefsKey = _isSeriousMode && _seriousUser != null
           ? SeriousModeService.getSeriousTodoGroupsKey(
@@ -232,7 +235,46 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
                           },
                         ),
 
-                        // Serious Mode Menu 4: Akun / Ganti Pemain
+                        // Serious Mode Menu 4: Hukuman
+                        _buildMenuItem(
+                          context: context,
+                          icon: Icons.tune_rounded,
+                          iconColor: const Color(0xFFF43F5E),
+                          title: 'Hukuman',
+                          subtitle:
+                              'Opsi mandiri, default, campuran & hukuman sendiri',
+                          badgeText:
+                              SeriousPunishmentMode.getShortLabel(_punishmentMode),
+                          badgeColor: _punishmentMode ==
+                                  SeriousPunishmentMode.mandiri
+                              ? const Color(0xFF0369A1)
+                              : (_punishmentMode ==
+                                      SeriousPunishmentMode.campuran
+                                  ? const Color(0xFF6B21A8)
+                                  : const Color(0xFF92400E)),
+                          badgeTextColor: _punishmentMode ==
+                                  SeriousPunishmentMode.mandiri
+                              ? const Color(0xFF7DD3FC)
+                              : (_punishmentMode ==
+                                      SeriousPunishmentMode.campuran
+                                  ? const Color(0xFFD8B4FE)
+                                  : const Color(0xFFFDE68A)),
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    const SeriousPunishmentConfigPage(),
+                              ),
+                            ).then((_) {
+                              widget.onDataChanged?.call();
+                              _loadAllTodoData();
+                            });
+                          },
+                        ),
+
+                        // Serious Mode Menu 5: Akun / Ganti Pemain
                         _buildMenuItem(
                           context: context,
                           icon: Icons.manage_accounts_rounded,
