@@ -320,11 +320,37 @@ void main() {
       expect(found2, contains('user_group'));
     });
 
-    test('Apps Script template code provides get_serious_tasks and sync_serious_tasks', () {
-      final code = SeriousModeService.getSeriousModeAppsScriptCode();
-      expect(code, contains('get_serious_tasks'));
-      expect(code, contains('sync_serious_tasks'));
-      expect(code, contains('Tasks_Mode_Serius'));
+    test('updateUserProfile correctly updates user display name, username and avatar', () async {
+      final user = SeriousUser(
+        id: 'usr_edit_test',
+        username: 'old_username',
+        password: 'initial_password',
+        displayName: 'Old Name',
+        avatarIndex: 1,
+        totalPoints: 50,
+      );
+      await SeriousModeService.saveCurrentUser(user);
+
+      final res = await SeriousModeService.updateUserProfile(
+        newDisplayName: 'New Hero Name',
+        newUsername: 'new_hero_username',
+        newPassword: 'updated_password',
+        avatarIndex: 3,
+        avatarBase64: 'data:image/png;base64,mockedAvatarData',
+      );
+
+      expect(res['success'], true);
+      final updatedUser = res['user'] as SeriousUser;
+      expect(updatedUser.displayName, 'New Hero Name');
+      expect(updatedUser.username, 'new_hero_username');
+      expect(updatedUser.password, 'updated_password');
+      expect(updatedUser.avatarIndex, 3);
+      expect(updatedUser.avatarBase64, 'data:image/png;base64,mockedAvatarData');
+      expect(updatedUser.totalPoints, 50);
+
+      final current = await SeriousModeService.getCurrentUser();
+      expect(current?.displayName, 'New Hero Name');
+      expect(current?.username, 'new_hero_username');
     });
   });
 }

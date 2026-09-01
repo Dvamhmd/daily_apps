@@ -63,6 +63,7 @@ class _TodoPageState extends State<TodoPage> {
 
   bool _isSeriousMode = false;
   SeriousUser? _seriousUser;
+  bool _isManualSyncing = false;
 
   @override
   void initState() {
@@ -78,24 +79,14 @@ class _TodoPageState extends State<TodoPage> {
   }
 
   void _initAlarmSystem() {
-    TodoAlarmService.initialize(
-      onNotificationClick: (payload) {
-        _handleNotificationAlarmTrigger(payload);
-      },
-    );
-    TodoAlarmService.requestPermissions();
     TodoAlarmService.activeAlarmNotifier.addListener(_onActiveAlarmChanged);
+    TodoAlarmService.requestPermissions();
   }
 
   void _onActiveAlarmChanged() {
     final payload = TodoAlarmService.activeAlarmNotifier.value;
-    if (payload != null && mounted) {
-      _handleNotificationAlarmTrigger(payload);
-    }
-  }
+    if (payload == null || !mounted) return;
 
-  void _handleNotificationAlarmTrigger(AlarmTriggerPayload payload) {
-    if (!mounted) return;
     final targetGroup = _dateGroups.firstWhere(
       (g) => g.id == payload.groupId,
       orElse: () => _dateGroups.firstWhere(
@@ -208,6 +199,42 @@ class _TodoPageState extends State<TodoPage> {
     }
   }
 
+  Future<void> _handleManualSyncSpreadsheet() async {
+    if (_isManualSyncing) return;
+    setState(() {
+      _isManualSyncing = true;
+    });
+    HapticFeedback.mediumImpact();
+
+    final res = await SeriousModeService.syncAllDataToSpreadsheet(
+      groups: _dateGroups,
+      targetUser: _seriousUser,
+    );
+
+    if (mounted) {
+      setState(() {
+        _isManualSyncing = false;
+        if (res['user'] is SeriousUser) {
+          _seriousUser = res['user'] as SeriousUser;
+        }
+      });
+
+      if (res['success'] == true) {
+        CustomToast.showSuccess(
+          context,
+          title: 'Sinkronisasi Berhasil! ☁️',
+          subtitle: 'Total ${_seriousUser?.totalPoints ?? 0} Poin & ${_seriousUser?.totalTasksCompleted ?? 0} Tugas Selesai berhasil disimpan ke Spreadsheet!',
+        );
+      } else {
+        CustomToast.showError(
+          context,
+          title: 'Gagal Sinkronisasi',
+          subtitle: res['message']?.toString() ?? 'Periksa koneksi internet Anda',
+        );
+      }
+    }
+  }
+
   Future<void> _handleOpenSeriousMode() async {
     final curUser = await SeriousModeService.getCurrentUser();
     if (!mounted) return;
@@ -239,6 +266,106 @@ class _TodoPageState extends State<TodoPage> {
         await _loadTodoData();
       }
     }
+  }
+
+  Future<void> _handleEditSeriousProfile() async {
+    HapticFeedback.mediumImpact();
+    final updated = await SeriousModeAuthDialog.showEditProfile(context);
+    if (updated != null && mounted) {
+      setState(() {
+        _seriousUser = updated;
+      });
+      await _loadTodoData();
+    }
+  }
+
+  Widget _buildSeriousUserAvatarWidget({double size = 52}) {
+    final user = _seriousUser;
+    Widget avatarContent;
+
+    if (user?.avatarBase64 != null && user!.avatarBase64!.isNotEmpty) {
+      try {
+        final bytes = base64Decode(user.avatarBase64!);
+        avatarContent = ClipOval(
+          child: Image.memory(
+            bytes,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) =>
+                Text('👑', style: TextStyle(fontSize: size * 0.5)),
+          ),
+        );
+      } catch (_) {
+        final idx = (user?.avatarIndex ?? 0)
+            .clamp(0, SeriousModeAuthDialog.presetAvatars.length - 1);
+        avatarContent = Text(
+          SeriousModeAuthDialog.presetAvatars[idx]['emoji'] as String,
+          style: TextStyle(fontSize: size * 0.5),
+        );
+      }
+    } else if (user != null) {
+      final idx = user.avatarIndex
+          .clamp(0, SeriousModeAuthDialog.presetAvatars.length - 1);
+      final avatarData = SeriousModeAuthDialog.presetAvatars[idx];
+      avatarContent = Text(
+        avatarData['emoji'] as String,
+        style: TextStyle(fontSize: size * 0.5),
+      );
+    } else {
+      avatarContent = Text(
+        '👑',
+        style: TextStyle(fontSize: size * 0.5),
+      );
+    }
+
+    final avatarColor = (user != null &&
+            user.avatarIndex >= 0 &&
+            user.avatarIndex < SeriousModeAuthDialog.presetAvatars.length)
+        ? Color(
+            SeriousModeAuthDialog.presetAvatars[user.avatarIndex]['color'] as int)
+        : seriousGold;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: avatarColor.withValues(alpha: 0.2),
+            shape: BoxShape.circle,
+            border: Border.all(color: avatarColor, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: avatarColor.withValues(alpha: 0.35),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          alignment: Alignment.center,
+          child: avatarContent,
+        ),
+        Positioned(
+          right: -2,
+          bottom: -2,
+          child: Container(
+            padding: const EdgeInsets.all(3.5),
+            decoration: BoxDecoration(
+              color: seriousCardBg,
+              shape: BoxShape.circle,
+              border: Border.all(color: seriousGold, width: 1.2),
+            ),
+            child: const Icon(
+              Icons.edit_rounded,
+              color: seriousGold,
+              size: 10.5,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Future<void> _handleExitSeriousMode() async {
@@ -1489,40 +1616,57 @@ class _TodoPageState extends State<TodoPage> {
       );
       return;
     }
+    final isDark = _isSeriousMode;
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
+          backgroundColor: isDark ? seriousCardBg : Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
+            side: isDark
+                ? const BorderSide(color: seriousBorder, width: 1)
+                : BorderSide.none,
           ),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.red, size: 24),
-              SizedBox(width: 10),
+              Icon(
+                Icons.warning_amber_rounded,
+                color: isDark ? seriousFire : Colors.red,
+                size: 24,
+              ),
+              const SizedBox(width: 10),
               Text(
                 'Hapus Section?',
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                  color: isDark ? Colors.white : const Color(0xFF1E293B),
                 ),
               ),
             ],
           ),
           content: Text(
             'Apakah kamu yakin ingin menghapus section "${group.formattedFullDate}" beserta seluruh ${group.totalCount} tugas di dalamnya?',
-            style: const TextStyle(fontSize: 13.5, color: Color(0xFF475569)),
+            style: TextStyle(
+              fontSize: 13.5,
+              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Batal', style: TextStyle(color: Colors.grey)),
+              child: Text(
+                'Batal',
+                style: TextStyle(
+                  color: isDark ? const Color(0xFF94A3B8) : Colors.grey,
+                ),
+              ),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red[700],
+                backgroundColor: isDark ? seriousFire : Colors.red[700],
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -2001,75 +2145,104 @@ class _TodoPageState extends State<TodoPage> {
               ],
             ),
             const SizedBox(height: 14),
-            Row(
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: seriousGold.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: seriousGold, width: 2),
-                  ),
-                  alignment: Alignment.center,
-                  child: const Text(
-                    '👑',
-                    style: TextStyle(fontSize: 26),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _seriousUser?.displayName ?? 'Pemain Serius',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        '@${_seriousUser?.username ?? "user"} • Anti-Hapus & Hukuman Aktif',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+            InkWell(
+              onTap: _handleEditSeriousProfile,
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
                   children: [
-                    Text(
-                      '${_seriousUser?.totalPoints ?? 0}',
-                      style: const TextStyle(
-                        color: seriousGold,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
+                    _buildSeriousUserAvatarWidget(),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  _seriousUser?.displayName ?? 'Pemain Serius',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.18)),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.edit_rounded,
+                                        size: 10, color: seriousGold),
+                                    SizedBox(width: 3),
+                                    Text(
+                                      'Edit',
+                                      style: TextStyle(
+                                        color: seriousGold,
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '@${_seriousUser?.username ?? "user"} • Ketuk untuk edit profil',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const Text(
-                      'TOTAL POIN',
-                      style: TextStyle(
-                        color: Color(0xFFFDE68A),
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.8,
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '${_seriousUser?.totalPoints ?? 0}',
+                          style: const TextStyle(
+                            color: seriousGold,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const Text(
+                          'TOTAL POIN',
+                          style: TextStyle(
+                            color: Color(0xFFFDE68A),
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
             const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
+                  flex: 3,
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: seriousGold,
@@ -2082,13 +2255,45 @@ class _TodoPageState extends State<TodoPage> {
                     ),
                     icon: const Icon(Icons.emoji_events_rounded, size: 18),
                     label: const Text(
-                      'Leaderboard Top 3 🏆',
+                      'Leaderboard 🏆',
                       style: TextStyle(
                           fontWeight: FontWeight.w900, fontSize: 12.5),
                     ),
                     onPressed: () {
                       SeriousLeaderboardModal.show(context);
                     },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: seriousGold,
+                      side: const BorderSide(color: seriousGold, width: 1.2),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: _isManualSyncing
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: seriousGold,
+                            ),
+                          )
+                        : const Icon(Icons.cloud_sync_rounded, size: 18),
+                    label: Text(
+                      _isManualSyncing ? 'Sync...' : 'Sync Sheet',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                    onPressed: _isManualSyncing ? null : _handleManualSyncSpreadsheet,
                   ),
                 ),
               ],
@@ -2689,171 +2894,268 @@ class _TodoPageState extends State<TodoPage> {
                     ),
 
                     // Menu Titik Tiga
-                    PopupMenuButton<String>(
-                      icon: Icon(
-                        Icons.more_vert_rounded,
-                        color: _isSeriousMode
-                            ? Colors.white70
-                            : const Color(0xFF64748B),
-                        size: 20,
+                    Theme(
+                      data: Theme.of(context).copyWith(
+                        dividerTheme: DividerThemeData(
+                          color: _isSeriousMode
+                              ? seriousBorder
+                              : const Color(0xFFE2E8F0),
+                          thickness: 1,
+                          space: 1,
+                        ),
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      onSelected: (val) {
-                        if (val == 'add') {
-                          _showAddTaskDialog(group);
-                        } else if (val == 'alarm') {
-                          _showConfigureAlarmDialog(group);
-                        } else if (val == 'archive') {
-                          _archiveGroup(group);
-                        } else if (val == 'toggle_collapse') {
-                          _toggleGroupCollapse(group.id);
-                        } else if (val == 'complete_all') {
-                          setState(() {
-                            for (final i in group.items) {
-                              i.isCompleted = true;
-                            }
-                          });
-                          TodoAlarmService.cancelGroupAlarm(group.id);
-                          _saveTodoData();
-                        } else if (val == 'clear_completed') {
-                          setState(() {
-                            group.items.removeWhere((i) => i.isCompleted);
-                          });
-                          _saveTodoData();
-                        } else if (val == 'delete_section') {
-                          _confirmDeleteGroup(group);
-                        }
-                      },
-                      itemBuilder: (ctx) => [
-                        PopupMenuItem(
-                          value: 'add',
-                          child: Row(
-                            children: [
-                              Icon(Icons.add_rounded,
+                      child: PopupMenuButton<String>(
+                        icon: Icon(
+                          Icons.more_vert_rounded,
+                          color: _isSeriousMode
+                              ? Colors.white70
+                              : const Color(0xFF64748B),
+                          size: 20,
+                        ),
+                        color: _isSeriousMode ? seriousCardBg : Colors.white,
+                        surfaceTintColor: Colors.transparent,
+                        elevation: _isSeriousMode ? 8 : 4,
+                        shadowColor: _isSeriousMode
+                            ? Colors.black.withValues(alpha: 0.6)
+                            : Colors.black26,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          side: BorderSide(
+                            color: _isSeriousMode
+                                ? seriousBorder
+                                : const Color(0xFFE2E8F0),
+                            width: 1,
+                          ),
+                        ),
+                        onSelected: (val) {
+                          if (val == 'add') {
+                            _showAddTaskDialog(group);
+                          } else if (val == 'alarm') {
+                            _showConfigureAlarmDialog(group);
+                          } else if (val == 'archive') {
+                            _archiveGroup(group);
+                          } else if (val == 'toggle_collapse') {
+                            _toggleGroupCollapse(group.id);
+                          } else if (val == 'complete_all') {
+                            setState(() {
+                              for (final i in group.items) {
+                                i.isCompleted = true;
+                              }
+                            });
+                            TodoAlarmService.cancelGroupAlarm(group.id);
+                            _saveTodoData();
+                          } else if (val == 'clear_completed') {
+                            setState(() {
+                              group.items.removeWhere((i) => i.isCompleted);
+                            });
+                            _saveTodoData();
+                          } else if (val == 'delete_section') {
+                            _confirmDeleteGroup(group);
+                          }
+                        },
+                        itemBuilder: (ctx) => [
+                          PopupMenuItem(
+                            value: 'add',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.add_rounded,
                                   size: 18,
                                   color: _isSeriousMode
                                       ? seriousGold
-                                      : primaryTerracotta),
-                              const SizedBox(width: 8),
-                              const Text('Tambah Tugas',
-                                  style: TextStyle(fontSize: 13)),
-                            ],
+                                      : primaryTerracotta,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Tambah Tugas',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: _isSeriousMode
+                                        ? Colors.white
+                                        : const Color(0xFF1E293B),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        PopupMenuItem(
-                          value: 'alarm',
-                          child: Row(
-                            children: [
-                              Icon(
-                                group.reminderEnabled
-                                    ? Icons.alarm_on_rounded
-                                    : Icons.alarm_add_rounded,
-                                size: 18,
-                                color: _isSeriousMode
-                                    ? seriousGold
-                                    : primaryTerracotta,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                group.reminderEnabled
-                                    ? 'Atur Pengingat Alarm'
-                                    : 'Nyalakan Pengingat Alarm',
-                                style: const TextStyle(fontSize: 13),
-                              ),
-                            ],
+                          PopupMenuItem(
+                            value: 'alarm',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  group.reminderEnabled
+                                      ? Icons.alarm_on_rounded
+                                      : Icons.alarm_add_rounded,
+                                  size: 18,
+                                  color: _isSeriousMode
+                                      ? seriousGold
+                                      : primaryTerracotta,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  group.reminderEnabled
+                                      ? 'Atur Pengingat Alarm'
+                                      : 'Nyalakan Pengingat Alarm',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: _isSeriousMode
+                                        ? Colors.white
+                                        : const Color(0xFF1E293B),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        PopupMenuItem(
-                          value: 'archive',
-                          enabled:
-                              group.isAllCompleted && group.items.isNotEmpty,
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.archive_rounded,
-                                size: 18,
-                                color: (group.isAllCompleted &&
-                                        group.items.isNotEmpty)
-                                    ? accentCompleted
-                                    : const Color(0xFF94A3B8),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                (group.isAllCompleted && group.items.isNotEmpty)
-                                    ? 'Arsipkan Section'
-                                    : 'Arsipkan (Belum Selesai)',
-                                style: TextStyle(
-                                  fontSize: 13,
+                          PopupMenuItem(
+                            value: 'archive',
+                            enabled:
+                                group.isAllCompleted && group.items.isNotEmpty,
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.archive_rounded,
+                                  size: 18,
                                   color: (group.isAllCompleted &&
                                           group.items.isNotEmpty)
-                                      ? null
-                                      : const Color(0xFF94A3B8),
+                                      ? (_isSeriousMode
+                                          ? const Color(0xFF10B981)
+                                          : accentCompleted)
+                                      : (_isSeriousMode
+                                          ? Colors.white38
+                                          : const Color(0xFF94A3B8)),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'toggle_collapse',
-                          child: Row(
-                            children: [
-                              Icon(
-                                isCollapsed
-                                    ? Icons.unfold_more_rounded
-                                    : Icons.unfold_less_rounded,
-                                size: 18,
-                                color: const Color(0xFF64748B),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                isCollapsed ? 'Buka Section' : 'Tutup Section',
-                                style: const TextStyle(fontSize: 13),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuDivider(),
-                        const PopupMenuItem(
-                          value: 'complete_all',
-                          child: Row(
-                            children: [
-                              Icon(Icons.done_all_rounded,
-                                  size: 18, color: accentCompleted),
-                              SizedBox(width: 8),
-                              Text('Tandai Semua Selesai',
-                                  style: TextStyle(fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'clear_completed',
-                          child: Row(
-                            children: [
-                              Icon(Icons.cleaning_services_rounded,
-                                  size: 18, color: Colors.orange),
-                              SizedBox(width: 8),
-                              Text('Hapus Tugas Selesai',
-                                  style: TextStyle(fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuDivider(),
-                        const PopupMenuItem(
-                          value: 'delete_section',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete_outline_rounded,
-                                  size: 18, color: Colors.red),
-                              SizedBox(width: 8),
-                              Text('Hapus Section Ini',
+                                const SizedBox(width: 8),
+                                Text(
+                                  (group.isAllCompleted &&
+                                          group.items.isNotEmpty)
+                                      ? 'Arsipkan Section'
+                                      : 'Arsipkan (Belum Selesai)',
                                   style: TextStyle(
-                                      fontSize: 13, color: Colors.red)),
-                            ],
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: (group.isAllCompleted &&
+                                            group.items.isNotEmpty)
+                                        ? (_isSeriousMode
+                                            ? Colors.white
+                                            : const Color(0xFF1E293B))
+                                        : (_isSeriousMode
+                                            ? Colors.white38
+                                            : const Color(0xFF94A3B8)),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                          PopupMenuItem(
+                            value: 'toggle_collapse',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isCollapsed
+                                      ? Icons.unfold_more_rounded
+                                      : Icons.unfold_less_rounded,
+                                  size: 18,
+                                  color: _isSeriousMode
+                                      ? seriousGold
+                                      : const Color(0xFF64748B),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  isCollapsed
+                                      ? 'Buka Section'
+                                      : 'Tutup Section',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: _isSeriousMode
+                                        ? Colors.white
+                                        : const Color(0xFF1E293B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuDivider(),
+                          PopupMenuItem(
+                            value: 'complete_all',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.done_all_rounded,
+                                  size: 18,
+                                  color: _isSeriousMode
+                                      ? const Color(0xFF10B981)
+                                      : accentCompleted,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Tandai Semua Selesai',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: _isSeriousMode
+                                        ? Colors.white
+                                        : const Color(0xFF1E293B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'clear_completed',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.cleaning_services_rounded,
+                                  size: 18,
+                                  color: _isSeriousMode
+                                      ? seriousGold
+                                      : Colors.orange,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Hapus Tugas Selesai',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: _isSeriousMode
+                                        ? Colors.white
+                                        : const Color(0xFF1E293B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuDivider(),
+                          PopupMenuItem(
+                            value: 'delete_section',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.delete_outline_rounded,
+                                  size: 18,
+                                  color: _isSeriousMode
+                                      ? seriousFire
+                                      : Colors.red,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Hapus Section Ini',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: _isSeriousMode
+                                        ? seriousFire
+                                        : Colors.red,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(width: 4),
                   ],

@@ -5,9 +5,7 @@ import 'package:daily_apps/pages/daily_productivity_page.dart';
 import 'package:daily_apps/pages/todo_riwayat_page.dart';
 import 'package:daily_apps/pages/tugas_harian_page.dart';
 import 'package:daily_apps/utils/serious_mode_service.dart';
-import 'package:daily_apps/widgets/serious_leaderboard_widget.dart';
 import 'package:daily_apps/widgets/serious_mode_auth_dialog.dart';
-import 'package:daily_apps/widgets/serious_punishment_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -130,7 +128,7 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
   Widget build(BuildContext context) {
     return Drawer(
       backgroundColor:
-          _isSeriousMode ? const Color(0xFF090D16) : const Color(0xFFF7F9FC),
+          _isSeriousMode ? seriousBg : const Color(0xFFF7F9FC),
       child: Column(
         children: [
           // Drawer Header
@@ -188,24 +186,26 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
                           },
                         ),
 
-                        // Serious Mode Menu 2: Hukuman Olahraga
+                        // Serious Mode Menu 2: Activity
                         _buildMenuItem(
                           context: context,
-                          icon: Icons.fitness_center_rounded,
-                          iconColor: seriousFire,
-                          title: 'Hukuman Olahraga',
+                          icon: Icons.insights_rounded,
+                          iconColor: seriousGold,
+                          title: 'Activity',
                           subtitle:
-                              'Latihan fisik & hukuman disiplin tugas terlewat',
+                              'Kalender aktivitas harian & riwayat mode serius',
                           onTap: () {
                             Navigator.pop(context);
-                            SeriousPunishmentDialog.show(
+                            Navigator.push(
                               context,
-                              allGroups: widget.activeGroups,
-                              onCompleted: () {
-                                widget.onDataChanged?.call();
-                                _loadAllTodoData();
-                              },
-                            );
+                              MaterialPageRoute(
+                                builder: (_) => const DailyProductivityPage(
+                                    isSeriousMode: true),
+                              ),
+                            ).then((_) {
+                              widget.onDataChanged?.call();
+                              _loadAllTodoData();
+                            });
                           },
                         ),
 
@@ -428,14 +428,53 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
     );
   }
 
+  static const List<Map<String, dynamic>> _presetAvatars = [
+    {'emoji': '🦁', 'name': 'Singa Juara', 'color': 0xFFF59E0B},
+    {'emoji': '⚡', 'name': 'Flash Fokus', 'color': 0xFF3B82F6},
+    {'emoji': '👑', 'name': 'Sultan Task', 'color': 0xFFEAB308},
+    {'emoji': '🥷', 'name': 'Ninja Disiplin', 'color': 0xFF6366F1},
+    {'emoji': '🐉', 'name': 'Naga Produktif', 'color': 0xFF10B981},
+    {'emoji': '🚀', 'name': 'Rocket Man', 'color': 0xFFEC4899},
+    {'emoji': '🥊', 'name': 'Fighter', 'color': 0xFFEF4444},
+    {'emoji': '🧠', 'name': 'Mastermind', 'color': 0xFF8B5CF6},
+  ];
+
   Widget _buildSeriousDrawerHeader() {
     final playerName = _seriousUser?.displayName ?? 'Challenger';
+
+    Widget avatarChild;
+    if (_seriousUser?.avatarBase64 != null && _seriousUser!.avatarBase64!.isNotEmpty) {
+      try {
+        final bytes = base64Decode(_seriousUser!.avatarBase64!);
+        avatarChild = ClipOval(
+          child: Image.memory(
+            bytes,
+            width: 46,
+            height: 46,
+            fit: BoxFit.cover,
+          ),
+        );
+      } catch (_) {
+        final idx = (_seriousUser?.avatarIndex ?? 0).clamp(0, _presetAvatars.length - 1);
+        avatarChild = Text(_presetAvatars[idx]['emoji'] as String, style: const TextStyle(fontSize: 24));
+      }
+    } else if (_seriousUser != null) {
+      final idx = _seriousUser!.avatarIndex.clamp(0, _presetAvatars.length - 1);
+      avatarChild = Text(_presetAvatars[idx]['emoji'] as String, style: const TextStyle(fontSize: 24));
+    } else {
+      avatarChild = const Icon(
+        Icons.local_fire_department_rounded,
+        color: Colors.white,
+        size: 26,
+      );
+    }
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 48, 20, 24),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+          colors: [Color(0xFF0F172A), Color(0xFF1E1B4B)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -454,7 +493,7 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(14),
+                  shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
                       color: seriousFire.withValues(alpha: 0.35),
@@ -463,11 +502,8 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.local_fire_department_rounded,
-                  color: Colors.white,
-                  size: 26,
-                ),
+                alignment: Alignment.center,
+                child: avatarChild,
               ),
               const SizedBox(width: 12),
               Expanded(

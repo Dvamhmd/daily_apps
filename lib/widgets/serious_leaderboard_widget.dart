@@ -397,45 +397,49 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Crown & Avatar
-        Text(crownIcon, style: const TextStyle(fontSize: 22)),
-        const SizedBox(height: 4),
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: badgeColor, width: 2.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: badgeColor.withValues(alpha: 0.3),
-                    blurRadius: 10,
-                  ),
-                ],
-              ),
-              child: _buildAvatar(user, size: rank == 1 ? 58 : 48),
-            ),
-            Positioned(
-              bottom: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(4),
+        // Crown & Avatar with Bouncy "Tuing-Tuing" Animation
+        _BouncingPodiumAvatar(
+          rank: rank,
+          crownIcon: crownIcon,
+          badgeColor: badgeColor,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
                 decoration: BoxDecoration(
-                  color: badgeColor,
                   shape: BoxShape.circle,
+                  border: Border.all(color: badgeColor, width: 2.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: badgeColor.withValues(alpha: rank == 1 ? 0.45 : 0.3),
+                      blurRadius: rank == 1 ? 14 : 10,
+                      spreadRadius: rank == 1 ? 1.5 : 0,
+                    ),
+                  ],
                 ),
-                child: Text(
-                  '#$rank',
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w900,
+                child: _buildAvatar(user, size: rank == 1 ? 58 : 48),
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: badgeColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '#$rank',
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 8),
 
@@ -574,3 +578,164 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
     );
   }
 }
+
+/// Widget animasi "Tuing-Tuing" untuk avatar podium Top 3
+class _BouncingPodiumAvatar extends StatefulWidget {
+  final Widget child;
+  final String crownIcon;
+  final int rank;
+  final Color badgeColor;
+
+  const _BouncingPodiumAvatar({
+    required this.child,
+    required this.crownIcon,
+    required this.rank,
+    required this.badgeColor,
+  });
+
+  @override
+  State<_BouncingPodiumAvatar> createState() => _BouncingPodiumAvatarState();
+}
+
+class _BouncingPodiumAvatarState extends State<_BouncingPodiumAvatar>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _bounceAnimation;
+  late Animation<double> _tiltAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Durasi berbeda tiap rank agar gerakan tuing-tuing terlihat dinamis & tidak kaku bersamaan
+    final durationMs = widget.rank == 1
+        ? 1200
+        : (widget.rank == 2 ? 1450 : 1350);
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: durationMs),
+    );
+
+    // Ketinggian memantul (Rank 1 melompat lebih tinggi & bangga)
+    final bounceHeight = widget.rank == 1
+        ? -13.0
+        : (widget.rank == 2 ? -9.5 : -8.0);
+
+    _bounceAnimation = Tween<double>(
+      begin: 0.0,
+      end: bounceHeight,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeInOutSine,
+      ),
+    );
+
+    // Goyangan mahkota (Crown tilt tuing-tuing)
+    final maxTilt = widget.rank == 1
+        ? 0.08
+        : (widget.rank == 2 ? -0.06 : 0.06);
+
+    _tiltAnimation = Tween<double>(
+      begin: -maxTilt,
+      end: maxTilt,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeInOutSine,
+      ),
+    );
+
+    // Delay start bertahap berdasarkan rank
+    Future.delayed(Duration(milliseconds: widget.rank * 150), () {
+      if (mounted) {
+        _controller.repeat(reverse: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final t = _controller.value; // 0.0 (bawah/mendarat) -> 1.0 (puncak pantulan)
+
+        // Squash & Stretch cartoonish "Tuing-Tuing":
+        // Saat di bawah (mendarat): agak gepeng/squash (scaleY = 0.93, scaleX = 1.07)
+        // Saat di puncak (terbang): memanjang/stretch (scaleY = 1.06, scaleX = 0.95)
+        final scaleX = 1.07 - (0.12 * t);
+        final scaleY = 0.93 + (0.13 * t);
+        final yOffset = _bounceAnimation.value;
+        final tilt = _tiltAnimation.value;
+
+        // Shadow di bawah avatar yang membesar & mengecil mengikuti tinggi pantulan
+        final shadowWidth = (widget.rank == 1 ? 46.0 : 38.0) * (1.1 - 0.28 * t);
+        final shadowOpacity = (0.38 - (0.18 * t)).clamp(0.1, 0.45);
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Mahkota dengan animasi goyang tuing-tuing
+            Transform.translate(
+              offset: Offset(0, yOffset * 0.45),
+              child: Transform.rotate(
+                angle: tilt,
+                child: Text(
+                  widget.crownIcon,
+                  style: TextStyle(
+                    fontSize: widget.rank == 1 ? 24 : 21,
+                    shadows: [
+                      Shadow(
+                        color: widget.badgeColor.withValues(alpha: 0.6),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 3),
+
+            // Avatar dengan squash & stretch bounce
+            Transform.translate(
+              offset: Offset(0, yOffset),
+              child: Transform.scale(
+                alignment: Alignment.bottomCenter,
+                scaleX: scaleX,
+                scaleY: scaleY,
+                child: widget.child,
+              ),
+            ),
+            const SizedBox(height: 3),
+
+            // Bayangan kontak di atas podium yang dinamis
+            Container(
+              height: 4,
+              width: shadowWidth,
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: shadowOpacity),
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: widget.badgeColor.withValues(alpha: shadowOpacity * 0.4),
+                    blurRadius: 4,
+                    spreadRadius: 0.5,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+

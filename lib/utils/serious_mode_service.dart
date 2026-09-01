@@ -256,10 +256,14 @@ class SeriousModeService {
   /// URL Spreadsheet Web App terpusat khusus untuk Mode Serius To Do List
   static Future<String> getEffectiveSpreadsheetUrl() async {
     final prefs = await SharedPreferences.getInstance();
+    
+    // 1. Cek konfigurasi URL spreadsheet khusus mode serius jika ada
     final customUrl = prefs.getString(prefKeySeriousWebAppUrl);
     if (customUrl != null && customUrl.trim().isNotEmpty) {
       return customUrl.trim();
     }
+
+    // 2. Gunakan URL terpusat Mode Serius yang ditentukan
     return defaultSeriousWebAppUrl;
   }
 
@@ -271,37 +275,19 @@ class SeriousModeService {
   /// Helper untuk mengirim HTTP Request ke Google Apps Script Web App (Mendukung Flutter Web & Mobile)
   static Future<Map<String, dynamic>?> _sendSpreadsheetRequest(
     Map<String, dynamic> payload, {
-    Duration timeout = const Duration(seconds: 6),
+    Duration timeout = const Duration(seconds: 8),
   }) async {
     final targetUrl = await getEffectiveSpreadsheetUrl();
     if (targetUrl.isEmpty) return null;
     final bodyJson = jsonEncode(payload);
     final uri = Uri.parse(targetUrl);
     final action = payload['action']?.toString() ?? 'get_leaderboard';
+    final isMutation = action.startsWith('register_') ||
+        action.startsWith('sync_') ||
+        action.startsWith('save_');
 
-    // 1. Pada Flutter Web atau Read Request: gunakan GET query parameter (paling cepat & anti-CORS preflight)
-    if (kIsWeb || action.startsWith('get_')) {
-      try {
-        final getUri = uri.replace(
-          queryParameters: {
-            'action': action,
-            'payload': bodyJson,
-          },
-        );
-        final getRes = await _httpClient.get(getUri).timeout(timeout);
-        if (getRes.statusCode == 200) {
-          final decoded = jsonDecode(getRes.body);
-          if (decoded is Map<String, dynamic>) {
-            return decoded;
-          }
-        }
-      } catch (e) {
-        debugPrint('Spreadsheet GET request error: $e');
-      }
-    }
-
-    // 2. Pada non-web atau Fallback: gunakan POST request langsung
-    if (!kIsWeb) {
+    // 1. Jika aksi mutasi/penyimpanan atau payload besar, coba POST dengan text/plain (CORS Simple Request & anti URL length limit)
+    if (isMutation || bodyJson.length > 500) {
       try {
         final postRes = await _httpClient.post(
           uri,
@@ -315,14 +301,71 @@ class SeriousModeService {
             final redirectedRes =
                 await _httpClient.get(Uri.parse(loc)).timeout(timeout);
             if (redirectedRes.statusCode == 200) {
-              return jsonDecode(redirectedRes.body) as Map<String, dynamic>;
+              final decoded = jsonDecode(redirectedRes.body);
+              if (decoded is Map<String, dynamic>) {
+                return decoded;
+              }
             }
           }
         } else if (postRes.statusCode == 200) {
-          return jsonDecode(postRes.body) as Map<String, dynamic>;
+          final decoded = jsonDecode(postRes.body);
+          if (decoded is Map<String, dynamic>) {
+            return decoded;
+          }
         }
       } catch (e) {
         debugPrint('Spreadsheet POST request error: $e');
+      }
+    }
+
+    // 2. Gunakan GET query parameter (Paling cepat untuk read request & Flutter Web fallback)
+    try {
+      final getUri = uri.replace(
+        queryParameters: {
+          'action': action,
+          'payload': bodyJson,
+        },
+      );
+      final getRes = await _httpClient.get(getUri).timeout(timeout);
+      if (getRes.statusCode == 200) {
+        final decoded = jsonDecode(getRes.body);
+        if (decoded is Map<String, dynamic>) {
+          return decoded;
+        }
+      }
+    } catch (e) {
+      debugPrint('Spreadsheet GET request error: $e');
+    }
+
+    // 3. Fallback POST jika sebelumnya belum mencoba POST
+    if (!isMutation && bodyJson.length <= 500) {
+      try {
+        final postRes = await _httpClient.post(
+          uri,
+          headers: {'Content-Type': 'text/plain;charset=utf-8'},
+          body: bodyJson,
+        ).timeout(timeout);
+
+        if (postRes.statusCode >= 300 && postRes.statusCode < 400) {
+          final loc = postRes.headers['location'];
+          if (loc != null) {
+            final redirectedRes =
+                await _httpClient.get(Uri.parse(loc)).timeout(timeout);
+            if (redirectedRes.statusCode == 200) {
+              final decoded = jsonDecode(redirectedRes.body);
+              if (decoded is Map<String, dynamic>) {
+                return decoded;
+              }
+            }
+          }
+        } else if (postRes.statusCode == 200) {
+          final decoded = jsonDecode(postRes.body);
+          if (decoded is Map<String, dynamic>) {
+            return decoded;
+          }
+        }
+      } catch (e) {
+        debugPrint('Spreadsheet POST fallback error: $e');
       }
     }
 
@@ -478,6 +521,93 @@ class SeriousModeService {
     return {'success': true, 'user': newUser};
   }
 
+  /// Update data profil pengguna (Display Name, Username, Foto Avatar / Preset Emoji, Password opsional)
+  static Future<Map<String, dynamic>> updateUserProfile({
+    required String newDisplayName,
+    required String newUsername,
+    String? newPassword,
+    String? avatarBase64,
+    int? avatarIndex,
+  }) async {
+    final currentUser = await getCurrentUser();
+    if (currentUser == null) {
+      return {'success': false, 'message': 'Tidak ada akun aktif yang login!'};
+    }
+
+    final cleanNewUsername = newUsername.trim().toLowerCase();
+    final cleanNewDisplayName = newDisplayName.trim();
+    final oldUsername = currentUser.username.trim().toLowerCase();
+
+    if (cleanNewUsername.isEmpty) {
+      return {'success': false, 'message': 'Username tidak boleh kosong!'};
+    }
+
+    // Jika username diubah, validasi apakah username baru sudah digunakan akun lain
+    if (cleanNewUsername != oldUsername) {
+      final isTaken = await isUsernameRegisteredInSpreadsheet(cleanNewUsername);
+      if (isTaken) {
+        return {
+          'success': false,
+          'message':
+              'Username "$cleanNewUsername" sudah digunakan akun lain. Silakan pilih username lain!'
+        };
+      }
+    }
+
+    final updatedUser = currentUser.copyWith(
+      username: cleanNewUsername,
+      displayName: cleanNewDisplayName.isNotEmpty ? cleanNewDisplayName : cleanNewUsername,
+      password: (newPassword != null && newPassword.trim().isNotEmpty)
+          ? newPassword.trim()
+          : currentUser.password,
+      avatarBase64: avatarBase64,
+      avatarIndex: avatarIndex ?? currentUser.avatarIndex,
+      lastActiveAt: DateTime.now(),
+    );
+
+    final prefs = await SharedPreferences.getInstance();
+
+    // Jika username berubah, migrasikan data tasks & punishment lokal ke key username baru
+    if (cleanNewUsername != oldUsername) {
+      final oldTodoKey = getSeriousTodoGroupsKey(oldUsername);
+      final newTodoKey = getSeriousTodoGroupsKey(cleanNewUsername);
+      if (prefs.containsKey(oldTodoKey)) {
+        final todoData = prefs.getString(oldTodoKey);
+        if (todoData != null && todoData.isNotEmpty) {
+          await prefs.setString(newTodoKey, todoData);
+        }
+      }
+
+      final oldPunishmentKey = getPunishmentStatesKey(oldUsername);
+      final newPunishmentKey = getPunishmentStatesKey(cleanNewUsername);
+      if (prefs.containsKey(oldPunishmentKey)) {
+        final punishmentData = prefs.getString(oldPunishmentKey);
+        if (punishmentData != null && punishmentData.isNotEmpty) {
+          await prefs.setString(newPunishmentKey, punishmentData);
+        }
+      }
+    }
+
+    // Simpan ke lokal
+    await saveCurrentUser(updatedUser);
+
+    // Perbarui cache in-memory
+    if (_cachedRemoteUsers != null) {
+      _cachedRemoteUsers!.removeWhere((u) =>
+          u.id == updatedUser.id || u.username.toLowerCase() == oldUsername);
+      _cachedRemoteUsers!.add(updatedUser);
+      _lastFetchTime = DateTime.now();
+    }
+
+    // Sinkronisasi data user terupdate ke Google Spreadsheet
+    await _sendSpreadsheetRequest({
+      'action': 'sync_serious_user',
+      'user': updatedUser.toJson(),
+    });
+
+    return {'success': true, 'user': updatedUser};
+  }
+
   /// Login Pengguna Mode Serius:
   /// 1. Username dan password dicocokkan langsung dari data yang ada di Google Spreadsheets
   /// 2. Fallback ke lokal jika spreadsheet sedang tidak terjangkau (offline)
@@ -602,7 +732,7 @@ class SeriousModeService {
     user.lastActiveAt = DateTime.now();
 
     await saveCurrentUser(user);
-    _syncUserToSpreadsheet(user);
+    await _syncUserToSpreadsheet(user);
   }
 
   /// Catat Hukuman yang Diambil
@@ -611,7 +741,7 @@ class SeriousModeService {
     if (user == null) return;
     user.totalPunishmentsTaken += 1;
     await saveCurrentUser(user);
-    _syncUserToSpreadsheet(user);
+    await _syncUserToSpreadsheet(user);
   }
 
   /// Ambil Leaderboard Seluruh Users dari Spreadsheet (Diurutkan berdasarkan poin tertinggi)
@@ -1064,54 +1194,41 @@ class SeriousModeService {
     await _saveAllLocalUsers(allUsers);
   }
 
-  static final Set<String> _syncingUserKeys = {};
+  /// Sinkronisasi data user ke Spreadsheet Apps Script secara andal (payload ringkas & cepat)
+  static Future<bool> _syncUserToSpreadsheet(SeriousUser user, {bool includeAvatar = false}) async {
+    final Map<String, dynamic> userPayload = {
+      'id': user.id,
+      'username': user.username,
+      'displayName': user.displayName,
+      'avatarIndex': user.avatarIndex,
+      'totalPoints': user.totalPoints,
+      'totalTasksCompleted': user.totalTasksCompleted,
+      'totalPunishmentsTaken': user.totalPunishmentsTaken,
+      'registeredAt': user.registeredAt.toIso8601String(),
+      'lastActiveAt': user.lastActiveAt.toIso8601String(),
+    };
 
-  /// Sinkronisasi data user ke Spreadsheet Apps Script (Single dispatch & anti-duplikasi)
-  static Future<void> _syncUserToSpreadsheet(SeriousUser user) async {
-    final syncKey = '${user.id}_${user.totalPoints}_${user.totalTasksCompleted}_${user.totalPunishmentsTaken}';
-    if (_syncingUserKeys.contains(syncKey)) return;
-    _syncingUserKeys.add(syncKey);
+    if (includeAvatar && user.avatarBase64 != null) {
+      userPayload['avatarBase64'] = user.avatarBase64;
+    }
+    if (user.password.isNotEmpty) {
+      userPayload['password'] = user.password;
+    }
 
-    final targetUrl = await getEffectiveSpreadsheetUrl();
-    if (targetUrl.isEmpty) return;
     final payload = {
       'action': 'sync_serious_user',
-      'user': user.toJson(),
+      'user': userPayload,
     };
-    final bodyJson = jsonEncode(payload);
-    final uri = Uri.parse(targetUrl);
 
     try {
-      if (kIsWeb) {
-        // Di Flutter Web / Chrome, gunakan single GET request agar tidak terjadi CORS redirect retry ganda
-        final getUri = uri.replace(
-          queryParameters: {
-            'action': 'sync_serious_user',
-            'payload': bodyJson,
-          },
-        );
-        await http.get(getUri).timeout(const Duration(seconds: 6));
-      } else {
-        // Di Mobile / Desktop
-        final response = await http.post(
-          uri,
-          headers: {'Content-Type': 'text/plain;charset=utf-8'},
-          body: bodyJson,
-        ).timeout(const Duration(seconds: 6));
-
-        if (response.statusCode >= 300 && response.statusCode < 400) {
-          final loc = response.headers['location'];
-          if (loc != null) {
-            await http.get(Uri.parse(loc));
-          }
-        }
-      }
+      final res = await _sendSpreadsheetRequest(
+        payload,
+        timeout: const Duration(seconds: 15),
+      );
+      return res != null && res['status'] == 'success';
     } catch (e) {
       debugPrint('Sync serious user to sheet error: $e');
-    } finally {
-      Future.delayed(const Duration(seconds: 3), () {
-        _syncingUserKeys.remove(syncKey);
-      });
+      return false;
     }
   }
 
@@ -1127,7 +1244,7 @@ class SeriousModeService {
       final res = await _sendSpreadsheetRequest({
         'action': 'get_serious_tasks',
         'username': cleanUsername,
-      });
+      }, timeout: const Duration(seconds: 15));
 
       if (res != null && res['status'] == 'success') {
         final tasksRaw = res['tasks'] ?? res['data'];
@@ -1173,7 +1290,7 @@ class SeriousModeService {
     if (user == null || user.username.trim().isEmpty) return;
 
     _tasksSyncDebounceTimer?.cancel();
-    _tasksSyncDebounceTimer = Timer(const Duration(milliseconds: 1500), () async {
+    _tasksSyncDebounceTimer = Timer(const Duration(milliseconds: 800), () async {
       final encoded = jsonEncode(groups.map((g) => g.toJson()).toList());
       final hash = '${user.username}_${encoded.hashCode}';
       if (_lastSyncedTasksHash == hash) return;
@@ -1186,11 +1303,36 @@ class SeriousModeService {
       };
 
       try {
-        await _sendSpreadsheetRequest(payload);
+        await _sendSpreadsheetRequest(payload, timeout: const Duration(seconds: 15));
       } catch (e) {
         debugPrint('Schedule tasks cloud sync error: $e');
       }
     });
+  }
+
+  /// Sinkronisasi instan menyeluruh (Data user, total poin, total tasks selesai, dan tasks JSON) ke Spreadsheet
+  static Future<Map<String, dynamic>> syncAllDataToSpreadsheet({
+    List<TodoDateGroup>? groups,
+    SeriousUser? targetUser,
+  }) async {
+    final user = targetUser ?? await getCurrentUser();
+    if (user == null) {
+      return {'success': false, 'message': 'Tidak ada akun Mode Serius yang aktif'};
+    }
+
+    if (groups != null && groups.isNotEmpty) {
+      await recalculateAndSyncUserProgress(groups, targetUser: user);
+      final encoded = jsonEncode(groups.map((g) => g.toJson()).toList());
+      await _sendSpreadsheetRequest({
+        'action': 'sync_serious_tasks',
+        'username': user.username.trim().toLowerCase(),
+        'tasksJson': encoded,
+      }, timeout: const Duration(seconds: 15));
+    } else {
+      await _syncUserToSpreadsheet(user);
+    }
+
+    return {'success': true, 'user': user};
   }
 
   /// Template Kode Google Apps Script untuk penanganan Mode Serius di Spreadsheet
@@ -1320,17 +1462,32 @@ function handleSeriousModeActions(data, ss) {
       });
     }
 
+    var existingRow = (foundRowIndex !== -1 && values[foundRowIndex - 1]) ? values[foundRowIndex - 1] : null;
+
+    var finalId = u.id || (existingRow ? existingRow[0] : ("usr_" + new Date().getTime()));
+    var finalPass = (u.password !== undefined && u.password !== null && u.password !== "")
+        ? u.password
+        : (existingRow ? existingRow[2] : "");
+    var finalDisplayName = u.displayName || (existingRow ? existingRow[3] : username);
+    var finalAvatarIndex = (u.avatarIndex !== undefined && u.avatarIndex !== null)
+        ? (parseInt(u.avatarIndex) || 0)
+        : (existingRow ? (parseInt(existingRow[4]) || 0) : 0);
+    var finalAvatarBase64 = (u.avatarBase64 !== undefined && u.avatarBase64 !== null && u.avatarBase64 !== "")
+        ? u.avatarBase64
+        : (existingRow ? existingRow[5] : "");
+    var finalRegisteredAt = u.registeredAt || (existingRow ? existingRow[9] : new Date().toISOString());
+
     var rowData = [
-      u.id || ("usr_" + new Date().getTime()),
+      finalId,
       username,
-      u.password || "",
-      u.displayName || username,
-      parseInt(u.avatarIndex) || 0,
-      u.avatarBase64 || "",
+      finalPass,
+      finalDisplayName,
+      finalAvatarIndex,
+      finalAvatarBase64,
       parseInt(u.totalPoints) || 0,
       parseInt(u.totalTasksCompleted) || 0,
       parseInt(u.totalPunishmentsTaken) || 0,
-      u.registeredAt || new Date().toISOString(),
+      finalRegisteredAt,
       new Date().toISOString()
     ];
 
