@@ -6,8 +6,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:daily_apps/utils/serious_mode_service.dart';
+
 class TodoRiwayatPage extends StatefulWidget {
-  const TodoRiwayatPage({super.key});
+  final bool isSeriousMode;
+
+  const TodoRiwayatPage({
+    super.key,
+    this.isSeriousMode = false,
+  });
 
   @override
   State<TodoRiwayatPage> createState() => _TodoRiwayatPageState();
@@ -15,9 +22,18 @@ class TodoRiwayatPage extends StatefulWidget {
 
 class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
   static const Color primaryTerracotta = Color(0xFFBA5A3A);
+  static const Color seriousBg = Color(0xFF0F172A);
+  static const Color seriousCardBg = Color(0xFF1E293B);
+  static const Color seriousCardBorder = Color(0xFF334155);
+  static const Color seriousGold = Color(0xFFF59E0B);
+  static const Color seriousFire = Color(0xFFEF4444);
   static const Color accentCompleted = Color(0xFF2E7D32);
 
-  static const String _prefsKey = 'daily_apps_todo_groups_v1';
+  static const String _prefsKeyNormal = SeriousModeService.prefKeyNormalTodoGroups;
+  static const String _prefsKeySerious = SeriousModeService.prefKeySeriousTodoGroups;
+
+  String get _prefsKey =>
+      widget.isSeriousMode ? _prefsKeySerious : _prefsKeyNormal;
 
   List<TodoDateGroup> _allGroups = [];
   final Set<String> _collapsedGroupIds = {};
@@ -30,10 +46,19 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
     _loadData();
   }
 
+  Future<String> _getEffectiveKey() async {
+    if (widget.isSeriousMode) {
+      final user = await SeriousModeService.getCurrentUser();
+      return SeriousModeService.getSeriousTodoGroupsKey(user?.id);
+    }
+    return SeriousModeService.prefKeyNormalTodoGroups;
+  }
+
   Future<void> _loadData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final String? jsonStr = prefs.getString(_prefsKey);
+      final key = await _getEffectiveKey();
+      final String? jsonStr = prefs.getString(key);
       if (jsonStr != null && jsonStr.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(jsonStr);
         _allGroups = decoded
@@ -54,10 +79,11 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
   Future<void> _saveData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final key = await _getEffectiveKey();
       final String encoded = jsonEncode(
         _allGroups.map((group) => group.toJson()).toList(),
       );
-      await prefs.setString(_prefsKey, encoded);
+      await prefs.setString(key, encoded);
     } catch (e) {
       debugPrint('Error saving todos: $e');
     }
@@ -123,32 +149,40 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
     _saveData();
   }
 
-  /// Hapus Riwayat Section
+  /// Hapus satu section selesai permanen
   Future<void> _deleteCompletedSection(TodoDateGroup group) async {
+    final isDark = widget.isSeriousMode;
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
+          backgroundColor: isDark ? seriousCardBg : Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: isDark ? seriousCardBorder : Colors.transparent,
+            ),
           ),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.delete_sweep_rounded, color: Colors.red, size: 24),
-              SizedBox(width: 10),
+              const Icon(Icons.delete_sweep_rounded, color: Colors.red, size: 24),
+              const SizedBox(width: 10),
               Text(
                 'Hapus Riwayat?',
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                  color: isDark ? Colors.white : const Color(0xFF1E293B),
                 ),
               ),
             ],
           ),
           content: Text(
             'Hapus permanen riwayat to-do pada tanggal "${group.formattedFullDate}"?',
-            style: const TextStyle(fontSize: 13.5, color: Color(0xFF475569)),
+            style: TextStyle(
+              fontSize: 13.5,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+            ),
           ),
           actions: [
             TextButton(
@@ -189,30 +223,38 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
   Future<void> _clearAllCompleted() async {
     if (_archivedGroups.isEmpty) return;
 
+    final isDark = widget.isSeriousMode;
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
+          backgroundColor: isDark ? seriousCardBg : Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: isDark ? seriousCardBorder : Colors.transparent,
+            ),
           ),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.red, size: 24),
-              SizedBox(width: 10),
+              const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 24),
+              const SizedBox(width: 10),
               Text(
                 'Hapus Semua Riwayat?',
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                  color: isDark ? Colors.white : const Color(0xFF1E293B),
                 ),
               ),
             ],
           ),
-          content: const Text(
+          content: Text(
             'Apakah kamu yakin ingin menghapus seluruh riwayat section to-do yang sudah diarsipkan?',
-            style: TextStyle(fontSize: 13.5, color: Color(0xFF475569)),
+            style: TextStyle(
+              fontSize: 13.5,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+            ),
           ),
           actions: [
             TextButton(
@@ -246,11 +288,12 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
   @override
   Widget build(BuildContext context) {
     final archivedList = _archivedGroups;
+    final isDark = widget.isSeriousMode;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFBF8F6),
+      backgroundColor: isDark ? seriousBg : const Color(0xFFFBF8F6),
       appBar: AppBar(
-        backgroundColor: primaryTerracotta,
+        backgroundColor: isDark ? seriousBg : primaryTerracotta,
         centerTitle: true,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -259,14 +302,22 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
           statusBarIconBrightness: Brightness.light,
           statusBarBrightness: Brightness.dark,
         ),
-        title: const Row(
+        title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.history_toggle_off_rounded, color: Colors.white, size: 22),
-            SizedBox(width: 8),
+            Icon(
+              isDark
+                  ? Icons.history_rounded
+                  : Icons.history_toggle_off_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
+            const SizedBox(width: 8),
             Text(
-              'Riwayat Task',
-              style: TextStyle(
+              isDark
+                  ? 'Riwayat Task (Mode Serius)'
+                  : 'Riwayat Task',
+              style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
                 fontSize: 17.5,
@@ -284,12 +335,14 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
         ],
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: primaryTerracotta),
+          ? Center(
+              child: CircularProgressIndicator(
+                color: isDark ? seriousGold : primaryTerracotta,
+              ),
             )
           : RefreshIndicator(
               onRefresh: _loadData,
-              color: primaryTerracotta,
+              color: isDark ? seriousGold : primaryTerracotta,
               child: ResponsiveContentWrapper(
                 maxWidth: 720,
                 child: ListView(
@@ -303,15 +356,24 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF2E7D32), Color(0xFF1B5E20)],
+                        gradient: LinearGradient(
+                          colors: isDark
+                              ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+                              : [const Color(0xFF2E7D32), const Color(0xFF1B5E20)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                          color: isDark
+                              ? seriousGold.withValues(alpha: 0.35)
+                              : Colors.transparent,
+                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: accentCompleted.withValues(alpha: 0.28),
+                            color: isDark
+                                ? Colors.black.withValues(alpha: 0.35)
+                                : accentCompleted.withValues(alpha: 0.28),
                             blurRadius: 15,
                             offset: const Offset(0, 6),
                           ),
@@ -329,22 +391,28 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.2),
+                                  color: isDark
+                                      ? seriousGold.withValues(alpha: 0.2)
+                                      : Colors.white.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(12),
+                                  border: isDark
+                                      ? Border.all(
+                                          color: seriousGold.withValues(alpha: 0.4))
+                                      : null,
                                 ),
-                                child: const Text(
-                                  'ARCHIVED SECTIONS',
+                                child: Text(
+                                  isDark ? 'ARSIP MODE SERIUS 🔥' : 'ARCHIVED SECTIONS',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: isDark ? seriousGold : Colors.white,
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 0.8,
                                   ),
                                 ),
                               ),
-                              const Icon(
+                              Icon(
                                 Icons.archive_rounded,
-                                color: Colors.white,
+                                color: isDark ? seriousGold : Colors.white,
                                 size: 22,
                               ),
                             ],
@@ -360,7 +428,9 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Daftar section to-do yang telah diselesaikan dan kamu arsipkan.',
+                            isDark
+                                ? 'Daftar riwayat tugas mode serius yang telah diselesaikan dan diarsipkan.'
+                                : 'Daftar section to-do yang telah diselesaikan dan kamu arsipkan.',
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.88),
                               fontSize: 12.5,
@@ -372,11 +442,13 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                               _buildStatBadge(
                                 '${archivedList.length} Section',
                                 Icons.calendar_today_rounded,
+                                isDark: isDark,
                               ),
                               const SizedBox(width: 10),
                               _buildStatBadge(
                                 '$_totalCompletedTasks Tugas',
                                 Icons.task_alt_rounded,
+                                isDark: isDark,
                               ),
                             ],
                           ),
@@ -393,17 +465,22 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                           _searchQuery = val;
                         });
                       },
+                      style: TextStyle(
+                        color: isDark ? Colors.white : const Color(0xFF1E293B),
+                      ),
                       decoration: InputDecoration(
                         hintText: 'Cari riwayat tugas atau tanggal...',
-                        hintStyle:
-                            TextStyle(color: Colors.grey[400], fontSize: 13.5),
-                        prefixIcon: const Icon(
+                        hintStyle: TextStyle(
+                          color: isDark ? const Color(0xFF94A3B8) : Colors.grey[400],
+                          fontSize: 13.5,
+                        ),
+                        prefixIcon: Icon(
                           Icons.search_rounded,
-                          color: accentCompleted,
+                          color: isDark ? seriousGold : accentCompleted,
                           size: 20,
                         ),
                         filled: true,
-                        fillColor: Colors.white,
+                        fillColor: isDark ? seriousCardBg : Colors.white,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 12,
@@ -411,19 +488,23 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
                           borderSide: BorderSide(
-                            color: accentCompleted.withValues(alpha: 0.15),
+                            color: isDark
+                                ? seriousCardBorder
+                                : accentCompleted.withValues(alpha: 0.15),
                           ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
                           borderSide: BorderSide(
-                            color: Colors.black.withValues(alpha: 0.05),
+                            color: isDark
+                                ? seriousCardBorder
+                                : Colors.black.withValues(alpha: 0.05),
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(
-                            color: accentCompleted,
+                          borderSide: BorderSide(
+                            color: isDark ? seriousGold : accentCompleted,
                             width: 1.5,
                           ),
                         ),
@@ -448,22 +529,31 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
     );
   }
 
-  Widget _buildStatBadge(String label, IconData icon) {
+  Widget _buildStatBadge(String label, IconData icon, {required bool isDark}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.18),
+        color: isDark
+            ? seriousGold.withValues(alpha: 0.15)
+            : Colors.white.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(12),
+        border: isDark
+            ? Border.all(color: seriousGold.withValues(alpha: 0.35))
+            : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: Colors.white, size: 14),
+          Icon(
+            icon,
+            color: isDark ? seriousGold : Colors.white,
+            size: 14,
+          ),
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: isDark ? seriousGold : Colors.white,
               fontSize: 12,
               fontWeight: FontWeight.bold,
             ),
@@ -475,19 +565,24 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
 
   Widget _buildCompletedGroupCard(TodoDateGroup group) {
     final isCollapsed = _isGroupCollapsed(group.id);
+    final isDark = widget.isSeriousMode;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? seriousCardBg : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: accentCompleted.withValues(alpha: 0.25),
+          color: isDark
+              ? seriousCardBorder
+              : accentCompleted.withValues(alpha: 0.25),
           width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.25)
+                : Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -503,18 +598,20 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
               onTap: () => _toggleGroupCollapse(group.id),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                color: accentCompleted.withValues(alpha: 0.08),
+                color: isDark
+                    ? const Color(0xFF0F172A).withValues(alpha: 0.6)
+                    : accentCompleted.withValues(alpha: 0.08),
                 child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(7),
                       decoration: BoxDecoration(
-                        color: accentCompleted,
+                        color: isDark ? seriousGold : accentCompleted,
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.done_all_rounded,
-                        color: Colors.white,
+                        color: isDark ? Colors.black : Colors.white,
                         size: 16,
                       ),
                     ),
@@ -525,10 +622,10 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                         children: [
                           Text(
                             group.formattedFullDate,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E293B),
+                              color: isDark ? Colors.white : const Color(0xFF1E293B),
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -536,9 +633,9 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                             children: [
                               Text(
                                 '${group.totalCount} Tugas selesai',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11.5,
-                                  color: accentCompleted,
+                                  color: isDark ? const Color(0xFFFDE68A) : accentCompleted,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -550,9 +647,9 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
 
                     // Tombol Kembalikan / Batalkan Arsip (Unarchive)
                     IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.unarchive_rounded,
-                        color: primaryTerracotta,
+                        color: isDark ? seriousGold : primaryTerracotta,
                         size: 20,
                       ),
                       tooltip: 'Kembalikan ke Daftar Aktif',
@@ -566,9 +663,9 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                         turns: isCollapsed ? 0.0 : 0.5,
                         duration: const Duration(milliseconds: 280),
                         curve: Curves.easeInOutCubic,
-                        child: const Icon(
+                        child: Icon(
                           Icons.keyboard_arrow_down_rounded,
-                          color: accentCompleted,
+                          color: isDark ? seriousGold : accentCompleted,
                           size: 22,
                         ),
                       ),
@@ -607,7 +704,7 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                           Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
-                              vertical: 4,
+                              vertical: 6,
                             ),
                             child: Row(
                               children: [
@@ -616,15 +713,15 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                                   height: 20,
                                   decoration: BoxDecoration(
                                     color: group.items[idx].isCompleted
-                                        ? accentCompleted
-                                        : Colors.grey[400],
+                                        ? (isDark ? seriousGold : accentCompleted)
+                                        : (isDark ? const Color(0xFF475569) : Colors.grey[400]),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(
                                     group.items[idx].isCompleted
                                         ? Icons.check_rounded
                                         : Icons.radio_button_unchecked,
-                                    color: Colors.white,
+                                    color: isDark ? Colors.black : Colors.white,
                                     size: 13,
                                   ),
                                 ),
@@ -635,12 +732,14 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                                     style: TextStyle(
                                       fontSize: 12.5,
                                       color: group.items[idx].isCompleted
-                                          ? const Color(0xFF64748B)
-                                          : const Color(0xFF1E293B),
+                                          ? (isDark ? const Color(0xFF64748B) : const Color(0xFF64748B))
+                                          : (isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B)),
                                       decoration: group.items[idx].isCompleted
                                           ? TextDecoration.lineThrough
                                           : TextDecoration.none,
-                                      decorationColor: const Color(0xFF94A3B8),
+                                      decorationColor: isDark
+                                          ? const Color(0xFF64748B)
+                                          : const Color(0xFF94A3B8),
                                     ),
                                   ),
                                 ),
@@ -654,16 +753,16 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                                     tapTargetSize:
                                         MaterialTapTargetSize.shrinkWrap,
                                   ),
-                                  icon: const Icon(
+                                  icon: Icon(
                                     Icons.undo_rounded,
                                     size: 13,
-                                    color: primaryTerracotta,
+                                    color: isDark ? seriousGold : primaryTerracotta,
                                   ),
-                                  label: const Text(
+                                  label: Text(
                                     'Aktifkan',
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: primaryTerracotta,
+                                      color: isDark ? seriousGold : primaryTerracotta,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -675,7 +774,9 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                             Divider(
                               height: 1,
                               thickness: 0.6,
-                              color: Colors.grey.withValues(alpha: 0.12),
+                              color: isDark
+                                  ? seriousCardBorder.withValues(alpha: 0.5)
+                                  : Colors.grey.withValues(alpha: 0.12),
                               indent: 44,
                             ),
                         ],
@@ -689,18 +790,23 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
   }
 
   Widget _buildEmptyRiwayat() {
+    final isDark = widget.isSeriousMode;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? seriousCardBg : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: accentCompleted.withValues(alpha: 0.15),
+          color: isDark
+              ? seriousCardBorder
+              : accentCompleted.withValues(alpha: 0.15),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.25)
+                : Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -712,31 +818,35 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
             width: 72,
             height: 72,
             decoration: BoxDecoration(
-              color: accentCompleted.withValues(alpha: 0.1),
+              color: isDark
+                  ? seriousGold.withValues(alpha: 0.15)
+                  : accentCompleted.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.archive_rounded,
               size: 36,
-              color: accentCompleted,
+              color: isDark ? seriousGold : accentCompleted,
             ),
           ),
           const SizedBox(height: 18),
-          const Text(
+          Text(
             'Belum Ada Section yang Diarsipkan',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
+              color: isDark ? Colors.white : const Color(0xFF1E293B),
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Section tanggal yang telah selesai dan kamu pilih untuk "Arsipkan" pada halaman To-Do List akan muncul di sini.',
+            isDark
+                ? 'Section mode serius yang telah selesai dan kamu arsipkan pada halaman To-Do List akan muncul di sini.'
+                : 'Section tanggal yang telah selesai dan kamu pilih untuk "Arsipkan" pada halaman To-Do List akan muncul di sini.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
-              color: Colors.grey[600],
+              color: isDark ? const Color(0xFF94A3B8) : Colors.grey[600],
               height: 1.4,
             ),
           ),

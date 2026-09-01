@@ -61,17 +61,20 @@ class TodoAlarmConfig {
 class TodoAlarmSetupSheet extends StatefulWidget {
   final TodoAlarmConfig initialConfig;
   final String dateTitle;
+  final bool isSeriousMode;
 
   const TodoAlarmSetupSheet({
     super.key,
     required this.initialConfig,
     required this.dateTitle,
+    this.isSeriousMode = false,
   });
 
   static Future<TodoAlarmConfig?> show(
     BuildContext context, {
     required TodoAlarmConfig initialConfig,
     required String dateTitle,
+    bool isSeriousMode = false,
   }) {
     return showModalBottomSheet<TodoAlarmConfig>(
       context: context,
@@ -80,6 +83,7 @@ class TodoAlarmSetupSheet extends StatefulWidget {
       builder: (context) => TodoAlarmSetupSheet(
         initialConfig: initialConfig,
         dateTitle: dateTitle,
+        isSeriousMode: isSeriousMode,
       ),
     );
   }
@@ -92,6 +96,11 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
   static const Color primaryTerracotta = Color(0xFFBA5A3A);
   static const Color darkTerracotta = Color(0xFF8C3E26);
   static const Color softTerracottaBg = Color(0xFFFDF6F3);
+  static const Color seriousBg = Color(0xFF0F172A);
+  static const Color seriousCardBg = Color(0xFF1E293B);
+  static const Color seriousCardBorder = Color(0xFF334155);
+  static const Color seriousGold = Color(0xFFF59E0B);
+  static const Color seriousFire = Color(0xFFEF4444);
 
   late String _type; // 'interval' | 'specific'
   late int _intervalMinutes;
@@ -206,6 +215,7 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
   }
 
   Future<void> _pickTimeFor(bool isStartTime) async {
+    final isDark = widget.isSeriousMode;
     final currentStr = isStartTime ? _intervalStartTime : _intervalEndTime;
     final parts = currentStr.split(':');
     final initialTime = TimeOfDay(
@@ -219,11 +229,11 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: primaryTerracotta,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Color(0xFF1E293B),
+            colorScheme: ColorScheme.light(
+              primary: isDark ? seriousGold : primaryTerracotta,
+              onPrimary: isDark ? Colors.black : Colors.white,
+              surface: isDark ? seriousCardBg : Colors.white,
+              onSurface: isDark ? Colors.white : const Color(0xFF1E293B),
             ),
           ),
           child: child!,
@@ -245,6 +255,7 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
   }
 
   Future<void> _addSpecificTime() async {
+    final isDark = widget.isSeriousMode;
     HapticFeedback.lightImpact();
     const defaultTime = TimeOfDay(hour: 12, minute: 0);
 
@@ -254,11 +265,11 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: primaryTerracotta,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Color(0xFF1E293B),
+            colorScheme: ColorScheme.light(
+              primary: isDark ? seriousGold : primaryTerracotta,
+              onPrimary: isDark ? Colors.black : Colors.white,
+              surface: isDark ? seriousCardBg : Colors.white,
+              onSurface: isDark ? Colors.white : const Color(0xFF1E293B),
             ),
           ),
           child: child!,
@@ -329,13 +340,18 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = widget.isSeriousMode;
+
     return Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.90,
       ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: isDark ? seriousBg : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: isDark
+            ? Border.all(color: seriousCardBorder, width: 1.5)
+            : null,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -346,7 +362,7 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
             width: 44,
             height: 4.5,
             decoration: BoxDecoration(
-              color: Colors.grey[300],
+              color: isDark ? const Color(0xFF475569) : Colors.grey[300],
               borderRadius: BorderRadius.circular(10),
             ),
           ),
@@ -360,12 +376,14 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: primaryTerracotta.withValues(alpha: 0.12),
+                    color: isDark
+                        ? seriousGold.withValues(alpha: 0.15)
+                        : primaryTerracotta.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.alarm_on_rounded,
-                    color: primaryTerracotta,
+                    color: isDark ? seriousGold : primaryTerracotta,
                     size: 24,
                   ),
                 ),
@@ -374,20 +392,20 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Set Up Pengingat & Alarm',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
+                          color: isDark ? Colors.white : const Color(0xFF1E293B),
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         'Section: ${widget.dateTitle}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12.5,
-                          color: Color(0xFF64748B),
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                           fontWeight: FontWeight.w500,
                         ),
                         maxLines: 1,
@@ -401,13 +419,19 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                     TodoAlarmService.stopPreview();
                     Navigator.pop(context);
                   },
-                  icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                  icon: Icon(
+                    Icons.close_rounded,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 14),
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          Divider(
+            height: 1,
+            color: isDark ? seriousCardBorder : const Color(0xFFF1F5F9),
+          ),
 
           // Scrollable Content
           Expanded(
@@ -417,12 +441,12 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 1. MODE SELECTION (Segmented Switch)
-                  const Text(
+                  Text(
                     'PILIH METODE PENGINGAT',
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF94A3B8),
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF94A3B8),
                       letterSpacing: 0.8,
                     ),
                   ),
@@ -430,8 +454,9 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
+                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(16),
+                      border: isDark ? Border.all(color: seriousCardBorder) : null,
                     ),
                     child: Row(
                       children: [
@@ -441,6 +466,7 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                             subtitle: 'Tiap X jam/menit',
                             icon: Icons.timer_outlined,
                             isSelected: _type == 'interval',
+                            isDark: isDark,
                             onTap: () {
                               setState(() => _type = 'interval');
                             },
@@ -453,6 +479,7 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                             subtitle: 'Pilih jam tertentu',
                             icon: Icons.schedule_rounded,
                             isSelected: _type == 'specific',
+                            isDark: isDark,
                             onTap: () {
                               setState(() => _type = 'specific');
                             },
@@ -465,18 +492,18 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                   const SizedBox(height: 20),
 
                   // 2. MODE CONFIGURATION BODY
-                  if (_type == 'interval') _buildIntervalConfigSection(),
-                  if (_type == 'specific') _buildSpecificTimesConfigSection(),
+                  if (_type == 'interval') _buildIntervalConfigSection(isDark),
+                  if (_type == 'specific') _buildSpecificTimesConfigSection(isDark),
 
                   const SizedBox(height: 24),
 
                   // 3. SOUND SELECTION SECTION
-                  const Text(
+                  Text(
                     'PILIH SUARA ALARM / NADA DERING',
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF94A3B8),
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF94A3B8),
                       letterSpacing: 0.8,
                     ),
                   ),
@@ -491,12 +518,16 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
                       decoration: BoxDecoration(
-                        color: isSelected ? softTerracottaBg : const Color(0xFFF8FAFC),
+                        color: isSelected
+                            ? (isDark ? seriousCardBg : softTerracottaBg)
+                            : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color: isSelected
-                              ? primaryTerracotta.withValues(alpha: 0.6)
-                              : const Color(0xFFE2E8F0),
+                              ? (isDark
+                                  ? seriousGold.withValues(alpha: 0.6)
+                                  : primaryTerracotta.withValues(alpha: 0.6))
+                              : (isDark ? seriousCardBorder : const Color(0xFFE2E8F0)),
                           width: isSelected ? 1.6 : 1,
                         ),
                       ),
@@ -516,13 +547,15 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? primaryTerracotta
-                                : const Color(0xFFE2E8F0),
+                                ? (isDark ? seriousGold : primaryTerracotta)
+                                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(
                             sound['icon'] as IconData,
-                            color: isSelected ? Colors.white : const Color(0xFF64748B),
+                            color: isSelected
+                                ? (isDark ? Colors.black : Colors.white)
+                                : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                             size: 18,
                           ),
                         ),
@@ -531,7 +564,9 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                           style: TextStyle(
                             fontSize: 13.5,
                             fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                            color: isSelected ? darkTerracotta : const Color(0xFF1E293B),
+                            color: isSelected
+                                ? (isDark ? seriousGold : darkTerracotta)
+                                : (isDark ? Colors.white : const Color(0xFF1E293B)),
                           ),
                         ),
                         subtitle: Text(
@@ -539,8 +574,10 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                           style: TextStyle(
                             fontSize: 11,
                             color: isSelected
-                                ? primaryTerracotta.withValues(alpha: 0.85)
-                                : const Color(0xFF64748B),
+                                ? (isDark
+                                    ? const Color(0xFFFDE68A)
+                                    : primaryTerracotta.withValues(alpha: 0.85))
+                                : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                           ),
                         ),
                         trailing: Row(
@@ -551,7 +588,9 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                                 isPlaying
                                     ? Icons.stop_circle_rounded
                                     : Icons.play_circle_fill_rounded,
-                                color: isPlaying ? primaryTerracotta : const Color(0xFF94A3B8),
+                                color: isPlaying
+                                    ? (isDark ? seriousGold : primaryTerracotta)
+                                    : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
                                 size: 28,
                               ),
                               onPressed: () {
@@ -561,7 +600,7 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                             Radio<String>(
                               value: sound['id'] as String,
                               groupValue: _soundType == 'default' ? _defaultSound : null,
-                              activeColor: primaryTerracotta,
+                              activeColor: isDark ? seriousGold : primaryTerracotta,
                               onChanged: (val) {
                                 if (val != null) {
                                   setState(() {
@@ -585,13 +624,15 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: _soundType == 'custom'
-                          ? softTerracottaBg
-                          : const Color(0xFFF8FAFC),
+                          ? (isDark ? seriousCardBg : softTerracottaBg)
+                          : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: _soundType == 'custom'
-                            ? primaryTerracotta.withValues(alpha: 0.6)
-                            : const Color(0xFFE2E8F0),
+                            ? (isDark
+                                ? seriousGold.withValues(alpha: 0.6)
+                                : primaryTerracotta.withValues(alpha: 0.6))
+                            : (isDark ? seriousCardBorder : const Color(0xFFE2E8F0)),
                         width: _soundType == 'custom' ? 1.6 : 1,
                       ),
                     ),
@@ -604,20 +645,20 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
                                 color: _soundType == 'custom'
-                                    ? primaryTerracotta
-                                    : const Color(0xFFE2E8F0),
+                                    ? (isDark ? seriousGold : primaryTerracotta)
+                                    : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Icon(
                                 Icons.folder_special_rounded,
                                 color: _soundType == 'custom'
-                                    ? Colors.white
-                                    : const Color(0xFF64748B),
+                                    ? (isDark ? Colors.black : Colors.white)
+                                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                                 size: 18,
                               ),
                             ),
                             const SizedBox(width: 12),
-                            const Expanded(
+                            Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -626,14 +667,14 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                                     style: TextStyle(
                                       fontSize: 13.5,
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF1E293B),
+                                      color: isDark ? Colors.white : const Color(0xFF1E293B),
                                     ),
                                   ),
                                   Text(
                                     'Gunakan lagu atau rekaman suara sendiri',
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: Color(0xFF64748B),
+                                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                                     ),
                                   ),
                                 ],
@@ -642,7 +683,7 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                             Radio<String>(
                               value: 'custom',
                               groupValue: _soundType,
-                              activeColor: primaryTerracotta,
+                              activeColor: isDark ? seriousGold : primaryTerracotta,
                               onChanged: (_) {
                                 if (_customSoundPath != null) {
                                   setState(() => _soundType = 'custom');
@@ -661,27 +702,29 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                               vertical: 10,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: isDark ? const Color(0xFF0F172A) : Colors.white,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: primaryTerracotta.withValues(alpha: 0.3),
+                                color: isDark
+                                    ? seriousGold.withValues(alpha: 0.3)
+                                    : primaryTerracotta.withValues(alpha: 0.3),
                               ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.audio_file_rounded,
-                                  color: primaryTerracotta,
+                                  color: isDark ? seriousGold : primaryTerracotta,
                                   size: 20,
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     _customSoundName!,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12.5,
                                       fontWeight: FontWeight.w600,
-                                      color: Color(0xFF1E293B),
+                                      color: isDark ? Colors.white : const Color(0xFF1E293B),
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -692,7 +735,7 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                                     _currentlyPlayingSoundKey == 'custom'
                                         ? Icons.stop_circle_rounded
                                         : Icons.play_circle_fill_rounded,
-                                    color: primaryTerracotta,
+                                    color: isDark ? seriousGold : primaryTerracotta,
                                     size: 24,
                                   ),
                                   onPressed: () {
@@ -708,29 +751,31 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                           width: double.infinity,
                           child: OutlinedButton.icon(
                             onPressed: _pickCustomMp3,
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.file_upload_outlined,
                               size: 18,
-                              color: primaryTerracotta,
+                              color: isDark ? seriousGold : primaryTerracotta,
                             ),
                             label: Text(
                               _customSoundName == null
                                   ? 'Pilih File .mp3 dari Memori'
                                   : 'Ganti File .mp3',
-                              style: const TextStyle(
-                                color: primaryTerracotta,
+                              style: TextStyle(
+                                color: isDark ? seriousGold : primaryTerracotta,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 12.5,
                               ),
                             ),
                             style: OutlinedButton.styleFrom(
-                              backgroundColor: Colors.white,
+                              backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               side: BorderSide(
-                                color: primaryTerracotta.withValues(alpha: 0.4),
+                                color: isDark
+                                    ? seriousGold.withValues(alpha: 0.4)
+                                    : primaryTerracotta.withValues(alpha: 0.4),
                               ),
                             ),
                           ),
@@ -745,27 +790,29 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFFBEB),
+                      color: isDark ? seriousCardBg : const Color(0xFFFFFBEB),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: const Color(0xFFFDE68A),
+                        color: isDark
+                            ? seriousGold.withValues(alpha: 0.4)
+                            : const Color(0xFFFDE68A),
                       ),
                     ),
-                    child: const Row(
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(
                           Icons.info_outline_rounded,
-                          color: Color(0xFFD97706),
+                          color: isDark ? seriousGold : const Color(0xFFD97706),
                           size: 20,
                         ),
-                        SizedBox(width: 10),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             'Saat waktu alarm tiba, alarm akan berdering looping selama 5 menit & menampilkan pop-up daftar tugas yang belum selesai hingga Anda klik "Iyaa tau".',
                             style: TextStyle(
                               fontSize: 11.5,
-                              color: Color(0xFF92400E),
+                              color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E),
                               height: 1.4,
                             ),
                           ),
@@ -781,10 +828,12 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
           // Bottom Action Button
           Container(
             padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(
+              color: isDark ? seriousCardBg : Colors.white,
               border: Border(
-                top: BorderSide(color: Color(0xFFF1F5F9)),
+                top: BorderSide(
+                  color: isDark ? seriousCardBorder : const Color(0xFFF1F5F9),
+                ),
               ),
             ),
             child: Column(
@@ -795,25 +844,30 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                   height: 46,
                   child: OutlinedButton.icon(
                     onPressed: _testAlarmNow,
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.notifications_active_rounded,
-                      color: primaryTerracotta,
+                      color: isDark ? seriousGold : primaryTerracotta,
                       size: 20,
                     ),
-                    label: const Text(
+                    label: Text(
                       'Tes Pop-up Alarm Sekarang',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: primaryTerracotta,
+                        color: isDark ? seriousGold : primaryTerracotta,
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: primaryTerracotta, width: 1.5),
+                      side: BorderSide(
+                        color: isDark ? seriousGold : primaryTerracotta,
+                        width: 1.5,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      backgroundColor: softTerracottaBg,
+                      backgroundColor: isDark
+                          ? seriousGold.withValues(alpha: 0.15)
+                          : softTerracottaBg,
                     ),
                   ),
                 ),
@@ -823,17 +877,20 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                   height: 50,
                   child: ElevatedButton.icon(
                     onPressed: _saveAndClose,
-                    icon: const Icon(Icons.check_circle_rounded, color: Colors.white),
-                    label: const Text(
+                    icon: Icon(
+                      Icons.check_circle_rounded,
+                      color: isDark ? Colors.black : Colors.white,
+                    ),
+                    label: Text(
                       'Simpan Pengingat',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: isDark ? Colors.black : Colors.white,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryTerracotta,
+                      backgroundColor: isDark ? seriousGold : primaryTerracotta,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -854,6 +911,7 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
     required String subtitle,
     required IconData icon,
     required bool isSelected,
+    required bool isDark,
     required VoidCallback onTap,
   }) {
     return InkWell(
@@ -865,12 +923,17 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
+          color: isSelected
+              ? (isDark ? seriousCardBg : Colors.white)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
+          border: isSelected && isDark
+              ? Border.all(color: seriousGold.withValues(alpha: 0.4))
+              : null,
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
+                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.06),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
@@ -881,7 +944,9 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
           children: [
             Icon(
               icon,
-              color: isSelected ? primaryTerracotta : const Color(0xFF64748B),
+              color: isSelected
+                  ? (isDark ? seriousGold : primaryTerracotta)
+                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
               size: 20,
             ),
             const SizedBox(height: 4),
@@ -890,14 +955,18 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
               style: TextStyle(
                 fontSize: 12.5,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                color: isSelected ? darkTerracotta : const Color(0xFF475569),
+                color: isSelected
+                    ? (isDark ? seriousGold : darkTerracotta)
+                    : (isDark ? Colors.white : const Color(0xFF475569)),
               ),
             ),
             Text(
               subtitle,
               style: TextStyle(
                 fontSize: 10,
-                color: isSelected ? primaryTerracotta : const Color(0xFF94A3B8),
+                color: isSelected
+                    ? (isDark ? const Color(0xFFFDE68A) : primaryTerracotta)
+                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF94A3B8)),
               ),
             ),
           ],
@@ -906,23 +975,25 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
     );
   }
 
-  Widget _buildIntervalConfigSection() {
+  Widget _buildIntervalConfigSection(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: isDark ? seriousCardBg : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: isDark ? seriousCardBorder : const Color(0xFFE2E8F0),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Ulangi Setiap:',
             style: TextStyle(
               fontSize: 12.5,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF334155),
+              color: isDark ? Colors.white : const Color(0xFF334155),
             ),
           ),
           const SizedBox(height: 8),
@@ -942,19 +1013,21 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
               return ChoiceChip(
                 label: Text(label),
                 selected: isSel,
-                selectedColor: primaryTerracotta,
-                backgroundColor: Colors.white,
+                selectedColor: isDark ? seriousGold : primaryTerracotta,
+                backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
                 labelStyle: TextStyle(
                   fontSize: 12,
                   fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
-                  color: isSel ? Colors.white : const Color(0xFF475569),
+                  color: isSel
+                      ? (isDark ? Colors.black : Colors.white)
+                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                   side: BorderSide(
                     color: isSel
-                        ? primaryTerracotta
-                        : const Color(0xFFCBD5E1),
+                        ? (isDark ? seriousGold : primaryTerracotta)
+                        : (isDark ? seriousCardBorder : const Color(0xFFCBD5E1)),
                   ),
                 ),
                 onSelected: (selected) {
@@ -966,14 +1039,17 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
             }).toList(),
           ),
           const SizedBox(height: 16),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          Divider(
+            height: 1,
+            color: isDark ? seriousCardBorder : const Color(0xFFE2E8F0),
+          ),
           const SizedBox(height: 14),
-          const Text(
+          Text(
             'Rentang Jam Operasional Pengingat:',
             style: TextStyle(
               fontSize: 12.5,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF334155),
+              color: isDark ? Colors.white : const Color(0xFF334155),
             ),
           ),
           const SizedBox(height: 10),
@@ -983,17 +1059,23 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                 child: _buildTimePickerTile(
                   label: 'Mulai Jam',
                   timeStr: _intervalStartTime,
+                  isDark: isDark,
                   onTap: () => _pickTimeFor(true),
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 10),
-                child: Icon(Icons.arrow_forward_rounded, color: Color(0xFF94A3B8), size: 18),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                  size: 18,
+                ),
               ),
               Expanded(
                 child: _buildTimePickerTile(
                   label: 'Selesai Jam',
                   timeStr: _intervalEndTime,
+                  isDark: isDark,
                   onTap: () => _pickTimeFor(false),
                 ),
               ),
@@ -1004,13 +1086,15 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
     );
   }
 
-  Widget _buildSpecificTimesConfigSection() {
+  Widget _buildSpecificTimesConfigSection(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: isDark ? seriousCardBg : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: isDark ? seriousCardBorder : const Color(0xFFE2E8F0),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1018,23 +1102,27 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Daftar Jam Pengingat:',
                 style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF334155),
+                  color: isDark ? Colors.white : const Color(0xFF334155),
                 ),
               ),
               TextButton.icon(
                 onPressed: _addSpecificTime,
-                icon: const Icon(Icons.add_circle_outline_rounded, size: 16, color: primaryTerracotta),
-                label: const Text(
+                icon: Icon(
+                  Icons.add_circle_outline_rounded,
+                  size: 16,
+                  color: isDark ? seriousGold : primaryTerracotta,
+                ),
+                label: Text(
                   'Tambah Jam',
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.bold,
-                    color: primaryTerracotta,
+                    color: isDark ? seriousGold : primaryTerracotta,
                   ),
                 ),
                 style: TextButton.styleFrom(
@@ -1050,12 +1138,12 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
             Container(
               padding: const EdgeInsets.symmetric(vertical: 16),
               alignment: Alignment.center,
-              child: const Text(
+              child: Text(
                 'Belum ada jam yang ditambahkan.\nKlik tombol "+ Tambah Jam" di atas.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 12,
-                  color: Color(0xFF94A3B8),
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF94A3B8),
                   height: 1.4,
                 ),
               ),
@@ -1068,12 +1156,14 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: isDark ? const Color(0xFF0F172A) : Colors.white,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                    border: Border.all(
+                      color: isDark ? seriousCardBorder : const Color(0xFFCBD5E1),
+                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.03),
+                        color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.03),
                         blurRadius: 3,
                         offset: const Offset(0, 1),
                       ),
@@ -1082,18 +1172,18 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.access_time_filled_rounded,
                         size: 14,
-                        color: primaryTerracotta,
+                        color: isDark ? seriousGold : primaryTerracotta,
                       ),
                       const SizedBox(width: 5),
                       Text(
                         time,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
+                          color: isDark ? Colors.white : const Color(0xFF1E293B),
                         ),
                       ),
                       const SizedBox(width: 4),
@@ -1105,12 +1195,12 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
                           });
                         },
                         borderRadius: BorderRadius.circular(8),
-                        child: const Padding(
-                          padding: EdgeInsets.all(2),
+                        child: Padding(
+                          padding: const EdgeInsets.all(2),
                           child: Icon(
                             Icons.cancel_rounded,
                             size: 15,
-                            color: Color(0xFF94A3B8),
+                            color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
                           ),
                         ),
                       ),
@@ -1127,6 +1217,7 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
   Widget _buildTimePickerTile({
     required String label,
     required String timeStr,
+    required bool isDark,
     required VoidCallback onTap,
   }) {
     return InkWell(
@@ -1138,18 +1229,20 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF0F172A) : Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFCBD5E1)),
+          border: Border.all(
+            color: isDark ? seriousCardBorder : const Color(0xFFCBD5E1),
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10.5,
-                color: Color(0xFF64748B),
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1159,16 +1252,16 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
               children: [
                 Text(
                   timeStr,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
+                    color: isDark ? Colors.white : const Color(0xFF1E293B),
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.edit_rounded,
                   size: 15,
-                  color: primaryTerracotta,
+                  color: isDark ? seriousGold : primaryTerracotta,
                 ),
               ],
             ),

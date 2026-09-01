@@ -1,19 +1,30 @@
 import 'dart:convert';
+import 'package:daily_apps/models/model_serious_mode.dart';
 import 'package:daily_apps/models/model_todo.dart';
 import 'package:daily_apps/pages/daily_productivity_page.dart';
 import 'package:daily_apps/pages/todo_riwayat_page.dart';
 import 'package:daily_apps/pages/tugas_harian_page.dart';
+import 'package:daily_apps/utils/serious_mode_service.dart';
+import 'package:daily_apps/widgets/serious_leaderboard_widget.dart';
+import 'package:daily_apps/widgets/serious_mode_auth_dialog.dart';
+import 'package:daily_apps/widgets/serious_punishment_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class TodoProductivityDrawer extends StatefulWidget {
   final List<TodoDateGroup> activeGroups;
   final VoidCallback? onDataChanged;
+  final bool isSeriousMode;
+  final VoidCallback? onOpenSeriousMode;
+  final VoidCallback? onExitSeriousMode;
 
   const TodoProductivityDrawer({
     super.key,
     required this.activeGroups,
     this.onDataChanged,
+    this.isSeriousMode = false,
+    this.onOpenSeriousMode,
+    this.onExitSeriousMode,
   });
 
   @override
@@ -23,21 +34,46 @@ class TodoProductivityDrawer extends StatefulWidget {
 class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
   static const Color primaryTerracotta = Color(0xFFBA5A3A);
   static const Color darkTerracotta = Color(0xFF8C3E26);
-  static const String _prefsKey = 'daily_apps_todo_groups_v1';
+
+  static const Color seriousBg = Color(0xFF0F172A);
+  static const Color seriousCardBg = Color(0xFF1E293B);
+  static const Color seriousGold = Color(0xFFF59E0B);
+  static const Color seriousFire = Color(0xFFEF4444);
 
   List<TodoDateGroup> _allGroups = [];
   bool _isLoading = true;
+  bool _isSeriousMode = false;
+  SeriousUser? _seriousUser;
 
   @override
   void initState() {
     super.initState();
+    _isSeriousMode = widget.isSeriousMode;
     _loadAllTodoData();
+  }
+
+  @override
+  void didUpdateWidget(covariant TodoProductivityDrawer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isSeriousMode != widget.isSeriousMode) {
+      _isSeriousMode = widget.isSeriousMode;
+      _loadAllTodoData();
+    }
   }
 
   Future<void> _loadAllTodoData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final String? jsonStr = prefs.getString(_prefsKey);
+      _isSeriousMode = widget.isSeriousMode;
+      _seriousUser = await SeriousModeService.getCurrentUser();
+
+      final String prefsKey = _isSeriousMode && _seriousUser != null
+          ? SeriousModeService.getSeriousTodoGroupsKey(_seriousUser!.id)
+          : (_isSeriousMode
+              ? SeriousModeService.prefKeySeriousTodoGroups
+              : SeriousModeService.prefKeyNormalTodoGroups);
+
+      final String? jsonStr = prefs.getString(prefsKey);
       if (jsonStr != null && jsonStr.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(jsonStr);
         _allGroups = decoded
@@ -91,26 +127,22 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
 
   @override
   Widget build(BuildContext context) {
-    final todayCount = _todayCompletedCount;
-    final level = ProductivityHelper.getLevel(todayCount);
-    final isCrown = level == ProductivityLevel.king;
-    final isOverload = level == ProductivityLevel.overload;
-    final statusTitle = ProductivityHelper.getLevelLabel(level);
-    final statusDesc = todayCount == 0
-        ? 'Belum ada to-do yang selesai hari ini. Yuk mulai selesaikan tugasmu!'
-        : ProductivityHelper.getPraiseQuote(level);
-
     return Drawer(
-      backgroundColor: const Color(0xFFF7F9FC),
+      backgroundColor:
+          _isSeriousMode ? const Color(0xFF090D16) : const Color(0xFFF7F9FC),
       child: Column(
         children: [
-          // Drawer Header with gradient Terracotta
-          _buildDrawerHeader(),
+          // Drawer Header
+          _isSeriousMode
+              ? _buildSeriousDrawerHeader()
+              : _buildNormalDrawerHeader(),
 
           Expanded(
             child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: primaryTerracotta),
+                ? Center(
+                    child: CircularProgressIndicator(
+                      color: _isSeriousMode ? seriousGold : primaryTerracotta,
+                    ),
                   )
                 : ListView(
                     padding: const EdgeInsets.symmetric(
@@ -118,96 +150,188 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
                       vertical: 16,
                     ),
                     children: [
-                      // Top Quick Productivity Card
-                      _buildQuickStatusCard(
-                        todayCount: todayCount,
-                        isCrown: isCrown,
-                        isOverload: isOverload,
-                        level: level,
-                        statusTitle: statusTitle,
-                        statusDesc: statusDesc,
-                      ),
+                      // Top Quick Card
+                      if (_isSeriousMode)
+                        _buildSeriousPlayerCard()
+                      else
+                        _buildNormalQuickStatusCard(),
 
                       const SizedBox(height: 18),
                       Text(
-                        'FITUR & MENU',
+                        _isSeriousMode
+                            ? 'FITUR & MENU (MODE SERIUS)'
+                            : 'FITUR & MENU (MODE BIASA)',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: Colors.grey[500],
+                          color: _isSeriousMode
+                              ? const Color(0xFF94A3B8)
+                              : Colors.grey[500],
                           letterSpacing: 1,
                         ),
                       ),
                       const SizedBox(height: 8),
 
-                      // Menu 1: Tugas Harian (Set Up Grup Aktivitas)
-                      _buildMenuItem(
-                        context: context,
-                        icon: Icons.event_repeat_rounded,
-                        iconColor: const Color(0xFFE65100),
-                        title: 'Tugas Harian',
-                        subtitle: 'Set up grup aktivitas & terapkan ke section',
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const TugasHarianPage(),
-                            ),
-                          ).then((_) {
-                            if (widget.onDataChanged != null) {
-                              widget.onDataChanged!();
-                            }
-                            _loadAllTodoData();
-                          });
-                        },
-                      ),
+                      if (_isSeriousMode) ...[
+                        // Serious Mode Menu 1: Kembali ke Mode Biasa
+                        _buildMenuItem(
+                          context: context,
+                          icon: Icons.swap_horiz_rounded,
+                          iconColor: const Color(0xFF38BDF8),
+                          title: 'Mode Biasa / Reguler',
+                          subtitle:
+                              'Kembali ke To-Do List normal (data terpisah)',
+                          onTap: () {
+                            Navigator.pop(context);
+                            widget.onExitSeriousMode?.call();
+                          },
+                        ),
 
-                      // Menu 2: Activity
-                      _buildMenuItem(
-                        context: context,
-                        icon: Icons.insights_rounded,
-                        iconColor: primaryTerracotta,
-                        title: 'Activity',
-                        subtitle: 'Kalender aktivitas harian & pencapaian',
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const DailyProductivityPage(),
-                            ),
-                          ).then((_) {
-                            if (widget.onDataChanged != null) {
-                              widget.onDataChanged!();
-                            }
-                            _loadAllTodoData();
-                          });
-                        },
-                      ),
+                        // Serious Mode Menu 2: Hukuman Olahraga
+                        _buildMenuItem(
+                          context: context,
+                          icon: Icons.fitness_center_rounded,
+                          iconColor: seriousFire,
+                          title: 'Hukuman Olahraga',
+                          subtitle:
+                              'Latihan fisik & hukuman disiplin tugas terlewat',
+                          onTap: () {
+                            Navigator.pop(context);
+                            SeriousPunishmentDialog.show(
+                              context,
+                              allGroups: widget.activeGroups,
+                              onCompleted: () {
+                                widget.onDataChanged?.call();
+                                _loadAllTodoData();
+                              },
+                            );
+                          },
+                        ),
 
-                      // Menu 3: Riwayat Task
-                      _buildMenuItem(
-                        context: context,
-                        icon: Icons.history_rounded,
-                        iconColor: const Color(0xFF1976D2),
-                        title: 'Riwayat Task',
-                        subtitle: 'Arsip daftar task yang telah selesai',
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const TodoRiwayatPage(),
-                            ),
-                          ).then((_) {
-                            if (widget.onDataChanged != null) {
-                              widget.onDataChanged!();
+                        // Serious Mode Menu 3: Tugas Harian
+                        _buildMenuItem(
+                          context: context,
+                          icon: Icons.event_repeat_rounded,
+                          iconColor: const Color(0xFFFB923C),
+                          title: 'Tugas Harian',
+                          subtitle:
+                              'Set up & terapkan aktivitas ke to-do serius',
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    const TugasHarianPage(isSeriousMode: true),
+                              ),
+                            ).then((_) {
+                              widget.onDataChanged?.call();
+                              _loadAllTodoData();
+                            });
+                          },
+                        ),
+
+                        // Serious Mode Menu 4: Akun / Ganti Pemain
+                        _buildMenuItem(
+                          context: context,
+                          icon: Icons.manage_accounts_rounded,
+                          iconColor: const Color(0xFFA855F7),
+                          title: 'Akun Pemain',
+                          subtitle:
+                              'Ganti akun, buat pemain baru atau lihat profil',
+                          onTap: () async {
+                            Navigator.pop(context);
+                            final updated =
+                                await SeriousModeAuthDialog.show(context);
+                            if (updated != null) {
+                              widget.onDataChanged?.call();
+                              _loadAllTodoData();
                             }
-                            _loadAllTodoData();
-                          });
-                        },
-                      ),
+                          },
+                        ),
+                      ] else ...[
+                        // Normal Mode Menu 1: Mode Serius
+                        _buildMenuItem(
+                          context: context,
+                          icon: Icons.local_fire_department_rounded,
+                          iconColor: const Color(0xFFEF4444),
+                          title: 'Mode Serius',
+                          subtitle:
+                              'To-do list tantangan, sistem poin, ranking & hukuman',
+                          onTap: () {
+                            Navigator.pop(context);
+                            widget.onOpenSeriousMode?.call();
+                          },
+                        ),
+
+                        // Normal Mode Menu 2: Tugas Harian
+                        _buildMenuItem(
+                          context: context,
+                          icon: Icons.event_repeat_rounded,
+                          iconColor: const Color(0xFFE65100),
+                          title: 'Tugas Harian',
+                          subtitle:
+                              'Set up grup aktivitas & terapkan ke section normal',
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    const TugasHarianPage(isSeriousMode: false),
+                              ),
+                            ).then((_) {
+                              widget.onDataChanged?.call();
+                              _loadAllTodoData();
+                            });
+                          },
+                        ),
+
+                        // Normal Mode Menu 3: Activity
+                        _buildMenuItem(
+                          context: context,
+                          icon: Icons.insights_rounded,
+                          iconColor: primaryTerracotta,
+                          title: 'Activity',
+                          subtitle: 'Kalender aktivitas harian & pencapaian',
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const DailyProductivityPage(
+                                    isSeriousMode: false),
+                              ),
+                            ).then((_) {
+                              widget.onDataChanged?.call();
+                              _loadAllTodoData();
+                            });
+                          },
+                        ),
+
+                        // Normal Mode Menu 4: Riwayat Task
+                        _buildMenuItem(
+                          context: context,
+                          icon: Icons.history_rounded,
+                          iconColor: const Color(0xFF1976D2),
+                          title: 'Riwayat Task',
+                          subtitle:
+                              'Arsip daftar task reguler yang telah selesai',
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    const TodoRiwayatPage(isSeriousMode: false),
+                              ),
+                            ).then((_) {
+                              widget.onDataChanged?.call();
+                              _loadAllTodoData();
+                            });
+                          },
+                        ),
+                      ],
                     ],
                   ),
           ),
@@ -216,10 +340,14 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
-              'Daily Apps v2.1.0',
+              _isSeriousMode
+                  ? 'Daily Apps • Serious Game Mode v2.1'
+                  : 'Daily Apps v2.1.0',
               style: TextStyle(
                 fontSize: 11,
-                color: Colors.grey[400],
+                color: _isSeriousMode
+                    ? const Color(0xFF64748B)
+                    : Colors.grey[400],
               ),
             ),
           ),
@@ -228,7 +356,7 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
     );
   }
 
-  Widget _buildDrawerHeader() {
+  Widget _buildNormalDrawerHeader() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 48, 20, 24),
@@ -282,7 +410,7 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
                       ),
                     ),
                     Text(
-                      'To-Do List & Activity',
+                      'To-Do List (Mode Biasa)',
                       style: TextStyle(
                         color: Colors.white70,
                         fontSize: 11.5,
@@ -299,14 +427,194 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
     );
   }
 
-  Widget _buildQuickStatusCard({
-    required int todayCount,
-    required bool isCrown,
-    required bool isOverload,
-    required ProductivityLevel level,
-    required String statusTitle,
-    required String statusDesc,
-  }) {
+  Widget _buildSeriousDrawerHeader() {
+    final playerName = _seriousUser?.displayName ?? 'Challenger';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 48, 20, 24),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [seriousGold, seriousFire],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: seriousFire.withValues(alpha: 0.35),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.local_fire_department_rounded,
+                  color: Colors.white,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Mode Serius',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Pemain: $playerName 🔥',
+                      style: const TextStyle(
+                        color: Color(0xFFFDE68A),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSeriousPlayerCard() {
+    final points = _seriousUser?.totalPoints ?? 0;
+    final completed = _seriousUser?.totalTasksCompleted ?? 0;
+    final punishments = _seriousUser?.totalPunishmentsTaken ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: seriousCardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: seriousGold.withValues(alpha: 0.4),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: seriousGold.withValues(alpha: 0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.military_tech_rounded,
+                  color: seriousGold, size: 20),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Status Pemain Serius',
+                  style: TextStyle(
+                    color: seriousGold,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13.5,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: seriousGold.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$points Pts',
+                  style: const TextStyle(
+                    color: seriousGold,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Mode Serius aktif dengan sistem poin, hukuman roulette & aturan anti-hapus.',
+            style: TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 11.5,
+              height: 1.3,
+            ),
+          ),
+          const Divider(height: 18, color: Color(0xFF334155)),
+          Row(
+            children: [
+              Expanded(
+                child: _buildMiniStat(
+                  'Total Poin',
+                  '$points Pts',
+                  seriousGold,
+                  isDark: true,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _buildMiniStat(
+                  'Task Selesai',
+                  '$completed Task',
+                  const Color(0xFF4ADE80),
+                  isDark: true,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _buildMiniStat(
+                  'Hukuman',
+                  '${punishments}x Diambil',
+                  const Color(0xFFF87171),
+                  isDark: true,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNormalQuickStatusCard() {
+    final todayCount = _todayCompletedCount;
+    final level = ProductivityHelper.getLevel(todayCount);
+    final isCrown = level == ProductivityLevel.king;
+    final isOverload = level == ProductivityLevel.overload;
+    final statusTitle = ProductivityHelper.getLevelLabel(level);
+    final statusDesc = todayCount == 0
+        ? 'Belum ada to-do yang selesai hari ini. Yuk mulai selesaikan tugasmu!'
+        : ProductivityHelper.getPraiseQuote(level);
+
     final statusColor = isOverload
         ? const Color(0xFFEF4444)
         : (isCrown
@@ -362,7 +670,6 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
               ),
             ),
             const Divider(height: 18, color: Color(0xFF27272A)),
-            // Mini Stats Row
             Row(
               children: [
                 Expanded(
@@ -430,12 +737,14 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
                 size: 20,
               ),
               const SizedBox(width: 8),
-              Text(
-                statusTitle,
-                style: TextStyle(
-                  color: statusColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+              Expanded(
+                child: Text(
+                  statusTitle,
+                  style: TextStyle(
+                    color: statusColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
                 ),
               ),
             ],
@@ -450,7 +759,6 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
             ),
           ),
           const Divider(height: 18),
-          // Mini Stats Row
           Row(
             children: [
               Expanded(
@@ -483,7 +791,8 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
     );
   }
 
-  Widget _buildMiniStat(String label, String value, Color color, {bool isDark = false}) {
+  Widget _buildMiniStat(String label, String value, Color color,
+      {bool isDark = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -524,14 +833,20 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
     Color? badgeColor,
     Color? badgeTextColor,
   }) {
+    final isDark = _isSeriousMode;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.15)),
+        border: Border.all(
+          color: isDark
+              ? const Color(0xFF334155).withValues(alpha: 0.6)
+              : Colors.grey.withValues(alpha: 0.15),
+        ),
       ),
       child: Material(
-        color: Colors.white,
+        color: isDark ? seriousCardBg : Colors.white,
         borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
         child: ListTile(
@@ -542,7 +857,7 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
           leading: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.1),
+              color: iconColor.withValues(alpha: isDark ? 0.18 : 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: iconColor, size: 22),
@@ -552,10 +867,12 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF1E293B),
+                    color: isDark
+                        ? const Color(0xFFF1F5F9)
+                        : const Color(0xFF1E293B),
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -568,7 +885,10 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: badgeColor ?? const Color(0xFFDCFCE7),
+                    color: badgeColor ??
+                        (isDark
+                            ? const Color(0xFF1E3A8A)
+                            : const Color(0xFFDCFCE7)),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -576,7 +896,10 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
-                      color: badgeTextColor ?? const Color(0xFF166534),
+                      color: badgeTextColor ??
+                          (isDark
+                              ? const Color(0xFF93C5FD)
+                              : const Color(0xFF166534)),
                     ),
                   ),
                 ),
@@ -587,13 +910,13 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
             subtitle,
             style: TextStyle(
               fontSize: 11,
-              color: Colors.grey[500],
+              color: isDark ? const Color(0xFF94A3B8) : Colors.grey[500],
             ),
           ),
-          trailing: const Icon(
+          trailing: Icon(
             Icons.chevron_right_rounded,
             size: 20,
-            color: Colors.grey,
+            color: isDark ? const Color(0xFF64748B) : Colors.grey,
           ),
         ),
       ),

@@ -1,10 +1,16 @@
 import 'dart:convert';
+import 'package:daily_apps/models/model_serious_mode.dart';
 import 'package:daily_apps/models/model_todo.dart';
 import 'package:daily_apps/pages/todo_riwayat_page.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
+import 'package:daily_apps/utils/serious_mode_service.dart';
 import 'package:daily_apps/utils/todo_alarm_service.dart';
 import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:daily_apps/widgets/gta_switch_wheel.dart';
+import 'package:daily_apps/widgets/serious_confirm_add_dialog.dart';
+import 'package:daily_apps/widgets/serious_leaderboard_widget.dart';
+import 'package:daily_apps/widgets/serious_mode_auth_dialog.dart';
+import 'package:daily_apps/widgets/serious_punishment_dialog.dart';
 import 'package:daily_apps/widgets/todo_alarm_popup_dialog.dart';
 import 'package:daily_apps/widgets/todo_alarm_setup_sheet.dart';
 import 'package:daily_apps/widgets/todo_productivity_drawer.dart';
@@ -29,13 +35,32 @@ class _TodoPageState extends State<TodoPage> {
   static const Color darkTerracotta = Color(0xFF8C3E26);
   static const Color accentCompleted = Color(0xFF2E7D32);
 
-  static const String _prefsKey = 'daily_apps_todo_groups_v1';
+  static const Color seriousBg = Color(0xFF0F172A);
+  static const Color seriousCardBg = Color(0xFF1E293B);
+  static const Color seriousGold = Color(0xFFF59E0B);
+  static const Color seriousFire = Color(0xFFEF4444);
+  static const Color seriousBorder = Color(0xFF334155);
+
+  static const String _prefsKeyNormal = SeriousModeService.prefKeyNormalTodoGroups;
+  static const String _prefsKeySerious = SeriousModeService.prefKeySeriousTodoGroups;
+
+  String get _prefsKey {
+    if (_isSeriousMode && _seriousUser != null) {
+      return SeriousModeService.getSeriousTodoGroupsKey(_seriousUser!.id);
+    } else if (_isSeriousMode) {
+      return _prefsKeySerious;
+    }
+    return _prefsKeyNormal;
+  }
 
   List<TodoDateGroup> _dateGroups = [];
   final Set<String> _collapsedGroupIds = {};
   bool _isLoading = true;
   String _searchQuery = '';
   String _selectedFilter = 'all'; // 'all', 'pending', 'completed'
+
+  bool _isSeriousMode = false;
+  SeriousUser? _seriousUser;
 
   @override
   void initState() {
@@ -84,6 +109,7 @@ class _TodoPageState extends State<TodoPage> {
       TodoAlarmPopupDialog.show(
         context,
         group: targetGroup,
+        isSeriousMode: _isSeriousMode,
         onDismiss: () {
           _loadTodoData();
         },
@@ -96,7 +122,22 @@ class _TodoPageState extends State<TodoPage> {
   Future<void> _loadTodoData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final String? jsonStr = prefs.getString(_prefsKey);
+      _isSeriousMode = await SeriousModeService.isSeriousModeActive();
+      _seriousUser = await SeriousModeService.getCurrentUser();
+
+      // Legacy migration: Jika Mode Serius aktif untuk user ini tapi key user belum ada sedangkan key legacy ada
+      if (_isSeriousMode && _seriousUser != null) {
+        final userKey = SeriousModeService.getSeriousTodoGroupsKey(_seriousUser!.id);
+        if (!prefs.containsKey(userKey) && prefs.containsKey(_prefsKeySerious)) {
+          final legacyData = prefs.getString(_prefsKeySerious);
+          if (legacyData != null && legacyData.isNotEmpty) {
+            await prefs.setString(userKey, legacyData);
+          }
+        }
+      }
+
+      final String currentKey = _prefsKey;
+      final String? jsonStr = prefs.getString(currentKey);
       if (jsonStr != null && jsonStr.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(jsonStr);
         _dateGroups = decoded
@@ -111,6 +152,12 @@ class _TodoPageState extends State<TodoPage> {
       } else {
         _dateGroups = [];
       }
+
+      if (_isSeriousMode && _seriousUser != null) {
+        await SeriousModeService.recalculateAndSyncUserProgress(_dateGroups, targetUser: _seriousUser);
+        _seriousUser = await SeriousModeService.getCurrentUser();
+      }
+
       // Sinkronisasi jadwal alarm seluruh group
       TodoAlarmService.syncAllAlarms(_dateGroups);
     } catch (e) {
@@ -131,8 +178,108 @@ class _TodoPageState extends State<TodoPage> {
         _dateGroups.map((group) => group.toJson()).toList(),
       );
       await prefs.setString(_prefsKey, encoded);
+
+      if (_isSeriousMode) {
+        await SeriousModeService.recalculateAndSyncUserProgress(_dateGroups, targetUser: _seriousUser);
+        _seriousUser = await SeriousModeService.getCurrentUser();
+        if (mounted) {
+          setState(() {});
+        }
+      }
     } catch (e) {
       debugPrint('Error saving todos: $e');
+    }
+  }
+
+  Future<void> _handleOpenSeriousMode() async {
+    final curUser = await SeriousModeService.getCurrentUser();
+    if (!mounted) return;
+    if (curUser == null) {
+      final user = await SeriousModeAuthDialog.show(context);
+      if (user != null && mounted) {
+        setState(() {
+          _isSeriousMode = true;
+          _seriousUser = user;
+          _dateGroups = [];
+          _isLoading = true;
+        });
+        await _loadTodoData();
+      }
+    } else {
+      await SeriousModeService.setSeriousModeActive(true);
+      if (mounted) {
+        setState(() {
+          _isSeriousMode = true;
+          _seriousUser = curUser;
+          _dateGroups = [];
+          _isLoading = true;
+        });
+        CustomToast.showSuccess(
+          context,
+          title: 'Mode Serius Aktif 🔥',
+          subtitle: 'Anti-Hapus, sistem poin & hukuman aktif',
+        );
+        await _loadTodoData();
+      }
+    }
+  }
+
+  Future<void> _handleExitSeriousMode() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: seriousCardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Row(
+          children: [
+            Text('🎮', style: TextStyle(fontSize: 22)),
+            SizedBox(width: 8),
+            Text(
+              'Keluar Mode Serius?',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Anda akan kembali ke tampilan To-Do List mode reguler. Akun, poin dan peringkat Anda tetap tersimpan.',
+          style: TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Tetap di Mode Serius',
+                style: TextStyle(color: seriousGold)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red[700]),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Keluar ke Mode Normal',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await SeriousModeService.setSeriousModeActive(false);
+      if (mounted) {
+        setState(() {
+          _isSeriousMode = false;
+          _seriousUser = null;
+          _dateGroups = [];
+          _isLoading = true;
+        });
+        CustomToast.showInfo(
+          context,
+          title: 'Mode Normal',
+          subtitle: 'Beralih ke To-Do List Mode Normal',
+        );
+        _loadTodoData();
+      }
     }
   }
 
@@ -221,6 +368,7 @@ class _TodoPageState extends State<TodoPage> {
       context,
       initialConfig: initialConfig,
       dateTitle: group.formattedFullDate,
+      isSeriousMode: _isSeriousMode,
     );
     if (res != null) {
       setState(() {
@@ -264,15 +412,23 @@ class _TodoPageState extends State<TodoPage> {
             final isDateToday = selectedDate.year == now.year &&
                 selectedDate.month == now.month &&
                 selectedDate.day == now.day;
+            final isDark = _isSeriousMode;
 
             return Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
               ),
               child: Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                decoration: BoxDecoration(
+                  color: isDark ? seriousCardBg : Colors.white,
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(28)),
+                  border: isDark
+                      ? Border.all(
+                          color: seriousGold.withValues(alpha: 0.35),
+                          width: 1.5,
+                        )
+                      : null,
                 ),
                 padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
                 child: Column(
@@ -284,7 +440,9 @@ class _TodoPageState extends State<TodoPage> {
                         width: 44,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.grey[300],
+                          color: isDark
+                              ? const Color(0xFF475569)
+                              : Colors.grey[300],
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
@@ -295,17 +453,18 @@ class _TodoPageState extends State<TodoPage> {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: primaryTerracotta.withValues(alpha: 0.12),
+                            color: (isDark ? seriousGold : primaryTerracotta)
+                                .withValues(alpha: isDark ? 0.15 : 0.12),
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.playlist_add_rounded,
-                            color: primaryTerracotta,
+                            color: isDark ? seriousGold : primaryTerracotta,
                             size: 24,
                           ),
                         ),
                         const SizedBox(width: 14),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -314,15 +473,19 @@ class _TodoPageState extends State<TodoPage> {
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1E293B),
+                                  color: isDark
+                                      ? Colors.white
+                                      : const Color(0xFF1E293B),
                                 ),
                               ),
-                              SizedBox(height: 2),
+                              const SizedBox(height: 2),
                               Text(
                                 'Pilih tanggal untuk membuat list section baru',
                                 style: TextStyle(
                                   fontSize: 12.5,
-                                  color: Color(0xFF64748B),
+                                  color: isDark
+                                      ? const Color(0xFF94A3B8)
+                                      : const Color(0xFF64748B),
                                 ),
                               ),
                             ],
@@ -341,12 +504,19 @@ class _TodoPageState extends State<TodoPage> {
                           builder: (context, child) {
                             return Theme(
                               data: Theme.of(context).copyWith(
-                                colorScheme: const ColorScheme.light(
-                                  primary: primaryTerracotta,
-                                  onPrimary: Colors.white,
-                                  surface: Colors.white,
-                                  onSurface: Color(0xFF1E293B),
-                                ),
+                                colorScheme: isDark
+                                    ? const ColorScheme.dark(
+                                        primary: seriousGold,
+                                        onPrimary: Colors.black,
+                                        surface: Color(0xFF1E293B),
+                                        onSurface: Colors.white,
+                                      )
+                                    : const ColorScheme.light(
+                                        primary: primaryTerracotta,
+                                        onPrimary: Colors.white,
+                                        surface: Colors.white,
+                                        onSurface: Color(0xFF1E293B),
+                                      ),
                               ),
                               child: child!,
                             );
@@ -365,18 +535,19 @@ class _TodoPageState extends State<TodoPage> {
                           vertical: 14,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
+                          color: isDark ? seriousBg : const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: primaryTerracotta.withValues(alpha: 0.3),
+                            color: (isDark ? seriousGold : primaryTerracotta)
+                                .withValues(alpha: isDark ? 0.45 : 0.3),
                             width: 1.5,
                           ),
                         ),
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.event_available_rounded,
-                              color: primaryTerracotta,
+                              color: isDark ? seriousGold : primaryTerracotta,
                               size: 22,
                             ),
                             const SizedBox(width: 12),
@@ -384,11 +555,13 @@ class _TodoPageState extends State<TodoPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Tanggal To-Do List',
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: Color(0xFF94A3B8),
+                                      color: isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : const Color(0xFF94A3B8),
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -398,10 +571,12 @@ class _TodoPageState extends State<TodoPage> {
                                       id: '',
                                       date: selectedDate,
                                     ).formattedFullDate,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 14.5,
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF1E293B),
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF1E293B),
                                     ),
                                   ),
                                 ],
@@ -414,23 +589,27 @@ class _TodoPageState extends State<TodoPage> {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color:
-                                      primaryTerracotta.withValues(alpha: 0.15),
+                                  color: (isDark
+                                          ? seriousGold
+                                          : primaryTerracotta)
+                                      .withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'Hari Ini',
                                   style: TextStyle(
-                                    color: primaryTerracotta,
+                                    color: isDark
+                                        ? seriousGold
+                                        : primaryTerracotta,
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ),
                             const SizedBox(width: 6),
-                            const Icon(
+                            Icon(
                               Icons.edit_calendar_rounded,
-                              color: primaryTerracotta,
+                              color: isDark ? seriousGold : primaryTerracotta,
                               size: 20,
                             ),
                           ],
@@ -438,45 +617,59 @@ class _TodoPageState extends State<TodoPage> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Tugas Pertama (Opsional)',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF334155),
+                        color: isDark
+                            ? const Color(0xFFCBD5E1)
+                            : const Color(0xFF334155),
                       ),
                     ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: taskController,
                       autofocus: false,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
                       textCapitalization: TextCapitalization.sentences,
                       decoration: InputDecoration(
                         hintText: 'Contoh: Rapat koordinasi proyek...',
                         hintStyle: TextStyle(
-                          color: Colors.grey[400],
+                          color: isDark
+                              ? const Color(0xFF64748B)
+                              : Colors.grey[400],
                           fontSize: 13.5,
                         ),
                         filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
+                        fillColor:
+                            isDark ? seriousBg : const Color(0xFFF8FAFC),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 14,
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(color: Colors.grey[300]!),
+                          borderSide: BorderSide(
+                            color: isDark
+                                ? seriousBorder
+                                : Colors.grey[300]!,
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                           borderSide: BorderSide(
-                            color: Colors.grey.withValues(alpha: 0.25),
+                            color: isDark
+                                ? seriousBorder
+                                : Colors.grey.withValues(alpha: 0.25),
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: primaryTerracotta,
+                          borderSide: BorderSide(
+                            color: isDark ? seriousGold : primaryTerracotta,
                             width: 1.8,
                           ),
                         ),
@@ -490,13 +683,19 @@ class _TodoPageState extends State<TodoPage> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: alarmConfig.enabled
-                            ? primaryTerracotta.withValues(alpha: 0.06)
-                            : const Color(0xFFF8FAFC),
+                            ? (isDark
+                                ? seriousGold.withValues(alpha: 0.12)
+                                : primaryTerracotta.withValues(alpha: 0.06))
+                            : (isDark ? seriousBg : const Color(0xFFF8FAFC)),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: alarmConfig.enabled
-                              ? primaryTerracotta.withValues(alpha: 0.4)
-                              : Colors.grey.withValues(alpha: 0.25),
+                              ? (isDark
+                                  ? seriousGold.withValues(alpha: 0.5)
+                                  : primaryTerracotta.withValues(alpha: 0.4))
+                              : (isDark
+                                  ? seriousBorder
+                                  : Colors.grey.withValues(alpha: 0.25)),
                           width: alarmConfig.enabled ? 1.5 : 1,
                         ),
                       ),
@@ -509,14 +708,18 @@ class _TodoPageState extends State<TodoPage> {
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
                                   color: alarmConfig.enabled
-                                      ? primaryTerracotta
-                                      : const Color(0xFFE2E8F0),
+                                      ? (isDark
+                                          ? seriousGold
+                                          : primaryTerracotta)
+                                      : (isDark
+                                          ? const Color(0xFF334155)
+                                          : const Color(0xFFE2E8F0)),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Icon(
                                   Icons.alarm_rounded,
                                   color: alarmConfig.enabled
-                                      ? Colors.white
+                                      ? (isDark ? Colors.black : Colors.white)
                                       : const Color(0xFF64748B),
                                   size: 20,
                                 ),
@@ -526,12 +729,14 @@ class _TodoPageState extends State<TodoPage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
+                                    Text(
                                       'Pengingat / Alarm Section',
                                       style: TextStyle(
                                         fontSize: 13.5,
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFF1E293B),
+                                        color: isDark
+                                            ? Colors.white
+                                            : const Color(0xFF1E293B),
                                       ),
                                     ),
                                     Text(
@@ -541,7 +746,9 @@ class _TodoPageState extends State<TodoPage> {
                                       style: TextStyle(
                                         fontSize: 11,
                                         color: alarmConfig.enabled
-                                            ? darkTerracotta
+                                            ? (isDark
+                                                ? seriousGold
+                                                : darkTerracotta)
                                             : const Color(0xFF64748B),
                                       ),
                                     ),
@@ -550,7 +757,8 @@ class _TodoPageState extends State<TodoPage> {
                               ),
                               Switch(
                                 value: alarmConfig.enabled,
-                                activeThumbColor: primaryTerracotta,
+                                activeThumbColor:
+                                    isDark ? seriousGold : primaryTerracotta,
                                 onChanged: (val) async {
                                   if (val) {
                                     await TodoAlarmService
@@ -564,6 +772,7 @@ class _TodoPageState extends State<TodoPage> {
                                         id: '',
                                         date: selectedDate,
                                       ).formattedFullDate,
+                                      isSeriousMode: _isSeriousMode,
                                     );
                                     if (res != null) {
                                       setModalState(() {
@@ -586,7 +795,12 @@ class _TodoPageState extends State<TodoPage> {
                           ),
                           if (alarmConfig.enabled) ...[
                             const SizedBox(height: 8),
-                            const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                            Divider(
+                              height: 1,
+                              color: isDark
+                                  ? seriousBorder
+                                  : const Color(0xFFE2E8F0),
+                            ),
                             const SizedBox(height: 8),
                             Row(
                               children: [
@@ -595,9 +809,11 @@ class _TodoPageState extends State<TodoPage> {
                                     alarmConfig.type == 'interval'
                                         ? '🔔 Tiap ${alarmConfig.intervalMinutes < 60 ? "${alarmConfig.intervalMinutes} Menit" : "${alarmConfig.intervalMinutes ~/ 60} Jam"} (${alarmConfig.intervalStartTime} - ${alarmConfig.intervalEndTime}) • ${_getSoundLabel(alarmConfig)}'
                                         : '🔔 Jam: ${alarmConfig.specificTimes.join(', ')} • ${_getSoundLabel(alarmConfig)}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 11.5,
-                                      color: darkTerracotta,
+                                      color: isDark
+                                          ? seriousGold
+                                          : darkTerracotta,
                                       fontWeight: FontWeight.w600,
                                     ),
                                     maxLines: 2,
@@ -613,6 +829,7 @@ class _TodoPageState extends State<TodoPage> {
                                         id: '',
                                         date: selectedDate,
                                       ).formattedFullDate,
+                                      isSeriousMode: _isSeriousMode,
                                     );
                                     if (res != null) {
                                       setModalState(() {
@@ -624,13 +841,21 @@ class _TodoPageState extends State<TodoPage> {
                                       }
                                     }
                                   },
-                                  icon: const Icon(Icons.edit_rounded, size: 14, color: primaryTerracotta),
-                                  label: const Text(
+                                  icon: Icon(
+                                    Icons.edit_rounded,
+                                    size: 14,
+                                    color: isDark
+                                        ? seriousGold
+                                        : primaryTerracotta,
+                                  ),
+                                  label: Text(
                                     'Ubah',
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
-                                      color: primaryTerracotta,
+                                      color: isDark
+                                          ? seriousGold
+                                          : primaryTerracotta,
                                     ),
                                   ),
                                   style: TextButton.styleFrom(
@@ -657,12 +882,18 @@ class _TodoPageState extends State<TodoPage> {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
                               ),
-                              side: BorderSide(color: Colors.grey[300]!),
+                              side: BorderSide(
+                                color: isDark
+                                    ? seriousBorder
+                                    : Colors.grey[300]!,
+                              ),
                             ),
-                            child: const Text(
+                            child: Text(
                               'Batal',
                               style: TextStyle(
-                                color: Color(0xFF64748B),
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : const Color(0xFF64748B),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -672,13 +903,22 @@ class _TodoPageState extends State<TodoPage> {
                         Expanded(
                           flex: 2,
                           child: ElevatedButton.icon(
-                            onPressed: () {
+                            onPressed: () async {
                               final cleanDate = DateTime(
                                 selectedDate.year,
                                 selectedDate.month,
                                 selectedDate.day,
                               );
                               final taskTitle = taskController.text.trim();
+
+                              if (taskTitle.isNotEmpty && _isSeriousMode) {
+                                final confirmed =
+                                    await SeriousConfirmAddDialog.show(
+                                  context,
+                                  taskTitle: taskTitle,
+                                );
+                                if (!confirmed) return;
+                              }
 
                               final existingIndex = _dateGroups.indexWhere(
                                 (g) =>
@@ -754,8 +994,11 @@ class _TodoPageState extends State<TodoPage> {
                               HapticFeedback.mediumImpact();
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryTerracotta,
-                              foregroundColor: Colors.white,
+                              backgroundColor: isDark
+                                  ? seriousGold
+                                  : primaryTerracotta,
+                              foregroundColor:
+                                  isDark ? Colors.black : Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
@@ -804,6 +1047,7 @@ class _TodoPageState extends State<TodoPage> {
   /// Tambah Kerjaan Baru ke Section Tanggal
   Future<void> _showAddTaskDialog(TodoDateGroup group) async {
     final taskController = TextEditingController();
+    final isDark = _isSeriousMode;
 
     await showModalBottomSheet(
       context: context,
@@ -815,9 +1059,16 @@ class _TodoPageState extends State<TodoPage> {
             bottom: MediaQuery.of(context).viewInsets.bottom,
           ),
           child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            decoration: BoxDecoration(
+              color: isDark ? seriousCardBg : Colors.white,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
+              border: isDark
+                  ? Border.all(
+                      color: seriousGold.withValues(alpha: 0.35),
+                      width: 1.5,
+                    )
+                  : null,
             ),
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
             child: Column(
@@ -829,7 +1080,9 @@ class _TodoPageState extends State<TodoPage> {
                     width: 44,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: isDark
+                          ? const Color(0xFF475569)
+                          : Colors.grey[300],
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
@@ -840,12 +1093,13 @@ class _TodoPageState extends State<TodoPage> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: primaryTerracotta.withValues(alpha: 0.12),
+                        color: (isDark ? seriousGold : primaryTerracotta)
+                            .withValues(alpha: isDark ? 0.15 : 0.12),
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.add_task_rounded,
-                        color: primaryTerracotta,
+                        color: isDark ? seriousGold : primaryTerracotta,
                         size: 24,
                       ),
                     ),
@@ -854,20 +1108,24 @@ class _TodoPageState extends State<TodoPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Tambah Kerjaan Baru',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E293B),
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF1E293B),
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             group.formattedFullDate,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12.5,
-                              color: primaryTerracotta,
+                              color: isDark
+                                  ? seriousGold
+                                  : primaryTerracotta,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -877,47 +1135,60 @@ class _TodoPageState extends State<TodoPage> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Tugas / Pekerjaan yang Harus Dikerjakan',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF334155),
+                    color: isDark
+                        ? const Color(0xFFCBD5E1)
+                        : const Color(0xFF334155),
                   ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: taskController,
                   autofocus: true,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
                   textCapitalization: TextCapitalization.sentences,
                   maxLines: 2,
                   minLines: 1,
                   decoration: InputDecoration(
                     hintText: 'Ketik apa tugas kamu...',
                     hintStyle: TextStyle(
-                      color: Colors.grey[400],
+                      color: isDark
+                          ? const Color(0xFF64748B)
+                          : Colors.grey[400],
                       fontSize: 14,
                     ),
                     filled: true,
-                    fillColor: const Color(0xFFF8FAFC),
+                    fillColor: isDark ? seriousBg : const Color(0xFFF8FAFC),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 14,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
+                      borderSide: BorderSide(
+                        color: isDark
+                            ? seriousBorder
+                            : Colors.grey[300]!,
+                      ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
-                        color: Colors.grey.withValues(alpha: 0.25),
+                        color: isDark
+                            ? seriousBorder
+                            : Colors.grey.withValues(alpha: 0.25),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(
-                        color: primaryTerracotta,
+                      borderSide: BorderSide(
+                        color: isDark ? seriousGold : primaryTerracotta,
                         width: 1.8,
                       ),
                     ),
@@ -934,12 +1205,18 @@ class _TodoPageState extends State<TodoPage> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          side: BorderSide(color: Colors.grey[300]!),
+                          side: BorderSide(
+                            color: isDark
+                                ? seriousBorder
+                                : Colors.grey[300]!,
+                          ),
                         ),
-                        child: const Text(
+                        child: Text(
                           'Batal',
                           style: TextStyle(
-                            color: Color(0xFF64748B),
+                            color: isDark
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF64748B),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -949,7 +1226,7 @@ class _TodoPageState extends State<TodoPage> {
                     Expanded(
                       flex: 2,
                       child: ElevatedButton.icon(
-                        onPressed: () {
+                        onPressed: () async {
                           final text = taskController.text.trim();
                           if (text.isEmpty) {
                             CustomToast.showWarning(
@@ -958,6 +1235,15 @@ class _TodoPageState extends State<TodoPage> {
                               subtitle: 'Tolong isi nama tugas terlebih dahulu.',
                             );
                             return;
+                          }
+
+                          if (_isSeriousMode) {
+                            final confirmed =
+                                await SeriousConfirmAddDialog.show(
+                              context,
+                              taskTitle: text,
+                            );
+                            if (!confirmed) return;
                           }
 
                           setState(() {
@@ -985,8 +1271,10 @@ class _TodoPageState extends State<TodoPage> {
                           HapticFeedback.lightImpact();
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryTerracotta,
-                          foregroundColor: Colors.white,
+                          backgroundColor:
+                              isDark ? seriousGold : primaryTerracotta,
+                          foregroundColor:
+                              isDark ? Colors.black : Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -1016,39 +1304,63 @@ class _TodoPageState extends State<TodoPage> {
   /// Edit Nama Tugas
   Future<void> _showEditTaskDialog(TodoItem item) async {
     final controller = TextEditingController(text: item.title);
+    final isDark = _isSeriousMode;
 
     await showDialog(
       context: context,
       builder: (ctx) {
         return AlertDialog(
+          backgroundColor: isDark ? seriousCardBg : Colors.white,
           scrollable: true,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
+            side: isDark
+                ? BorderSide(
+                    color: seriousGold.withValues(alpha: 0.35),
+                    width: 1.5,
+                  )
+                : BorderSide.none,
           ),
-          title: const Text(
+          title: Text(
             'Edit Tugas',
             style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
+              color: isDark ? Colors.white : const Color(0xFF1E293B),
             ),
           ),
           content: TextField(
             controller: controller,
             autofocus: true,
+            style: TextStyle(
+              color: isDark ? Colors.white : Colors.black87,
+            ),
             textCapitalization: TextCapitalization.sentences,
             decoration: InputDecoration(
               hintText: 'Nama tugas...',
+              hintStyle: TextStyle(
+                color: isDark ? const Color(0xFF64748B) : Colors.grey[400],
+              ),
               filled: true,
-              fillColor: const Color(0xFFF8FAFC),
+              fillColor: isDark ? seriousBg : const Color(0xFFF8FAFC),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey[300]!),
+                borderSide: BorderSide(
+                  color: isDark ? seriousBorder : Colors.grey[300]!,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: isDark
+                      ? seriousBorder
+                      : Colors.grey.withValues(alpha: 0.25),
+                ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                  color: primaryTerracotta,
+                borderSide: BorderSide(
+                  color: isDark ? seriousGold : primaryTerracotta,
                   width: 1.8,
                 ),
               ),
@@ -1057,7 +1369,12 @@ class _TodoPageState extends State<TodoPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Batal', style: TextStyle(color: Colors.grey)),
+              child: Text(
+                'Batal',
+                style: TextStyle(
+                  color: isDark ? const Color(0xFF94A3B8) : Colors.grey,
+                ),
+              ),
             ),
             ElevatedButton(
               onPressed: () {
@@ -1071,8 +1388,9 @@ class _TodoPageState extends State<TodoPage> {
                 Navigator.pop(ctx);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: primaryTerracotta,
-                foregroundColor: Colors.white,
+                backgroundColor:
+                    isDark ? seriousGold : primaryTerracotta,
+                foregroundColor: isDark ? Colors.black : Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -1086,6 +1404,24 @@ class _TodoPageState extends State<TodoPage> {
   }
 
   void _toggleTask(TodoDateGroup group, TodoItem item) {
+    // Mode Serius: Cek jika task berada pada tanggal lampau dan belum dikerjakan
+    if (_isSeriousMode && !item.isCompleted) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final groupDate =
+          DateTime(group.date.year, group.date.month, group.date.day);
+      if (groupDate.isBefore(today)) {
+        HapticFeedback.heavyImpact();
+        CustomToast.showWarning(
+          context,
+          title: 'Tugas Terlewat Terkunci 🔒',
+          subtitle:
+              'Tugas pada tanggal lampau tidak bisa dicentang untuk menambah poin langsung. Selesaikan hukuman olahraga untuk mempertahankan poin!',
+        );
+        return;
+      }
+    }
+
     HapticFeedback.selectionClick();
     setState(() {
       item.isCompleted = !item.isCompleted;
@@ -1105,6 +1441,14 @@ class _TodoPageState extends State<TodoPage> {
   }
 
   void _deleteTask(TodoDateGroup group, TodoItem item) {
+    if (_isSeriousMode) {
+      CustomToast.showError(
+        context,
+        title: 'Tugas Terkunci',
+        subtitle: 'Di Mode Serius, tugas yang sudah disepakati TIDAK BISA DIHAPUS! 🚫',
+      );
+      return;
+    }
     setState(() {
       group.items.removeWhere((i) => i.id == item.id);
     });
@@ -1120,6 +1464,14 @@ class _TodoPageState extends State<TodoPage> {
   }
 
   Future<void> _confirmDeleteGroup(TodoDateGroup group) async {
+    if (_isSeriousMode) {
+      CustomToast.showError(
+        context,
+        title: 'Section Terkunci',
+        subtitle: 'Di Mode Serius, section to-do list TIDAK BISA DIHAPUS! 🚫',
+      );
+      return;
+    }
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) {
@@ -1216,21 +1568,25 @@ class _TodoPageState extends State<TodoPage> {
       return true;
     }).toList();
   }
-
   @override
   Widget build(BuildContext context) {
     final filtered = _filteredGroups;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFBF8F6),
+      backgroundColor:
+          _isSeriousMode ? seriousBg : const Color(0xFFFBF8F6),
       drawer: TodoProductivityDrawer(
         activeGroups: _dateGroups,
+        isSeriousMode: _isSeriousMode,
+        onOpenSeriousMode: _handleOpenSeriousMode,
+        onExitSeriousMode: _handleExitSeriousMode,
         onDataChanged: () async {
           await _loadTodoData();
         },
       ),
       appBar: AppBar(
-        backgroundColor: primaryTerracotta,
+        backgroundColor:
+            _isSeriousMode ? seriousBg : primaryTerracotta,
         centerTitle: false,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -1239,15 +1595,21 @@ class _TodoPageState extends State<TodoPage> {
           statusBarIconBrightness: Brightness.light,
           statusBarBrightness: Brightness.dark,
         ),
-        title: const Row(
+        title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.checklist_rounded, color: Colors.white, size: 20),
-            SizedBox(width: 6),
+            Icon(
+              _isSeriousMode
+                  ? Icons.local_fire_department_rounded
+                  : Icons.checklist_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 6),
             Flexible(
               child: Text(
-                'To-Do List',
-                style: TextStyle(
+                _isSeriousMode ? 'To-Do List (Mode Serius)' : 'To-Do List',
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontSize: 17,
@@ -1255,16 +1617,45 @@ class _TodoPageState extends State<TodoPage> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            if (_isSeriousMode) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: seriousGold,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'GAMES',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
         actions: [
+          if (_isSeriousMode)
+            IconButton(
+              icon: const Icon(Icons.emoji_events_rounded,
+                  color: seriousGold),
+              tooltip: 'Leaderboard Top 3',
+              onPressed: () => SeriousLeaderboardModal.show(context),
+            ),
           IconButton(
             icon: const Icon(Icons.history_rounded, color: Colors.white),
             tooltip: 'Riwayat Task',
             onPressed: () async {
               await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (ctx) => const TodoRiwayatPage()),
+                MaterialPageRoute(
+                  builder: (ctx) =>
+                      TodoRiwayatPage(isSeriousMode: _isSeriousMode),
+                ),
               );
               _loadTodoData();
             },
@@ -1281,12 +1672,13 @@ class _TodoPageState extends State<TodoPage> {
         onPageSelected: widget.onPageSelected,
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: primaryTerracotta),
+          ? Center(
+              child: CircularProgressIndicator(
+                  color: _isSeriousMode ? seriousGold : primaryTerracotta),
             )
           : RefreshIndicator(
               onRefresh: _loadTodoData,
-              color: primaryTerracotta,
+              color: _isSeriousMode ? seriousGold : primaryTerracotta,
               child: ResponsiveContentWrapper(
                 maxWidth: 720,
                 child: CustomScrollView(
@@ -1306,49 +1698,49 @@ class _TodoPageState extends State<TodoPage> {
                             const SizedBox(height: 14),
 
                             // Section Title
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              runSpacing: 6,
                               children: [
-                                Flexible(
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Flexible(
-                                        child: Text(
-                                          'Daftar Rencana & Tugas',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xFF1E293B),
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: primaryTerracotta
-                                              .withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(10),
-                                        ),
-                                        child: Text(
-                                          '${_activeDateGroups.length} Hari',
-                                          style: const TextStyle(
-                                            color: primaryTerracotta,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                                Text(
+                                  _isSeriousMode
+                                      ? 'Misi & Target Harian'
+                                      : 'Daftar Rencana & Tugas',
+                                  style: TextStyle(
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: _isSeriousMode
+                                        ? Colors.white
+                                        : const Color(0xFF1E293B),
                                   ),
                                 ),
-                                if (filtered.length > 1) ...[
-                                  const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: (_isSeriousMode
+                                            ? seriousGold
+                                            : primaryTerracotta)
+                                        .withValues(alpha: 0.15),
+                                    borderRadius:
+                                        BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    '${_activeDateGroups.length} Hari',
+                                    style: TextStyle(
+                                      color: _isSeriousMode
+                                          ? seriousGold
+                                          : primaryTerracotta,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                if (filtered.length > 1)
                                   const Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -1368,7 +1760,6 @@ class _TodoPageState extends State<TodoPage> {
                                       ),
                                     ],
                                   ),
-                                ],
                               ],
                             ),
 
@@ -1452,15 +1843,17 @@ class _TodoPageState extends State<TodoPage> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: _isSeriousMode ? seriousCardBg : Colors.white,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: primaryTerracotta.withValues(alpha: 0.35),
+                color: (_isSeriousMode ? seriousGold : primaryTerracotta)
+                    .withValues(alpha: 0.35),
                 width: 1.5,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: primaryTerracotta.withValues(alpha: 0.06),
+                  color: (_isSeriousMode ? seriousGold : primaryTerracotta)
+                      .withValues(alpha: 0.06),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -1472,20 +1865,23 @@ class _TodoPageState extends State<TodoPage> {
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: primaryTerracotta.withValues(alpha: 0.12),
+                    color: (_isSeriousMode ? seriousGold : primaryTerracotta)
+                        .withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.add_rounded,
-                    color: primaryTerracotta,
+                    color: _isSeriousMode ? seriousGold : primaryTerracotta,
                     size: 20,
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Text(
-                  'Buat Section / Tanggal Baru',
+                Text(
+                  _isSeriousMode
+                      ? 'Buat Section Tanggal Baru (Mode Serius)'
+                      : 'Buat Section / Tanggal Baru',
                   style: TextStyle(
-                    color: primaryTerracotta,
+                    color: _isSeriousMode ? seriousGold : primaryTerracotta,
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                     letterSpacing: 0.2,
@@ -1501,6 +1897,190 @@ class _TodoPageState extends State<TodoPage> {
 
   // --- HEADER BANNER ---
   Widget _buildHeaderBanner() {
+    if (_isSeriousMode) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: seriousGold.withValues(alpha: 0.35),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: seriousGold.withValues(alpha: 0.08),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: seriousGold,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('🔥', style: TextStyle(fontSize: 12)),
+                      SizedBox(width: 4),
+                      Text(
+                        'MODE SERIUS AKTIF',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                InkWell(
+                  onTap: _handleExitSeriousMode,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.15),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.exit_to_app_rounded,
+                            color: Colors.white70, size: 14),
+                        SizedBox(width: 4),
+                        Text(
+                          'Keluar Mode',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: seriousGold.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: seriousGold, width: 2),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Text(
+                    '👑',
+                    style: TextStyle(fontSize: 26),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _seriousUser?.displayName ?? 'Pemain Serius',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '@${_seriousUser?.username ?? "user"} • Anti-Hapus & Hukuman Aktif',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${_seriousUser?.totalPoints ?? 0}',
+                      style: const TextStyle(
+                        color: seriousGold,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const Text(
+                      'TOTAL POIN',
+                      style: TextStyle(
+                        color: Color(0xFFFDE68A),
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: seriousGold,
+                      foregroundColor: Colors.black,
+                      elevation: 2,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.emoji_events_rounded, size: 18),
+                    label: const Text(
+                      'Leaderboard Top 3 🏆',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w900, fontSize: 12.5),
+                    ),
+                    onPressed: () {
+                      SeriousLeaderboardModal.show(context);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
     final progressPercent = (_overallProgress * 100).toInt();
 
     return Container(
@@ -1549,33 +2129,33 @@ class _TodoPageState extends State<TodoPage> {
                   ),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.task_alt_rounded,
-                      color: Colors.white,
-                      size: 14,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      '$_completedTasks/$_totalTasks Selesai',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.bold,
+              InkWell(
+                onTap: _handleOpenSeriousMode,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('🔥', style: TextStyle(fontSize: 12)),
+                      SizedBox(width: 4),
+                      Text(
+                        'Mode Serius',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -1590,7 +2170,7 @@ class _TodoPageState extends State<TodoPage> {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
+          const Text(
             'Kelola pekerjaan terstruktur per tanggal untuk produktivitas yang rapi dan terpantau.',
             style: TextStyle(
               color: Colors.white,
@@ -1634,6 +2214,10 @@ class _TodoPageState extends State<TodoPage> {
     return Column(
       children: [
         TextField(
+          style: TextStyle(
+            color: _isSeriousMode ? Colors.white : const Color(0xFF1E293B),
+            fontSize: 13.5,
+          ),
           onChanged: (val) {
             setState(() {
               _searchQuery = val;
@@ -1641,15 +2225,24 @@ class _TodoPageState extends State<TodoPage> {
           },
           decoration: InputDecoration(
             hintText: 'Cari tugas atau tanggal...',
-            hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13.5),
-            prefixIcon: const Icon(
+            hintStyle: TextStyle(
+              color: _isSeriousMode
+                  ? const Color(0xFF64748B)
+                  : Colors.grey[400],
+              fontSize: 13.5,
+            ),
+            prefixIcon: Icon(
               Icons.search_rounded,
-              color: primaryTerracotta,
+              color: _isSeriousMode ? seriousGold : primaryTerracotta,
               size: 20,
             ),
             suffixIcon: _searchQuery.isNotEmpty
                 ? IconButton(
-                    icon: const Icon(Icons.clear_rounded, size: 18),
+                    icon: Icon(
+                      Icons.clear_rounded,
+                      size: 18,
+                      color: _isSeriousMode ? Colors.white70 : Colors.grey[600],
+                    ),
                     onPressed: () {
                       setState(() {
                         _searchQuery = '';
@@ -1658,7 +2251,7 @@ class _TodoPageState extends State<TodoPage> {
                   )
                 : null,
             filled: true,
-            fillColor: Colors.white,
+            fillColor: _isSeriousMode ? seriousCardBg : Colors.white,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 12,
@@ -1666,19 +2259,23 @@ class _TodoPageState extends State<TodoPage> {
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                color: primaryTerracotta.withValues(alpha: 0.15),
+                color: _isSeriousMode
+                    ? const Color(0xFF334155)
+                    : primaryTerracotta.withValues(alpha: 0.15),
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: _isSeriousMode
+                    ? const Color(0xFF334155)
+                    : Colors.black.withValues(alpha: 0.05),
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(
-                color: primaryTerracotta,
+              borderSide: BorderSide(
+                color: _isSeriousMode ? seriousGold : primaryTerracotta,
                 width: 1.5,
               ),
             ),
@@ -1721,17 +2318,22 @@ class _TodoPageState extends State<TodoPage> {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected ? primaryTerracotta : Colors.white,
+          color: isSelected
+              ? (_isSeriousMode ? seriousGold : primaryTerracotta)
+              : (_isSeriousMode ? seriousCardBg : Colors.white),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
-                ? primaryTerracotta
-                : Colors.grey.withValues(alpha: 0.2),
+                ? (_isSeriousMode ? seriousGold : primaryTerracotta)
+                : (_isSeriousMode
+                    ? const Color(0xFF334155)
+                    : Colors.grey.withValues(alpha: 0.2)),
           ),
           boxShadow: [
             if (isSelected)
               BoxShadow(
-                color: primaryTerracotta.withValues(alpha: 0.25),
+                color: (_isSeriousMode ? seriousGold : primaryTerracotta)
+                    .withValues(alpha: 0.25),
                 blurRadius: 8,
                 offset: const Offset(0, 3),
               ),
@@ -1740,7 +2342,11 @@ class _TodoPageState extends State<TodoPage> {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : const Color(0xFF475569),
+            color: isSelected
+                ? (_isSeriousMode ? Colors.black : Colors.white)
+                : (_isSeriousMode
+                    ? const Color(0xFF94A3B8)
+                    : const Color(0xFF475569)),
             fontSize: 12,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
           ),
@@ -1763,17 +2369,23 @@ class _TodoPageState extends State<TodoPage> {
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: _isSeriousMode ? seriousCardBg : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: group.isToday
-                ? primaryTerracotta.withValues(alpha: 0.4)
-                : Colors.black.withValues(alpha: 0.06),
+            color: _isSeriousMode
+                ? (group.isToday
+                    ? seriousGold.withValues(alpha: 0.5)
+                    : const Color(0xFF334155))
+                : (group.isToday
+                    ? primaryTerracotta.withValues(alpha: 0.4)
+                    : Colors.black.withValues(alpha: 0.06)),
             width: group.isToday ? 1.6 : 1.0,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: _isSeriousMode
+                  ? Colors.black.withValues(alpha: 0.25)
+                  : Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -1787,14 +2399,20 @@ class _TodoPageState extends State<TodoPage> {
               // Header Tanggal Section (Tappable untuk Expand / Collapse)
               Container(
                 decoration: BoxDecoration(
-                  color: group.isToday
-                      ? primaryTerracotta.withValues(alpha: 0.07)
-                      : const Color(0xFFF8FAFC),
+                  color: _isSeriousMode
+                      ? (group.isToday
+                          ? seriousGold.withValues(alpha: 0.12)
+                          : const Color(0xFF162032))
+                      : (group.isToday
+                          ? primaryTerracotta.withValues(alpha: 0.07)
+                          : const Color(0xFFF8FAFC)),
                   border: Border(
                     bottom: BorderSide(
                       color: isCollapsed
                           ? Colors.transparent
-                          : Colors.grey.withValues(alpha: 0.12),
+                          : (_isSeriousMode
+                              ? const Color(0xFF334155)
+                              : Colors.grey.withValues(alpha: 0.12)),
                     ),
                   ),
                 ),
@@ -1807,9 +2425,11 @@ class _TodoPageState extends State<TodoPage> {
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         color: Colors.transparent,
-                        child: const Icon(
+                        child: Icon(
                           Icons.drag_indicator_rounded,
-                          color: Color(0xFF94A3B8),
+                          color: _isSeriousMode
+                              ? const Color(0xFF64748B)
+                              : const Color(0xFF94A3B8),
                           size: 20,
                         ),
                       ),
@@ -1832,16 +2452,24 @@ class _TodoPageState extends State<TodoPage> {
                               Container(
                                 padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(
-                                  color: group.isToday
-                                      ? primaryTerracotta
-                                      : const Color(0xFFE2E8F0),
+                                  color: _isSeriousMode
+                                      ? (group.isToday
+                                          ? seriousGold
+                                          : const Color(0xFF334155))
+                                      : (group.isToday
+                                          ? primaryTerracotta
+                                          : const Color(0xFFE2E8F0)),
                                   borderRadius: BorderRadius.circular(9),
                                 ),
                                 child: Icon(
                                   Icons.event_note_rounded,
-                                  color: group.isToday
-                                      ? Colors.white
-                                      : const Color(0xFF475569),
+                                  color: _isSeriousMode
+                                      ? (group.isToday
+                                          ? Colors.black
+                                          : Colors.white70)
+                                      : (group.isToday
+                                          ? Colors.white
+                                          : const Color(0xFF475569)),
                                   size: 15,
                                 ),
                               ),
@@ -1861,9 +2489,13 @@ class _TodoPageState extends State<TodoPage> {
                                             style: TextStyle(
                                               fontSize: 13.5,
                                               fontWeight: FontWeight.bold,
-                                              color: group.isToday
-                                                  ? primaryTerracotta
-                                                  : const Color(0xFF1E293B),
+                                              color: _isSeriousMode
+                                                  ? (group.isToday
+                                                      ? seriousGold
+                                                      : Colors.white)
+                                                  : (group.isToday
+                                                      ? primaryTerracotta
+                                                      : const Color(0xFF1E293B)),
                                             ),
                                           ),
                                         ),
@@ -1877,20 +2509,29 @@ class _TodoPageState extends State<TodoPage> {
                                               vertical: 2,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: group.isToday
-                                                  ? primaryTerracotta
-                                                      .withValues(alpha: 0.15)
-                                                  : Colors.grey
-                                                      .withValues(alpha: 0.15),
+                                              color: _isSeriousMode
+                                                  ? (group.isToday
+                                                      ? seriousGold
+                                                          .withValues(alpha: 0.2)
+                                                      : const Color(0xFF334155))
+                                                  : (group.isToday
+                                                      ? primaryTerracotta
+                                                          .withValues(alpha: 0.15)
+                                                      : Colors.grey
+                                                          .withValues(alpha: 0.15)),
                                               borderRadius:
                                                   BorderRadius.circular(6),
                                             ),
                                             child: Text(
                                               group.relativeDateLabel,
                                               style: TextStyle(
-                                                color: group.isToday
-                                                    ? primaryTerracotta
-                                                    : const Color(0xFF475569),
+                                                color: _isSeriousMode
+                                                    ? (group.isToday
+                                                        ? seriousGold
+                                                        : Colors.white70)
+                                                    : (group.isToday
+                                                        ? primaryTerracotta
+                                                        : const Color(0xFF475569)),
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.bold,
                                               ),
@@ -1900,7 +2541,11 @@ class _TodoPageState extends State<TodoPage> {
                                       ],
                                     ),
                                     const SizedBox(height: 2),
-                                    Row(
+                                    Wrap(
+                                      crossAxisAlignment:
+                                          WrapCrossAlignment.center,
+                                      spacing: 6,
+                                      runSpacing: 2,
                                       children: [
                                         Text(
                                           '${group.completedCount}/${group.totalCount} Tugas selesai',
@@ -1908,10 +2553,35 @@ class _TodoPageState extends State<TodoPage> {
                                             fontSize: 11,
                                             color: group.isAllCompleted
                                                 ? accentCompleted
-                                                : const Color(0xFF64748B),
+                                                : (_isSeriousMode
+                                                    ? const Color(0xFF94A3B8)
+                                                    : const Color(0xFF64748B)),
                                             fontWeight: group.isAllCompleted
                                                 ? FontWeight.bold
                                                 : FontWeight.normal,
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 1.5,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: _isSeriousMode
+                                                ? seriousGold.withValues(alpha: 0.18)
+                                                : primaryTerracotta.withValues(alpha: 0.15),
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            '+${SeriousModeService.calculatePoints(group.completedCount)} PTS',
+                                            style: TextStyle(
+                                              color: _isSeriousMode
+                                                  ? seriousGold
+                                                  : primaryTerracotta,
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -1927,29 +2597,39 @@ class _TodoPageState extends State<TodoPage> {
                                             vertical: 2,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: primaryTerracotta.withValues(alpha: 0.12),
+                                            color: (_isSeriousMode
+                                                    ? seriousGold
+                                                    : primaryTerracotta)
+                                                .withValues(alpha: 0.12),
                                             borderRadius: BorderRadius.circular(6),
                                             border: Border.all(
-                                              color: primaryTerracotta.withValues(alpha: 0.3),
+                                              color: (_isSeriousMode
+                                                      ? seriousGold
+                                                      : primaryTerracotta)
+                                                  .withValues(alpha: 0.3),
                                               width: 0.8,
                                             ),
                                           ),
                                           child: Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              const Icon(
+                                              Icon(
                                                 Icons.alarm_on_rounded,
                                                 size: 12,
-                                                color: primaryTerracotta,
+                                                color: _isSeriousMode
+                                                    ? seriousGold
+                                                    : primaryTerracotta,
                                               ),
                                               const SizedBox(width: 4),
                                               Flexible(
                                                 child: Text(
                                                   group.reminderSummaryLabel,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.bold,
-                                                    color: primaryTerracotta,
+                                                    color: _isSeriousMode
+                                                        ? seriousGold
+                                                        : primaryTerracotta,
                                                   ),
                                                   overflow: TextOverflow.ellipsis,
                                                 ),
@@ -1976,9 +2656,11 @@ class _TodoPageState extends State<TodoPage> {
                         curve: Curves.easeInOutCubic,
                         child: Icon(
                           Icons.keyboard_arrow_down_rounded,
-                          color: group.isToday
-                              ? primaryTerracotta
-                              : const Color(0xFF64748B),
+                          color: _isSeriousMode
+                              ? (group.isToday ? seriousGold : Colors.white70)
+                              : (group.isToday
+                                  ? primaryTerracotta
+                                  : const Color(0xFF64748B)),
                           size: 22,
                         ),
                       ),
@@ -1991,9 +2673,11 @@ class _TodoPageState extends State<TodoPage> {
 
                     // Menu Titik Tiga
                     PopupMenuButton<String>(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.more_vert_rounded,
-                        color: Color(0xFF64748B),
+                        color: _isSeriousMode
+                            ? Colors.white70
+                            : const Color(0xFF64748B),
                         size: 20,
                       ),
                       shape: RoundedRectangleBorder(
@@ -2026,14 +2710,17 @@ class _TodoPageState extends State<TodoPage> {
                         }
                       },
                       itemBuilder: (ctx) => [
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'add',
                           child: Row(
                             children: [
                               Icon(Icons.add_rounded,
-                                  size: 18, color: primaryTerracotta),
-                              SizedBox(width: 8),
-                              Text('Tambah Tugas',
+                                  size: 18,
+                                  color: _isSeriousMode
+                                      ? seriousGold
+                                      : primaryTerracotta),
+                              const SizedBox(width: 8),
+                              const Text('Tambah Tugas',
                                   style: TextStyle(fontSize: 13)),
                             ],
                           ),
@@ -2047,9 +2734,11 @@ class _TodoPageState extends State<TodoPage> {
                                     ? Icons.alarm_on_rounded
                                     : Icons.alarm_add_rounded,
                                 size: 18,
-                                color: primaryTerracotta,
+                                color: _isSeriousMode
+                                    ? seriousGold
+                                    : primaryTerracotta,
                               ),
-                              SizedBox(width: 8),
+                              const SizedBox(width: 8),
                               Text(
                                 group.reminderEnabled
                                     ? 'Atur Pengingat Alarm'
@@ -2174,10 +2863,21 @@ class _TodoPageState extends State<TodoPage> {
                                 valueColor: AlwaysStoppedAnimation<Color>(
                                   group.isAllCompleted
                                       ? accentCompleted
-                                      : primaryTerracotta,
+                                      : (_isSeriousMode
+                                          ? seriousGold
+                                          : primaryTerracotta),
                                 ),
                               ),
                             ),
+
+                          // Kartu Evaluasi Mode Serius untuk Section yang Terlewat
+                          () {
+                            final eval = SeriousModeService.evaluateSection(group);
+                            if (eval != null) {
+                              return _buildSeriousEvaluationCard(eval);
+                            }
+                            return const SizedBox.shrink();
+                          }(),
 
                           // Tombol Arsipkan Section Jika Sudah 100% Selesai
                           if (group.isAllCompleted && group.items.isNotEmpty)
@@ -2186,11 +2886,11 @@ class _TodoPageState extends State<TodoPage> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
-                                color: accentCompleted.withValues(alpha: 0.08),
+                                color: accentCompleted.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color:
-                                      accentCompleted.withValues(alpha: 0.25),
+                                      accentCompleted.withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Row(
@@ -2252,7 +2952,9 @@ class _TodoPageState extends State<TodoPage> {
                                       ? 'Belum ada tugas pada tanggal ini'
                                       : 'Tidak ada tugas yang sesuai filter',
                                   style: TextStyle(
-                                    color: Colors.grey[500],
+                                    color: _isSeriousMode
+                                        ? const Color(0xFF64748B)
+                                        : Colors.grey[500],
                                     fontSize: 12.5,
                                     fontStyle: FontStyle.italic,
                                   ),
@@ -2270,8 +2972,9 @@ class _TodoPageState extends State<TodoPage> {
                                     Divider(
                                       height: 1,
                                       thickness: 0.6,
-                                      color:
-                                          Colors.grey.withValues(alpha: 0.12),
+                                      color: _isSeriousMode
+                                          ? const Color(0xFF334155)
+                                          : Colors.grey.withValues(alpha: 0.12),
                                       indent: 44,
                                     ),
                                 ],
@@ -2289,27 +2992,33 @@ class _TodoPageState extends State<TodoPage> {
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 7),
                                 decoration: BoxDecoration(
-                                  color:
-                                      primaryTerracotta.withValues(alpha: 0.06),
+                                  color: _isSeriousMode
+                                      ? const Color(0xFF0F172A).withValues(alpha: 0.4)
+                                      : primaryTerracotta.withValues(alpha: 0.06),
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                    color: primaryTerracotta
-                                        .withValues(alpha: 0.2),
+                                    color: _isSeriousMode
+                                        ? seriousGold.withValues(alpha: 0.3)
+                                        : primaryTerracotta.withValues(alpha: 0.2),
                                   ),
                                 ),
-                                child: const Row(
+                                child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(
                                       Icons.add_circle_rounded,
                                       size: 16,
-                                      color: primaryTerracotta,
+                                      color: _isSeriousMode
+                                          ? seriousGold
+                                          : primaryTerracotta,
                                     ),
-                                    SizedBox(width: 6),
+                                    const SizedBox(width: 6),
                                     Text(
                                       'Tambah Kerjaan',
                                       style: TextStyle(
-                                        color: primaryTerracotta,
+                                        color: _isSeriousMode
+                                            ? seriousGold
+                                            : primaryTerracotta,
                                         fontWeight: FontWeight.bold,
                                         fontSize: 12,
                                       ),
@@ -2329,11 +3038,155 @@ class _TodoPageState extends State<TodoPage> {
     );
   }
 
+  // --- KARTU EVALUASI ROASTING & HUKUMAN MODE SERIUS ---
+  Widget _buildSeriousEvaluationCard(SeriousSectionEvaluation eval) {
+    final Color borderColor;
+    final Color bgColor;
+    final Color badgeColor;
+    final String emoji;
+    final String tagLabel;
+
+    if (eval.isExempt) {
+      borderColor = const Color(0xFF10B981);
+      bgColor = const Color(0xFF064E3B).withValues(alpha: 0.2);
+      badgeColor = const Color(0xFF10B981);
+      emoji = '👑';
+      tagLabel = 'OVER PRODUKTIF (>15 SELESAI)';
+    } else if (eval.isPunishmentOptional) {
+      borderColor = seriousGold;
+      bgColor = const Color(0xFF78350F).withValues(alpha: 0.2);
+      badgeColor = seriousGold;
+      emoji = '⚡';
+      tagLabel = 'SANGAT PRODUKTIF (11-15 SELESAI)';
+    } else {
+      borderColor = seriousFire;
+      bgColor = const Color(0xFF7F1D1D).withValues(alpha: 0.2);
+      badgeColor = seriousFire;
+      emoji = '💀';
+      tagLabel = 'TANGGAL LEWAT • HUKUMAN WAJIB';
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor, width: 1.4),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 16)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  tagLabel,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    color: badgeColor,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: badgeColor.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  eval.isExempt
+                      ? 'Bebas Hukuman'
+                      : (eval.isPunishmentOptional
+                          ? 'Opsional'
+                          : '${eval.pendingCount} Belum Selesai'),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: badgeColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '"${eval.message}"',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12.5,
+              fontStyle: FontStyle.italic,
+              fontWeight: FontWeight.w600,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: badgeColor,
+                foregroundColor:
+                    eval.isPunishmentOptional ? Colors.black : Colors.white,
+                elevation: 0,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              icon: Icon(
+                eval.isExempt
+                    ? Icons.bedtime_rounded
+                    : Icons.sports_esports_rounded,
+                size: 13,
+              ),
+              label: Text(
+                eval.isExempt
+                    ? 'Bebas Hukuman • Istirahat Dulu'
+                    : (eval.isPunishmentOptional
+                        ? 'Pilih Hukuman / Lewati'
+                        : 'Ambil Hukuman! 💀'),
+                style:
+                    const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+              onPressed: () {
+                SeriousPunishmentDialog.show(
+                  context,
+                  evaluation: eval,
+                  allGroups: _dateGroups,
+                  onCompleted: () {
+                    _loadTodoData();
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // --- TASK ITEM TILE DENGAN CHECKBOX & NAMA TUGAS ---
   Widget _buildTaskItemTile(TodoDateGroup group, TodoItem item) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final groupDate =
+        DateTime(group.date.year, group.date.month, group.date.day);
+    final isMissedLocked =
+        _isSeriousMode && groupDate.isBefore(today) && !item.isCompleted;
+
     return Dismissible(
       key: Key(item.id),
-      direction: DismissDirection.endToStart,
+      direction:
+          _isSeriousMode ? DismissDirection.none : DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 16),
@@ -2360,18 +3213,31 @@ class _TodoPageState extends State<TodoPage> {
                   width: 22,
                   height: 22,
                   decoration: BoxDecoration(
-                    color: item.isCompleted ? accentCompleted : Colors.white,
+                    color: item.isCompleted
+                        ? (_isSeriousMode ? seriousGold : accentCompleted)
+                        : (isMissedLocked
+                            ? const Color(0xFF3B1212)
+                            : (_isSeriousMode
+                                ? const Color(0xFF0F172A)
+                                : Colors.white)),
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: item.isCompleted
-                          ? accentCompleted
-                          : const Color(0xFFCBD5E1),
+                          ? (_isSeriousMode ? seriousGold : accentCompleted)
+                          : (isMissedLocked
+                              ? const Color(0xFFEF4444)
+                              : (_isSeriousMode
+                                  ? const Color(0xFF475569)
+                                  : const Color(0xFFCBD5E1))),
                       width: 1.8,
                     ),
                     boxShadow: item.isCompleted
                         ? [
                             BoxShadow(
-                              color: accentCompleted.withValues(alpha: 0.25),
+                              color: (_isSeriousMode
+                                      ? seriousGold
+                                      : accentCompleted)
+                                  .withValues(alpha: 0.25),
                               blurRadius: 4,
                               offset: const Offset(0, 1.5),
                             ),
@@ -2380,39 +3246,89 @@ class _TodoPageState extends State<TodoPage> {
                   ),
                   child: Center(
                     child: item.isCompleted
-                        ? const Icon(
+                        ? Icon(
                             Icons.check_rounded,
-                            color: Colors.white,
+                            color: _isSeriousMode ? Colors.black : Colors.white,
                             size: 13,
                           )
-                        : null,
+                        : (isMissedLocked
+                            ? const Icon(
+                                Icons.lock_rounded,
+                                color: Color(0xFFEF4444),
+                                size: 11,
+                              )
+                            : null),
                   ),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  item.title,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    color: item.isCompleted
-                        ? const Color(0xFF94A3B8)
-                        : const Color(0xFF1E293B),
-                    fontWeight:
-                        item.isCompleted ? FontWeight.w400 : FontWeight.w500,
-                    decoration: item.isCompleted
-                        ? TextDecoration.lineThrough
-                        : TextDecoration.none,
-                    decorationColor: const Color(0xFF94A3B8),
-                  ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.title,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: item.isCompleted
+                              ? (_isSeriousMode
+                                  ? const Color(0xFF64748B)
+                                  : const Color(0xFF94A3B8))
+                              : (isMissedLocked
+                                  ? const Color(0xFFFCA5A5)
+                                  : (_isSeriousMode
+                                      ? Colors.white
+                                      : const Color(0xFF1E293B))),
+                          fontWeight: item.isCompleted
+                              ? FontWeight.w400
+                              : (isMissedLocked
+                                  ? FontWeight.w600
+                                  : FontWeight.w500),
+                          decoration: item.isCompleted
+                              ? TextDecoration.lineThrough
+                              : TextDecoration.none,
+                          decorationColor: _isSeriousMode
+                              ? const Color(0xFF64748B)
+                              : const Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ),
+                    if (isMissedLocked) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color:
+                              const Color(0xFFEF4444).withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: const Color(0xFFEF4444)
+                                .withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: const Text(
+                          'TERLEWAT',
+                          style: TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFFEF4444),
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               const SizedBox(width: 4),
               IconButton(
-                icon: const Icon(
+                icon: Icon(
                   Icons.edit_outlined,
                   size: 15,
-                  color: Color(0xFF94A3B8),
+                  color: _isSeriousMode
+                      ? const Color(0xFF64748B)
+                      : const Color(0xFF94A3B8),
                 ),
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.all(2),
@@ -2420,18 +3336,39 @@ class _TodoPageState extends State<TodoPage> {
                 tooltip: 'Edit Tugas',
                 onPressed: () => _showEditTaskDialog(item),
               ),
-              IconButton(
-                icon: const Icon(
-                  Icons.close_rounded,
-                  size: 15,
-                  color: Color(0xFFCBD5E1),
+              if (_isSeriousMode)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Tooltip(
+                    message: 'Tugas terkunci (Anti-Hapus Mode Serius)',
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: seriousGold.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(
+                        Icons.lock_rounded,
+                        size: 13,
+                        color: seriousGold,
+                      ),
+                    ),
+                  ),
+                )
+              else
+
+                IconButton(
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    size: 15,
+                    color: Color(0xFFCBD5E1),
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.all(2),
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Hapus Tugas',
+                  onPressed: () => _deleteTask(group, item),
                 ),
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.all(2),
-                constraints: const BoxConstraints(),
-                tooltip: 'Hapus Tugas',
-                onPressed: () => _deleteTask(group, item),
-              ),
             ],
           ),
         ),
@@ -2445,14 +3382,18 @@ class _TodoPageState extends State<TodoPage> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _isSeriousMode ? seriousCardBg : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: primaryTerracotta.withValues(alpha: 0.15),
+          color: _isSeriousMode
+              ? const Color(0xFF334155)
+              : primaryTerracotta.withValues(alpha: 0.15),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: _isSeriousMode
+                ? Colors.black.withValues(alpha: 0.2)
+                : Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -2464,22 +3405,24 @@ class _TodoPageState extends State<TodoPage> {
             width: 72,
             height: 72,
             decoration: BoxDecoration(
-              color: primaryTerracotta.withValues(alpha: 0.1),
+              color: _isSeriousMode
+                  ? seriousGold.withValues(alpha: 0.15)
+                  : primaryTerracotta.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.calendar_today_rounded,
               size: 36,
-              color: primaryTerracotta,
+              color: _isSeriousMode ? seriousGold : primaryTerracotta,
             ),
           ),
           const SizedBox(height: 18),
-          const Text(
+          Text(
             'Tidak Ada List Tugas',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
+              color: _isSeriousMode ? Colors.white : const Color(0xFF1E293B),
             ),
           ),
           const SizedBox(height: 8),
@@ -2490,7 +3433,9 @@ class _TodoPageState extends State<TodoPage> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
-              color: Colors.grey[600],
+              color: _isSeriousMode
+                  ? const Color(0xFF94A3B8)
+                  : Colors.grey[600],
               height: 1.4,
             ),
           ),
@@ -2498,8 +3443,10 @@ class _TodoPageState extends State<TodoPage> {
           ElevatedButton.icon(
             onPressed: _showCreateTodoListDialog,
             style: ElevatedButton.styleFrom(
-              backgroundColor: primaryTerracotta,
-              foregroundColor: Colors.white,
+              backgroundColor:
+                  _isSeriousMode ? seriousGold : primaryTerracotta,
+              foregroundColor:
+                  _isSeriousMode ? Colors.black : Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),

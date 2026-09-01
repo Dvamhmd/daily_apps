@@ -548,12 +548,36 @@ class _RiwayatPageState extends State<RiwayatPage> {
                 start: now.subtract(const Duration(days: 7)),
                 end: now,
               ),
+          helpText: 'PILIH RENTANG TANGGAL',
+          saveText: 'SIMPAN',
+          confirmText: 'SIMPAN',
+          cancelText: 'BATAL',
           builder: (context, child) {
             return Theme(
               data: Theme.of(context).copyWith(
+                appBarTheme: const AppBarTheme(
+                  backgroundColor: Color(0xFF5E35B1),
+                  foregroundColor: Colors.white,
+                  iconTheme: IconThemeData(color: Colors.white),
+                  titleTextStyle: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                textButtonTheme: TextButtonThemeData(
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
                 colorScheme: const ColorScheme.light(
                   primary: Color(0xFF5E35B1),
                   onPrimary: Colors.white,
+                  surface: Colors.white,
                   onSurface: Color(0xFF1E293B),
                 ),
               ),

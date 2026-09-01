@@ -1,21 +1,25 @@
 import 'package:daily_apps/models/model_daily_task.dart';
 import 'package:daily_apps/models/model_todo.dart';
 import 'package:daily_apps/utils/todo_alarm_service.dart';
+import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:daily_apps/widgets/todo_alarm_setup_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class DailyTaskFormSheet extends StatefulWidget {
   final DailyTaskGroup? initialGroup;
+  final bool isSeriousMode;
 
   const DailyTaskFormSheet({
     super.key,
     this.initialGroup,
+    this.isSeriousMode = false,
   });
 
   static Future<Map<String, dynamic>?> show(
     BuildContext context, {
     DailyTaskGroup? initialGroup,
+    bool isSeriousMode = false,
   }) {
     return showModalBottomSheet<Map<String, dynamic>>(
       context: context,
@@ -23,6 +27,7 @@ class DailyTaskFormSheet extends StatefulWidget {
       backgroundColor: Colors.transparent,
       builder: (context) => DailyTaskFormSheet(
         initialGroup: initialGroup,
+        isSeriousMode: isSeriousMode,
       ),
     );
   }
@@ -34,6 +39,11 @@ class DailyTaskFormSheet extends StatefulWidget {
 class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
   static const Color primaryTerracotta = Color(0xFFBA5A3A);
   static const Color darkTerracotta = Color(0xFF8C3E26);
+  static const Color seriousBg = Color(0xFF0F172A);
+  static const Color seriousCardBg = Color(0xFF1E293B);
+  static const Color seriousCardBorder = Color(0xFF334155);
+  static const Color seriousGold = Color(0xFFF59E0B);
+  static const Color seriousFire = Color(0xFFEF4444);
 
   late TextEditingController _titleController;
   late TextEditingController _taskInputController;
@@ -129,6 +139,7 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
   }
 
   Future<void> _pickDateRange() async {
+    final isDark = widget.isSeriousMode;
     final picked = await showDateRangePicker(
       context: context,
       firstDate: DateTime(2020),
@@ -137,14 +148,40 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
         start: _startDate,
         end: _endDate.isBefore(_startDate) ? _startDate : _endDate,
       ),
+      helpText: 'PILIH RENTANG TANGGAL',
+      saveText: 'SIMPAN',
+      confirmText: 'SIMPAN',
+      cancelText: 'BATAL',
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: primaryTerracotta,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Color(0xFF1E293B),
+            scaffoldBackgroundColor: isDark ? seriousBg : Colors.white,
+            appBarTheme: AppBarTheme(
+              backgroundColor: isDark ? seriousCardBg : primaryTerracotta,
+              foregroundColor: Colors.white,
+              iconTheme: IconThemeData(
+                color: isDark ? seriousGold : Colors.white,
+              ),
+              titleTextStyle: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: isDark ? seriousGold : Colors.white,
+                textStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            colorScheme: ColorScheme.light(
+              primary: isDark ? seriousGold : primaryTerracotta,
+              onPrimary: isDark ? Colors.black : Colors.white,
+              surface: isDark ? seriousCardBg : Colors.white,
+              onSurface: isDark ? Colors.white : const Color(0xFF1E293B),
             ),
           ),
           child: child!,
@@ -193,6 +230,7 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
       context,
       initialConfig: TodoAlarmConfig.fromGroup(dummyGroup),
       dateTitle: 'Tugas Harian (${_titleController.text.trim().isEmpty ? "Grup Aktivitas" : _titleController.text.trim()})',
+      isSeriousMode: widget.isSeriousMode,
     );
 
     if (res != null) {
@@ -283,21 +321,19 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
 
   void _submit({required bool shouldApply}) {
     if (_titleController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Silakan masukkan judul grup aktivitas!'),
-          backgroundColor: Colors.redAccent,
-        ),
+      CustomToast.showWarning(
+        context,
+        title: 'Judul Wajib Diisi',
+        subtitle: 'Silakan masukkan judul grup aktivitas terlebih dahulu.',
       );
       return;
     }
 
     if (_tasks.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tambahkan minimal 1 tugas pada grup aktivitas!'),
-          backgroundColor: Colors.redAccent,
-        ),
+      CustomToast.showWarning(
+        context,
+        title: 'Tugas Masih Kosong',
+        subtitle: 'Tambahkan minimal 1 tugas pada grup aktivitas!',
       );
       return;
     }
@@ -313,6 +349,7 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.initialGroup != null;
+    final isDark = widget.isSeriousMode;
     final totalDays = _totalDaysCount;
 
     return Padding(
@@ -323,9 +360,12 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.9,
         ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        decoration: BoxDecoration(
+          color: isDark ? seriousBg : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: isDark
+              ? Border.all(color: seriousCardBorder, width: 1.5)
+              : null,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -337,7 +377,7 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                 width: 44,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: isDark ? const Color(0xFF475569) : Colors.grey[300],
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
@@ -352,12 +392,14 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: primaryTerracotta.withValues(alpha: 0.12),
+                      color: isDark
+                          ? seriousGold.withValues(alpha: 0.15)
+                          : primaryTerracotta.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.event_repeat_rounded,
-                      color: primaryTerracotta,
+                      color: isDark ? seriousGold : primaryTerracotta,
                       size: 24,
                     ),
                   ),
@@ -370,18 +412,20 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                           isEditing
                               ? 'Edit Grup Aktivitas'
                               : 'Buat Grup Aktivitas Baru',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF1E293B),
+                            color: isDark ? Colors.white : const Color(0xFF1E293B),
                           ),
                         ),
                         const SizedBox(height: 2),
-                        const Text(
-                          'Kustomisasi tugas & terapkan otomatis ke section tanggal',
+                        Text(
+                          isDark
+                              ? 'Kustomisasi tugas mode serius & terapkan otomatis'
+                              : 'Kustomisasi tugas & terapkan otomatis ke section tanggal',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF64748B),
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                           ),
                         ),
                       ],
@@ -389,13 +433,16 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                   ),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded, color: Colors.grey),
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: isDark ? const Color(0xFF94A3B8) : Colors.grey,
+                    ),
                   ),
                 ],
               ),
             ),
 
-            const Divider(height: 20),
+            Divider(height: 20, color: isDark ? seriousCardBorder : null),
 
             // Scrollable Form Content
             Flexible(
@@ -403,12 +450,12 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                 padding: const EdgeInsets.fromLTRB(22, 0, 22, 20),
                 children: [
                   // 1. Judul Grup Aktivitas
-                  const Text(
+                  Text(
                     'Judul Grup Aktivitas',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF334155),
+                      color: isDark ? Colors.white : const Color(0xFF334155),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -416,32 +463,42 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                     controller: _titleController,
                     autofocus: !isEditing,
                     textCapitalization: TextCapitalization.words,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : const Color(0xFF1E293B),
+                    ),
                     decoration: InputDecoration(
                       hintText: 'Misal: Kesehatan, Rutinitas Pagi, Belajar...',
-                      hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                      prefixIcon: const Icon(
+                      hintStyle: TextStyle(
+                        color: isDark ? const Color(0xFF94A3B8) : Colors.grey[400],
+                        fontSize: 14,
+                      ),
+                      prefixIcon: Icon(
                         Icons.bookmark_outline_rounded,
-                        color: primaryTerracotta,
+                        color: isDark ? seriousGold : primaryTerracotta,
                         size: 20,
                       ),
                       filled: true,
-                      fillColor: const Color(0xFFF8FAFC),
+                      fillColor: isDark ? seriousCardBg : const Color(0xFFF8FAFC),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 14,
                       ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide(color: Colors.grey[200]!),
+                        borderSide: BorderSide(
+                          color: isDark ? seriousCardBorder : Colors.grey[200]!,
+                        ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide(color: Colors.grey[200]!),
+                        borderSide: BorderSide(
+                          color: isDark ? seriousCardBorder : Colors.grey[200]!,
+                        ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(
-                          color: primaryTerracotta,
+                        borderSide: BorderSide(
+                          color: isDark ? seriousGold : primaryTerracotta,
                           width: 1.5,
                         ),
                       ),
@@ -454,20 +511,20 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Daftar Tugas Aktivitas',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF334155),
+                          color: isDark ? Colors.white : const Color(0xFF334155),
                         ),
                       ),
                       Text(
                         '${_tasks.length} Tugas',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: primaryTerracotta,
+                          color: isDark ? seriousGold : primaryTerracotta,
                         ),
                       ),
                     ],
@@ -483,30 +540,37 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                           focusNode: _taskFocusNode,
                           textCapitalization: TextCapitalization.sentences,
                           onSubmitted: (_) => _addTask(),
+                          style: TextStyle(
+                            color: isDark ? Colors.white : const Color(0xFF1E293B),
+                          ),
                           decoration: InputDecoration(
                             hintText: 'Ketik nama tugas lalu klik tambah...',
                             hintStyle: TextStyle(
-                              color: Colors.grey[400],
+                              color: isDark ? const Color(0xFF94A3B8) : Colors.grey[400],
                               fontSize: 13.5,
                             ),
                             filled: true,
-                            fillColor: const Color(0xFFF8FAFC),
+                            fillColor: isDark ? seriousCardBg : const Color(0xFFF8FAFC),
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 14,
                               vertical: 12,
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey[200]!),
+                              borderSide: BorderSide(
+                                color: isDark ? seriousCardBorder : Colors.grey[200]!,
+                              ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey[200]!),
+                              borderSide: BorderSide(
+                                color: isDark ? seriousCardBorder : Colors.grey[200]!,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: primaryTerracotta,
+                              borderSide: BorderSide(
+                                color: isDark ? seriousGold : primaryTerracotta,
                                 width: 1.5,
                               ),
                             ),
@@ -517,8 +581,8 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                       ElevatedButton(
                         onPressed: _addTask,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryTerracotta,
-                          foregroundColor: Colors.white,
+                          backgroundColor: isDark ? seriousGold : primaryTerracotta,
+                          foregroundColor: isDark ? Colors.black : Colors.white,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
                             vertical: 13,
@@ -547,6 +611,12 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                     child: Row(
                       children: _quickTaskSuggestions.map((suggestion) {
                         final isAdded = _tasks.contains(suggestion);
+                        final labelColor = isAdded
+                            ? (isDark ? const Color(0xFF64748B) : Colors.grey)
+                            : (isDark
+                                ? const Color(0xFFFEF3C7)
+                                : const Color(0xFF1E293B));
+
                         return Padding(
                           padding: const EdgeInsets.only(right: 6),
                           child: ActionChip(
@@ -556,25 +626,49 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                                   : Icons.add_circle_outline_rounded,
                               size: 14,
                               color: isAdded
-                                  ? Colors.grey
-                                  : primaryTerracotta,
+                                  ? (isDark
+                                      ? const Color(0xFF64748B)
+                                      : Colors.grey)
+                                  : (isDark ? seriousGold : primaryTerracotta),
                             ),
                             label: Text(
                               suggestion,
                               style: TextStyle(
-                                fontSize: 11,
-                                color: isAdded
-                                    ? Colors.grey
-                                    : const Color(0xFF334155),
+                                fontSize: 11.5,
+                                color: labelColor,
                                 fontWeight: isAdded
                                     ? FontWeight.normal
                                     : FontWeight.w600,
                               ),
                             ),
+                            labelStyle: TextStyle(
+                              fontSize: 11.5,
+                              color: labelColor,
+                              fontWeight: isAdded
+                                  ? FontWeight.normal
+                                  : FontWeight.w600,
+                            ),
                             backgroundColor: isAdded
-                                ? Colors.grey[100]
-                                : primaryTerracotta.withValues(alpha: 0.08),
-                            side: BorderSide.none,
+                                ? (isDark
+                                    ? const Color(0xFF0F172A)
+                                    : Colors.grey[100])
+                                : (isDark
+                                    ? const Color(0xFF1E293B)
+                                    : primaryTerracotta
+                                        .withValues(alpha: 0.08)),
+                            side: isDark
+                                ? BorderSide(
+                                    color: isAdded
+                                        ? const Color(0xFF334155)
+                                        : seriousGold.withValues(alpha: 0.5),
+                                    width: 1,
+                                  )
+                                : BorderSide(
+                                    color: isAdded
+                                        ? Colors.transparent
+                                        : primaryTerracotta
+                                            .withValues(alpha: 0.25),
+                                  ),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 4,
                               vertical: 2,
@@ -593,9 +687,11 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                     const SizedBox(height: 12),
                     Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.grey[200]!),
+                        border: Border.all(
+                          color: isDark ? seriousCardBorder : Colors.grey[200]!,
+                        ),
                       ),
                       child: ListView.separated(
                         shrinkWrap: true,
@@ -603,7 +699,7 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                         itemCount: _tasks.length,
                         separatorBuilder: (_, __) => Divider(
                           height: 1,
-                          color: Colors.grey[200],
+                          color: isDark ? seriousCardBorder : Colors.grey[200],
                         ),
                         itemBuilder: (context, idx) {
                           final taskName = _tasks[idx];
@@ -618,16 +714,18 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                                   width: 24,
                                   height: 24,
                                   decoration: BoxDecoration(
-                                    color: primaryTerracotta.withValues(alpha: 0.15),
+                                    color: isDark
+                                        ? seriousGold.withValues(alpha: 0.2)
+                                        : primaryTerracotta.withValues(alpha: 0.15),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Center(
                                     child: Text(
                                       '${idx + 1}',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.bold,
-                                        color: primaryTerracotta,
+                                        color: isDark ? seriousGold : primaryTerracotta,
                                       ),
                                     ),
                                   ),
@@ -636,17 +734,17 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                                 Expanded(
                                   child: Text(
                                     taskName,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 13.5,
-                                      color: Color(0xFF1E293B),
+                                      color: isDark ? Colors.white : const Color(0xFF1E293B),
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(
+                                  icon: Icon(
                                     Icons.delete_outline_rounded,
-                                    color: Colors.redAccent,
+                                    color: isDark ? seriousFire : Colors.redAccent,
                                     size: 19,
                                   ),
                                   tooltip: 'Hapus Tugas',
@@ -665,20 +763,20 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                   const SizedBox(height: 22),
 
                   // 3. Pilihan Rentang Tanggal
-                  const Text(
+                  Text(
                     'Pilih Rentang Tanggal Penerapan',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF334155),
+                      color: isDark ? Colors.white : const Color(0xFF334155),
                     ),
                   ),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     'Tugas akan otomatis dibuat pada setiap section tanggal dalam rentang',
                     style: TextStyle(
                       fontSize: 11.5,
-                      color: Color(0xFF64748B),
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -689,11 +787,11 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                     physics: const BouncingScrollPhysics(),
                     child: Row(
                       children: [
-                        _buildPresetChip(label: 'Hari Ini (1 Hari)', days: 1),
-                        _buildPresetChip(label: '3 Hari', days: 3),
-                        _buildPresetChip(label: '7 Hari (Seminggu)', days: 7),
-                        _buildPresetChip(label: '14 Hari (2 Minggu)', days: 14),
-                        _buildPresetChip(label: '30 Hari (Sebulan)', days: 30),
+                        _buildPresetChip(label: 'Hari Ini (1 Hari)', days: 1, isDark: isDark),
+                        _buildPresetChip(label: '3 Hari', days: 3, isDark: isDark),
+                        _buildPresetChip(label: '7 Hari (Seminggu)', days: 7, isDark: isDark),
+                        _buildPresetChip(label: '14 Hari (2 Minggu)', days: 14, isDark: isDark),
+                        _buildPresetChip(label: '30 Hari (Sebulan)', days: 30, isDark: isDark),
                       ],
                     ),
                   ),
@@ -709,10 +807,12 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                         vertical: 14,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
+                        color: isDark ? seriousCardBg : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: primaryTerracotta.withValues(alpha: 0.3),
+                          color: isDark
+                              ? seriousGold.withValues(alpha: 0.4)
+                              : primaryTerracotta.withValues(alpha: 0.3),
                           width: 1.5,
                         ),
                       ),
@@ -721,12 +821,14 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: primaryTerracotta.withValues(alpha: 0.12),
+                              color: isDark
+                                  ? seriousGold.withValues(alpha: 0.2)
+                                  : primaryTerracotta.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.date_range_rounded,
-                              color: primaryTerracotta,
+                              color: isDark ? seriousGold : primaryTerracotta,
                               size: 20,
                             ),
                           ),
@@ -735,21 +837,21 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                Text(
                                   'Rentang Tanggal Section',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: Color(0xFF94A3B8),
+                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF94A3B8),
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
                                   '${_startDate.day}/${_startDate.month}/${_startDate.year}  →  ${_endDate.day}/${_endDate.month}/${_endDate.year}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF1E293B),
+                                    color: isDark ? Colors.white : const Color(0xFF1E293B),
                                   ),
                                 ),
                               ],
@@ -761,22 +863,27 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                               vertical: 5,
                             ),
                             decoration: BoxDecoration(
-                              color: primaryTerracotta.withValues(alpha: 0.15),
+                              color: isDark
+                                  ? seriousGold.withValues(alpha: 0.2)
+                                  : primaryTerracotta.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(8),
+                              border: isDark
+                                  ? Border.all(color: seriousGold.withValues(alpha: 0.3))
+                                  : null,
                             ),
                             child: Text(
                               '$totalDays Hari',
-                              style: const TextStyle(
-                                color: primaryTerracotta,
+                              style: TextStyle(
+                                color: isDark ? seriousGold : primaryTerracotta,
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
                           const SizedBox(width: 6),
-                          const Icon(
+                          Icon(
                             Icons.edit_calendar_rounded,
-                            color: primaryTerracotta,
+                            color: isDark ? seriousGold : primaryTerracotta,
                             size: 18,
                           ),
                         ],
@@ -791,13 +898,17 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: _reminderEnabled
-                          ? primaryTerracotta.withValues(alpha: 0.05)
-                          : const Color(0xFFF8FAFC),
+                          ? (isDark
+                              ? seriousCardBg
+                              : primaryTerracotta.withValues(alpha: 0.05))
+                          : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: _reminderEnabled
-                            ? primaryTerracotta.withValues(alpha: 0.4)
-                            : Colors.grey[200]!,
+                            ? (isDark
+                                ? seriousGold.withValues(alpha: 0.5)
+                                : primaryTerracotta.withValues(alpha: 0.4))
+                            : (isDark ? seriousCardBorder : Colors.grey[200]!),
                         width: _reminderEnabled ? 1.5 : 1,
                       ),
                     ),
@@ -810,15 +921,15 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
                                 color: _reminderEnabled
-                                    ? primaryTerracotta
-                                    : const Color(0xFFE2E8F0),
+                                    ? (isDark ? seriousGold : primaryTerracotta)
+                                    : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Icon(
                                 Icons.alarm_rounded,
                                 color: _reminderEnabled
-                                    ? Colors.white
-                                    : const Color(0xFF64748B),
+                                    ? (isDark ? Colors.black : Colors.white)
+                                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                                 size: 20,
                               ),
                             ),
@@ -827,12 +938,12 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Terapkan Alarm Sekaligus',
                                     style: TextStyle(
                                       fontSize: 13.5,
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF1E293B),
+                                      color: isDark ? Colors.white : const Color(0xFF1E293B),
                                     ),
                                   ),
                                   Text(
@@ -842,8 +953,8 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: _reminderEnabled
-                                          ? darkTerracotta
-                                          : const Color(0xFF64748B),
+                                          ? (isDark ? const Color(0xFFFDE68A) : darkTerracotta)
+                                          : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                                     ),
                                   ),
                                 ],
@@ -851,7 +962,8 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                             ),
                             Switch(
                               value: _reminderEnabled,
-                              activeThumbColor: primaryTerracotta,
+                              activeThumbColor: isDark ? seriousGold : primaryTerracotta,
+                              activeTrackColor: isDark ? seriousGold.withValues(alpha: 0.4) : null,
                               onChanged: (val) async {
                                 if (val) {
                                   await _configureAlarm();
@@ -866,16 +978,19 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                         ),
                         if (_reminderEnabled) ...[
                           const SizedBox(height: 8),
-                          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                          Divider(
+                            height: 1,
+                            color: isDark ? seriousCardBorder : const Color(0xFFE2E8F0),
+                          ),
                           const SizedBox(height: 8),
                           Row(
                             children: [
                               Expanded(
                                 child: Text(
                                   '🔔 $_alarmSummary',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11.5,
-                                    color: darkTerracotta,
+                                    color: isDark ? const Color(0xFFFDE68A) : darkTerracotta,
                                     fontWeight: FontWeight.w600,
                                   ),
                                   maxLines: 2,
@@ -884,17 +999,17 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                               ),
                               TextButton.icon(
                                 onPressed: _configureAlarm,
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.tune_rounded,
                                   size: 14,
-                                  color: primaryTerracotta,
+                                  color: isDark ? seriousGold : primaryTerracotta,
                                 ),
-                                label: const Text(
+                                label: Text(
                                   'Atur Ulang',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: primaryTerracotta,
+                                    color: isDark ? seriousGold : primaryTerracotta,
                                   ),
                                 ),
                                 style: TextButton.styleFrom(
@@ -915,12 +1030,12 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                   ),
 
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     '* Catatan: Pengaturan alarm dapat diatur ulang secara individual pada masing-masing section tanggal setelah diterapkan.',
                     style: TextStyle(
                       fontSize: 11,
                       fontStyle: FontStyle.italic,
-                      color: Color(0xFF94A3B8),
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF94A3B8),
                     ),
                   ),
                 ],
@@ -931,10 +1046,13 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
             Container(
               padding: const EdgeInsets.fromLTRB(22, 12, 22, 16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? seriousCardBg : Colors.white,
+                border: isDark
+                    ? Border(top: BorderSide(color: seriousCardBorder))
+                    : null,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
                     offset: const Offset(0, -4),
                     blurRadius: 10,
                   ),
@@ -947,8 +1065,10 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                     child: OutlinedButton(
                       onPressed: () => _submit(shouldApply: false),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF475569),
-                        side: BorderSide(color: Colors.grey[300]!),
+                        foregroundColor: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                        side: BorderSide(
+                          color: isDark ? seriousCardBorder : Colors.grey[300]!,
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
@@ -969,8 +1089,8 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
                     child: ElevatedButton.icon(
                       onPressed: () => _submit(shouldApply: true),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryTerracotta,
-                        foregroundColor: Colors.white,
+                        backgroundColor: isDark ? seriousGold : primaryTerracotta,
+                        foregroundColor: isDark ? Colors.black : Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
@@ -996,7 +1116,11 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
     );
   }
 
-  Widget _buildPresetChip({required String label, required int days}) {
+  Widget _buildPresetChip({
+    required String label,
+    required int days,
+    required bool isDark,
+  }) {
     final now = DateTime.now();
     final s = DateTime(now.year, now.month, now.day);
     final targetEnd = s.add(Duration(days: days - 1));
@@ -1014,15 +1138,21 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
         label: Text(label),
         labelStyle: TextStyle(
           fontSize: 11.5,
-          color: isSelected ? primaryTerracotta : const Color(0xFF475569),
+          color: isSelected
+              ? (isDark ? seriousGold : primaryTerracotta)
+              : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         ),
-        selectedColor: primaryTerracotta.withValues(alpha: 0.15),
-        backgroundColor: const Color(0xFFF1F5F9),
+        selectedColor: isDark
+            ? seriousGold.withValues(alpha: 0.25)
+            : primaryTerracotta.withValues(alpha: 0.15),
+        backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
         side: BorderSide(
-          color: isSelected ? primaryTerracotta : Colors.transparent,
+          color: isSelected
+              ? (isDark ? seriousGold : primaryTerracotta)
+              : (isDark ? seriousCardBorder : Colors.transparent),
         ),
-        checkmarkColor: primaryTerracotta,
+        checkmarkColor: isDark ? seriousGold : primaryTerracotta,
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         onSelected: (_) => _setPresetDays(days),
       ),

@@ -9,8 +9,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:daily_apps/utils/serious_mode_service.dart';
+
 class TugasHarianPage extends StatefulWidget {
-  const TugasHarianPage({super.key});
+  final bool isSeriousMode;
+
+  const TugasHarianPage({
+    super.key,
+    this.isSeriousMode = false,
+  });
 
   @override
   State<TugasHarianPage> createState() => _TugasHarianPageState();
@@ -18,9 +25,20 @@ class TugasHarianPage extends StatefulWidget {
 
 class _TugasHarianPageState extends State<TugasHarianPage> {
   static const Color primaryTerracotta = Color(0xFFBA5A3A);
+  static const Color seriousBg = Color(0xFF0F172A);
+  static const Color seriousCardBg = Color(0xFF1E293B);
+  static const Color seriousCardBorder = Color(0xFF334155);
+  static const Color seriousGold = Color(0xFFF59E0B);
+  static const Color seriousFire = Color(0xFFEF4444);
 
   static const String _prefsGroupsKey = 'daily_apps_daily_task_groups_v1';
-  static const String _prefsTodoKey = 'daily_apps_todo_groups_v1';
+  static const String _prefsTodoKeyNormal =
+      SeriousModeService.prefKeyNormalTodoGroups;
+  static const String _prefsTodoKeySerious =
+      SeriousModeService.prefKeySeriousTodoGroups;
+
+  String get _prefsTodoKey =>
+      widget.isSeriousMode ? _prefsTodoKeySerious : _prefsTodoKeyNormal;
 
   List<DailyTaskGroup> _taskGroups = [];
   bool _isLoading = true;
@@ -108,6 +126,14 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
     }
   }
 
+  Future<String> _getEffectiveTodoKey() async {
+    if (widget.isSeriousMode) {
+      final user = await SeriousModeService.getCurrentUser();
+      return SeriousModeService.getSeriousTodoGroupsKey(user?.id);
+    }
+    return SeriousModeService.prefKeyNormalTodoGroups;
+  }
+
   Future<void> _applyGroupToTodoSections(
     DailyTaskGroup group, {
     DateTime? customStart,
@@ -115,12 +141,12 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final String? jsonStr = prefs.getString(_prefsTodoKey) ??
-          prefs.getString('todo_date_groups_v1');
-
+      final String effectiveKey = await _getEffectiveTodoKey();
+      final String? existingTodoJson = prefs.getString(effectiveKey);
       List<TodoDateGroup> existingDateGroups = [];
-      if (jsonStr != null && jsonStr.isNotEmpty) {
-        final List<dynamic> decoded = jsonDecode(jsonStr);
+
+      if (existingTodoJson != null && existingTodoJson.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(existingTodoJson);
         existingDateGroups = decoded
             .map((item) => TodoDateGroup.fromJson(item as Map<String, dynamic>))
             .toList();
@@ -147,7 +173,7 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
       final String encoded = jsonEncode(
         updatedGroups.map((g) => g.toJson()).toList(),
       );
-      await prefs.setString(_prefsTodoKey, encoded);
+      await prefs.setString(effectiveKey, encoded);
 
       // Sinkronisasi jadwal alarm
       await TodoAlarmService.syncAllAlarms(updatedGroups);
@@ -156,7 +182,8 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
       if (mounted) {
         CustomToast.showSuccess(
           context,
-          title: 'Berhasil diterapkan ke $totalDays section tanggal To-Do List!',
+          title: 'Grup Aktivitas Berhasil Diterapkan!',
+          subtitle: 'Diterapkan ke $totalDays section tanggal To-Do List (${group.tasks.length} tugas)',
         );
       }
     } catch (e) {
@@ -164,7 +191,8 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
       if (mounted) {
         CustomToast.showError(
           context,
-          title: 'Gagal menerapkan tugas ke section: $e',
+          title: 'Gagal Menerapkan Tugas ke Section',
+          subtitle: '$e',
         );
       }
     }
@@ -174,6 +202,7 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
     final result = await DailyTaskFormSheet.show(
       context,
       initialGroup: template,
+      isSeriousMode: widget.isSeriousMode,
     );
 
     if (result != null && result['group'] is DailyTaskGroup) {
@@ -191,12 +220,17 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
       await _saveDailyTaskGroups();
 
       if (shouldApply) {
-        await _applyGroupToTodoSections(newGroup);
+        await _applyGroupToTodoSections(
+          newGroup,
+          customStart: newGroup.startDate,
+          customEnd: newGroup.endDate,
+        );
       } else {
         if (mounted) {
           CustomToast.showSuccess(
             context,
-            title: 'Grup Aktivitas berhasil disimpan!',
+            title: 'Grup Aktivitas Berhasil Disimpan!',
+            subtitle: '${newGroup.title} (${newGroup.tasks.length} tugas tersimpan)',
           );
         }
       }
@@ -204,6 +238,7 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
   }
 
   Future<void> _quickApplyGroupDialog(DailyTaskGroup group) async {
+    final isDark = widget.isSeriousMode;
     final now = DateTime.now();
     DateTime rangeStart = group.startDate ?? DateTime(now.year, now.month, now.day);
     DateTime rangeEnd = group.endDate ??
@@ -218,16 +253,39 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
         end: rangeEnd.isBefore(rangeStart) ? rangeStart : rangeEnd,
       ),
       helpText: 'PILIH RENTANG TANGGAL PENERAPAN',
-      confirmText: 'TERAPKAN SEKARANG',
+      saveText: 'SIMPAN',
+      confirmText: 'SIMPAN & TERAPKAN',
       cancelText: 'BATAL',
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: primaryTerracotta,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Color(0xFF1E293B),
+            scaffoldBackgroundColor: isDark ? seriousBg : Colors.white,
+            appBarTheme: AppBarTheme(
+              backgroundColor: isDark ? seriousCardBg : primaryTerracotta,
+              foregroundColor: Colors.white,
+              iconTheme: IconThemeData(
+                color: isDark ? seriousGold : Colors.white,
+              ),
+              titleTextStyle: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: isDark ? seriousGold : Colors.white,
+                textStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            colorScheme: ColorScheme.light(
+              primary: isDark ? seriousGold : primaryTerracotta,
+              onPrimary: isDark ? Colors.black : Colors.white,
+              surface: isDark ? seriousCardBg : Colors.white,
+              onSurface: isDark ? Colors.white : const Color(0xFF1E293B),
             ),
           ),
           child: child!,
@@ -251,27 +309,37 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
   }
 
   Future<void> _confirmDeleteGroup(DailyTaskGroup group) async {
+    final isDark = widget.isSeriousMode;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
+        backgroundColor: isDark ? seriousCardBg : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: isDark ? seriousCardBorder : Colors.transparent,
+          ),
+        ),
+        title: Row(
           children: [
-            Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 24),
-            SizedBox(width: 10),
+            const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 24),
+            const SizedBox(width: 10),
             Text(
               'Hapus Grup Aktivitas?',
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1E293B),
+                color: isDark ? Colors.white : const Color(0xFF1E293B),
               ),
             ),
           ],
         ),
         content: Text(
           'Apakah kamu yakin ingin menghapus grup aktivitas "${group.title}"?',
-          style: const TextStyle(fontSize: 13.5, color: Color(0xFF475569)),
+          style: TextStyle(
+            fontSize: 13.5,
+            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+          ),
         ),
         actions: [
           TextButton(
@@ -281,7 +349,7 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
+              backgroundColor: isDark ? seriousFire : Colors.redAccent,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
@@ -321,10 +389,12 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = widget.isSeriousMode;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFFBF8F6),
+      backgroundColor: isDark ? seriousBg : const Color(0xFFFBF8F6),
       appBar: AppBar(
-        backgroundColor: primaryTerracotta,
+        backgroundColor: isDark ? seriousBg : primaryTerracotta,
         centerTitle: false,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -333,14 +403,17 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
           statusBarIconBrightness: Brightness.light,
           statusBarBrightness: Brightness.dark,
         ),
-        title: const Row(
+        title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.event_repeat_rounded, color: Colors.white, size: 22),
-            SizedBox(width: 8),
+            const Icon(Icons.event_repeat_rounded,
+                color: Colors.white, size: 22),
+            const SizedBox(width: 8),
             Text(
-              'Tugas Harian',
-              style: TextStyle(
+              isDark
+                  ? 'Tugas Harian (Mode Serius)'
+                  : 'Tugas Harian',
+              style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
                 fontSize: 17.5,
@@ -359,14 +432,16 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
         ],
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: primaryTerracotta),
+          ? Center(
+              child: CircularProgressIndicator(
+                color: isDark ? seriousGold : primaryTerracotta,
+              ),
             )
           : ResponsiveContentWrapper(
               maxWidth: 720,
               child: RefreshIndicator(
                 onRefresh: _loadDailyTaskGroups,
-                color: primaryTerracotta,
+                color: isDark ? seriousGold : primaryTerracotta,
                 child: CustomScrollView(
                   physics: const AlwaysScrollableScrollPhysics(
                     parent: BouncingScrollPhysics(),
@@ -379,12 +454,12 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // Header Banner
-                            _buildInfoBanner(),
+                            _buildInfoBanner(isDark: isDark),
 
                             const SizedBox(height: 16),
 
                             // Main Action Button: Buat Grup Aktivitas Baru
-                            _buildCreateButton(),
+                            _buildCreateButton(isDark: isDark),
 
                             const SizedBox(height: 22),
 
@@ -392,12 +467,12 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text(
+                                Text(
                                   'Grup Aktivitas Tersimpan',
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF1E293B),
+                                    color: isDark ? Colors.white : const Color(0xFF1E293B),
                                   ),
                                 ),
                                 if (_taskGroups.isNotEmpty)
@@ -407,14 +482,18 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
                                       vertical: 3,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: primaryTerracotta
-                                          .withValues(alpha: 0.12),
+                                      color: isDark
+                                          ? seriousGold.withValues(alpha: 0.15)
+                                          : primaryTerracotta.withValues(alpha: 0.12),
                                       borderRadius: BorderRadius.circular(8),
+                                      border: isDark
+                                          ? Border.all(color: seriousGold.withValues(alpha: 0.35))
+                                          : null,
                                     ),
                                     child: Text(
                                       '${_taskGroups.length} Grup',
-                                      style: const TextStyle(
-                                        color: primaryTerracotta,
+                                      style: TextStyle(
+                                        color: isDark ? seriousGold : primaryTerracotta,
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -426,7 +505,7 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
 
                             // List of Groups or Empty State
                             if (_taskGroups.isEmpty)
-                              _buildEmptyState()
+                              _buildEmptyState(isDark: isDark)
                             else
                               ListView.separated(
                                 shrinkWrap: true,
@@ -436,24 +515,24 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
                                     const SizedBox(height: 14),
                                 itemBuilder: (context, idx) {
                                   final group = _taskGroups[idx];
-                                  return _buildGroupCard(group);
+                                  return _buildGroupCard(group, isDark: isDark);
                                 },
                               ),
 
                             // Rekomendasi Starter Templates (jika ada grup)
                             if (_taskGroups.isNotEmpty) ...[
                               const SizedBox(height: 28),
-                              const Text(
+                              Text(
                                 'Inspirasi Template Rutinitas',
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF475569),
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
                                 ),
                               ),
                               const SizedBox(height: 10),
                               ..._starterTemplates.map(
-                                (t) => _buildStarterTemplateTile(t),
+                                (t) => _buildStarterTemplateTile(t, isDark: isDark),
                               ),
                             ],
                           ],
@@ -467,21 +546,25 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
     );
   }
 
-  Widget _buildInfoBanner() {
+  Widget _buildInfoBanner({required bool isDark}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            primaryTerracotta.withValues(alpha: 0.08),
-            primaryTerracotta.withValues(alpha: 0.02),
-          ],
+          colors: isDark
+              ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+              : [
+                  primaryTerracotta.withValues(alpha: 0.08),
+                  primaryTerracotta.withValues(alpha: 0.02),
+                ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: primaryTerracotta.withValues(alpha: 0.2),
+          color: isDark
+              ? seriousGold.withValues(alpha: 0.35)
+              : primaryTerracotta.withValues(alpha: 0.2),
           width: 1.5,
         ),
       ),
@@ -491,24 +574,26 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: primaryTerracotta,
+              color: isDark ? seriousGold : primaryTerracotta,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: primaryTerracotta.withValues(alpha: 0.3),
+                  color: isDark
+                      ? seriousGold.withValues(alpha: 0.3)
+                      : primaryTerracotta.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 3),
                 ),
               ],
             ),
-            child: const Icon(
+            child: Icon(
               Icons.auto_awesome_rounded,
-              color: Colors.white,
+              color: isDark ? Colors.black : Colors.white,
               size: 22,
             ),
           ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -517,15 +602,17 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
                   style: TextStyle(
                     fontSize: 14.5,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
+                    color: isDark ? Colors.white : const Color(0xFF1E293B),
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  'Buat kumpulan tugas berulang (Grup Aktivitas) dan terapkan langsung ke banyak section tanggal To-Do List sekaligus beserta jadwal alarmnya.',
+                  isDark
+                      ? 'Buat kumpulan tugas rutin dan terapkan langsung ke banyak section tanggal To-Do List Mode Serius sekaligus.'
+                      : 'Buat kumpulan tugas berulang (Grup Aktivitas) dan terapkan langsung ke banyak section tanggal To-Do List sekaligus beserta jadwal alarmnya.',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF64748B),
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                     height: 1.4,
                   ),
                 ),
@@ -537,14 +624,16 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
     );
   }
 
-  Widget _buildCreateButton() {
+  Widget _buildCreateButton({required bool isDark}) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: primaryTerracotta.withValues(alpha: 0.28),
+            color: isDark
+                ? seriousGold.withValues(alpha: 0.25)
+                : primaryTerracotta.withValues(alpha: 0.28),
             blurRadius: 14,
             offset: const Offset(0, 5),
           ),
@@ -553,8 +642,8 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
       child: ElevatedButton(
         onPressed: () => _openCreateGroupDialog(),
         style: ElevatedButton.styleFrom(
-          backgroundColor: primaryTerracotta,
-          foregroundColor: Colors.white,
+          backgroundColor: isDark ? seriousGold : primaryTerracotta,
+          foregroundColor: isDark ? Colors.black : Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -580,15 +669,20 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
     );
   }
 
-  Widget _buildGroupCard(DailyTaskGroup group) {
+  Widget _buildGroupCard(DailyTaskGroup group, {required bool isDark}) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? seriousCardBg : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey[200]!, width: 1.2),
+        border: Border.all(
+          color: isDark ? seriousCardBorder : Colors.grey[200]!,
+          width: 1.2,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.25)
+                : Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -605,12 +699,14 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: primaryTerracotta.withValues(alpha: 0.12),
+                    color: isDark
+                        ? seriousGold.withValues(alpha: 0.15)
+                        : primaryTerracotta.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.event_note_rounded,
-                    color: primaryTerracotta,
+                    color: isDark ? seriousGold : primaryTerracotta,
                     size: 20,
                   ),
                 ),
@@ -621,27 +717,34 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
                     children: [
                       Text(
                         group.title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15.5,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
+                          color: isDark ? Colors.white : const Color(0xFF1E293B),
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '${group.totalTasks} Aktivitas Terdaftar',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11.5,
-                          color: Color(0xFF64748B),
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                         ),
                       ),
                     ],
                   ),
                 ),
                 PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert_rounded, color: Colors.grey),
+                  icon: Icon(
+                    Icons.more_vert_rounded,
+                    color: isDark ? const Color(0xFF94A3B8) : Colors.grey,
+                  ),
+                  color: isDark ? seriousCardBg : Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
+                    side: BorderSide(
+                      color: isDark ? seriousCardBorder : Colors.transparent,
+                    ),
                   ),
                   onSelected: (val) {
                     if (val == 'edit') {
@@ -653,33 +756,33 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
                     }
                   },
                   itemBuilder: (ctx) => [
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'edit',
                       child: Row(
                         children: [
-                          Icon(Icons.edit_outlined, size: 18, color: primaryTerracotta),
-                          SizedBox(width: 10),
-                          Text('Edit Grup'),
+                          Icon(Icons.edit_outlined, size: 18, color: isDark ? seriousGold : primaryTerracotta),
+                          const SizedBox(width: 10),
+                          Text('Edit Grup', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'duplicate',
                       child: Row(
                         children: [
-                          Icon(Icons.copy_rounded, size: 18, color: Color(0xFF1976D2)),
-                          SizedBox(width: 10),
-                          Text('Duplikasi'),
+                          const Icon(Icons.copy_rounded, size: 18, color: Color(0xFF38BDF8)),
+                          const SizedBox(width: 10),
+                          Text('Duplikasi', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'delete',
                       child: Row(
                         children: [
-                          Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
-                          SizedBox(width: 10),
-                          Text('Hapus', style: TextStyle(color: Colors.redAccent)),
+                          Icon(Icons.delete_outline_rounded, size: 18, color: isDark ? seriousFire : Colors.redAccent),
+                          const SizedBox(width: 10),
+                          Text('Hapus', style: TextStyle(color: isDark ? seriousFire : Colors.redAccent)),
                         ],
                       ),
                     ),
@@ -699,24 +802,25 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(8),
+                    border: isDark ? Border.all(color: seriousCardBorder) : null,
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.date_range_rounded,
                         size: 13,
-                        color: Color(0xFF475569),
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
                       ),
                       const SizedBox(width: 5),
                       Text(
                         group.dateRangeSummary,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF475569),
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
                         ),
                       ),
                     ],
@@ -726,9 +830,10 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                   decoration: BoxDecoration(
                     color: group.reminderEnabled
-                        ? primaryTerracotta.withValues(alpha: 0.12)
-                        : Colors.grey[100],
+                        ? (isDark ? seriousGold.withValues(alpha: 0.15) : primaryTerracotta.withValues(alpha: 0.12))
+                        : (isDark ? const Color(0xFF0F172A) : Colors.grey[100]),
                     borderRadius: BorderRadius.circular(8),
+                    border: isDark ? Border.all(color: seriousCardBorder) : null,
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -739,8 +844,8 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
                             : Icons.alarm_off_rounded,
                         size: 13,
                         color: group.reminderEnabled
-                            ? primaryTerracotta
-                            : Colors.grey,
+                            ? (isDark ? seriousGold : primaryTerracotta)
+                            : (isDark ? const Color(0xFF64748B) : Colors.grey),
                       ),
                       const SizedBox(width: 5),
                       Text(
@@ -751,8 +856,8 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: group.reminderEnabled
-                              ? primaryTerracotta
-                              : Colors.grey[600],
+                              ? (isDark ? seriousGold : primaryTerracotta)
+                              : (isDark ? const Color(0xFF64748B) : Colors.grey[600]),
                         ),
                       ),
                     ],
@@ -769,9 +874,11 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
             margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[200]!),
+              border: Border.all(
+                color: isDark ? seriousCardBorder : Colors.grey[200]!,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -780,18 +887,18 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
                   padding: const EdgeInsets.symmetric(vertical: 2.5),
                   child: Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.check_circle_outline_rounded,
                         size: 14,
-                        color: primaryTerracotta,
+                        color: isDark ? seriousGold : primaryTerracotta,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           task,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12.5,
-                            color: Color(0xFF334155),
+                            color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF334155),
                             fontWeight: FontWeight.w500,
                           ),
                           maxLines: 1,
@@ -833,8 +940,8 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
                   child: ElevatedButton.icon(
                     onPressed: () => _quickApplyGroupDialog(group),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryTerracotta,
-                      foregroundColor: Colors.white,
+                      backgroundColor: isDark ? seriousGold : primaryTerracotta,
+                      foregroundColor: isDark ? Colors.black : Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 11),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -855,8 +962,11 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
                 OutlinedButton.icon(
                   onPressed: () => _openCreateGroupDialog(template: group),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: primaryTerracotta,
-                    side: const BorderSide(color: primaryTerracotta, width: 1.2),
+                    foregroundColor: isDark ? seriousGold : primaryTerracotta,
+                    side: BorderSide(
+                      color: isDark ? seriousGold : primaryTerracotta,
+                      width: 1.2,
+                    ),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
                       vertical: 11,
@@ -882,88 +992,96 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState({required bool isDark}) {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? seriousCardBg : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(
+          color: isDark ? seriousCardBorder : Colors.grey[200]!,
+        ),
       ),
       child: Column(
         children: [
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: primaryTerracotta.withValues(alpha: 0.1),
+              color: isDark
+                  ? seriousGold.withValues(alpha: 0.15)
+                  : primaryTerracotta.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.checklist_rtl_rounded,
-              color: primaryTerracotta,
+              color: isDark ? seriousGold : primaryTerracotta,
               size: 40,
             ),
           ),
           const SizedBox(height: 14),
-          const Text(
+          Text(
             'Belum Ada Grup Aktivitas',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
+              color: isDark ? Colors.white : const Color(0xFF1E293B),
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'Mulai dengan membuat grup aktivitas baru atau gunakan salah satu rekomendasi template di bawah ini.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 12.5,
-              color: Color(0xFF64748B),
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
               height: 1.4,
             ),
           ),
           const SizedBox(height: 20),
-          const Divider(),
+          Divider(color: isDark ? seriousCardBorder : Colors.grey[200]!),
           const SizedBox(height: 12),
-          const Align(
+          Align(
             alignment: Alignment.centerLeft,
             child: Text(
               'Rekomendasi Template Siap Pakai:',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF334155),
+                color: isDark ? Colors.white : const Color(0xFF334155),
               ),
             ),
           ),
           const SizedBox(height: 10),
-          ..._starterTemplates.map((t) => _buildStarterTemplateTile(t)),
+          ..._starterTemplates.map((t) => _buildStarterTemplateTile(t, isDark: isDark)),
         ],
       ),
     );
   }
 
-  Widget _buildStarterTemplateTile(DailyTaskGroup template) {
+  Widget _buildStarterTemplateTile(DailyTaskGroup template, {required bool isDark}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(
+          color: isDark ? seriousCardBorder : Colors.grey[200]!,
+        ),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: primaryTerracotta.withValues(alpha: 0.12),
+              color: isDark
+                  ? seriousGold.withValues(alpha: 0.15)
+                  : primaryTerracotta.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.bookmark_add_rounded,
-              color: primaryTerracotta,
+              color: isDark ? seriousGold : primaryTerracotta,
               size: 20,
             ),
           ),
@@ -974,18 +1092,18 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
               children: [
                 Text(
                   template.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
+                    color: isDark ? Colors.white : const Color(0xFF1E293B),
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   '${template.totalTasks} tugas • ${template.tasks.first}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11.5,
-                    color: Color(0xFF64748B),
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -997,11 +1115,10 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
           ElevatedButton(
             onPressed: () => _openCreateGroupDialog(template: template),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: primaryTerracotta,
-              side: const BorderSide(color: primaryTerracotta, width: 1.2),
+              backgroundColor: isDark ? seriousGold : primaryTerracotta,
+              foregroundColor: isDark ? Colors.black : Colors.white,
               elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -1022,25 +1139,36 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
   }
 
   void _showHelpDialog() {
+    final isDark = widget.isSeriousMode;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
+        backgroundColor: isDark ? seriousCardBg : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: isDark ? seriousCardBorder : Colors.transparent,
+          ),
+        ),
+        title: Row(
           children: [
-            Icon(Icons.help_outline_rounded, color: primaryTerracotta, size: 24),
-            SizedBox(width: 10),
+            Icon(
+              Icons.help_outline_rounded,
+              color: isDark ? seriousGold : primaryTerracotta,
+              size: 24,
+            ),
+            const SizedBox(width: 10),
             Text(
               'Cara Kerja Tugas Harian',
               style: TextStyle(
                 fontSize: 16.5,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1E293B),
+                color: isDark ? Colors.white : const Color(0xFF1E293B),
               ),
             ),
           ],
         ),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1053,7 +1181,7 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
               '6. Anda tetap dapat mengedit atau mengatur ulang alarm pada tiap section tanggal secara terpisah.',
               style: TextStyle(
                 fontSize: 13,
-                color: Color(0xFF475569),
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
                 height: 1.45,
               ),
             ),
@@ -1063,8 +1191,8 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
             style: ElevatedButton.styleFrom(
-              backgroundColor: primaryTerracotta,
-              foregroundColor: Colors.white,
+              backgroundColor: isDark ? seriousGold : primaryTerracotta,
+              foregroundColor: isDark ? Colors.black : Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),

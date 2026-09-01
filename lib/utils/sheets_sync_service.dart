@@ -1091,6 +1091,15 @@ function processRequest(data) {
   try {
     var action = data.action || "test_connection";
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // --- AKSI MODE SERIUS (USERS, LEADERBOARD, CEK USERNAME, REGISTRASI/LOGIN) ---
+    if (action === "get_serious_users" || action === "get_leaderboard" || 
+        action === "check_username" || action === "register_serious_user" || 
+        action === "sync_serious_user") {
+      var seriousRes = handleSeriousModeActions(data, ss);
+      if (seriousRes) return seriousRes;
+    }
+
     var sheet = findOrCreateSheet(ss, data.sheetName);
     var sheetName = sheet.getName();
     
@@ -1880,6 +1889,166 @@ function processRequest(data) {
 function jsonResponse(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// === HANDLER GOOGLE APPS SCRIPT UNTUK MODE SERIUS (USERS & TOP 3 LEADERBOARD) ===
+function handleSeriousModeActions(data, ss) {
+  var action = data.action;
+  var userSheetName = "Users_Mode_Serius";
+  var sheet = ss.getSheetByName(userSheetName);
+  var headers = [
+    "ID", "Username", "Password", "Display Name", 
+    "Avatar Index", "Avatar Base64", "Total Points", 
+    "Total Tasks Completed", "Total Punishments Taken", 
+    "Registered At", "Last Active At"
+  ];
+  
+  if (!sheet) {
+    sheet = ss.insertSheet(userSheetName);
+    sheet.appendRow(headers);
+    sheet.getRange("A1:K1").setFontWeight("bold").setBackground("#1E293B").setFontColor("#F59E0B");
+    sheet.setFrozenRows(1);
+  } else {
+    // Sinkronkan baris 1 header agar kolom Password selalu muncul di Kolom C
+    var currentHeader = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
+    var needsUpdate = false;
+    for (var h = 0; h < headers.length; h++) {
+      if (currentHeader[h] !== headers[h]) {
+        needsUpdate = true;
+        break;
+      }
+    }
+    if (needsUpdate) {
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      sheet.getRange("A1:K1").setFontWeight("bold").setBackground("#1E293B").setFontColor("#F59E0B");
+      sheet.setFrozenRows(1);
+    }
+  }
+
+  // 1. GET ALL USERS / LEADERBOARD (SORTED TOP HIGHEST POINTS)
+  if (action === "get_serious_users" || action === "get_leaderboard") {
+    var dataRange = sheet.getDataRange();
+    var values = dataRange.getValues();
+    var users = [];
+    
+    for (var r = 1; r < values.length; r++) {
+      var row = values[r];
+      if (!row[1] || row[1].toString().trim() === "") continue; // Skip jika username kosong
+      
+      users.push({
+        id: row[0] ? row[0].toString() : "",
+        username: row[1] ? row[1].toString() : "",
+        password: row[2] ? row[2].toString() : "",
+        displayName: row[3] ? row[3].toString() : (row[1] ? row[1].toString() : "Player"),
+        avatarIndex: parseInt(row[4]) || 0,
+        avatarBase64: row[5] ? row[5].toString() : null,
+        totalPoints: parseInt(row[6]) || 0,
+        totalTasksCompleted: parseInt(row[7]) || 0,
+        totalPunishmentsTaken: parseInt(row[8]) || 0,
+        registeredAt: row[9] ? row[9].toString() : new Date().toISOString(),
+        lastActiveAt: row[10] ? row[10].toString() : new Date().toISOString()
+      });
+    }
+
+    // Urutkan berdasarkan total points tertinggi
+    users.sort(function(a, b) {
+      if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+      return b.totalTasksCompleted - a.totalTasksCompleted;
+    });
+
+    return jsonResponse({
+      status: "success",
+      users: users,
+      top3: users.slice(0, 3),
+      totalUsers: users.length
+    });
+  }
+
+  // 2. CHECK USERNAME AVAILABILITY
+  if (action === "check_username") {
+    var checkUsername = (data.username || "").toString().trim().toLowerCase();
+    var values = sheet.getDataRange().getValues();
+    var isTaken = false;
+    
+    for (var r = 1; r < values.length; r++) {
+      var un = (values[r][1] || "").toString().trim().toLowerCase();
+      if (un === checkUsername) {
+        isTaken = true;
+        break;
+      }
+    }
+    
+    return jsonResponse({
+      status: "success",
+      username: checkUsername,
+      isAvailable: !isTaken
+    });
+  }
+
+  // 3. REGISTER / SYNC SERIOUS USER
+  if (action === "register_serious_user" || action === "sync_serious_user") {
+    var u = data.user || {};
+    var username = (u.username || "").toString().trim();
+    var cleanUsername = username.toLowerCase();
+    
+    if (!username) {
+      return jsonResponse({ status: "error", message: "Username tidak boleh kosong" });
+    }
+
+    var values = sheet.getDataRange().getValues();
+    var foundRowIndex = -1;
+
+    for (var r = 1; r < values.length; r++) {
+      var existingUn = (values[r][1] || "").toString().trim().toLowerCase();
+      var existingId = (values[r][0] || "").toString().trim();
+      if (existingUn === cleanUsername || (u.id && existingId === u.id.toString())) {
+        foundRowIndex = r + 1; // 1-based row index
+        break;
+      }
+    }
+
+    if (action === "register_serious_user" && foundRowIndex !== -1) {
+      return jsonResponse({
+        status: "error",
+        code: "USERNAME_EXISTS",
+        message: "Username '" + username + "' sudah terdaftar di Google Spreadsheet!"
+      });
+    }
+
+    var rowData = [
+      u.id || ("usr_" + new Date().getTime()),
+      username,
+      u.password || "",
+      u.displayName || username,
+      parseInt(u.avatarIndex) || 0,
+      u.avatarBase64 || "",
+      parseInt(u.totalPoints) || 0,
+      parseInt(u.totalTasksCompleted) || 0,
+      parseInt(u.totalPunishmentsTaken) || 0,
+      u.registeredAt || new Date().toISOString(),
+      new Date().toISOString()
+    ];
+
+    if (foundRowIndex !== -1) {
+      // Update existing user row
+      sheet.getRange(foundRowIndex, 1, 1, rowData.length).setValues([rowData]);
+      return jsonResponse({
+        status: "success",
+        action: "updated",
+        message: "Data user '" + username + "' berhasil diperbarui di Spreadsheet."
+      });
+    } else {
+      // Append new user row
+      sheet.appendRow(rowData);
+      return jsonResponse({
+        status: "success",
+        action: "created",
+        message: "Akun user '" + username + "' berhasil didaftarkan di Spreadsheet."
+      });
+    }
+  }
+
+  return null;
 }''';
   }
 }

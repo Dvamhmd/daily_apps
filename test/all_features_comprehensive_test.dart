@@ -328,7 +328,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('To-Do List'), findsWidgets);
-      expect(find.byTooltip('Riwayat To-Do Selesai'), findsOneWidget);
+      expect(find.byTooltip('Riwayat Task'), findsOneWidget);
     });
 
     testWidgets('TodoRiwayatPage renders empty state properly', (tester) async {
@@ -339,7 +339,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Riwayat To-Do Selesai'), findsOneWidget);
+      expect(find.text('Riwayat Task'), findsOneWidget);
       expect(find.text('Belum Ada Section yang Diarsipkan'), findsOneWidget);
     });
   });

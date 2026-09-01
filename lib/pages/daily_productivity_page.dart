@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:daily_apps/models/model_todo.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
+import 'package:daily_apps/utils/serious_mode_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -121,7 +122,12 @@ class ProductivityHelper {
 }
 
 class DailyProductivityPage extends StatefulWidget {
-  const DailyProductivityPage({super.key});
+  final bool isSeriousMode;
+
+  const DailyProductivityPage({
+    super.key,
+    this.isSeriousMode = false,
+  });
 
   @override
   State<DailyProductivityPage> createState() => _DailyProductivityPageState();
@@ -129,7 +135,16 @@ class DailyProductivityPage extends StatefulWidget {
 
 class _DailyProductivityPageState extends State<DailyProductivityPage> {
   static const Color primaryTerracotta = Color(0xFFBA5A3A);
-  static const String _prefsKey = 'daily_apps_todo_groups_v1';
+  static const Color seriousBg = Color(0xFF0F172A);
+  static const Color seriousCardBg = Color(0xFF1E293B);
+  static const Color seriousGold = Color(0xFFF59E0B);
+  static const Color seriousBorder = Color(0xFF334155);
+
+  static const String _prefsKeyNormal = SeriousModeService.prefKeyNormalTodoGroups;
+  static const String _prefsKeySerious = SeriousModeService.prefKeySeriousTodoGroups;
+
+  String get _prefsKey =>
+      widget.isSeriousMode ? _prefsKeySerious : _prefsKeyNormal;
 
   late DateTime _selectedMonth;
   DateTime? _selectedDateDetail;
@@ -171,10 +186,19 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
     _loadAllTodoData();
   }
 
+  Future<String> _getEffectiveKey() async {
+    if (widget.isSeriousMode) {
+      final user = await SeriousModeService.getCurrentUser();
+      return SeriousModeService.getSeriousTodoGroupsKey(user?.id);
+    }
+    return SeriousModeService.prefKeyNormalTodoGroups;
+  }
+
   Future<void> _loadAllTodoData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final String? jsonStr = prefs.getString(_prefsKey);
+      final key = await _getEffectiveKey();
+      final String? jsonStr = prefs.getString(key);
       if (jsonStr != null && jsonStr.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(jsonStr);
         _allGroups = decoded
@@ -253,6 +277,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = widget.isSeriousMode;
     final now = DateTime.now();
     final isCurrentMonth = _selectedMonth.year == now.year &&
         _selectedMonth.month == now.month;
@@ -280,9 +305,9 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFBF8F6),
+      backgroundColor: isDark ? seriousBg : const Color(0xFFFBF8F6),
       appBar: AppBar(
-        backgroundColor: primaryTerracotta,
+        backgroundColor: isDark ? seriousBg : primaryTerracotta,
         elevation: 0,
         centerTitle: false,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -291,14 +316,20 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
           statusBarIconBrightness: Brightness.light,
           statusBarBrightness: Brightness.dark,
         ),
-        title: const Row(
+        title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.insights_rounded, color: Colors.white, size: 20),
-            SizedBox(width: 8),
+            Icon(
+              Icons.insights_rounded,
+              color: isDark ? seriousGold : Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
             Text(
-              'Activity',
-              style: TextStyle(
+              widget.isSeriousMode
+                  ? 'Activity (Mode Serius)'
+                  : 'Activity',
+              style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
                 fontSize: 17,
@@ -308,12 +339,14 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
         ),
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: primaryTerracotta),
+          ? Center(
+              child: CircularProgressIndicator(
+                color: isDark ? seriousGold : primaryTerracotta,
+              ),
             )
           : RefreshIndicator(
               onRefresh: _loadAllTodoData,
-              color: primaryTerracotta,
+              color: isDark ? seriousGold : primaryTerracotta,
               child: ResponsiveContentWrapper(
                 maxWidth: 680,
                 child: ListView(
@@ -352,18 +385,21 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
     required int monthCrownDays,
     required bool isCurrentMonth,
   }) {
+    final isDark = widget.isSeriousMode;
     final monthName = _namaBulan[_selectedMonth.month - 1];
     final year = _selectedMonth.year;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? seriousCardBg : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: isDark ? seriousBorder : const Color(0xFFE2E8F0),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -376,7 +412,11 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
-                icon: const Icon(Icons.chevron_left_rounded, size: 24),
+                icon: Icon(
+                  Icons.chevron_left_rounded,
+                  size: 24,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
                 onPressed: _previousMonth,
                 visualDensity: VisualDensity.compact,
                 tooltip: 'Bulan Sebelumnya',
@@ -392,10 +432,10 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                     children: [
                       Text(
                         '$monthName $year',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15.5,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
+                          color: isDark ? Colors.white : const Color(0xFF1E293B),
                         ),
                       ),
                       if (!isCurrentMonth) ...[
@@ -406,14 +446,15 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: primaryTerracotta.withValues(alpha: 0.12),
+                            color: (isDark ? seriousGold : primaryTerracotta)
+                                .withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Bulan Ini',
                             style: TextStyle(
                               fontSize: 9.5,
-                              color: primaryTerracotta,
+                              color: isDark ? seriousGold : primaryTerracotta,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -424,7 +465,11 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.chevron_right_rounded, size: 24),
+                icon: Icon(
+                  Icons.chevron_right_rounded,
+                  size: 24,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
                 onPressed: _nextMonth,
                 visualDensity: VisualDensity.compact,
                 tooltip: 'Bulan Berikutnya',
@@ -447,7 +492,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                 label: 'Hari Aktif',
                 value: '$monthActiveDays Hari',
                 icon: Icons.event_available_rounded,
-                color: primaryTerracotta,
+                color: isDark ? seriousGold : primaryTerracotta,
               ),
               const SizedBox(width: 8),
               _buildMiniMetric(
@@ -469,14 +514,17 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
     required IconData icon,
     required Color color,
   }) {
+    final isDark = widget.isSeriousMode;
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
+          color: isDark
+              ? color.withValues(alpha: 0.12)
+              : color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: color.withValues(alpha: 0.2),
+            color: color.withValues(alpha: isDark ? 0.35 : 0.2),
             width: 1,
           ),
         ),
@@ -517,6 +565,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
   }
 
   Widget _buildCalendarCard() {
+    final isDark = widget.isSeriousMode;
     final year = _selectedMonth.year;
     final month = _selectedMonth.month;
     final totalDays = DateTime(year, month + 1, 0).day;
@@ -528,12 +577,14 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? seriousCardBg : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: isDark ? seriousBorder : const Color(0xFFE2E8F0),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -542,30 +593,30 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
               Icon(
                 Icons.calendar_month_rounded,
                 size: 18,
-                color: primaryTerracotta,
+                color: isDark ? seriousGold : primaryTerracotta,
               ),
-              SizedBox(width: 7),
+              const SizedBox(width: 7),
               Text(
                 'Kalender Aktivitas Harian',
                 style: TextStyle(
                   fontSize: 14.5,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                  color: isDark ? Colors.white : const Color(0xFF1E293B),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 2),
-          const Text(
+          Text(
             'Klik tanggal untuk melihat pencapaian dan daftar aktivitas.',
             style: TextStyle(
               fontSize: 11,
-              color: Color(0xFF64748B),
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
             ),
           ),
           const SizedBox(height: 10),
@@ -583,8 +634,12 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       color: isWeekend
-                          ? primaryTerracotta.withValues(alpha: 0.85)
-                          : const Color(0xFF94A3B8),
+                          ? (isDark
+                              ? seriousGold
+                              : primaryTerracotta.withValues(alpha: 0.85))
+                          : (isDark
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF94A3B8)),
                     ),
                   ),
                 ),
@@ -695,8 +750,13 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
     required bool isToday,
     required bool isSelected,
   }) {
-    final cellColor = ProductivityHelper.getCellColor(level);
-    final textColor = ProductivityHelper.getTextColor(level);
+    final isDark = widget.isSeriousMode;
+    final cellColor = isDark && level == ProductivityLevel.none
+        ? const Color(0xFF0F172A)
+        : ProductivityHelper.getCellColor(level);
+    final textColor = isDark && level == ProductivityLevel.none
+        ? const Color(0xFF64748B)
+        : ProductivityHelper.getTextColor(level);
     final isCrown = level == ProductivityLevel.king;
     final isOverload = level == ProductivityLevel.overload;
 
@@ -727,7 +787,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: isSelected
-                    ? primaryTerracotta
+                    ? (isDark ? seriousGold : primaryTerracotta)
                     : (isToday
                         ? const Color(0xFF2563EB)
                         : (isOverload
@@ -736,7 +796,9 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                                 ? const Color(0xFFFDE68A)
                                 : (count > 0
                                     ? const Color(0xFF16A34A).withValues(alpha: 0.3)
-                                    : const Color(0xFFE2E8F0))))),
+                                    : (isDark
+                                        ? const Color(0xFF334155)
+                                        : const Color(0xFFE2E8F0)))))),
                 width: (isSelected || isToday || isCrown || isOverload) ? 2 : 1,
               ),
               boxShadow: isOverload
@@ -758,7 +820,8 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                       : (isSelected
                           ? [
                               BoxShadow(
-                                color: primaryTerracotta.withValues(alpha: 0.3),
+                                color: (isDark ? seriousGold : primaryTerracotta)
+                                    .withValues(alpha: 0.3),
                                 blurRadius: 4,
                                 offset: const Offset(0, 1),
                               ),
@@ -828,6 +891,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
   }
 
   Widget _buildDateDetailCard(DateTime date) {
+    final isDark = widget.isSeriousMode;
     final count = _getCompletedCountForDate(date);
     final items = _getCompletedItemsForDate(date);
     final level = ProductivityHelper.getLevel(count);
@@ -1020,21 +1084,23 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isCrown
-            ? const Color(0xFFFFFBEB)
-            : const Color(0xFFF8FAFC),
+            ? (isDark ? const Color(0xFF451A03) : const Color(0xFFFFFBEB))
+            : (isDark ? seriousCardBg : const Color(0xFFF8FAFC)),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isCrown
               ? const Color(0xFFF59E0B)
               : (count > 0
-                  ? primaryTerracotta.withValues(alpha: 0.3)
-                  : const Color(0xFFE2E8F0)),
+                  ? (isDark
+                      ? seriousGold.withValues(alpha: 0.4)
+                      : primaryTerracotta.withValues(alpha: 0.3))
+                  : (isDark ? seriousBorder : const Color(0xFFE2E8F0))),
           width: isCrown ? 1.5 : 1.2,
         ),
         boxShadow: isCrown
             ? [
                 BoxShadow(
-                  color: const Color(0xFFD97706).withValues(alpha: 0.15),
+                  color: const Color(0xFFD97706).withValues(alpha: 0.25),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -1060,8 +1126,8 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                   color: isCrown
                       ? null
                       : (count > 0
-                          ? const Color(0xFFDCFCE7)
-                          : const Color(0xFFF1F5F9)),
+                          ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFDCFCE7))
+                          : (isDark ? seriousBg : const Color(0xFFF1F5F9))),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
@@ -1073,8 +1139,8 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                   color: isCrown
                       ? Colors.white
                       : (count > 0
-                          ? const Color(0xFF16A34A)
-                          : const Color(0xFF64748B)),
+                          ? const Color(0xFF22C55E)
+                          : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
                   size: 18,
                 ),
               ),
@@ -1085,10 +1151,10 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                   children: [
                     Text(
                       dateStr,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
+                        color: isDark ? Colors.white : const Color(0xFF1E293B),
                       ),
                     ),
                     const SizedBox(height: 1),
@@ -1100,10 +1166,10 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: isCrown
-                            ? const Color(0xFFB45309)
+                            ? const Color(0xFFFBBF24)
                             : (count > 0
-                                ? const Color(0xFF16A34A)
-                                : const Color(0xFF64748B)),
+                                ? const Color(0xFF22C55E)
+                                : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
                       ),
                     ),
                   ],
@@ -1117,8 +1183,8 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                   ),
                   decoration: BoxDecoration(
                     color: isCrown
-                        ? const Color(0xFFFEF08A)
-                        : const Color(0xFFDCFCE7),
+                        ? (isDark ? const Color(0xFF78350F) : const Color(0xFFFEF08A))
+                        : (isDark ? const Color(0xFF064E3B) : const Color(0xFFDCFCE7)),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -1129,8 +1195,8 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                       fontSize: 10.5,
                       fontWeight: FontWeight.bold,
                       color: isCrown
-                          ? const Color(0xFF854D0E)
-                          : const Color(0xFF166534),
+                          ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFF854D0E))
+                          : (isDark ? const Color(0xFF86EFAC) : const Color(0xFF166534)),
                     ),
                   ),
                 ),
@@ -1145,13 +1211,13 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
                 color: isCrown
-                    ? const Color(0xFFFEF3C7)
-                    : const Color(0xFFF0FDF4),
+                    ? (isDark ? const Color(0xFF78350F).withValues(alpha: 0.5) : const Color(0xFFFEF3C7))
+                    : (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.3) : const Color(0xFFF0FDF4)),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: isCrown
-                      ? const Color(0xFFFDE68A)
-                      : const Color(0xFFBBF7D0),
+                      ? const Color(0xFFF59E0B)
+                      : (isDark ? const Color(0xFF059669) : const Color(0xFFBBF7D0)),
                 ),
               ),
               child: Text(
@@ -1159,8 +1225,8 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                 style: TextStyle(
                   fontSize: 12,
                   color: isCrown
-                      ? const Color(0xFF92400E)
-                      : const Color(0xFF166534),
+                      ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E))
+                      : (isDark ? const Color(0xFF86EFAC) : const Color(0xFF166534)),
                   fontWeight: FontWeight.w600,
                   height: 1.35,
                 ),
@@ -1184,10 +1250,10 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                   children: [
                     Text(
                       '${items.length} Aktivitas Dikerjakan',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF475569),
+                        color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
                       ),
                     ),
                     const SizedBox(width: 4),
@@ -1195,18 +1261,18 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                       turns: _isActivitiesExpanded ? 0.5 : 0.0,
                       duration: const Duration(milliseconds: 250),
                       curve: Curves.easeInOut,
-                      child: const Icon(
+                      child: Icon(
                         Icons.keyboard_arrow_down_rounded,
                         size: 18,
-                        color: primaryTerracotta,
+                        color: isDark ? seriousGold : primaryTerracotta,
                       ),
                     ),
                     const Spacer(),
                     Text(
                       _isActivitiesExpanded ? 'Tutup' : 'Lihat Detail',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10.5,
-                        color: primaryTerracotta,
+                        color: isDark ? seriousGold : primaryTerracotta,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1221,11 +1287,11 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
             ),
           ] else ...[
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'Belum ada kegiatan yang diselesaikan pada tanggal ini.',
               style: TextStyle(
                 fontSize: 11.5,
-                color: Color(0xFF94A3B8),
+                color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -1240,6 +1306,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
     required List<TodoItem> items,
     required bool isOverload,
   }) {
+    final isDark = widget.isSeriousMode;
     return AnimatedSize(
       duration: const Duration(milliseconds: 320),
       curve: Curves.easeInOutCubic,
@@ -1272,7 +1339,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                               fontSize: 12,
                               color: isOverload
                                   ? Colors.white
-                                  : const Color(0xFF1E293B),
+                                  : (isDark ? Colors.white : const Color(0xFF1E293B)),
                               fontWeight: FontWeight.w500,
                             ),
                           ),

@@ -7,11 +7,13 @@ import 'package:flutter/services.dart';
 class TodoAlarmPopupDialog extends StatefulWidget {
   final TodoDateGroup group;
   final VoidCallback? onDismiss;
+  final bool isSeriousMode;
 
   const TodoAlarmPopupDialog({
     super.key,
     required this.group,
     this.onDismiss,
+    this.isSeriousMode = false,
   });
 
   static bool _isShowing = false;
@@ -20,6 +22,7 @@ class TodoAlarmPopupDialog extends StatefulWidget {
     BuildContext context, {
     required TodoDateGroup group,
     VoidCallback? onDismiss,
+    bool isSeriousMode = false,
   }) async {
     if (_isShowing) return;
     _isShowing = true;
@@ -34,6 +37,7 @@ class TodoAlarmPopupDialog extends StatefulWidget {
         pageBuilder: (context, anim1, anim2) {
           return TodoAlarmPopupDialog(
             group: group,
+            isSeriousMode: isSeriousMode,
             onDismiss: () {
               onDismiss?.call();
             },
@@ -64,6 +68,11 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
     with TickerProviderStateMixin {
   static const Color primaryTerracotta = Color(0xFFBA5A3A);
   static const Color softTerracottaBg = Color(0xFFFDF6F3);
+
+  static const Color seriousBg = Color(0xFF0F172A);
+  static const Color seriousCardBg = Color(0xFF1E293B);
+  static const Color seriousGold = Color(0xFFF59E0B);
+  static const Color seriousBorder = Color(0xFF334155);
 
   late AnimationController _bellAnimController;
   late Animation<double> _bellRotationAnim;
@@ -143,6 +152,7 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = widget.isSeriousMode;
     final pendingTasks = widget.group.pendingItems;
 
     return PopScope(
@@ -156,17 +166,24 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
           margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           constraints: const BoxConstraints(maxWidth: 400),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? seriousCardBg : Colors.white,
             borderRadius: BorderRadius.circular(32),
+            border: isDark
+                ? Border.all(
+                    color: seriousGold.withValues(alpha: 0.35),
+                    width: 1.5,
+                  )
+                : null,
             boxShadow: [
               BoxShadow(
-                color: primaryTerracotta.withValues(alpha: 0.28),
+                color: (isDark ? seriousGold : primaryTerracotta)
+                    .withValues(alpha: isDark ? 0.22 : 0.28),
                 blurRadius: 36,
                 spreadRadius: 2,
                 offset: const Offset(0, 12),
               ),
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
+                color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
                 blurRadius: 16,
                 offset: const Offset(0, 4),
               ),
@@ -177,21 +194,27 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Top Header Section dengan Padding Atas Nyaman & Gradien Terracotta Premium
+                // Top Header Section
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFFC86745),
-                        Color(0xFFBA5A3A),
-                        Color(0xFF8C3E26),
-                      ],
+                      colors: isDark
+                          ? const [
+                              Color(0xFF1E293B),
+                              Color(0xFF0F172A),
+                            ]
+                          : const [
+                              Color(0xFFC86745),
+                              Color(0xFFBA5A3A),
+                              Color(0xFF8C3E26),
+                            ],
                     ),
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(30)),
                   ),
                   child: Column(
                     children: [
@@ -213,7 +236,8 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
                                   height: 82,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: Colors.white.withValues(alpha: 0.14),
+                                    color: (isDark ? seriousGold : Colors.white)
+                                        .withValues(alpha: isDark ? 0.2 : 0.14),
                                   ),
                                 ),
                               ),
@@ -224,23 +248,29 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
                                   width: 66,
                                   height: 66,
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.22),
+                                    color: (isDark
+                                            ? seriousGold
+                                            : Colors.white)
+                                        .withValues(alpha: isDark ? 0.25 : 0.22),
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: Colors.white.withValues(alpha: 0.55),
+                                      color: isDark
+                                          ? seriousGold
+                                          : Colors.white.withValues(alpha: 0.55),
                                       width: 2.5,
                                     ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.12),
+                                        color: Colors.black.withValues(
+                                            alpha: isDark ? 0.35 : 0.12),
                                         blurRadius: 10,
                                         offset: const Offset(0, 4),
                                       ),
                                     ],
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.notifications_active_rounded,
-                                    color: Colors.white,
+                                    color: isDark ? seriousGold : Colors.white,
                                     size: 34,
                                   ),
                                 ),
@@ -252,10 +282,12 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
                       const SizedBox(height: 18),
 
                       // Pesan Utama: "Tugasmu belum selesai nih"
-                      const Text(
-                        'Tugasmu belum selesai nih',
+                      Text(
+                        isDark
+                            ? 'Tugas Belum Selesai 🔥'
+                            : 'Tugasmu belum selesai nih',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 18.5,
                           fontWeight: FontWeight.w800,
                           color: Colors.white,
@@ -271,27 +303,31 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
                           vertical: 5,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.20),
+                          color: isDark
+                              ? seriousGold.withValues(alpha: 0.18)
+                              : Colors.black.withValues(alpha: 0.20),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.24),
+                            color: isDark
+                                ? seriousGold.withValues(alpha: 0.45)
+                                : Colors.white.withValues(alpha: 0.24),
                             width: 1,
                           ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.calendar_today_rounded,
-                              color: Colors.white,
+                              color: isDark ? seriousGold : Colors.white,
                               size: 12,
                             ),
                             const SizedBox(width: 6),
                             Text(
                               widget.group.formattedFullDate,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.white,
+                                color: isDark ? seriousGold : Colors.white,
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: 0.1,
                               ),
@@ -321,18 +357,22 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
                               Container(
                                 width: 7,
                                 height: 7,
-                                decoration: const BoxDecoration(
-                                  color: primaryTerracotta,
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? seriousGold
+                                      : primaryTerracotta,
                                   shape: BoxShape.circle,
                                 ),
                               ),
                               const SizedBox(width: 7),
                               Text(
                                 'DAFTAR TUGAS (${pendingTasks.length})',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF64748B),
+                                  color: isDark
+                                      ? const Color(0xFF94A3B8)
+                                      : const Color(0xFF64748B),
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -344,10 +384,15 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
                               vertical: 3.5,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFEF2F2),
+                              color: isDark
+                                  ? const Color(0xFF450A0A)
+                                  : const Color(0xFFFEF2F2),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: const Color(0xFFFECACA),
+                                color: isDark
+                                    ? const Color(0xFFEF4444)
+                                        .withValues(alpha: 0.5)
+                                    : const Color(0xFFFECACA),
                                 width: 1,
                               ),
                             ),
@@ -357,7 +402,7 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
                                 const Icon(
                                   Icons.volume_up_rounded,
                                   size: 13,
-                                  color: Color(0xFFDC2626),
+                                  color: Color(0xFFEF4444),
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
@@ -365,7 +410,7 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
                                   style: const TextStyle(
                                     fontSize: 11.5,
                                     fontWeight: FontWeight.w800,
-                                    color: Color(0xFFDC2626),
+                                    color: Color(0xFFEF4444),
                                   ),
                                 ),
                               ],
@@ -403,34 +448,45 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
                                   vertical: 11,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF8FAFC),
+                                  color: isDark
+                                      ? seriousBg
+                                      : const Color(0xFFF8FAFC),
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
-                                    color: const Color(0xFFE2E8F0),
+                                    color: isDark
+                                        ? seriousBorder
+                                        : const Color(0xFFE2E8F0),
                                   ),
                                 ),
                                 child: Row(
                                   children: [
                                     Container(
                                       padding: const EdgeInsets.all(5),
-                                      decoration: const BoxDecoration(
-                                        color: softTerracottaBg,
+                                      decoration: BoxDecoration(
+                                        color: isDark
+                                            ? seriousGold
+                                                .withValues(alpha: 0.15)
+                                            : softTerracottaBg,
                                         shape: BoxShape.circle,
                                       ),
-                                      child: const Icon(
+                                      child: Icon(
                                         Icons.check_box_outline_blank_rounded,
                                         size: 13,
-                                        color: primaryTerracotta,
+                                        color: isDark
+                                            ? seriousGold
+                                            : primaryTerracotta,
                                       ),
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
                                         item.title,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 13.5,
                                           fontWeight: FontWeight.w600,
-                                          color: Color(0xFF1E293B),
+                                          color: isDark
+                                              ? Colors.white
+                                              : const Color(0xFF1E293B),
                                           height: 1.3,
                                         ),
                                       ),
@@ -445,7 +501,10 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
                   ),
                 ),
 
-                const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                Divider(
+                  height: 1,
+                  color: isDark ? seriousBorder : const Color(0xFFF1F5F9),
+                ),
 
                 // Action Button: "Iyaa tau"
                 Padding(
@@ -456,21 +515,26 @@ class _TodoAlarmPopupDialogState extends State<TodoAlarmPopupDialog>
                     child: ElevatedButton(
                       onPressed: _handleAcknowledge,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryTerracotta,
-                        foregroundColor: Colors.white,
+                        backgroundColor:
+                            isDark ? seriousGold : primaryTerracotta,
+                        foregroundColor: isDark ? Colors.black : Colors.white,
                         elevation: 3,
-                        shadowColor: primaryTerracotta.withValues(alpha: 0.45),
+                        shadowColor: (isDark ? seriousGold : primaryTerracotta)
+                            .withValues(alpha: 0.45),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),
                         ),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.check_circle_rounded,
-                              size: 22, color: Colors.white),
-                          SizedBox(width: 8),
-                          Text(
+                          Icon(
+                            Icons.check_circle_rounded,
+                            size: 22,
+                            color: isDark ? Colors.black : Colors.white,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
                             'Iyaa tau',
                             style: TextStyle(
                               fontSize: 16,
