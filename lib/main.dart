@@ -376,6 +376,25 @@ class _KeuanganPageState extends State<KeuanganPage> {
     _loadInitialData();
   }
 
+  DateTime? _parseTargetDateFromPrefs(SharedPreferences prefs) {
+    try {
+      final raw = prefs.get('target_date');
+      if (raw == null) return null;
+      if (raw is int) {
+        return DateTime.fromMillisecondsSinceEpoch(raw);
+      }
+      if (raw is String) {
+        final parsed = DateTime.tryParse(raw);
+        if (parsed != null) return parsed;
+        final intVal = int.tryParse(raw);
+        if (intVal != null) return DateTime.fromMillisecondsSinceEpoch(intVal);
+      }
+    } catch (e) {
+      debugPrint('Error parsing target_date: $e');
+    }
+    return null;
+  }
+
   Future<void> _loadInitialData() async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -413,10 +432,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
     final rawTabungan = prefs.getStringList('tabungan') ?? [];
 
     // Target
-    final dateMillis = prefs.getInt('target_date');
-    final loadedTargetDate = dateMillis != null
-        ? DateTime.fromMillisecondsSinceEpoch(dateMillis)
-        : null;
+    final loadedTargetDate = _parseTargetDateFromPrefs(prefs);
     final loadedTargetAmount = prefs.getInt('target_amount') ?? 0;
 
     // Last Updated
@@ -739,10 +755,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
   Future<void> _loadTarget() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      final dateMillis = prefs.getInt('target_date');
-      targetDate = dateMillis != null
-          ? DateTime.fromMillisecondsSinceEpoch(dateMillis)
-          : null;
+      targetDate = _parseTargetDateFromPrefs(prefs);
       targetTabungan = prefs.getInt('target_amount') ?? 0;
     });
   }
@@ -1154,7 +1167,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    onPressed: () {
+                    onPressed: () async {
                       final cleanValue =
                           targetCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
 
@@ -1163,8 +1176,10 @@ class _KeuanganPageState extends State<KeuanganPage> {
                         targetDate = tempTargetDate;
                       });
 
-                      _saveTarget();
-                      Navigator.pop(context);
+                      await _saveTarget();
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                      }
                     },
                     child: const Text(
                       'Simpan',

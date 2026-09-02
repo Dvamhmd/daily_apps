@@ -36,6 +36,25 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
   int _localTargetAmount = 0;
   DateTime? _localTargetDate;
 
+  DateTime? _parseTargetDateFromPrefs(SharedPreferences prefs) {
+    try {
+      final raw = prefs.get('target_date');
+      if (raw == null) return null;
+      if (raw is int) {
+        return DateTime.fromMillisecondsSinceEpoch(raw);
+      }
+      if (raw is String) {
+        final parsed = DateTime.tryParse(raw);
+        if (parsed != null) return parsed;
+        final intVal = int.tryParse(raw);
+        if (intVal != null) return DateTime.fromMillisecondsSinceEpoch(intVal);
+      }
+    } catch (e) {
+      debugPrint('Error parsing target_date: $e');
+    }
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -47,34 +66,47 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.amount != widget.amount ||
         oldWidget.targetAmount != widget.targetAmount ||
-        oldWidget.targetDate != widget.targetDate) {
+        oldWidget.targetDate != widget.targetDate ||
+        oldWidget.items != widget.items) {
       _loadTabungan();
     }
   }
 
   Future<void> _saveTabungan() async {
-    final prefs = await SharedPreferences.getInstance();
-    final data = tabunganList.map((e) => jsonEncode(e.toJson())).toList();
-    await prefs.setStringList('tabungan', data);
-  }
-
-  Future<void> _loadTabungan() async {
-    final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getStringList('tabungan') ?? [];
-    final loadedTarget = prefs.getInt('target_amount') ?? 0;
-    final dateStr = prefs.getString('target_date');
-
-    if (mounted) {
-      setState(() {
-        tabunganList =
-            data.map((e) => Tabungan.fromJson(jsonDecode(e))).toList();
-        _localTargetAmount = loadedTarget;
-        _localTargetDate = dateStr != null ? DateTime.tryParse(dateStr) : null;
-      });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = tabunganList.map((e) => jsonEncode(e.toJson())).toList();
+      await prefs.setStringList('tabungan', data);
+    } catch (e) {
+      debugPrint('Error saving tabungan: $e');
     }
   }
 
-  int get effectiveTargetAmount => widget.targetAmount ?? _localTargetAmount;
+  Future<void> _loadTabungan() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = prefs.getStringList('tabungan') ?? [];
+      final loadedTarget = prefs.getInt('target_amount') ?? 0;
+      final loadedDate = _parseTargetDateFromPrefs(prefs);
+
+      if (mounted) {
+        setState(() {
+          tabunganList =
+              data.map((e) => Tabungan.fromJson(jsonDecode(e))).toList();
+          _localTargetAmount = loadedTarget;
+          _localTargetDate = loadedDate;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading tabungan: $e');
+    }
+  }
+
+  int get effectiveTargetAmount =>
+      (widget.targetAmount != null && widget.targetAmount! > 0)
+          ? widget.targetAmount!
+          : _localTargetAmount;
+
   DateTime? get effectiveTargetDate => widget.targetDate ?? _localTargetDate;
 
   int get totalNominal {
@@ -85,18 +117,19 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
   }
 
   int get sisaTarget {
+    if (effectiveTargetAmount <= 0) return 0;
     final sisa = effectiveTargetAmount - totalNominal;
     return sisa < 0 ? 0 : sisa;
   }
 
   double get progressTabungan {
-    if (effectiveTargetAmount == 0) return 0.0;
+    if (effectiveTargetAmount <= 0) return 0.0;
     final p = totalNominal / effectiveTargetAmount;
     return p.clamp(0.0, 1.0);
   }
 
   int get persenTabungan {
-    if (effectiveTargetAmount == 0) return 0;
+    if (effectiveTargetAmount <= 0) return 0;
     return ((totalNominal / effectiveTargetAmount) * 100).round();
   }
 
@@ -289,8 +322,8 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                     final prefs = await SharedPreferences.getInstance();
                     await prefs.setInt('target_amount', newTarget);
                     if (tempTargetDate != null) {
-                      await prefs.setString(
-                          'target_date', tempTargetDate!.toIso8601String());
+                      await prefs.setInt(
+                          'target_date', tempTargetDate!.millisecondsSinceEpoch);
                     } else {
                       await prefs.remove('target_date');
                     }

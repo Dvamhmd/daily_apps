@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:daily_apps/models/model_pribadi.dart';
 import 'package:daily_apps/utils/custom_rule_import_helper.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
@@ -4115,7 +4116,33 @@ class _PribadiPageState extends State<PribadiPage> {
               },
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
+
+            // Petunjuk interaksi tekan tahan
+            Row(
+              children: [
+                Icon(
+                  Icons.touch_app_rounded,
+                  size: 13,
+                  color: textMuted.withValues(alpha: 0.8),
+                ),
+                const SizedBox(width: 5),
+                const Expanded(
+                  child: Text(
+                    'Tekan & tahan untuk edit data',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: textMuted,
+                      fontStyle: FontStyle.italic,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
 
             // Tombol Menu Detail Tabel
             SizedBox(
@@ -4149,8 +4176,8 @@ class _PribadiPageState extends State<PribadiPage> {
   }
 
   // ==========================================
-  // KOMPONEN HEADER TABEL TRANSAKSI (5 KOLOM)
-  // tanggal | kategori | jumlah | tipe | aksi
+  // KOMPONEN HEADER TABEL TRANSAKSI (4 KOLOM)
+  // tanggal | kategori | jumlah | tipe
   // ==========================================
   Widget _buildTransactionTableHeader() {
     return Container(
@@ -4164,7 +4191,7 @@ class _PribadiPageState extends State<PribadiPage> {
         children: [
           // 1. Tanggal
           SizedBox(
-            width: 72,
+            width: 70,
             child: Text(
               'TANGGAL',
               style: TextStyle(
@@ -4178,7 +4205,7 @@ class _PribadiPageState extends State<PribadiPage> {
           SizedBox(width: 6),
           // 2. Kategori
           Expanded(
-            flex: 4,
+            flex: 5,
             child: Text(
               'KATEGORI',
               style: TextStyle(
@@ -4207,26 +4234,10 @@ class _PribadiPageState extends State<PribadiPage> {
           SizedBox(width: 8),
           // 4. Tipe (Debit / Kredit)
           SizedBox(
-            width: 62,
+            width: 56,
             child: Center(
               child: Text(
                 'TIPE',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: textMuted,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-          ),
-          SizedBox(width: 6),
-          // 5. Aksi
-          SizedBox(
-            width: 58,
-            child: Center(
-              child: Text(
-                'AKSI',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
@@ -4242,7 +4253,8 @@ class _PribadiPageState extends State<PribadiPage> {
   }
 
   // ==========================================
-  // KOMPONEN BARIS TABEL TRANSAKSI (5 KOLOM)
+  // KOMPONEN BARIS TABEL TRANSAKSI (4 KOLOM)
+  // Dilengkapi trigger tekan tahan 1.5 detik
   // ==========================================
   Widget _buildTransactionTableRow(PribadiTransaction tx,
       {VoidCallback? onRefresh}) {
@@ -4251,7 +4263,8 @@ class _PribadiPageState extends State<PribadiPage> {
     final isDebit = isPemasukan;
     final typeLabel = isDebit ? 'Debit' : 'Kredit';
     final typeColor = isDebit ? primaryGreen : primaryRose;
-    final amountColor = isDebit ? primaryGreen : (isPengeluaran ? primaryRose : primaryBlue);
+    final amountColor =
+        isDebit ? primaryGreen : (isPengeluaran ? primaryRose : primaryBlue);
     final dateFormatted = DateFormat('dd/MM/yy').format(tx.timestamp);
     final rawKategori = tx.getDisplayKode(customRules: _data.customKodeRules);
     final displayKategori =
@@ -4259,136 +4272,267 @@ class _PribadiPageState extends State<PribadiPage> {
             ? rawKategori
             : 'Umum';
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: lightCard,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: lightBorder),
-      ),
-      child: Row(
-        children: [
-          // 1. Kolom Tanggal
-          SizedBox(
-            width: 72,
-            child: Text(
-              dateFormatted,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: textDark,
-              ),
-            ),
+    return _PribadiTransactionRowWidget(
+      tx: tx,
+      dateFormatted: dateFormatted,
+      displayKategori: displayKategori,
+      typeLabel: typeLabel,
+      typeColor: typeColor,
+      amountColor: amountColor,
+      isPemasukan: isPemasukan,
+      isPengeluaran: isPengeluaran,
+      onTriggerAction: () {
+        _showTransactionActionSheet(tx, onRefresh);
+      },
+    );
+  }
+
+  // ==========================================
+  // ACTION SHEET SAAT BARIS DATA DITEKAN TAHAN 1.5 DETIK
+  // ==========================================
+  void _showTransactionActionSheet(PribadiTransaction tx,
+      [VoidCallback? onRefresh]) {
+    final isPemasukan = tx.isPemasukan;
+    final isDebit = isPemasukan;
+    final typeLabel = isDebit ? 'Debit' : 'Kredit';
+    final typeColor = isDebit ? primaryGreen : primaryRose;
+    final rawKategori = tx.getDisplayKode(customRules: _data.customKodeRules);
+    final displayKategori =
+        (rawKategori != '-' && rawKategori.trim().isNotEmpty)
+            ? rawKategori
+            : 'Umum';
+
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          decoration: const BoxDecoration(
+            color: lightCard,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          const SizedBox(width: 6),
-          // 2. Kolom Kategori (Custom Pengguna)
-          Expanded(
-            flex: 4,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
                   decoration: BoxDecoration(
-                    color: primaryBlue.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    displayKategori,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.bold,
-                      color: primaryBlue,
-                    ),
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                if (tx.title.isNotEmpty && tx.title != displayKategori) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    tx.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: textMuted,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 6),
-          // 3. Kolom Jumlah
-          Expanded(
-            flex: 4,
-            child: Text(
-              '${isPemasukan ? '+' : (isPengeluaran ? '-' : '')}${RupiahFormatter.format(tx.amount)}',
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.bold,
-                color: amountColor,
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // 4. Kolom Tipe (Debit / Kredit)
-          SizedBox(
-            width: 62,
-            child: Center(
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              const SizedBox(height: 16),
+
+              // Kartu Ringkasan Data Transaksi yang Dipilih
+              Container(
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: typeColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6),
+                  color: lightCardElevated,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: lightBorder),
                 ),
-                child: Text(
-                  typeLabel,
-                  style: TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.bold,
-                    color: typeColor,
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: typeColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        isDebit
+                            ? Icons.arrow_downward_rounded
+                            : Icons.arrow_upward_rounded,
+                        color: typeColor,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: primaryBlue.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  displayKategori,
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: primaryBlue,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: typeColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  typeLabel,
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: typeColor,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            tx.title.isNotEmpty ? tx.title : displayKategori,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                              color: textDark,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${DateFormat('dd MMMM yyyy, HH:mm').format(tx.timestamp)} • Rp ${RupiahFormatter.format(tx.amount)}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: textMuted,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Pilihan Menu: Ubah Transaksi
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showEditTransactionModal(tx, onRefresh);
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: lightBorder),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.edit_outlined,
+                            size: 20, color: primaryBlue),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Ubah Transaksi',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: textDark,
+                                ),
+                              ),
+                              Text(
+                                'Edit judul, nominal, kategori, atau catatan',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right_rounded,
+                            size: 18, color: textMuted),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          // 5. Kolom Aksi (Edit & Hapus)
-          SizedBox(
-            width: 58,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                InkWell(
-                  onTap: () => _showEditTransactionModal(tx, onRefresh),
-                  borderRadius: BorderRadius.circular(6),
-                  child: const Padding(
-                    padding: EdgeInsets.all(4),
-                    child: Icon(Icons.edit_outlined,
-                        size: 16, color: primaryBlue),
+              const SizedBox(height: 10),
+
+              // Pilihan Menu: Hapus Transaksi
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _confirmDeleteTransaction(tx, onRefresh);
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: primaryRose.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border:
+                          Border.all(color: primaryRose.withValues(alpha: 0.2)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.delete_outline_rounded,
+                            size: 20, color: primaryRose),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Hapus Transaksi',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: primaryRose,
+                                ),
+                              ),
+                              Text(
+                                'Hapus transaksi ini dan pulihkan saldo',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right_rounded,
+                            size: 18, color: textMuted),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(width: 2),
-                InkWell(
-                  onTap: () => _confirmDeleteTransaction(tx, onRefresh),
-                  borderRadius: BorderRadius.circular(6),
-                  child: const Padding(
-                    padding: EdgeInsets.all(4),
-                    child: Icon(Icons.delete_outline_rounded,
-                        size: 16, color: primaryRose),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -5243,5 +5387,366 @@ class _PribadiPageState extends State<PribadiPage> {
     return list;
   }
 }
+
+// ==========================================
+// WIDGET BARIS TRANSAKSI KEUANGAN PRIBADI (4 KOLOM)
+// Dilengkapi efek visual fill membesar saat ditekan tahan untuk edit
+// ==========================================
+class _PribadiTransactionRowWidget extends StatefulWidget {
+  final PribadiTransaction tx;
+  final String dateFormatted;
+  final String displayKategori;
+  final String typeLabel;
+  final Color typeColor;
+  final Color amountColor;
+  final bool isPemasukan;
+  final bool isPengeluaran;
+  final VoidCallback onTriggerAction;
+
+  const _PribadiTransactionRowWidget({
+    required this.tx,
+    required this.dateFormatted,
+    required this.displayKategori,
+    required this.typeLabel,
+    required this.typeColor,
+    required this.amountColor,
+    required this.isPemasukan,
+    required this.isPengeluaran,
+    required this.onTriggerAction,
+  });
+
+  @override
+  State<_PribadiTransactionRowWidget> createState() =>
+      _PribadiTransactionRowWidgetState();
+}
+
+class _PribadiTransactionRowWidgetState
+    extends State<_PribadiTransactionRowWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+  Offset _touchPosition = Offset.zero;
+  Offset? _downGlobalPosition;
+  bool _actionTriggered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
+    );
+    _animation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOutCubic,
+    );
+
+    _animationController.addStatusListener((status) {
+      if (status == AnimationStatus.completed && !_actionTriggered) {
+        _actionTriggered = true;
+        HapticFeedback.mediumImpact();
+        widget.onTriggerAction();
+        Future.delayed(const Duration(milliseconds: 250), () {
+          if (mounted) {
+            _animationController.reset();
+            _actionTriggered = false;
+          }
+        });
+      }
+    });
+  }
+
+  void _onPointerDown(PointerDownEvent event) {
+    if (_actionTriggered) return;
+    _downGlobalPosition = event.position;
+    _touchPosition = event.localPosition;
+    _animationController.forward(from: 0.0);
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    if (_downGlobalPosition != null) {
+      final dist = (event.position - _downGlobalPosition!).distance;
+      if (dist > 15) {
+        _cancelHold();
+      }
+    }
+  }
+
+  void _cancelHold() {
+    _downGlobalPosition = null;
+    if (_animationController.isAnimating || _animationController.value > 0) {
+      if (!_actionTriggered) {
+        _animationController.animateBack(
+          0.0,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activeFillColor = widget.typeColor;
+    final activeGlowColor = _PribadiPageState.primaryBlue;
+
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: _onPointerDown,
+      onPointerMove: _onPointerMove,
+      onPointerUp: (_) => _cancelHold(),
+      onPointerCancel: (_) => _cancelHold(),
+      child: AnimatedBuilder(
+        animation: _animation,
+        builder: (context, child) {
+          final progress = _animation.value;
+          final scale = 1.0 - (0.015 * progress);
+
+          return Transform.scale(
+            scale: scale,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: progress > 0.01
+                    ? [
+                        BoxShadow(
+                          color: activeFillColor.withValues(
+                              alpha: 0.15 * progress),
+                          blurRadius: 10 * progress,
+                          offset: const Offset(0, 3),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: CustomPaint(
+                  painter: _HoldFillPainter(
+                    progress: progress,
+                    origin: _touchPosition,
+                    fillColor: activeFillColor,
+                    glowColor: activeGlowColor,
+                  ),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _PribadiPageState.lightCard.withValues(
+                          alpha: progress > 0
+                              ? (1.0 - (0.35 * progress))
+                              : 1.0),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: progress > 0.05
+                            ? Color.lerp(
+                                _PribadiPageState.lightBorder,
+                                activeFillColor,
+                                progress)!
+                            : _PribadiPageState.lightBorder,
+                        width: 1.0 + (0.8 * progress),
+                      ),
+                    ),
+                    child: child,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+        child: Row(
+          children: [
+            // 1. Kolom Tanggal
+            SizedBox(
+              width: 70,
+              child: Text(
+                widget.dateFormatted,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: _PribadiPageState.textDark,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 6),
+
+            // 2. Kolom Kategori (Badge Kategori + Subtitle Judul Transaksi)
+            Expanded(
+              flex: 5,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _PribadiPageState.primaryBlue
+                          .withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      widget.displayKategori,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: _PribadiPageState.primaryBlue,
+                      ),
+                    ),
+                  ),
+                  if (widget.tx.title.isNotEmpty &&
+                      widget.tx.title != widget.displayKategori) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      widget.tx.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: _PribadiPageState.textMuted,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+
+            // 3. Kolom Jumlah
+            Expanded(
+              flex: 4,
+              child: Text(
+                '${widget.isPemasukan ? '+' : (widget.isPengeluaran ? '-' : '')}${RupiahFormatter.format(widget.tx.amount)}',
+                textAlign: TextAlign.right,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.bold,
+                  color: widget.amountColor,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // 4. Kolom Tipe (Debit / Kredit)
+            SizedBox(
+              width: 56,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2.5),
+                  decoration: BoxDecoration(
+                    color: widget.typeColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    widget.typeLabel,
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.bold,
+                      color: widget.typeColor,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==========================================
+// PAINTER EFEK FILL RADIAL & PROGRESS BAR SAAT DITEKAN TAHAN
+// ==========================================
+class _HoldFillPainter extends CustomPainter {
+  final double progress;
+  final Offset origin;
+  final Color fillColor;
+  final Color glowColor;
+
+  _HoldFillPainter({
+    required this.progress,
+    required this.origin,
+    required this.fillColor,
+    required this.glowColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress <= 0) return;
+
+    final center = (origin == Offset.zero)
+        ? Offset(size.width / 2, size.height / 2)
+        : origin;
+
+    // Radius maksimum mencakup seluruh dimensi kartu dari posisi tekan
+    final dx = math.max(center.dx, size.width - center.dx);
+    final dy = math.max(center.dy, size.height - center.dy);
+    final maxRadius = math.sqrt(dx * dx + dy * dy);
+    final currentRadius = maxRadius * progress;
+
+    // 1. Radial expansion gradient dari titik sentuh
+    final gradientPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          fillColor.withValues(alpha: 0.32 * progress),
+          glowColor.withValues(alpha: 0.20 * progress),
+          fillColor.withValues(alpha: 0.08 * progress),
+        ],
+        stops: const [0.0, 0.65, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: currentRadius));
+
+    canvas.drawCircle(center, currentRadius, gradientPaint);
+
+    // 2. Ambient fill tint background saat ditahan
+    final bgTintPaint = Paint()
+      ..color = fillColor.withValues(alpha: 0.10 * progress)
+      ..style = PaintingStyle.fill;
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgTintPaint);
+
+    // 3. Garis indikator progress di bagian bawah baris
+    const barHeight = 2.5;
+    final barWidth = size.width * progress;
+    final barPaint = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          fillColor,
+          glowColor,
+        ],
+      ).createShader(
+          Rect.fromLTWH(0, size.height - barHeight, size.width, barHeight))
+      ..style = PaintingStyle.fill;
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, size.height - barHeight, barWidth, barHeight),
+        const Radius.circular(2),
+      ),
+      barPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _HoldFillPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.origin != origin ||
+        oldDelegate.fillColor != fillColor ||
+        oldDelegate.glowColor != glowColor;
+  }
+}
+
+
 
 
