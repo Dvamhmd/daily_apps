@@ -1,5 +1,6 @@
 import 'package:daily_apps/models/model_tagihan.dart';
 import 'package:daily_apps/models/model_uangku.dart';
+import 'package:daily_apps/utils/pribadi_sync_service.dart';
 import 'package:daily_apps/utils/riwayat_service.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:flutter/material.dart';
@@ -397,6 +398,15 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     if (isDpEnabled && jumlah > 0 && newUangku.isCair) {
                       await _tambah10PersenKeTagihanDp(jumlah);
                     }
+                    if (jumlah > 0) {
+                      await PribadiSyncService.recordPemasukanFromUangku(
+                        nama: nama,
+                        nominal: jumlah,
+                        date: selectedTanggalCair,
+                        selectedMonth: widget.selectedMonth,
+                        keterangan: nama,
+                      );
+                    }
                     await RiwayatService.catatTambahUangku(
                       nama,
                       jumlah,
@@ -640,6 +650,15 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                         }
                       }
                     }
+                    await PribadiSyncService.syncEditUangku(
+                      namaLama: namaLama,
+                      jumlahLama: jumlahLama,
+                      namaBaru: nama,
+                      jumlahBaru: jumlahBaru,
+                      tanggalCairLama: itemLama.tanggalCair,
+                      tanggalCairBaru: selectedTanggalCair,
+                      selectedMonth: widget.selectedMonth,
+                    );
                     await RiwayatService.catatEditUangku(
                       namaLama: namaLama,
                       jumlahLama: jumlahLama,
@@ -819,6 +838,12 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                         if (isDpEnabled && item.isCair) {
                           await _tambah10PersenKeTagihanDp(nominal);
                         }
+                        await PribadiSyncService.recordPemasukanFromUangku(
+                          nama: item.nama,
+                          nominal: nominal,
+                          selectedMonth: widget.selectedMonth,
+                          keterangan: '${item.nama} (Debit)',
+                        );
                         await RiwayatService.catatEditUangku(
                           namaLama: namaLama,
                           jumlahLama: jumlahLama,
@@ -850,7 +875,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      onPressed: () {
+                      onPressed: () async {
                         final cleanText =
                             nominalCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
                         if (cleanText.isEmpty) {
@@ -885,8 +910,14 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                               item.copyWith(jumlah: jumlahBaru);
                         });
 
-                        _saveUangku();
-                        RiwayatService.catatEditUangku(
+                        await _saveUangku();
+                        await PribadiSyncService.recordPengeluaranFromUangku(
+                          nama: item.nama,
+                          nominal: nominal,
+                          selectedMonth: widget.selectedMonth,
+                          keterangan: '${item.nama} (Kredit)',
+                        );
+                        await RiwayatService.catatEditUangku(
                           namaLama: namaLama,
                           jumlahLama: jumlahLama,
                           namaBaru: namaLama,
@@ -894,7 +925,9 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                           bulan: widget.selectedMonth ?? DateTime.now(),
                         );
                         widget.onChanged();
-                        Navigator.pop(context);
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext);
+                        }
                       },
                       child: Text(
                         'Kredit',
@@ -979,7 +1012,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  onPressed: () {
+                  onPressed: () async {
                     final itemsToDelete = uangkuList
                         .asMap()
                         .entries
@@ -995,16 +1028,18 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                           .map((e) => e.value)
                           .toList();
                     });
-                    _saveUangku();
+                    await _saveUangku();
                     for (final item in itemsToDelete) {
-                      RiwayatService.catatHapusUangku(
+                      await RiwayatService.catatHapusUangku(
                         item.nama,
                         item.jumlah,
                         bulan: widget.selectedMonth ?? DateTime.now(),
                       );
                     }
                     widget.onChanged();
-                    Navigator.pop(context);
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                    }
                   },
                   child: Text(
                     'Konfirmasi Hapus',

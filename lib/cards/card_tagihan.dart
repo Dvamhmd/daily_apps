@@ -1,6 +1,7 @@
 import 'package:daily_apps/models/model_tagihan.dart';
 import 'package:daily_apps/models/model_uangku.dart';
 import 'package:daily_apps/utils/notification_service.dart';
+import 'package:daily_apps/utils/pribadi_sync_service.dart';
 import 'package:daily_apps/utils/riwayat_service.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:daily_apps/widgets/custom_toast.dart';
@@ -820,6 +821,13 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                     listUangku
                         .map((e) => jsonEncode(e.toJson()))
                         .toList(),
+                  );
+
+                  await PribadiSyncService.recordPengeluaranFromUangku(
+                    nama: chosenUangku.nama,
+                    nominal: nominalBayar,
+                    selectedMonth: widget.selectedMonth,
+                    keterangan: 'Bayar Tagihan: ${item.nama} (${chosenUangku.nama})',
                   );
 
                   // Kasus 1: Bayar Sebagian (nominalBayar < item.jumlah)

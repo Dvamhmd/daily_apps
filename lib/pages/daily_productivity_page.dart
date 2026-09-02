@@ -29,7 +29,26 @@ class ProductivityHelper {
     return ProductivityLevel.overload;
   }
 
-  static Color getCellColor(ProductivityLevel level) {
+  static Color getCellColor(ProductivityLevel level, {bool isDark = false}) {
+    if (isDark) {
+      switch (level) {
+        case ProductivityLevel.none:
+          return const Color(0xFF0F172A); // Slate gelap netral (0 task)
+        case ProductivityLevel.lazy:
+          return const Color(0xFF22C55E).withValues(alpha: 0.18); // Hijau opacity rendah / samar (1-2 task)
+        case ProductivityLevel.okay:
+          return const Color(0xFF22C55E).withValues(alpha: 0.42); // Hijau opacity sedang (3-5 task)
+        case ProductivityLevel.good:
+          return const Color(0xFF22C55E).withValues(alpha: 0.70); // Hijau opacity tinggi (6-8 task)
+        case ProductivityLevel.amazing:
+          return const Color(0xFF22C55E); // Hijau terang 100% opacity penuh (9-10 task)
+        case ProductivityLevel.king:
+          return const Color(0xFFD97706); // Emas / Amber (11-15 task)
+        case ProductivityLevel.overload:
+          return const Color(0xFF09090B); // Hitam pekat (>15 task)
+      }
+    }
+
     switch (level) {
       case ProductivityLevel.none:
         return const Color(0xFFF1F5F9); // Abu-abu netral lembut
@@ -48,7 +67,22 @@ class ProductivityHelper {
     }
   }
 
-  static Color getTextColor(ProductivityLevel level) {
+  static Color getTextColor(ProductivityLevel level, {bool isDark = false}) {
+    if (isDark) {
+      switch (level) {
+        case ProductivityLevel.none:
+          return const Color(0xFF64748B);
+        case ProductivityLevel.lazy:
+          return const Color(0xFFA7F3D0); // Mint muda lembut agar tetap terbaca jelas di opacity rendah
+        case ProductivityLevel.okay:
+        case ProductivityLevel.good:
+        case ProductivityLevel.amazing:
+        case ProductivityLevel.king:
+        case ProductivityLevel.overload:
+          return Colors.white;
+      }
+    }
+
     switch (level) {
       case ProductivityLevel.none:
         return const Color(0xFF64748B);
@@ -760,12 +794,8 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
     required bool isSelected,
   }) {
     final isDark = widget.isSeriousMode;
-    final cellColor = isDark && level == ProductivityLevel.none
-        ? const Color(0xFF0F172A)
-        : ProductivityHelper.getCellColor(level);
-    final textColor = isDark && level == ProductivityLevel.none
-        ? const Color(0xFF64748B)
-        : ProductivityHelper.getTextColor(level);
+    final cellColor = ProductivityHelper.getCellColor(level, isDark: isDark);
+    final textColor = ProductivityHelper.getTextColor(level, isDark: isDark);
     final isCrown = level == ProductivityLevel.king;
     final isOverload = level == ProductivityLevel.overload;
 
@@ -804,7 +834,15 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                             : (isCrown
                                 ? const Color(0xFFFDE68A)
                                 : (count > 0
-                                    ? const Color(0xFF16A34A).withValues(alpha: 0.3)
+                                    ? (isDark
+                                        ? const Color(0xFF22C55E).withValues(
+                                            alpha: level == ProductivityLevel.lazy
+                                                ? 0.25
+                                                : (level == ProductivityLevel.okay
+                                                    ? 0.45
+                                                    : 0.70),
+                                          )
+                                        : const Color(0xFF16A34A).withValues(alpha: 0.3))
                                     : (isDark
                                         ? const Color(0xFF334155)
                                         : const Color(0xFFE2E8F0)))))),

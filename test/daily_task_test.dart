@@ -1,5 +1,6 @@
 import 'package:daily_apps/models/model_daily_task.dart';
 import 'package:daily_apps/models/model_todo.dart';
+import 'package:daily_apps/pages/daily_productivity_page.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -123,4 +124,35 @@ void main() {
       expect(updatedSection.reminderIntervalMinutes, 120);
     });
   });
+
+  group('ProductivityHelper Heatmap Color Tests', () {
+    test('Serious Mode (Dark Mode): few tasks has lower opacity, more tasks has higher opacity', () {
+      // Lazy (1-2 tasks) -> Low opacity green (0.18)
+      final lazyColor = ProductivityHelper.getCellColor(ProductivityLevel.lazy, isDark: true);
+      // Okay (3-5 tasks) -> Medium opacity green (0.42)
+      final okayColor = ProductivityHelper.getCellColor(ProductivityLevel.okay, isDark: true);
+      // Good (6-8 tasks) -> High opacity green (0.70)
+      final goodColor = ProductivityHelper.getCellColor(ProductivityLevel.good, isDark: true);
+      // Amazing (9-10 tasks) -> Full opacity green (1.0)
+      final amazingColor = ProductivityHelper.getCellColor(ProductivityLevel.amazing, isDark: true);
+
+      // Verify opacity increases as task count increases
+      expect(lazyColor.opacity, closeTo(0.18, 0.01));
+      expect(okayColor.opacity, closeTo(0.42, 0.01));
+      expect(goodColor.opacity, closeTo(0.70, 0.01));
+      expect(amazingColor.opacity, closeTo(1.0, 0.01));
+
+      // Verify text colors in dark mode
+      expect(ProductivityHelper.getTextColor(ProductivityLevel.lazy, isDark: true).value, 0xFFA7F3D0);
+      expect(ProductivityHelper.getTextColor(ProductivityLevel.amazing, isDark: true).value, 0xFFFFFFFF);
+    });
+
+    test('Normal Mode (Light Mode): retains original light color palette', () {
+      expect(ProductivityHelper.getCellColor(ProductivityLevel.lazy, isDark: false).value, 0xFFDCFCE7);
+      expect(ProductivityHelper.getCellColor(ProductivityLevel.okay, isDark: false).value, 0xFF86EFAC);
+      expect(ProductivityHelper.getCellColor(ProductivityLevel.good, isDark: false).value, 0xFF22C55E);
+      expect(ProductivityHelper.getCellColor(ProductivityLevel.amazing, isDark: false).value, 0xFF15803D);
+    });
+  });
 }
+

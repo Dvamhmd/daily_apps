@@ -12,6 +12,10 @@ class NotificationService {
 
   static Future<void> initialize() async {
     if (_isInitialized) return;
+    if (kIsWeb) {
+      _isInitialized = true;
+      return;
+    }
 
     try {
       tz.initializeTimeZones();
@@ -45,6 +49,7 @@ class NotificationService {
 
   /// Request permission explicitly for Android 13+ and iOS
   static Future<void> requestPermissions() async {
+    if (kIsWeb) return;
     try {
       final androidPlatform = _notifications.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
