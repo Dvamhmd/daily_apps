@@ -110,5 +110,43 @@ void main() {
       expect(loaded.transactions.first.amount, 1500000);
       expect(loaded.posDanaList.first.balance, 1500000);
     });
+
+    test('Hapus pos Uangku otomatis menghapus data pemasukan terkait dari Keuangan Pribadi dan menyesuaikan saldo', () async {
+      final testMonth = DateTime(2026, 9, 1);
+      final monthKey = PribadiSyncService.getMonthKey(null, testMonth);
+
+      // Buat 2 pos dana Uangku
+      await PribadiSyncService.recordPemasukanFromUangku(
+        nama: 'Gaji',
+        nominal: 3000000,
+        selectedMonth: testMonth,
+        keterangan: 'Gaji',
+      );
+      await PribadiSyncService.recordPemasukanFromUangku(
+        nama: 'Freelance',
+        nominal: 1000000,
+        selectedMonth: testMonth,
+        keterangan: 'Freelance',
+      );
+
+      var loaded = await PribadiSyncService.loadPribadiData(monthKey);
+      expect(loaded.transactions.length, 2);
+      expect(loaded.posDanaList.first.balance, 4000000);
+
+      // Hapus pos dana Gaji dari Uangku
+      await PribadiSyncService.syncHapusUangku(
+        nama: 'Gaji',
+        jumlah: 3000000,
+        selectedMonth: testMonth,
+      );
+
+      loaded = await PribadiSyncService.loadPribadiData(monthKey);
+      // Transaksi Gaji hilang, hanya tersisa Freelance
+      expect(loaded.transactions.length, 1);
+      expect(loaded.transactions.first.title, 'Freelance');
+      expect(loaded.transactions.first.amount, 1000000);
+      expect(loaded.posDanaList.first.balance, 1000000);
+      expect(loaded.totalDanaPribadi, 1000000);
+    });
   });
 }

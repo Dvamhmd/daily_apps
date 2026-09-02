@@ -1030,6 +1030,12 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     });
                     await _saveUangku();
                     for (final item in itemsToDelete) {
+                      await PribadiSyncService.syncHapusUangku(
+                        nama: item.nama,
+                        jumlah: item.jumlah,
+                        tanggalCair: item.tanggalCair,
+                        selectedMonth: widget.selectedMonth,
+                      );
                       await RiwayatService.catatHapusUangku(
                         item.nama,
                         item.jumlah,

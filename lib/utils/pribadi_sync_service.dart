@@ -438,4 +438,64 @@ class PribadiSyncService {
       }
     }
   }
+
+  /// Sinkronisasi saat pos Uangku dihapus.
+  /// Menghapus data transaksi pemasukan yang berkaitan dari Keuangan Pribadi dan menyesuaikan saldo.
+  static Future<void> syncHapusUangku({
+    required String nama,
+    required int jumlah,
+    DateTime? tanggalCair,
+    DateTime? selectedMonth,
+  }) async {
+    final monthKey = getMonthKey(tanggalCair, selectedMonth);
+    final data = await loadPribadiData(monthKey);
+
+    // Cari seluruh transaksi pemasukan yang berasal dari pos Uangku ini
+    final matchingIndices = <int>[];
+    for (int i = 0; i < data.transactions.length; i++) {
+      final tx = data.transactions[i];
+      if (tx.isPemasukan &&
+          (tx.manualSource?.trim().toLowerCase() ==
+                  nama.trim().toLowerCase() ||
+              tx.title.trim().toLowerCase() == nama.trim().toLowerCase() ||
+              tx.note?.trim().toLowerCase() ==
+                  'pemasukan uangku: ${nama.trim().toLowerCase()}')) {
+        matchingIndices.add(i);
+      }
+    }
+
+    if (matchingIndices.isNotEmpty) {
+      // Hapus dari indeks terbesar ke terkecil agar tidak merusak urutan
+      for (final idx in matchingIndices.reversed) {
+        final tx = data.transactions[idx];
+        // Kurangi saldo Pos Dana target
+        if (data.posDanaList.isNotEmpty) {
+          final posIdx = data.posDanaList.indexWhere((p) =>
+              p.nama.trim().toLowerCase() ==
+                  tx.targetAccount?.trim().toLowerCase() ||
+              p.id.trim().toLowerCase() ==
+                  tx.targetAccount?.trim().toLowerCase());
+          if (posIdx != -1) {
+            data.posDanaList[posIdx].balance -= tx.amount;
+            if (data.posDanaList[posIdx].balance < 0) {
+              data.posDanaList[posIdx].balance = 0;
+            }
+          } else {
+            data.posDanaList.first.balance -= tx.amount;
+            if (data.posDanaList.first.balance < 0) {
+              data.posDanaList.first.balance = 0;
+            }
+          }
+        } else {
+          data.rekeningPribadi.balance -= tx.amount;
+          if (data.rekeningPribadi.balance < 0) {
+            data.rekeningPribadi.balance = 0;
+          }
+        }
+        data.transactions.removeAt(idx);
+      }
+
+      await savePribadiData(monthKey, data);
+    }
+  }
 }
