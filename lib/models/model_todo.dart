@@ -91,27 +91,31 @@ class TodoDateGroup {
 
   bool get isToday {
     final now = DateTime.now();
-    return date.year == now.year && date.month == now.month && date.day == now.day;
+    final localDate = date.toLocal();
+    return localDate.year == now.year && localDate.month == now.month && localDate.day == now.day;
   }
 
   bool get isTomorrow {
     final tomorrow = DateTime.now().add(const Duration(days: 1));
-    return date.year == tomorrow.year &&
-        date.month == tomorrow.month &&
-        date.day == tomorrow.day;
+    final localDate = date.toLocal();
+    return localDate.year == tomorrow.year &&
+        localDate.month == tomorrow.month &&
+        localDate.day == tomorrow.day;
   }
 
   bool get isYesterday {
     final yesterday = DateTime.now().subtract(const Duration(days: 1));
-    return date.year == yesterday.year &&
-        date.month == yesterday.month &&
-        date.day == yesterday.day;
+    final localDate = date.toLocal();
+    return localDate.year == yesterday.year &&
+        localDate.month == yesterday.month &&
+        localDate.day == yesterday.day;
   }
 
   bool get isPast {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final groupDate = DateTime(date.year, date.month, date.day);
+    final localDate = date.toLocal();
+    final groupDate = DateTime(localDate.year, localDate.month, localDate.day);
     return groupDate.isBefore(today);
   }
 

@@ -123,9 +123,9 @@ class TodoAlarmService {
 
         await _notifications.initialize(
           settings: initSettings,
-          onDidReceiveNotificationResponse: (NotificationResponse resp) {
+          onDidReceiveNotificationResponse: (NotificationResponse resp) async {
             if (resp.actionId == 'action_dismiss') {
-              stopAlarmSound();
+              await stopAlarmSound();
               return;
             }
             final payloadStr = resp.payload;
@@ -133,8 +133,10 @@ class TodoAlarmService {
               try {
                 final data = jsonDecode(payloadStr);
                 final payload = AlarmTriggerPayload.fromJson(data);
-                _handleAlarmTrigger(payload);
-                _onNotificationClickCallback?.call(payload);
+                final triggered = await _handleAlarmTrigger(payload);
+                if (triggered) {
+                  _onNotificationClickCallback?.call(payload);
+                }
               } catch (e) {
                 debugPrint('Error parsing notification payload: $e');
               }
@@ -155,9 +157,11 @@ class TodoAlarmService {
             if (payloadStr != null && payloadStr.isNotEmpty) {
               final data = jsonDecode(payloadStr);
               final payload = AlarmTriggerPayload.fromJson(data);
-              Future.delayed(const Duration(milliseconds: 600), () {
-                _handleAlarmTrigger(payload);
-                _onNotificationClickCallback?.call(payload);
+              Future.delayed(const Duration(milliseconds: 600), () async {
+                final triggered = await _handleAlarmTrigger(payload);
+                if (triggered) {
+                  _onNotificationClickCallback?.call(payload);
+                }
               });
             }
           }
@@ -203,8 +207,10 @@ class TodoAlarmService {
               try {
                 final data = jsonDecode(payloadStr);
                 final payload = AlarmTriggerPayload.fromJson(data);
-                await _handleAlarmTrigger(payload);
-                _onNotificationClickCallback?.call(payload);
+                final triggered = await _handleAlarmTrigger(payload);
+                if (triggered) {
+                  _onNotificationClickCallback?.call(payload);
+                }
               } catch (e) {
                 debugPrint('Error parsing native onAlarmTriggered payload: $e');
               }
@@ -222,9 +228,11 @@ class TodoAlarmService {
             debugPrint('🔔 [COLD START ALARM PAYLOAD DETECTED]');
             final data = jsonDecode(initialPayloadStr);
             final payload = AlarmTriggerPayload.fromJson(data);
-            Future.delayed(const Duration(milliseconds: 400), () {
-              _handleAlarmTrigger(payload);
-              _onNotificationClickCallback?.call(payload);
+            Future.delayed(const Duration(milliseconds: 400), () async {
+              final triggered = await _handleAlarmTrigger(payload);
+              if (triggered) {
+                _onNotificationClickCallback?.call(payload);
+              }
             });
           }
         } catch (e) {
@@ -443,8 +451,9 @@ class TodoAlarmService {
         }
 
         // Jika section tanggal sudah terlewati (sebelum hari ini), lewati alarm
+        final localGroupDate = group.date.toLocal();
         final groupDate =
-            DateTime(group.date.year, group.date.month, group.date.day);
+            DateTime(localGroupDate.year, localGroupDate.month, localGroupDate.day);
         if (groupDate.isBefore(today)) {
           continue;
         }
@@ -489,8 +498,9 @@ class TodoAlarmService {
       TodoDateGroup group, DateTime now) {
     final List<DateTime> times = [];
     final today = DateTime(now.year, now.month, now.day);
+    final localGroupDate = group.date.toLocal();
     final groupDate =
-        DateTime(group.date.year, group.date.month, group.date.day);
+        DateTime(localGroupDate.year, localGroupDate.month, localGroupDate.day);
 
     // Jika tanggal section sudah lewat dari hari ini, tidak ada jadwal waktu aktif lagi
     if (groupDate.isBefore(today)) {
@@ -542,26 +552,35 @@ class TodoAlarmService {
     return times;
   }
 
-  /// Trigger internal saat alarm aktif
-  static Future<void> _handleAlarmTrigger(AlarmTriggerPayload payload) async {
+  /// Trigger internal saat alarm aktif (mengembalikan false jika diabaikan)
+  static Future<bool> _handleAlarmTrigger(AlarmTriggerPayload payload) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+    final localPayloadDate = payload.date.toLocal();
     final payloadDate =
-        DateTime(payload.date.year, payload.date.month, payload.date.day);
+        DateTime(localPayloadDate.year, localPayloadDate.month, localPayloadDate.day);
 
     // Jika section tanggal sudah terlewati (sebelum hari ini), jangan bunyikan alarm
     if (payloadDate.isBefore(today)) {
       debugPrint(
           '⚠️ [ALARM IGNORED] Section date is in the past: ${payload.date}');
-      return;
+      await stopAlarmSound();
+      return false;
     }
 
     final group = _registeredGroups[payload.groupId];
     if (group != null) {
-      if (!group.reminderEnabled || group.isArchived || group.isAllCompleted) {
+      final localGroupDate = group.date.toLocal();
+      final groupDate =
+          DateTime(localGroupDate.year, localGroupDate.month, localGroupDate.day);
+      if (!group.reminderEnabled ||
+          group.isArchived ||
+          group.isAllCompleted ||
+          groupDate.isBefore(today)) {
         debugPrint(
-            '⚠️ [ALARM IGNORED] Group ${group.id} is archived, all completed, or reminder disabled');
-        return;
+            '⚠️ [ALARM IGNORED] Group ${group.id} is archived, all completed, past date, or reminder disabled');
+        await stopAlarmSound();
+        return false;
       }
     }
 
@@ -573,6 +592,7 @@ class TodoAlarmService {
       defaultSound: payload.defaultSound,
       customPath: payload.customSoundPath,
     );
+    return true;
   }
 
   /// Mainkan suara alarm secara looping (maks 5 menit)
@@ -766,14 +786,16 @@ class TodoAlarmService {
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+    final localGroupDate = group.date.toLocal();
     final groupDate =
-        DateTime(group.date.year, group.date.month, group.date.day);
+        DateTime(localGroupDate.year, localGroupDate.month, localGroupDate.day);
 
-    // Jika reminder dimatikan, semua tugas sudah selesai, atau tanggal section sudah terlewati, jangan jadwalkan
+    // Jika reminder dimatikan, semua tugas sudah selesai, atau tanggal section sudah terlewati, batalkan dan jangan jadwalkan
     if (!group.reminderEnabled ||
         group.isArchived ||
         group.isAllCompleted ||
         groupDate.isBefore(today)) {
+      await cancelGroupAlarm(group.id, unregister: false);
       return;
     }
 
@@ -882,12 +904,16 @@ class TodoAlarmService {
 
       for (final g in groups) {
         _registeredGroups[g.id] = g;
-        final groupDate = DateTime(g.date.year, g.date.month, g.date.day);
+        final localGroupDate = g.date.toLocal();
+        final groupDate = DateTime(localGroupDate.year, localGroupDate.month, localGroupDate.day);
         if (g.reminderEnabled &&
             !g.isArchived &&
             !g.isAllCompleted &&
             !groupDate.isBefore(today)) {
           await scheduleGroupAlarm(g);
+        } else {
+          // Batalkan alarm untuk group yang sudah lewat / selesai / nonaktif
+          await cancelGroupAlarm(g.id, unregister: false);
         }
       }
     } catch (e) {

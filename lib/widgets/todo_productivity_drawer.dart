@@ -273,22 +273,6 @@ class _TodoProductivityDrawerState extends State<TodoProductivityDrawer> {
                             });
                           },
                         ),
-
-                        // Serious Mode Menu 5: Akun / Ganti Pemain
-                        _buildMenuItem(
-                          context: context,
-                          icon: Icons.manage_accounts_rounded,
-                          iconColor: const Color(0xFFA855F7),
-                          title: 'Akun Pemain',
-                          subtitle:
-                              'Ganti akun, buat pemain baru atau lihat profil',
-                          onTap: () async {
-                            Navigator.pop(context);
-                            await SeriousModeAuthDialog.show(context);
-                            widget.onDataChanged?.call();
-                            _loadAllTodoData();
-                          },
-                        ),
                       ] else ...[
                         // Normal Mode Menu 1: Mode Serius
                         _buildMenuItem(

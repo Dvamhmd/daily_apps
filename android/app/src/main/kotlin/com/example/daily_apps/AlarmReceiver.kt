@@ -10,12 +10,45 @@ import android.os.Build
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 
+import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val payload = intent.getStringExtra("payload") ?: "{}"
         val title = intent.getStringExtra("title") ?: "🚨 Tugasmu belum selesai nih"
         val body = intent.getStringExtra("body") ?: "Ada tugas to-do list yang belum selesai!"
         val notificationId = intent.getIntExtra("notificationId", 88888)
+
+        // 0. Verifikasi apakah tanggal to-do list pada payload sudah terlewat (sebelum hari ini)
+        try {
+            if (payload.isNotEmpty() && payload != "{}") {
+                val json = JSONObject(payload)
+                val dateStr = json.optString("date", "")
+                if (dateStr.isNotEmpty()) {
+                    val todayCal = Calendar.getInstance().apply {
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }
+                    val datePrefix = if (dateStr.length >= 10) dateStr.substring(0, 10) else dateStr
+                    val parsedDate = try {
+                        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(datePrefix)
+                    } catch (e: Exception) {
+                        null
+                    }
+                    if (parsedDate != null && parsedDate.before(todayCal.time)) {
+                        android.util.Log.w("AlarmReceiver", "⚠️ [ALARM IGNORED NATIVE] Section date is in the past: $dateStr")
+                        return
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         // 1. Bangunkan sistem dan nyalakan layar dengan WakeLock
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
