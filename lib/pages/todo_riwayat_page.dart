@@ -60,6 +60,12 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
         _allGroups = decoded
             .map((item) => TodoDateGroup.fromJson(item as Map<String, dynamic>))
             .toList();
+        _collapsedGroupIds.clear();
+        for (final group in _allGroups) {
+          if (group.isCollapsed) {
+            _collapsedGroupIds.add(group.id);
+          }
+        }
       }
     } catch (e) {
       debugPrint('Error loading history todos: $e');
@@ -108,7 +114,16 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
     return _archivedGroups.fold(0, (sum, g) => sum + g.completedCount);
   }
 
-  bool _isGroupCollapsed(String id) => _collapsedGroupIds.contains(id);
+  bool _isGroupCollapsed(String id) {
+    final group = _allGroups.firstWhere(
+      (g) => g.id == id,
+      orElse: () => TodoDateGroup(id: '', date: DateTime.now()),
+    );
+    if (group.id.isNotEmpty) {
+      return group.isCollapsed;
+    }
+    return _collapsedGroupIds.contains(id);
+  }
 
   void _toggleGroupCollapse(String id) {
     HapticFeedback.selectionClick();
@@ -118,7 +133,14 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
       } else {
         _collapsedGroupIds.add(id);
       }
+      for (final g in _allGroups) {
+        if (g.id == id) {
+          g.isCollapsed = _collapsedGroupIds.contains(id);
+          break;
+        }
+      }
     });
+    _saveData();
   }
 
   /// Mengembalikan section dari arsip ke daftar aktif

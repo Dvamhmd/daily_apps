@@ -212,6 +212,13 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
         _dateGroups = [];
       }
 
+      _collapsedGroupIds.clear();
+      for (final group in _dateGroups) {
+        if (group.isCollapsed) {
+          _collapsedGroupIds.add(group.id);
+        }
+      }
+
       // Jika _dateGroups kosong pada Mode Serius (misal HP baru yang baru login),
       // coba ambil daftar tugas dari cloud spreadsheet
       if (_isSeriousMode && _seriousUser != null && _dateGroups.isEmpty) {
@@ -562,7 +569,16 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
     return _completedTasks / _totalTasks;
   }
 
-  bool _isGroupCollapsed(String id) => _collapsedGroupIds.contains(id);
+  bool _isGroupCollapsed(String id) {
+    final group = _dateGroups.firstWhere(
+      (g) => g.id == id,
+      orElse: () => TodoDateGroup(id: '', date: DateTime.now()),
+    );
+    if (group.id.isNotEmpty) {
+      return group.isCollapsed;
+    }
+    return _collapsedGroupIds.contains(id);
+  }
 
   void _toggleGroupCollapse(String id) {
     HapticFeedback.selectionClick();
@@ -572,7 +588,14 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
       } else {
         _collapsedGroupIds.add(id);
       }
+      for (final g in _dateGroups) {
+        if (g.id == id) {
+          g.isCollapsed = _collapsedGroupIds.contains(id);
+          break;
+        }
+      }
     });
+    _saveTodoData();
   }
 
   void _archiveGroup(TodoDateGroup group) {

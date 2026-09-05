@@ -49,6 +49,7 @@ class TodoDateGroup {
   DateTime date;
   List<TodoItem> items;
   bool isArchived;
+  bool isCollapsed;
 
   // Reminder / Alarm configuration
   bool reminderEnabled;
@@ -67,6 +68,7 @@ class TodoDateGroup {
     required this.date,
     List<TodoItem>? items,
     this.isArchived = false,
+    this.isCollapsed = false,
     this.reminderEnabled = false,
     this.reminderType = 'specific',
     this.reminderIntervalMinutes = 60,
@@ -192,6 +194,7 @@ class TodoDateGroup {
         'date': date.toIso8601String(),
         'items': items.map((item) => item.toJson()).toList(),
         'isArchived': isArchived,
+        'isCollapsed': isCollapsed,
         'reminderEnabled': reminderEnabled,
         'reminderType': reminderType,
         'reminderIntervalMinutes': reminderIntervalMinutes,
@@ -228,6 +231,7 @@ class TodoDateGroup {
       date: rawDate,
       items: parsedItems,
       isArchived: json['isArchived'] as bool? ?? false,
+      isCollapsed: json['isCollapsed'] as bool? ?? false,
       reminderEnabled: json['reminderEnabled'] as bool? ?? false,
       reminderType: json['reminderType'] as String? ?? 'specific',
       reminderIntervalMinutes: json['reminderIntervalMinutes'] as int? ?? 60,
