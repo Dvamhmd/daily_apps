@@ -43,6 +43,18 @@ class _TodoUndoAction {
   });
 }
 
+class TodoDragPayload {
+  final String sourceGroupId;
+  final List<TodoItem> items;
+  final int? sourceIndex;
+
+  TodoDragPayload({
+    required this.sourceGroupId,
+    required this.items,
+    this.sourceIndex,
+  });
+}
+
 class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
   static const Color primaryTerracotta = Color(0xFFBA5A3A);
   static const Color darkTerracotta = Color(0xFF8C3E26);
@@ -85,6 +97,14 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
   AnimationController? _undoController;
   _TodoUndoAction? _activeUndo;
 
+  // State untuk Seleksi Banyak (Multi-Select) & Drag-and-Drop Item (Mode Biasa)
+  final Set<String> _selectedTaskIds = {};
+  String? _multiSelectGroupId;
+  bool _isDraggingTasks = false;
+  String? _draggingTaskId;
+  final ValueNotifier<Set<String>> _activeDraggingTaskIdsNotifier =
+      ValueNotifier<Set<String>>({});
+
   @override
   void initState() {
     super.initState();
@@ -96,6 +116,7 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
   void dispose() {
     TodoAlarmService.activeAlarmNotifier.removeListener(_onActiveAlarmChanged);
     _undoController?.dispose();
+    _activeDraggingTaskIdsNotifier.dispose();
     super.dispose();
   }
 
@@ -1987,6 +2008,651 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
     );
   }
 
+  // --- HELPER METODE DRAG & DROP, PINDAH SECTION & GROUPING (MODE BIASA) ---
+
+  void _toggleTaskSelection(String groupId, String taskId) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (_multiSelectGroupId != groupId) {
+        _selectedTaskIds.clear();
+        _multiSelectGroupId = groupId;
+      }
+      if (_selectedTaskIds.contains(taskId)) {
+        _selectedTaskIds.remove(taskId);
+        if (_selectedTaskIds.isEmpty) {
+          _multiSelectGroupId = null;
+        }
+      } else {
+        _selectedTaskIds.add(taskId);
+      }
+    });
+  }
+
+  void _moveTasksToSection(
+    TodoDateGroup sourceGroup,
+    TodoDateGroup targetGroup,
+    List<TodoItem> tasksToMove, {
+    int? targetIndex,
+  }) {
+    if (_isSeriousMode) {
+      CustomToast.showError(
+        context,
+        title: 'Tugas Terkunci',
+        subtitle: 'Di Mode Serius, tugas tidak dapat dipindahkan ke section lain! 🚫',
+      );
+      return;
+    }
+
+    if (tasksToMove.isEmpty) return;
+    if (sourceGroup.id == targetGroup.id) return;
+
+    final List<TodoItem> movedTasks = List.from(tasksToMove);
+    final Map<String, int> originalIndices = {};
+    for (final task in movedTasks) {
+      originalIndices[task.id] = sourceGroup.items.indexOf(task);
+    }
+
+    HapticFeedback.mediumImpact();
+    setState(() {
+      sourceGroup.items.removeWhere((item) => movedTasks.any((t) => t.id == item.id));
+      if (targetIndex != null && targetIndex >= 0 && targetIndex <= targetGroup.items.length) {
+        targetGroup.items.insertAll(targetIndex, movedTasks);
+      } else {
+        targetGroup.items.addAll(movedTasks);
+      }
+      _selectedTaskIds.clear();
+      _multiSelectGroupId = null;
+    });
+
+    if (sourceGroup.reminderEnabled) {
+      if (sourceGroup.isAllCompleted || sourceGroup.items.isEmpty) {
+        TodoAlarmService.cancelGroupAlarm(sourceGroup.id);
+      } else {
+        TodoAlarmService.scheduleGroupAlarm(sourceGroup);
+      }
+    }
+    if (targetGroup.reminderEnabled) {
+      TodoAlarmService.scheduleGroupAlarm(targetGroup);
+    }
+
+    _saveTodoData();
+
+    _showTopUndoBanner(
+      title: 'Tugas Dipindahkan',
+      subtitle: movedTasks.length == 1
+          ? '${movedTasks.first.title} ➔ ${targetGroup.relativeDateLabel} (${targetGroup.formattedDateShort})'
+          : '${movedTasks.length} tugas ➔ ${targetGroup.relativeDateLabel} (${targetGroup.formattedDateShort})',
+      onUndo: () {
+        setState(() {
+          targetGroup.items.removeWhere((item) => movedTasks.any((t) => t.id == item.id));
+          for (final task in movedTasks) {
+            final origIdx = originalIndices[task.id] ?? sourceGroup.items.length;
+            final insertIdx = origIdx.clamp(0, sourceGroup.items.length);
+            sourceGroup.items.insert(insertIdx, task);
+          }
+        });
+        if (sourceGroup.reminderEnabled) {
+          TodoAlarmService.scheduleGroupAlarm(sourceGroup);
+        }
+        if (targetGroup.reminderEnabled) {
+          if (targetGroup.isAllCompleted || targetGroup.items.isEmpty) {
+            TodoAlarmService.cancelGroupAlarm(targetGroup.id);
+          } else {
+            TodoAlarmService.scheduleGroupAlarm(targetGroup);
+          }
+        }
+        _saveTodoData();
+      },
+    );
+  }
+
+  void _reorderTasksWithinSection(
+    TodoDateGroup group,
+    List<TodoItem> itemsToReorder,
+    int targetIndex,
+  ) {
+    if (_isSeriousMode || itemsToReorder.isEmpty) return;
+    final originalItems = List<TodoItem>.from(group.items);
+
+    HapticFeedback.selectionClick();
+    setState(() {
+      TodoItem? targetItem;
+      if (targetIndex >= 0 && targetIndex < group.items.length) {
+        targetItem = group.items[targetIndex];
+      }
+      group.items.removeWhere((i) => itemsToReorder.any((t) => t.id == i.id));
+      int newInsertIndex = targetItem != null ? group.items.indexOf(targetItem) : group.items.length;
+      if (newInsertIndex < 0) newInsertIndex = group.items.length;
+      group.items.insertAll(newInsertIndex, itemsToReorder);
+      _selectedTaskIds.clear();
+      _multiSelectGroupId = null;
+    });
+    _saveTodoData();
+  }
+
+  void _showMoveTasksModal(TodoDateGroup sourceGroup, List<TodoItem> tasksToMove) {
+    if (_isSeriousMode) return;
+    final otherGroups = _dateGroups.where((g) => g.id != sourceGroup.id && !g.isArchived).toList();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Material(
+          color: _isSeriousMode ? seriousCardBg : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          clipBehavior: Clip.antiAlias,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: primaryTerracotta.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.drive_file_move_rounded, color: primaryTerracotta, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Pindahkan ${tasksToMove.length} Tugas',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: _isSeriousMode ? Colors.white : const Color(0xFF1E293B),
+                          ),
+                        ),
+                        Text(
+                          'Dari ${sourceGroup.formattedDateShort} ke section tanggal lain:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _isSeriousMode ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (otherGroups.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Text(
+                      'Tidak ada section tanggal lain yang tersedia',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                        color: _isSeriousMode ? const Color(0xFF94A3B8) : Colors.grey[500],
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.45,
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: otherGroups.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (context, idx) {
+                      final target = otherGroups[idx];
+                      return InkWell(
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _moveTasksToSection(sourceGroup, target, tasksToMove);
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: target.isToday
+                                ? primaryTerracotta.withValues(alpha: 0.08)
+                                : (_isSeriousMode
+                                    ? const Color(0xFF0F172A)
+                                    : const Color(0xFFF8FAFC)),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: target.isToday
+                                  ? primaryTerracotta.withValues(alpha: 0.4)
+                                  : (_isSeriousMode ? seriousBorder : const Color(0xFFE2E8F0)),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_today_rounded,
+                                size: 16,
+                                color: target.isToday ? primaryTerracotta : const Color(0xFF64748B),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  target.formattedFullDate,
+                                  style: TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: target.isToday ? FontWeight.bold : FontWeight.w500,
+                                    color: target.isToday
+                                        ? primaryTerracotta
+                                        : (_isSeriousMode ? Colors.white : const Color(0xFF1E293B)),
+                                  ),
+                                ),
+                              ),
+                              if (target.isToday)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: primaryTerracotta,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'Hari Ini',
+                                    style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              const SizedBox(width: 8),
+                              const Icon(Icons.arrow_forward_ios_rounded, size: 13, color: Color(0xFF94A3B8)),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    },
+    );
+  }
+
+
+
+  Widget _buildMultiSelectBottomBar() {
+    if (_isSeriousMode || _selectedTaskIds.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final selectedCount = _selectedTaskIds.length;
+    TodoDateGroup? activeGroup;
+    for (final g in _dateGroups) {
+      if (g.items.any((i) => _selectedTaskIds.contains(i.id))) {
+        activeGroup = g;
+        break;
+      }
+    }
+
+    final selectedTasks = activeGroup?.items
+        .where((i) => _selectedTaskIds.contains(i.id))
+        .toList() ?? [];
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 580),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.35),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
+              ),
+            ],
+            border: Border.all(
+              color: primaryTerracotta.withValues(alpha: 0.5),
+              width: 1.2,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: primaryTerracotta,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$selectedCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Tugas Dipilih',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      'Tahan & seret untuk atur / pindahkan',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 10.5,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              if (activeGroup != null) ...[
+                IconButton(
+                  onPressed: () => _showMoveTasksModal(
+                    activeGroup!,
+                    selectedTasks,
+                  ),
+                  tooltip: 'Pindahkan ke Section Lain',
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.drive_file_move_rounded, color: Colors.white, size: 20),
+                ),
+                IconButton(
+                  onPressed: () {
+                    for (final task in selectedTasks) {
+                      task.isCompleted = true;
+                    }
+                    _selectedTaskIds.clear();
+                    _saveTodoData();
+                    setState(() {});
+                  },
+                  tooltip: 'Tandai Selesai',
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.done_all_rounded, color: Color(0xFF10B981), size: 20),
+                ),
+                IconButton(
+                  onPressed: () {
+                    final itemsToDelete = List<TodoItem>.from(selectedTasks);
+                    final group = activeGroup!;
+                    setState(() {
+                      group.items.removeWhere((i) => _selectedTaskIds.contains(i.id));
+                      _selectedTaskIds.clear();
+                    });
+                    _saveTodoData();
+                    _showTopUndoBanner(
+                      title: 'Tugas Dihapus',
+                      subtitle: '${itemsToDelete.length} tugas dihapus',
+                      onUndo: () {
+                        setState(() {
+                          group.items.addAll(itemsToDelete);
+                        });
+                        _saveTodoData();
+                      },
+                    );
+                  },
+                  tooltip: 'Hapus Tugas',
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20),
+                ),
+              ],
+              IconButton(
+                onPressed: () {
+                  setState(() {
+                    _selectedTaskIds.clear();
+                    _multiSelectGroupId = null;
+                  });
+                },
+                tooltip: 'Batal',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 18),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBatchDragFeedback(
+    List<TodoItem> tasks, {
+    bool isProxy = false,
+    TodoItem? singleFallback,
+  }) {
+    final effectiveTasks = tasks.isNotEmpty
+        ? tasks
+        : (singleFallback != null ? [singleFallback] : <TodoItem>[]);
+
+    if (effectiveTasks.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Material(
+      elevation: 8,
+      color: Colors.transparent,
+      shadowColor: primaryTerracotta.withValues(alpha: 0.35),
+      child: Container(
+        decoration: BoxDecoration(
+          color: _isSeriousMode ? seriousCardBg : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: primaryTerracotta.withValues(alpha: 0.35),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
+          border: Border.all(color: primaryTerracotta, width: 1.8),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: IntrinsicWidth(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: effectiveTasks.asMap().entries.map((entry) {
+                final idx = entry.key;
+                final t = entry.value;
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: idx > 0
+                      ? BoxDecoration(
+                          border: Border(
+                            top: BorderSide(
+                              color: _isSeriousMode
+                                  ? const Color(0xFF334155)
+                                  : Colors.grey.withValues(alpha: 0.2),
+                              width: 1,
+                            ),
+                          ),
+                        )
+                      : null,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.drag_indicator_rounded,
+                        color: primaryTerracotta,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          t.title,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: _isSeriousMode
+                                ? Colors.white
+                                : const Color(0xFF1E293B),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDraggableTaskTile(TodoDateGroup group, TodoItem item, {int index = 0}) {
+    if (_isSeriousMode) {
+      return _buildTaskItemTile(group, item, index: index);
+    }
+
+    final isSelected = _selectedTaskIds.contains(item.id);
+    final tasksBeingDragged = isSelected
+        ? group.items.where((i) => _selectedTaskIds.contains(i.id)).toList()
+        : [item];
+
+    return ValueListenableBuilder<Set<String>>(
+      valueListenable: _activeDraggingTaskIdsNotifier,
+      builder: (context, activeDraggedIds, _) {
+        final isItemBeingDragged = activeDraggedIds.contains(item.id) ||
+            (_isDraggingTasks && (isSelected || _draggingTaskId == item.id));
+
+        return DragTarget<TodoDragPayload>(
+          onWillAcceptWithDetails: (details) => true,
+          onAcceptWithDetails: (details) {
+            final payload = details.data;
+            _activeDraggingTaskIdsNotifier.value = {};
+            if (payload.sourceGroupId == group.id) {
+              final targetIndex = group.items.indexOf(item);
+              _reorderTasksWithinSection(group, payload.items, targetIndex);
+            } else {
+              final sourceGroup = _dateGroups.firstWhere(
+                (g) => g.id == payload.sourceGroupId,
+                orElse: () => group,
+              );
+              final targetIndex = group.items.indexOf(item);
+              _moveTasksToSection(sourceGroup, group, payload.items, targetIndex: targetIndex);
+            }
+          },
+          builder: (context, candidateData, rejectedData) {
+            final isHovering = candidateData.isNotEmpty;
+            final childTile = _buildTaskItemTile(
+              group,
+              item,
+              index: index,
+              isSelected: isSelected,
+              onSelectionToggled: () {
+                _toggleTaskSelection(group.id, item.id);
+              },
+            );
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isHovering)
+                  Container(
+                    height: 3,
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: primaryTerracotta,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                LongPressDraggable<TodoDragPayload>(
+                  data: TodoDragPayload(
+                    sourceGroupId: group.id,
+                    items: tasksBeingDragged,
+                    sourceIndex: group.items.indexOf(item),
+                  ),
+                  onDragStarted: () {
+                    HapticFeedback.mediumImpact();
+                    setState(() {
+                      _isDraggingTasks = true;
+                      _draggingTaskId = item.id;
+                      if (!_selectedTaskIds.contains(item.id)) {
+                        _multiSelectGroupId = group.id;
+                        _selectedTaskIds.add(item.id);
+                      }
+                    });
+                    _activeDraggingTaskIdsNotifier.value = isSelected
+                        ? Set<String>.from(_selectedTaskIds)
+                        : {item.id};
+                  },
+                  onDragEnd: (_) {
+                    setState(() {
+                      _isDraggingTasks = false;
+                      _draggingTaskId = null;
+                    });
+                    _activeDraggingTaskIdsNotifier.value = {};
+                  },
+                  onDraggableCanceled: (_, __) {
+                    setState(() {
+                      _isDraggingTasks = false;
+                      _draggingTaskId = null;
+                    });
+                    _activeDraggingTaskIdsNotifier.value = {};
+                  },
+                  feedback: Material(
+                    color: Colors.transparent,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 340),
+                      child: _buildBatchDragFeedback(
+                        tasksBeingDragged,
+                        isProxy: false,
+                        singleFallback: item,
+                      ),
+                    ),
+                  ),
+                  childWhenDragging: Visibility(
+                    visible: false,
+                    maintainSize: true,
+                    maintainAnimation: true,
+                    maintainState: true,
+                    child: childTile,
+                  ),
+                  child: isItemBeingDragged
+                      ? Visibility(
+                          visible: false,
+                          maintainSize: true,
+                          maintainAnimation: true,
+                          maintainState: true,
+                          child: childTile,
+                        )
+                      : childTile,
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _confirmDeleteGroup(TodoDateGroup group) async {
     if (_isSeriousMode) {
       CustomToast.showError(
@@ -2396,9 +3062,8 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                               },
                               itemBuilder: (context, index) {
                                 final group = filtered[index];
-                                return ReorderableDelayedDragStartListener(
+                                return KeyedSubtree(
                                   key: ValueKey(group.id),
-                                  index: index,
                                   child: _buildDateGroupSection(group, index),
                                 );
                               },
@@ -2432,6 +3097,13 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                         child: _buildTopUndoBanner(),
                       ),
                     ),
+                  ),
+                if (!_isSeriousMode && _selectedTaskIds.isNotEmpty)
+                  Positioned(
+                    bottom: 24,
+                    left: 16,
+                    right: 16,
+                    child: _buildMultiSelectBottomBar(),
                   ),
               ],
             ),
@@ -3034,39 +3706,90 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
       return true;
     }).toList();
 
-    return Material(
-      color: Colors.transparent,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          color: _isSeriousMode ? seriousCardBg : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: _isSeriousMode
-                ? (group.isToday
-                    ? seriousGold.withValues(alpha: 0.5)
-                    : const Color(0xFF334155))
-                : (group.isToday
-                    ? primaryTerracotta.withValues(alpha: 0.4)
-                    : Colors.black.withValues(alpha: 0.06)),
-            width: group.isToday ? 1.6 : 1.0,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: _isSeriousMode
-                  ? Colors.black.withValues(alpha: 0.25)
-                  : Colors.black.withValues(alpha: 0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+    return DragTarget<TodoDragPayload>(
+      onWillAcceptWithDetails: (details) {
+        if (_isSeriousMode) return false;
+        return true;
+      },
+      onAcceptWithDetails: (details) {
+        final payload = details.data;
+        if (payload.sourceGroupId != group.id) {
+          final sourceGroup = _dateGroups.firstWhere(
+            (g) => g.id == payload.sourceGroupId,
+            orElse: () => group,
+          );
+          _moveTasksToSection(sourceGroup, group, payload.items);
+        }
+      },
+      builder: (context, candidateData, rejectedData) {
+        final isDropHover = candidateData.any((p) => p != null && p.sourceGroupId != group.id);
+
+        return Material(
+          color: Colors.transparent,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: _isSeriousMode ? seriousCardBg : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isDropHover
+                    ? primaryTerracotta
+                    : (_isSeriousMode
+                        ? (group.isToday
+                            ? seriousGold.withValues(alpha: 0.5)
+                            : const Color(0xFF334155))
+                        : (group.isToday
+                            ? primaryTerracotta.withValues(alpha: 0.4)
+                            : Colors.black.withValues(alpha: 0.06))),
+                width: isDropHover ? 2.2 : (group.isToday ? 1.6 : 1.0),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: isDropHover
+                      ? primaryTerracotta.withValues(alpha: 0.35)
+                      : (_isSeriousMode
+                          ? Colors.black.withValues(alpha: 0.25)
+                          : Colors.black.withValues(alpha: 0.04)),
+                  blurRadius: isDropHover ? 14 : 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header Tanggal Section (Tappable untuk Expand / Collapse)
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isDropHover && candidateData.isNotEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: primaryTerracotta.withValues(alpha: 0.15),
+                        border: Border(
+                          bottom: BorderSide(
+                            color: primaryTerracotta.withValues(alpha: 0.3),
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.move_to_inbox_rounded, color: primaryTerracotta, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Lepas di sini untuk memindahkan ${candidateData.first?.items.length ?? 1} tugas ke section ini',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: primaryTerracotta,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  // Header Tanggal Section (Tappable untuk Expand / Collapse)
               Container(
                 decoration: BoxDecoration(
                   color: _isSeriousMode
@@ -3769,23 +4492,116 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                               ),
                             )
                           else
-                            Column(
-                              children: [
-                                for (int idx = 0;
-                                    idx < itemsToShow.length;
-                                    idx++) ...[
-                                  _buildTaskItemTile(group, itemsToShow[idx]),
-                                  if (idx < itemsToShow.length - 1)
-                                    Divider(
-                                      height: 1,
-                                      thickness: 0.6,
-                                      color: _isSeriousMode
-                                          ? const Color(0xFF334155)
-                                          : Colors.grey.withValues(alpha: 0.12),
-                                      indent: 44,
-                                    ),
-                                ],
-                              ],
+                            ReorderableListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              buildDefaultDragHandles: false,
+                              itemCount: itemsToShow.length,
+                              proxyDecorator: (child, index, animation) {
+                                final draggedItem = index < itemsToShow.length ? itemsToShow[index] : null;
+                                final isBatch = draggedItem != null &&
+                                    _selectedTaskIds.contains(draggedItem.id) &&
+                                    _selectedTaskIds.length > 1;
+
+                                final selectedTasks = isBatch
+                                    ? group.items.where((i) => _selectedTaskIds.contains(i.id)).toList()
+                                    : (draggedItem != null ? [draggedItem] : <TodoItem>[]);
+
+                                return AnimatedBuilder(
+                                  animation: animation,
+                                  builder: (context, _) {
+                                    if (isBatch && selectedTasks.isNotEmpty) {
+                                      return _buildBatchDragFeedback(
+                                        selectedTasks,
+                                        isProxy: true,
+                                        singleFallback: draggedItem,
+                                      );
+                                    }
+
+                                    return Material(
+                                      elevation: 6,
+                                      color: _isSeriousMode ? seriousCardBg : Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      shadowColor: primaryTerracotta.withValues(alpha: 0.3),
+                                      child: child,
+                                    );
+                                  },
+                                );
+                              },
+                              onReorderItem: (oldIndex, newIndex) {
+                                _activeDraggingTaskIdsNotifier.value = {};
+                                if (_isSeriousMode) return;
+                                if (oldIndex == newIndex) return;
+
+                                final itemToMove = itemsToShow[oldIndex];
+                                final targetItem = itemsToShow[newIndex];
+
+                                final isMovingSelectedBatch = _selectedTaskIds.contains(itemToMove.id) &&
+                                    _selectedTaskIds.length > 1;
+
+                                final List<TodoItem> itemsToReorder = isMovingSelectedBatch
+                                    ? group.items
+                                        .where((i) => _selectedTaskIds.contains(i.id))
+                                        .toList()
+                                    : [itemToMove];
+
+                                final actualOldIndex = group.items.indexOf(itemToMove);
+                                if (actualOldIndex == -1) return;
+
+                                HapticFeedback.selectionClick();
+                                setState(() {
+                                  final isTargetInBatch =
+                                      itemsToReorder.any((i) => i.id == targetItem.id);
+
+                                  group.items.removeWhere(
+                                      (i) => itemsToReorder.any((t) => t.id == i.id));
+
+                                  int insertIndex;
+                                  if (isTargetInBatch) {
+                                    insertIndex = actualOldIndex.clamp(0, group.items.length);
+                                  } else {
+                                    final targetActualIndex = group.items.indexOf(targetItem);
+                                    if (targetActualIndex == -1) {
+                                      insertIndex = group.items.length;
+                                    } else if (newIndex > oldIndex) {
+                                      insertIndex = targetActualIndex + 1;
+                                    } else {
+                                      insertIndex = targetActualIndex;
+                                    }
+                                  }
+
+                                  if (insertIndex < 0) insertIndex = 0;
+                                  if (insertIndex > group.items.length) {
+                                    insertIndex = group.items.length;
+                                  }
+
+                                  group.items.insertAll(insertIndex, itemsToReorder);
+                                  _selectedTaskIds.clear();
+                                  _multiSelectGroupId = null;
+                                });
+                                _saveTodoData();
+                              },
+                              itemBuilder: (context, idx) {
+                                final item = itemsToShow[idx];
+                                return KeyedSubtree(
+                                  key: ValueKey('task_${item.id}'),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      _buildDraggableTaskTile(group, item, index: idx),
+                                      if (idx < itemsToShow.length - 1)
+                                        Divider(
+                                          height: 1,
+                                          thickness: 0.6,
+                                          color: _isSeriousMode
+                                              ? const Color(0xFF334155)
+                                              : Colors.grey.withValues(alpha: 0.12),
+                                          indent: 44,
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              },
                             ),
 
                           // Tombol + Tambah Kerjaan pada section ini
@@ -3843,7 +4659,9 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
         ),
       ),
     );
-  }
+  },
+);
+}
 
   // --- KARTU EVALUASI ROASTING & HUKUMAN MODE SERIUS ---
   Widget _buildSeriousEvaluationCard(SeriousSectionEvaluation eval) {
@@ -3982,18 +4800,25 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
   }
 
   // --- TASK ITEM TILE DENGAN CHECKBOX & NAMA TUGAS ---
-  Widget _buildTaskItemTile(TodoDateGroup group, TodoItem item) {
+  Widget _buildTaskItemTile(
+    TodoDateGroup group,
+    TodoItem item, {
+    int index = 0,
+    bool isSelected = false,
+    VoidCallback? onSelectionToggled,
+  }) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final groupDate =
         DateTime(group.date.year, group.date.month, group.date.day);
     final isMissedLocked =
         _isSeriousMode && groupDate.isBefore(today) && !item.isCompleted;
+    final isMultiSelect = !_isSeriousMode && _selectedTaskIds.isNotEmpty;
 
     return Dismissible(
       key: Key(item.id),
       direction:
-          _isSeriousMode ? DismissDirection.none : DismissDirection.endToStart,
+          (_isSeriousMode || isMultiSelect) ? DismissDirection.none : DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 16),
@@ -4002,8 +4827,36 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
       ),
       onDismissed: (_) => _deleteTask(group, item),
       child: InkWell(
-        onTap: () => _toggleTask(group, item),
-        child: Padding(
+        onTap: () {
+          if (isMultiSelect) {
+            if (onSelectionToggled != null) {
+              onSelectionToggled();
+            } else {
+              _toggleTaskSelection(group.id, item.id);
+            }
+          } else {
+            _toggleTask(group, item);
+          }
+        },
+        onLongPress: () {
+          if (!_isSeriousMode) {
+            HapticFeedback.mediumImpact();
+            _toggleTaskSelection(group.id, item.id);
+          }
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: isSelected
+                ? primaryTerracotta.withValues(alpha: 0.1)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: isSelected
+                ? Border.all(
+                    color: primaryTerracotta.withValues(alpha: 0.45),
+                    width: 1.2,
+                  )
+                : null,
+          ),
           padding: const EdgeInsets.only(
             left: 12,
             right: 4,
@@ -4013,61 +4866,85 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              GestureDetector(
-                onTap: () => _toggleTask(group, item),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    color: item.isCompleted
-                        ? (_isSeriousMode ? seriousGold : accentCompleted)
-                        : (isMissedLocked
-                            ? const Color(0xFF3B1212)
-                            : (_isSeriousMode
-                                ? const Color(0xFF0F172A)
-                                : Colors.white)),
-                    shape: BoxShape.circle,
-                    border: Border.all(
+              // Checkbox (Seleksi jika mode pilih banyak aktif, atau Checkbox Status Selesai)
+              if (isMultiSelect)
+                GestureDetector(
+                  onTap: onSelectionToggled ?? () => _toggleTaskSelection(group.id, item.id),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: isSelected ? primaryTerracotta : Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isSelected ? primaryTerracotta : const Color(0xFFCBD5E1),
+                        width: 1.8,
+                      ),
+                    ),
+                    child: isSelected
+                        ? const Center(
+                            child: Icon(Icons.check_rounded, color: Colors.white, size: 13),
+                          )
+                        : null,
+                  ),
+                )
+              else
+                GestureDetector(
+                  onTap: () => _toggleTask(group, item),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
                       color: item.isCompleted
                           ? (_isSeriousMode ? seriousGold : accentCompleted)
                           : (isMissedLocked
-                              ? const Color(0xFFEF4444)
+                              ? const Color(0xFF3B1212)
                               : (_isSeriousMode
-                                  ? const Color(0xFF475569)
-                                  : const Color(0xFFCBD5E1))),
-                      width: 1.8,
+                                  ? const Color(0xFF0F172A)
+                                  : Colors.white)),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: item.isCompleted
+                            ? (_isSeriousMode ? seriousGold : accentCompleted)
+                            : (isMissedLocked
+                                ? const Color(0xFFEF4444)
+                                : (_isSeriousMode
+                                    ? const Color(0xFF475569)
+                                    : const Color(0xFFCBD5E1))),
+                        width: 1.8,
+                      ),
+                      boxShadow: item.isCompleted
+                          ? [
+                              BoxShadow(
+                                color: (_isSeriousMode
+                                        ? seriousGold
+                                        : accentCompleted)
+                                    .withValues(alpha: 0.25),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1.5),
+                              ),
+                            ]
+                          : [],
                     ),
-                    boxShadow: item.isCompleted
-                        ? [
-                            BoxShadow(
-                              color: (_isSeriousMode
-                                      ? seriousGold
-                                      : accentCompleted)
-                                  .withValues(alpha: 0.25),
-                              blurRadius: 4,
-                              offset: const Offset(0, 1.5),
-                            ),
-                          ]
-                        : [],
-                  ),
-                  child: Center(
-                    child: item.isCompleted
-                        ? Icon(
-                            Icons.check_rounded,
-                            color: _isSeriousMode ? Colors.black : Colors.white,
-                            size: 13,
-                          )
-                        : (isMissedLocked
-                            ? const Icon(
-                                Icons.lock_rounded,
-                                color: Color(0xFFEF4444),
-                                size: 11,
-                              )
-                            : null),
+                    child: Center(
+                      child: item.isCompleted
+                          ? Icon(
+                              Icons.check_rounded,
+                              color: _isSeriousMode ? Colors.black : Colors.white,
+                              size: 13,
+                            )
+                          : (isMissedLocked
+                              ? const Icon(
+                                  Icons.lock_rounded,
+                                  color: Color(0xFFEF4444),
+                                  size: 11,
+                                )
+                              : null),
+                    ),
                   ),
                 ),
-              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Row(
@@ -4162,20 +5039,36 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                     ),
                   ),
                 )
-              else
-
-                IconButton(
-                  icon: const Icon(
-                    Icons.close_rounded,
-                    size: 15,
-                    color: Color(0xFFCBD5E1),
+              else ...[
+                Listener(
+                  onPointerDown: (_) {
+                    if (_selectedTaskIds.contains(item.id)) {
+                      _activeDraggingTaskIdsNotifier.value =
+                          Set<String>.from(_selectedTaskIds);
+                    } else {
+                      _activeDraggingTaskIdsNotifier.value = {item.id};
+                    }
+                  },
+                  onPointerCancel: (_) {
+                    _activeDraggingTaskIdsNotifier.value = {};
+                  },
+                  child: ReorderableDragStartListener(
+                    index: index,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.grab,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                        color: Colors.transparent,
+                        child: const Icon(
+                          Icons.drag_indicator_rounded,
+                          size: 19,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ),
                   ),
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.all(2),
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Hapus Tugas',
-                  onPressed: () => _deleteTask(group, item),
                 ),
+              ],
             ],
           ),
         ),

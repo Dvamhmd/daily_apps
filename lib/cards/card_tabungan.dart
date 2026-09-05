@@ -990,6 +990,7 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                                     );
                                   },
                                   onReorderItem: (oldIndex, newIndex) {
+                                    if (oldIndex == newIndex) return;
                                     setState(() {
                                       final item =
                                           tabunganList.removeAt(oldIndex);
@@ -1003,7 +1004,7 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                                     final item = tabunganList[index];
                                     return Container(
                                       key: ValueKey(
-                                          '${item.nama}_${item.jumlah}_$index'),
+                                          'tabungan_${item.nama}_${item.jumlah}_${item.targetNominal ?? 0}'),
                                       margin: const EdgeInsets.symmetric(
                                           vertical: 3.5),
                                       decoration: BoxDecoration(

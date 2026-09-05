@@ -49,13 +49,11 @@ void main() {
     expect(find.text('Belajar Flutter'), findsOneWidget);
     expect(find.text('Makan Siang'), findsOneWidget);
 
-    // Find delete icon button for 'Belajar Flutter'
-    final deleteButtons = find.byTooltip('Hapus Tugas');
-    expect(deleteButtons, findsWidgets);
-
-    // Tap first delete button
-    await tester.tap(deleteButtons.first);
+    // Swipe left on 'Belajar Flutter' to delete task
+    await tester.drag(find.text('Belajar Flutter'), const Offset(-600, 0));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pump(const Duration(milliseconds: 350));
 
     // Top undo banner should appear with title and subtitle
     expect(find.text('Tugas Dihapus'), findsOneWidget);
@@ -112,9 +110,11 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    final deleteButton = find.byTooltip('Hapus Tugas');
-    await tester.tap(deleteButton);
+    // Swipe left to delete task
+    await tester.drag(find.text('Tugas Uji Coba'), const Offset(-600, 0));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pump(const Duration(milliseconds: 350));
 
     expect(find.text('Tugas Dihapus'), findsOneWidget);
 

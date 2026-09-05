@@ -1364,6 +1364,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                         },
                         onReorderItem: (oldIndex, newIndex) {
                           if (onlyCair) return;
+                          if (oldIndex == newIndex) return;
                           setState(() {
                             final item = uangkuList.removeAt(oldIndex);
                             uangkuList.insert(newIndex, item);
@@ -1376,7 +1377,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                           final originalIndex = uangkuList.indexOf(item);
 
                           return Container(
-                            key: ValueKey('${item.nama}_${item.jumlah}_$index'),
+                            key: ValueKey('uangku_${item.nama}_${item.jumlah}_${item.tanggalCair?.millisecondsSinceEpoch ?? 0}_$originalIndex'),
                             margin: const EdgeInsets.symmetric(vertical: 2.5),
                             decoration: BoxDecoration(
                               color: Colors.white,

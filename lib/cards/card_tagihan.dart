@@ -1222,6 +1222,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                           );
                         },
                         onReorderItem: (oldIndex, newIndex) {
+                          if (oldIndex == newIndex) return;
                           setState(() {
                             final item = tagihanList.removeAt(oldIndex);
                             tagihanList.insert(newIndex, item);
@@ -1232,7 +1233,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                         itemBuilder: (context, index) {
                           final item = tagihanList[index];
                           return Container(
-                            key: ValueKey('${item.nama}_${item.jumlah}_$index'),
+                            key: ValueKey('tagihan_${item.nama}_${item.jumlah}_${item.deadline ?? ''}'),
                             margin: const EdgeInsets.symmetric(vertical: 2.5),
                             decoration: BoxDecoration(
                               color: Colors.white,
