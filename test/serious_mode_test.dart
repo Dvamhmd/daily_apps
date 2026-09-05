@@ -483,5 +483,84 @@ void main() {
       expect(SeriousPunishmentMode.getShortLabel(SeriousPunishmentMode.mandiri), 'Mandiri');
       expect(SeriousPunishmentMode.getShortLabel(SeriousPunishmentMode.campuran), 'Campuran');
     });
+
+    test('Completed punishment and surrendered punishment dismiss evaluation notification', () async {
+      final pastDate = DateTime.now().subtract(const Duration(days: 2));
+      final pastGroup = TodoDateGroup(
+        id: 'group_past_eval',
+        date: pastDate,
+        items: [
+          TodoItem(id: 't1', title: 'Task 1', isCompleted: true),
+          TodoItem(id: 't2', title: 'Task 2', isCompleted: false),
+        ],
+      );
+
+      // Normal past evaluation without completed state returns evaluation
+      final initialEval = SeriousModeService.evaluateSection(pastGroup);
+      expect(initialEval, isNotNull);
+      expect(initialEval!.pendingCount, 1);
+
+      // Case 1: Completed punishment -> evaluation becomes null (notification disappears)
+      final completedState = SeriousGroupPunishmentState(
+        groupId: pastGroup.id,
+        assignedPunishmentIds: ['w1'],
+        completedPunishmentIds: ['w1'],
+        isFullyCompleted: true,
+      );
+      final evalAfterComplete = SeriousModeService.evaluateSection(
+        pastGroup,
+        states: {pastGroup.id: completedState},
+      );
+      expect(evalAfterComplete, isNull);
+
+      // Case 2: Surrendered punishment -> evaluation becomes null (notification disappears)
+      final surrenderedState = SeriousGroupPunishmentState(
+        groupId: pastGroup.id,
+        assignedPunishmentIds: ['w1'],
+        completedPunishmentIds: [],
+        isSurrendered: true,
+      );
+      final evalAfterSurrender = SeriousModeService.evaluateSection(
+        pastGroup,
+        states: {pastGroup.id: surrenderedState},
+      );
+      expect(evalAfterSurrender, isNull);
+    });
+
+    test('Punishment states persist and sync seamlessly across user id and username keys', () async {
+      final user = SeriousUser(
+        id: 'user_unique_123',
+        username: 'hero_dev',
+        password: '123',
+        displayName: 'Hero Dev',
+      );
+      await SeriousModeService.saveCurrentUser(user);
+
+      final testGroup = TodoDateGroup(
+        id: 'group_sync_test',
+        date: DateTime.now().subtract(const Duration(days: 2)),
+        items: [TodoItem(id: 't1', title: 'Task 1', isCompleted: false)],
+      );
+
+      // Surrender from dialog (which doesn't pass userId)
+      await SeriousModeService.surrenderPunishment(
+        groupId: testGroup.id,
+        allGroups: [testGroup],
+      );
+
+      // Read states by user id
+      final statesById = await SeriousModeService.getAllPunishmentStates(user.id);
+      expect(statesById.containsKey('group_sync_test'), isTrue);
+      expect(statesById['group_sync_test']!.isSurrendered, isTrue);
+
+      // Read states by username
+      final statesByUsername = await SeriousModeService.getAllPunishmentStates(user.username);
+      expect(statesByUsername.containsKey('group_sync_test'), isTrue);
+      expect(statesByUsername['group_sync_test']!.isSurrendered, isTrue);
+
+      // Evaluation returns null when evaluated with fetched states
+      final eval = SeriousModeService.evaluateSection(testGroup, states: statesById);
+      expect(eval, isNull);
+    });
   });
 }

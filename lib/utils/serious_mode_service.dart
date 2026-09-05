@@ -141,7 +141,10 @@ class SeriousModeService {
   }
 
   /// 2. Evaluasi Section Tanggal yang Telah Lewat dengan Tugas Belum Selesai
-  static SeriousSectionEvaluation? evaluateSection(TodoDateGroup group) {
+  static SeriousSectionEvaluation? evaluateSection(
+    TodoDateGroup group, {
+    Map<String, SeriousGroupPunishmentState>? states,
+  }) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final groupDate = DateTime(group.date.year, group.date.month, group.date.day);
@@ -149,6 +152,14 @@ class SeriousModeService {
     // Hanya evaluasi jika tanggal hari sudah melewati section (tanggal lampau)
     if (!groupDate.isBefore(today)) {
       return null;
+    }
+
+    // Jika hukuman sudah diselesaikan (tebus hukuman) atau sudah menyerah, notifikasi / evaluasi hukuman hilang
+    if (states != null && states.containsKey(group.id)) {
+      final state = states[group.id]!;
+      if (state.isFullyCompleted || state.isSurrendered) {
+        return null;
+      }
     }
 
     final completed = group.completedCount;
@@ -213,11 +224,13 @@ class SeriousModeService {
 
   /// Evaluasi seluruh section yang membutuhkan perhatian / hukuman
   static List<SeriousSectionEvaluation> evaluateAllPastSections(
-      List<TodoDateGroup> groups) {
+    List<TodoDateGroup> groups, {
+    Map<String, SeriousGroupPunishmentState>? states,
+  }) {
     final List<SeriousSectionEvaluation> results = [];
     for (final group in groups) {
       if (group.isArchived) continue;
-      final eval = evaluateSection(group);
+      final eval = evaluateSection(group, states: states);
       if (eval != null) {
         results.add(eval);
       }
@@ -761,24 +774,27 @@ class SeriousModeService {
         totalPoints += calculatePoints(comp);
       } else {
         // Section tanggal lampau
+        final state = allStates[g.id];
         final pending = g.pendingCount;
-        if (pending == 0) {
+        if (state != null && state.isFullyCompleted) {
+          // Pengguna telah menyelesaikan seluruh hukuman olahraga fisik (Mode Tebus Hukuman)
+          // Poin dipertahankan/ditambahkan penuh sesuai seluruh jadwal hari itu
+          final originalTotal = max(g.totalCount, state.assignedPunishmentIds.length + comp);
+          totalPoints += calculatePoints(originalTotal);
+        } else if (state != null && state.isSurrendered) {
+          // Menyerah: Setiap task yang terlewat dikenakan penalti -1 poin
+          final penalty = state.assignedPunishmentIds.length;
+          final basePoints = calculatePoints(comp);
+          totalPoints += (basePoints - penalty);
+        } else if (pending == 0) {
           totalPoints += calculatePoints(comp);
         } else {
-          final state = allStates[g.id];
-          if (state != null && state.isFullyCompleted) {
-            // Pengguna telah menyelesaikan seluruh hukuman olahraga fisik
-            // Poin dipertahankan/ditambahkan penuh sesuai seluruh jadwal hari itu
-            totalPoints += calculatePoints(g.totalCount);
-          } else {
-            // Menyerah atau belum selesai:
-            // Setiap task yang tidak dikerjakan (dan tidak ditebus hukuman) mengurangi 1 poin
-            final basePoints = calculatePoints(comp);
-            final remainingMissed = (state != null)
-                ? state.remainingCount
-                : pending;
-            totalPoints += (basePoints - remainingMissed);
-          }
+          // Belum selesai / belum memilih hukuman:
+          final basePoints = calculatePoints(comp);
+          final remainingMissed = (state != null)
+              ? state.remainingCount
+              : pending;
+          totalPoints += (basePoints - remainingMissed);
         }
       }
     }
@@ -788,7 +804,7 @@ class SeriousModeService {
     user.lastActiveAt = DateTime.now();
 
     await saveCurrentUser(user);
-    await _syncUserToSpreadsheet(user);
+    scheduleUserCloudSync(user);
   }
 
   /// Catat Hukuman yang Diambil
@@ -797,7 +813,7 @@ class SeriousModeService {
     if (user == null) return;
     user.totalPunishmentsTaken += 1;
     await saveCurrentUser(user);
-    await _syncUserToSpreadsheet(user);
+    scheduleUserCloudSync(user);
   }
 
   /// Ambil Leaderboard Seluruh Users dari Spreadsheet (Diurutkan berdasarkan poin tertinggi)
@@ -1131,15 +1147,42 @@ class SeriousModeService {
   }
 
   /// 7. Manajemen State Hukuman Per Section (Acak Otomatis Deterministik, Checklist & Menyerah)
-  static Future<Map<String, SeriousGroupPunishmentState>> _getAllPunishmentStates([String? userIdentifier]) async {
+  /// Helper untuk meresolusi storage identifier user (username/id) secara konsisten
+  static Future<String> _resolveUserStorageIdentifier([String? userIdentifier]) async {
+    if (userIdentifier != null && userIdentifier.trim().isNotEmpty) {
+      return userIdentifier.trim();
+    }
+    final user = await getCurrentUser();
+    if (user != null) {
+      return getUserStorageIdentifier(user);
+    }
+    return '';
+  }
+
+  static Future<Map<String, SeriousGroupPunishmentState>> getAllPunishmentStates([String? userIdentifier]) async {
     final prefs = await SharedPreferences.getInstance();
-    final effectiveIdentifier = userIdentifier ?? getUserStorageIdentifier(await getCurrentUser());
+    final effectiveUser = await getCurrentUser();
+    final effectiveIdentifier = await _resolveUserStorageIdentifier(userIdentifier);
     final key = getPunishmentStatesKey(effectiveIdentifier);
 
     String? raw = prefs.getString(key);
-    // Legacy migration: jika key spesifik user belum ada tapi key legacy ada
-    if ((raw == null || raw.isEmpty) && effectiveIdentifier.isNotEmpty && prefs.containsKey(prefKeyPunishmentStates)) {
-      raw = prefs.getString(prefKeyPunishmentStates);
+    // Legacy / alternate key fallback
+    if ((raw == null || raw.isEmpty) && effectiveUser != null) {
+      if (effectiveUser.id.isNotEmpty) {
+        final idKey = getPunishmentStatesKey(effectiveUser.id);
+        if (prefs.containsKey(idKey)) {
+          raw = prefs.getString(idKey);
+        }
+      }
+      if ((raw == null || raw.isEmpty) && effectiveUser.username.isNotEmpty) {
+        final usernameKey = getPunishmentStatesKey(effectiveUser.username);
+        if (prefs.containsKey(usernameKey)) {
+          raw = prefs.getString(usernameKey);
+        }
+      }
+      if ((raw == null || raw.isEmpty) && prefs.containsKey(prefKeyPunishmentStates)) {
+        raw = prefs.getString(prefKeyPunishmentStates);
+      }
       if (raw != null && raw.isNotEmpty) {
         await prefs.setString(key, raw);
       }
@@ -1161,14 +1204,30 @@ class SeriousModeService {
     return {};
   }
 
+  static Future<Map<String, SeriousGroupPunishmentState>> _getAllPunishmentStates([String? userIdentifier]) =>
+      getAllPunishmentStates(userIdentifier);
+
   static Future<void> _saveAllPunishmentStates(
       Map<String, SeriousGroupPunishmentState> states, [String? userIdentifier]) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final effectiveIdentifier = userIdentifier ?? getUserStorageIdentifier(await getCurrentUser());
+      final effectiveUser = await getCurrentUser();
+      final effectiveIdentifier = await _resolveUserStorageIdentifier(userIdentifier);
       final key = getPunishmentStatesKey(effectiveIdentifier);
       final map = states.map((k, v) => MapEntry(k, v.toJson()));
-      await prefs.setString(key, jsonEncode(map));
+      final encoded = jsonEncode(map);
+      await prefs.setString(key, encoded);
+
+      // Simpan juga ke key alternatif ID dan Username agar selalu tersinkronisasi
+      if (effectiveUser != null) {
+        if (effectiveUser.id.isNotEmpty && effectiveUser.id != effectiveIdentifier) {
+          await prefs.setString(getPunishmentStatesKey(effectiveUser.id), encoded);
+        }
+        if (effectiveUser.username.isNotEmpty && effectiveUser.username != effectiveIdentifier) {
+          await prefs.setString(getPunishmentStatesKey(effectiveUser.username), encoded);
+        }
+      }
+      await prefs.setString(prefKeyPunishmentStates, encoded);
     } catch (e) {
       debugPrint('Error saving punishment states: $e');
     }
@@ -1183,7 +1242,8 @@ class SeriousModeService {
     final allStates = await _getAllPunishmentStates(userId);
     if (allStates.containsKey(groupId)) {
       final existing = allStates[groupId]!;
-      if (existing.assignedPunishmentIds.length == pendingCount || pendingCount <= 0) {
+      // Jika status hukuman sudah tuntas atau sudah menyerah, jangan pernah di-reset!
+      if (existing.isFullyCompleted || existing.isSurrendered || existing.assignedPunishmentIds.length == pendingCount || pendingCount <= 0) {
         return existing;
       }
     }
@@ -1394,6 +1454,28 @@ class SeriousModeService {
       debugPrint('Sync serious user to sheet error: $e');
       return false;
     }
+  }
+
+  static Timer? _userSyncDebounceTimer;
+  static String _lastSyncedUserHash = '';
+
+  /// Sinkronisasi profil & poin user ke Cloud Spreadsheet dengan Debounce Non-Blocking (Tanpa lag / delay di UI)
+  static void scheduleUserCloudSync(SeriousUser? user, {bool includeAvatar = false}) {
+    if (user == null || user.username.trim().isEmpty) return;
+
+    _userSyncDebounceTimer?.cancel();
+    _userSyncDebounceTimer = Timer(const Duration(milliseconds: 600), () async {
+      final hash =
+          '${user.username}_${user.totalPoints}_${user.totalTasksCompleted}_${user.totalPunishmentsTaken}_${user.avatarIndex}';
+      if (_lastSyncedUserHash == hash) return;
+      _lastSyncedUserHash = hash;
+
+      try {
+        await _syncUserToSpreadsheet(user, includeAvatar: includeAvatar);
+      } catch (e) {
+        debugPrint('Schedule user cloud sync error: $e');
+      }
+    });
   }
 
   static Timer? _tasksSyncDebounceTimer;

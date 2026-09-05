@@ -5,6 +5,7 @@ import 'package:daily_apps/pages/todo_riwayat_page.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/utils/serious_mode_service.dart';
 import 'package:daily_apps/utils/todo_alarm_service.dart';
+import 'package:daily_apps/widgets/ash_disintegration_effect.dart';
 import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:daily_apps/widgets/gta_switch_wheel.dart';
 import 'package:daily_apps/widgets/serious_confirm_add_dialog.dart';
@@ -92,6 +93,8 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
   bool _isSeriousMode = false;
   SeriousUser? _seriousUser;
   bool _isManualSyncing = false;
+  Map<String, SeriousGroupPunishmentState> _punishmentStates = {};
+  final Set<String> _disintegratingTaskIds = {};
 
   // State untuk Undo Mode Biasa (5 Detik Cooldown)
   AnimationController? _undoController;
@@ -238,6 +241,11 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
       if (_isSeriousMode && _seriousUser != null) {
         await SeriousModeService.recalculateAndSyncUserProgress(_dateGroups, targetUser: _seriousUser);
         _seriousUser = await SeriousModeService.getCurrentUser();
+        _punishmentStates = await SeriousModeService.getAllPunishmentStates(_seriousUser?.id);
+      } else if (_isSeriousMode) {
+        _punishmentStates = await SeriousModeService.getAllPunishmentStates();
+      } else {
+        _punishmentStates = {};
       }
 
       // Sinkronisasi jadwal alarm seluruh group
@@ -271,6 +279,7 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
       if (_isSeriousMode) {
         await SeriousModeService.recalculateAndSyncUserProgress(_dateGroups, targetUser: _seriousUser);
         _seriousUser = await SeriousModeService.getCurrentUser();
+        _punishmentStates = await SeriousModeService.getAllPunishmentStates(_seriousUser?.id);
         // Sinkronisasi daftar task ke cloud spreadsheet di background secara non-blocking
         SeriousModeService.scheduleTasksCloudSync(_seriousUser, _dateGroups);
         if (mounted) {
@@ -315,6 +324,54 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
           subtitle: res['message']?.toString() ?? 'Periksa koneksi internet Anda',
         );
       }
+    }
+  }
+
+  Future<void> _handleSurrenderAshEffect(String groupId) async {
+    final groupIndex = _dateGroups.indexWhere((g) => g.id == groupId);
+    if (groupIndex == -1) {
+      await _loadTodoData();
+      return;
+    }
+
+    final group = _dateGroups[groupIndex];
+    final uncompleted = group.items.where((i) => !i.isCompleted).toList();
+    if (uncompleted.isEmpty) {
+      await _loadTodoData();
+      return;
+    }
+
+    // 1. Trigger animasi partikel abu tersapu angin
+    if (mounted) {
+      setState(() {
+        _disintegratingTaskIds.addAll(uncompleted.map((t) => t.id));
+      });
+    }
+
+    HapticFeedback.heavyImpact();
+
+    // 2. Tunggu durasi animasi (1350ms)
+    await Future.delayed(const Duration(milliseconds: 1400));
+
+    // 3. Hapus tugas yang tidak tercentang dari grup
+    group.items.removeWhere((i) => !i.isCompleted);
+
+    if (mounted) {
+      setState(() {
+        _disintegratingTaskIds.removeAll(uncompleted.map((t) => t.id));
+      });
+    }
+
+    // 4. Simpan ke database lokal dan background sync
+    await _saveTodoData();
+    await _loadTodoData();
+
+    if (mounted) {
+      CustomToast.showInfo(
+        context,
+        title: 'Tugas Menjadi Abu 💨',
+        subtitle: '${uncompleted.length} tugas yang tidak tercentang telah hangus dan dihapus.',
+      );
     }
   }
 
@@ -4448,10 +4505,19 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                               ),
                             ),
 
-                          // Kartu Evaluasi Mode Serius untuk Section yang Terlewat
+                          // Kartu Evaluasi / Note Tebus Hukuman Mode Serius untuk Section yang Terlewat
                           if (_isSeriousMode)
                             () {
-                              final eval = SeriousModeService.evaluateSection(group);
+                              final state = _punishmentStates[group.id];
+                              if (state != null && state.isFullyCompleted) {
+                                // Tampilkan Note Mode Tebus Hukuman
+                                return _buildTebusHukumanNote(group, state);
+                              }
+                              if (state != null && state.isSurrendered) {
+                                // Hukuman menyerah -> Notifikasi hukuman hilang
+                                return const SizedBox.shrink();
+                              }
+                              final eval = SeriousModeService.evaluateSection(group, states: _punishmentStates);
                               if (eval != null) {
                                 return _buildSeriousEvaluationCard(eval);
                               }
@@ -4831,16 +4897,102 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                 style:
                     const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
               ),
-              onPressed: () {
-                SeriousPunishmentDialog.show(
+              onPressed: () async {
+                await SeriousPunishmentDialog.show(
                   context,
                   evaluation: eval,
                   allGroups: _dateGroups,
                   onCompleted: () {
                     _loadTodoData();
                   },
+                  onSurrendered: (groupId) {
+                    _handleSurrenderAshEffect(groupId);
+                  },
                 );
+                await _loadTodoData();
               },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- NOTE TEBUS HUKUMAN MODE SERIUS PADA SECTION ---
+  Widget _buildTebusHukumanNote(
+      TodoDateGroup group, SeriousGroupPunishmentState state) {
+    final points = SeriousModeService.calculatePoints(group.totalCount);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF064E3B).withValues(alpha: 0.25),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFF10B981).withValues(alpha: 0.5),
+          width: 1.3,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981).withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.verified_rounded,
+              color: Color(0xFF34D399),
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'MODE TEBUS HUKUMAN AKTIF',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF34D399),
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'Poin Bertahan 🛡️',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF6EE7B7),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Seluruh ${state.totalAssigned} latihan fisik telah diselesaikan! Poin penuh jadwal hari ini ($points Pts) berhasil dipertahankan.',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: Color(0xFFD1FAE5),
+                    height: 1.35,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -4863,8 +5015,12 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
     final isMissedLocked =
         _isSeriousMode && groupDate.isBefore(today) && !item.isCompleted;
     final isMultiSelect = !_isSeriousMode && _selectedTaskIds.isNotEmpty;
+    final isDisintegrating = _disintegratingTaskIds.contains(item.id);
 
-    return Dismissible(
+    return AshDisintegrationWrapper(
+      isDisintegrating: isDisintegrating,
+      seed: item.id.hashCode,
+      child: Dismissible(
       key: Key(item.id),
       direction:
           (_isSeriousMode || isMultiSelect) ? DismissDirection.none : DismissDirection.endToStart,
@@ -5122,7 +5278,8 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   // --- EMPTY STATE CARD ---

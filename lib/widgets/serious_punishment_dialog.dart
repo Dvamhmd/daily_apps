@@ -12,12 +12,14 @@ class SeriousPunishmentDialog extends StatefulWidget {
   final SeriousSectionEvaluation evaluation;
   final List<TodoDateGroup> allGroups;
   final VoidCallback? onCompleted;
+  final void Function(String groupId)? onSurrendered;
 
   const SeriousPunishmentDialog({
     super.key,
     required this.evaluation,
     this.allGroups = const [],
     this.onCompleted,
+    this.onSurrendered,
   });
 
   static SeriousSectionEvaluation get defaultEvaluation =>
@@ -38,6 +40,7 @@ class SeriousPunishmentDialog extends StatefulWidget {
     SeriousSectionEvaluation? evaluation,
     List<TodoDateGroup> allGroups = const [],
     VoidCallback? onCompleted,
+    void Function(String groupId)? onSurrendered,
   }) {
     final eval = evaluation ?? defaultEvaluation;
     return showDialog(
@@ -47,6 +50,7 @@ class SeriousPunishmentDialog extends StatefulWidget {
         evaluation: eval,
         allGroups: allGroups,
         onCompleted: onCompleted,
+        onSurrendered: onSurrendered,
       ),
     );
   }
@@ -76,22 +80,37 @@ class _SeriousPunishmentDialogState extends State<SeriousPunishmentDialog> {
 
   Future<void> _loadPunishmentState() async {
     final eval = widget.evaluation;
-    final state = await SeriousModeService.getOrCreatePunishmentState(
-      eval.groupId,
-      eval.pendingCount,
-    );
-    final assignedItems = await SeriousModeService.getPunishmentItemsByIdsAsync(
-      state.assignedPunishmentIds,
-    );
-    final mode = await SeriousModeService.getPunishmentMode();
+    try {
+      final results = await Future.wait([
+        SeriousModeService.getOrCreatePunishmentState(
+          eval.groupId,
+          eval.pendingCount,
+        ),
+        SeriousModeService.getPunishmentMode(),
+      ]);
 
-    if (mounted) {
-      setState(() {
-        _punishmentState = state;
-        _assignedItems = assignedItems;
-        _punishmentMode = mode;
-        _isLoading = false;
-      });
+      final state = results[0] as SeriousGroupPunishmentState;
+      final mode = results[1] as String;
+      final assignedItems =
+          await SeriousModeService.getPunishmentItemsByIdsAsync(
+        state.assignedPunishmentIds,
+      );
+
+      if (mounted) {
+        setState(() {
+          _punishmentState = state;
+          _assignedItems = assignedItems;
+          _punishmentMode = mode;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading punishment state: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -99,20 +118,50 @@ class _SeriousPunishmentDialogState extends State<SeriousPunishmentDialog> {
     if (_punishmentState == null) return;
     HapticFeedback.selectionClick();
 
-    final updatedState = await SeriousModeService.togglePunishmentItemCompleted(
-      groupId: widget.evaluation.groupId,
-      punishmentId: punishmentId,
-      allGroups: widget.allGroups,
+    // 1. Optimistic UI update: Perbarui tampilan seketika (tanpa lag / delay)
+    final currentState = _punishmentState!;
+    final updatedCompleted =
+        List<String>.from(currentState.completedPunishmentIds);
+    if (updatedCompleted.contains(punishmentId)) {
+      updatedCompleted.remove(punishmentId);
+    } else {
+      updatedCompleted.add(punishmentId);
+    }
+
+    final isAllDone = currentState.assignedPunishmentIds.isNotEmpty &&
+        updatedCompleted.length >= currentState.assignedPunishmentIds.length;
+
+    final optimisticState = currentState.copyWith(
+      completedPunishmentIds: updatedCompleted,
+      isFullyCompleted: isAllDone,
+      isSurrendered: isAllDone ? false : currentState.isSurrendered,
+      updatedAt: DateTime.now(),
     );
 
-    if (mounted) {
-      setState(() {
-        _punishmentState = updatedState;
-      });
+    setState(() {
+      _punishmentState = optimisticState;
+    });
 
-      if (updatedState.isAllCompleted) {
-        HapticFeedback.heavyImpact();
+    if (isAllDone) {
+      HapticFeedback.heavyImpact();
+    }
+
+    // 2. Simpan dan sinkronkan di background
+    try {
+      final updatedState =
+          await SeriousModeService.togglePunishmentItemCompleted(
+        groupId: widget.evaluation.groupId,
+        punishmentId: punishmentId,
+        allGroups: widget.allGroups,
+      );
+
+      if (mounted) {
+        setState(() {
+          _punishmentState = updatedState;
+        });
       }
+    } catch (e) {
+      debugPrint('Error toggling punishment item: $e');
     }
   }
 
@@ -200,8 +249,10 @@ class _SeriousPunishmentDialogState extends State<SeriousPunishmentDialog> {
           title: 'Menyerah Diterima',
           subtitle: 'Pengurangan $remaining poin telah diterapkan pada akun Anda.',
         );
-        widget.onCompleted?.call();
+        final gId = widget.evaluation.groupId;
         Navigator.of(context).pop();
+        widget.onSurrendered?.call(gId);
+        widget.onCompleted?.call();
       }
     }
   }
