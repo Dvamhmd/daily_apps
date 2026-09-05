@@ -140,6 +140,11 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
       ),
     );
 
+    if (targetGroup.isPast) {
+      TodoAlarmService.stopAlarmSound();
+      return;
+    }
+
     if (targetGroup.pendingItems.isNotEmpty) {
       TodoAlarmPopupDialog.show(
         context,
@@ -4013,16 +4018,24 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                                             vertical: 2,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: (_isSeriousMode
-                                                    ? seriousGold
-                                                    : primaryTerracotta)
-                                                .withValues(alpha: 0.12),
+                                            color: group.isPast
+                                                ? (_isSeriousMode
+                                                        ? Colors.white.withValues(alpha: 0.05)
+                                                        : Colors.grey.withValues(alpha: 0.1))
+                                                : (_isSeriousMode
+                                                        ? seriousGold
+                                                        : primaryTerracotta)
+                                                    .withValues(alpha: 0.12),
                                             borderRadius: BorderRadius.circular(6),
                                             border: Border.all(
-                                              color: (_isSeriousMode
-                                                      ? seriousGold
-                                                      : primaryTerracotta)
-                                                  .withValues(alpha: 0.3),
+                                              color: group.isPast
+                                                  ? (_isSeriousMode
+                                                          ? Colors.white24
+                                                          : Colors.grey.withValues(alpha: 0.3))
+                                                  : (_isSeriousMode
+                                                          ? seriousGold
+                                                          : primaryTerracotta)
+                                                      .withValues(alpha: 0.3),
                                               width: 0.8,
                                             ),
                                           ),
@@ -4030,22 +4043,34 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Icon(
-                                                Icons.alarm_on_rounded,
+                                                group.isPast
+                                                    ? Icons.alarm_off_rounded
+                                                    : Icons.alarm_on_rounded,
                                                 size: 12,
-                                                color: _isSeriousMode
-                                                    ? seriousGold
-                                                    : primaryTerracotta,
+                                                color: group.isPast
+                                                    ? (_isSeriousMode
+                                                            ? Colors.white54
+                                                            : const Color(0xFF94A3B8))
+                                                    : (_isSeriousMode
+                                                            ? seriousGold
+                                                            : primaryTerracotta),
                                               ),
                                               const SizedBox(width: 4),
                                               Flexible(
                                                 child: Text(
-                                                  group.reminderSummaryLabel,
+                                                  group.isPast
+                                                      ? '${group.reminderSummaryLabel} (Lewat)'
+                                                      : group.reminderSummaryLabel,
                                                   style: TextStyle(
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.bold,
-                                                    color: _isSeriousMode
-                                                        ? seriousGold
-                                                        : primaryTerracotta,
+                                                    color: group.isPast
+                                                        ? (_isSeriousMode
+                                                                ? Colors.white54
+                                                                : const Color(0xFF94A3B8))
+                                                        : (_isSeriousMode
+                                                                ? seriousGold
+                                                                : primaryTerracotta),
                                                   ),
                                                   overflow: TextOverflow.ellipsis,
                                                 ),

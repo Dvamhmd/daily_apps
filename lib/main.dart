@@ -11,6 +11,7 @@ import 'package:daily_apps/pages/todo_page.dart';
 import 'package:daily_apps/utils/notification_service.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
+import 'package:daily_apps/utils/serious_mode_service.dart';
 import 'package:daily_apps/utils/todo_alarm_service.dart';
 import 'package:daily_apps/widgets/app_drawer.dart';
 import 'package:daily_apps/widgets/custom_toast.dart';
@@ -117,8 +118,25 @@ class _MainScreenWrapperState extends State<MainScreenWrapper> {
     if (!mounted) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final String? jsonStr = prefs.getString('daily_apps_todo_groups_v1') ??
-          prefs.getString('todo_date_groups_v1');
+      final isSeriousMode = await SeriousModeService.isSeriousModeActive();
+      String? jsonStr;
+      if (isSeriousMode) {
+        final curUser = await SeriousModeService.getCurrentUser();
+        if (curUser != null) {
+          final userKey = SeriousModeService.getSeriousTodoGroupsKey(
+            SeriousModeService.getUserStorageIdentifier(curUser),
+          );
+          jsonStr = prefs.getString(userKey) ??
+              prefs.getString(SeriousModeService.prefKeySeriousTodoGroups);
+        } else {
+          jsonStr = prefs.getString(SeriousModeService.prefKeySeriousTodoGroups);
+        }
+      } else {
+        jsonStr = prefs.getString(SeriousModeService.prefKeyNormalTodoGroups) ??
+            prefs.getString('daily_apps_todo_groups_v1') ??
+            prefs.getString('todo_date_groups_v1');
+      }
+
       TodoDateGroup targetGroup;
       if (jsonStr != null && jsonStr.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(jsonStr);
@@ -140,10 +158,15 @@ class _MainScreenWrapperState extends State<MainScreenWrapper> {
       }
 
       if (!mounted) return;
+      if (targetGroup.isPast) {
+        TodoAlarmService.stopAlarmSound();
+        return;
+      }
       if (targetGroup.items.isEmpty || targetGroup.pendingItems.isNotEmpty) {
         TodoAlarmPopupDialog.show(
           context,
           group: targetGroup,
+          isSeriousMode: isSeriousMode,
         );
       } else {
         TodoAlarmService.stopAlarmSound();

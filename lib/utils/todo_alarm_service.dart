@@ -435,9 +435,17 @@ class TodoAlarmService {
     _foregroundTicker?.cancel();
     _foregroundTicker = Timer.periodic(const Duration(seconds: 1), (timer) {
       final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
 
       for (final group in _registeredGroups.values) {
         if (!group.reminderEnabled || group.isArchived || group.isAllCompleted) {
+          continue;
+        }
+
+        // Jika section tanggal sudah terlewati (sebelum hari ini), lewati alarm
+        final groupDate =
+            DateTime(group.date.year, group.date.month, group.date.day);
+        if (groupDate.isBefore(today)) {
           continue;
         }
 
@@ -484,7 +492,12 @@ class TodoAlarmService {
     final groupDate =
         DateTime(group.date.year, group.date.month, group.date.day);
 
-    final baseDate = groupDate.isBefore(today) ? today : groupDate;
+    // Jika tanggal section sudah lewat dari hari ini, tidak ada jadwal waktu aktif lagi
+    if (groupDate.isBefore(today)) {
+      return times;
+    }
+
+    final baseDate = groupDate;
 
     if (group.reminderType == 'interval') {
       final startParts = _parseTimeString(group.reminderIntervalStartTime);
@@ -531,6 +544,27 @@ class TodoAlarmService {
 
   /// Trigger internal saat alarm aktif
   static Future<void> _handleAlarmTrigger(AlarmTriggerPayload payload) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final payloadDate =
+        DateTime(payload.date.year, payload.date.month, payload.date.day);
+
+    // Jika section tanggal sudah terlewati (sebelum hari ini), jangan bunyikan alarm
+    if (payloadDate.isBefore(today)) {
+      debugPrint(
+          '⚠️ [ALARM IGNORED] Section date is in the past: ${payload.date}');
+      return;
+    }
+
+    final group = _registeredGroups[payload.groupId];
+    if (group != null) {
+      if (!group.reminderEnabled || group.isArchived || group.isAllCompleted) {
+        debugPrint(
+            '⚠️ [ALARM IGNORED] Group ${group.id} is archived, all completed, or reminder disabled');
+        return;
+      }
+    }
+
     // Tarik aplikasi ke layar depan jika izin overlay aktif
     await bringAppToForeground();
     activeAlarmNotifier.value = payload;
@@ -730,12 +764,19 @@ class TodoAlarmService {
     // Batalkan jadwal lama terlebih dahulu untuk group ini
     await cancelGroupAlarm(group.id, unregister: false);
 
-    // Jika reminder dimatikan atau semua tugas sudah selesai, jangan jadwalkan
-    if (!group.reminderEnabled || group.isArchived || group.isAllCompleted) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final groupDate =
+        DateTime(group.date.year, group.date.month, group.date.day);
+
+    // Jika reminder dimatikan, semua tugas sudah selesai, atau tanggal section sudah terlewati, jangan jadwalkan
+    if (!group.reminderEnabled ||
+        group.isArchived ||
+        group.isAllCompleted ||
+        groupDate.isBefore(today)) {
       return;
     }
 
-    final now = DateTime.now();
     final payload = AlarmTriggerPayload(
       groupId: group.id,
       date: group.date,
@@ -836,9 +877,16 @@ class TodoAlarmService {
       if (!kIsWeb) {
         await _notifications.cancelAll();
       }
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+
       for (final g in groups) {
         _registeredGroups[g.id] = g;
-        if (g.reminderEnabled && !g.isArchived && !g.isAllCompleted) {
+        final groupDate = DateTime(g.date.year, g.date.month, g.date.day);
+        if (g.reminderEnabled &&
+            !g.isArchived &&
+            !g.isAllCompleted &&
+            !groupDate.isBefore(today)) {
           await scheduleGroupAlarm(g);
         }
       }

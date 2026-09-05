@@ -100,6 +100,12 @@ class MainActivity : FlutterActivity() {
         if (!alarmPayload.isNullOrEmpty()) {
             pendingAlarmPayload = alarmPayload
         }
+
+        val notifId = intent?.getIntExtra("notificationId", -1) ?: -1
+        if (notifId != -1) {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+            nm?.cancel(notifId)
+        }
     }
 
     override fun onResume() {
@@ -116,6 +122,12 @@ class MainActivity : FlutterActivity() {
         val alarmPayload = intent.getStringExtra("ALARM_TRIGGER_PAYLOAD")
         if (!alarmPayload.isNullOrEmpty()) {
             sendAlarmEventToFlutter(alarmPayload)
+        }
+
+        val notifId = intent.getIntExtra("notificationId", -1)
+        if (notifId != -1) {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+            nm?.cancel(notifId)
         }
     }
 

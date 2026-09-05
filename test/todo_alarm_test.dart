@@ -114,5 +114,47 @@ void main() {
       expect(group.reminderDefaultSound, 'cheerful_melody');
       expect(group.reminderSoundDisplayName, 'Melodi Ceria');
     });
+
+    test('TodoDateGroup isPast and isAlarmActive correctly handles past, today, and future dates', () {
+      final now = DateTime.now();
+      final pastDate = now.subtract(const Duration(days: 2));
+      final todayDate = DateTime(now.year, now.month, now.day);
+      final futureDate = now.add(const Duration(days: 2));
+
+      final pastGroup = TodoDateGroup(
+        id: 'group-past',
+        date: pastDate,
+        reminderEnabled: true,
+        items: [TodoItem(id: 't1', title: 'Task in past', isCompleted: false)],
+      );
+
+      final todayGroup = TodoDateGroup(
+        id: 'group-today',
+        date: todayDate,
+        reminderEnabled: true,
+        items: [TodoItem(id: 't2', title: 'Task today', isCompleted: false)],
+      );
+
+      final futureGroup = TodoDateGroup(
+        id: 'group-future',
+        date: futureDate,
+        reminderEnabled: true,
+        items: [TodoItem(id: 't3', title: 'Task in future', isCompleted: false)],
+      );
+
+      expect(pastGroup.isPast, isTrue);
+      expect(pastGroup.isAlarmActive, isFalse, reason: 'Past section alarms should not be active');
+
+      expect(todayGroup.isPast, isFalse);
+      expect(todayGroup.isAlarmActive, isTrue, reason: 'Today section alarms should be active');
+
+      expect(futureGroup.isPast, isFalse);
+      expect(futureGroup.isAlarmActive, isTrue, reason: 'Future section alarms should be active');
+
+      // If all items completed, alarm should be inactive
+      todayGroup.items.first.isCompleted = true;
+      expect(todayGroup.isAllCompleted, isTrue);
+      expect(todayGroup.isAlarmActive, isFalse);
+    });
   });
 }

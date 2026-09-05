@@ -108,6 +108,16 @@ class TodoDateGroup {
         date.day == yesterday.day;
   }
 
+  bool get isPast {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final groupDate = DateTime(date.year, date.month, date.day);
+    return groupDate.isBefore(today);
+  }
+
+  bool get isAlarmActive =>
+      reminderEnabled && !isArchived && !isAllCompleted && !isPast;
+
   static const List<String> _namaHari = [
     'Senin',
     'Selasa',
