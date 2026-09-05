@@ -660,8 +660,24 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
     _saveTodoData();
   }
 
+  bool _canArchiveGroup(TodoDateGroup group) {
+    if (group.items.isEmpty) return false;
+    if (group.isAllCompleted) return true;
+    if (_isSeriousMode) {
+      final state = _punishmentStates[group.id];
+      if (state != null && (state.isFullyCompleted || state.isSurrendered)) {
+        return true;
+      }
+      final eval = SeriousModeService.evaluateSection(group, states: _punishmentStates);
+      if (eval != null && eval.isExempt) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   void _archiveGroup(TodoDateGroup group) {
-    if (!group.isAllCompleted || group.items.isEmpty) {
+    if (!_canArchiveGroup(group)) {
       HapticFeedback.vibrate();
       return;
     }
@@ -670,6 +686,7 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
       group.isArchived = true;
     });
     _saveTodoData();
+    _showToast(context, 'Section berhasil diarsipkan');
   }
 
   void _showToast(BuildContext context, String message, {bool isSuccess = true}) {
@@ -4039,29 +4056,46 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                                                 : FontWeight.normal,
                                           ),
                                         ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 6,
-                                            vertical: 1.5,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: _isSeriousMode
-                                                ? seriousGold.withValues(alpha: 0.18)
-                                                : primaryTerracotta.withValues(alpha: 0.15),
-                                            borderRadius:
-                                                BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            '+${SeriousModeService.calculatePoints(group.completedCount)} PTS',
-                                            style: TextStyle(
-                                              color: _isSeriousMode
-                                                  ? seriousGold
-                                                  : primaryTerracotta,
-                                              fontSize: 9.5,
-                                              fontWeight: FontWeight.bold,
+                                        () {
+                                          final int sectionPts = _isSeriousMode
+                                              ? SeriousModeService.calculateSectionPoints(group, states: _punishmentStates)
+                                              : SeriousModeService.calculatePoints(group.completedCount);
+                                          final isNegative = sectionPts < 0;
+                                          final ptsText = isNegative ? '$sectionPts PTS' : '+$sectionPts PTS';
+                                          final Color ptsBadgeBg = _isSeriousMode
+                                              ? (isNegative
+                                                  ? const Color(0xFFEF4444).withValues(alpha: 0.2)
+                                                  : seriousGold.withValues(alpha: 0.18))
+                                              : primaryTerracotta.withValues(alpha: 0.15);
+                                          final Color ptsBadgeFg = _isSeriousMode
+                                              ? (isNegative ? const Color(0xFFF87171) : seriousGold)
+                                              : primaryTerracotta;
+
+                                          return Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 1.5,
                                             ),
-                                          ),
-                                        ),
+                                            decoration: BoxDecoration(
+                                              color: ptsBadgeBg,
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: isNegative
+                                                  ? Border.all(
+                                                      color: const Color(0xFFEF4444).withValues(alpha: 0.4),
+                                                      width: 0.8,
+                                                    )
+                                                  : null,
+                                            ),
+                                            child: Text(
+                                              ptsText,
+                                              style: TextStyle(
+                                                color: ptsBadgeFg,
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          );
+                                        }(),
                                       ],
                                     ),
                                     if (group.reminderEnabled) ...[
@@ -4316,15 +4350,13 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                           ),
                           PopupMenuItem(
                             value: 'archive',
-                            enabled:
-                                group.isAllCompleted && group.items.isNotEmpty,
+                            enabled: _canArchiveGroup(group),
                             child: Row(
                               children: [
                                 Icon(
                                   Icons.archive_rounded,
                                   size: 18,
-                                  color: (group.isAllCompleted &&
-                                          group.items.isNotEmpty)
+                                  color: _canArchiveGroup(group)
                                       ? (_isSeriousMode
                                           ? const Color(0xFF10B981)
                                           : accentCompleted)
@@ -4335,15 +4367,13 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                                 const SizedBox(width: 8),
                                 Flexible(
                                   child: Text(
-                                    (group.isAllCompleted &&
-                                            group.items.isNotEmpty)
+                                    _canArchiveGroup(group)
                                         ? 'Arsipkan Section'
                                         : 'Arsipkan (Belum Selesai)',
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w500,
-                                      color: (group.isAllCompleted &&
-                                              group.items.isNotEmpty)
+                                      color: _canArchiveGroup(group)
                                           ? (_isSeriousMode
                                               ? Colors.white
                                               : const Color(0xFF1E293B))
@@ -4514,8 +4544,8 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                                 return _buildTebusHukumanNote(group, state);
                               }
                               if (state != null && state.isSurrendered) {
-                                // Hukuman menyerah -> Notifikasi hukuman hilang
-                                return const SizedBox.shrink();
+                                // Tampilkan Note Menyerah (dengan opsi arsipkan)
+                                return _buildSurrenderedNote(group, state);
                               }
                               final eval = SeriousModeService.evaluateSection(group, states: _punishmentStates);
                               if (eval != null) {
@@ -4990,6 +5020,146 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                     fontSize: 11.5,
                     color: Color(0xFFD1FAE5),
                     height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _archiveGroup(group),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    icon: const Icon(Icons.archive_rounded, size: 13),
+                    label: const Text(
+                      'Arsipkan Section',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- NOTE MENYERAH MODE SERIUS PADA SECTION ---
+  Widget _buildSurrenderedNote(
+      TodoDateGroup group, SeriousGroupPunishmentState state) {
+    final penalty = state.assignedPunishmentIds.length;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFFEF4444).withValues(alpha: 0.4),
+          width: 1.3,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEF4444).withValues(alpha: 0.18),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.flag_rounded,
+              color: Color(0xFFF87171),
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'STATUS MENYERAH',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFF87171),
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '-$penalty Pts ⚠️',
+                        style: const TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFFCA5A5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                const Text(
+                  'Kamu memutuskan menyerah untuk section ini. Poin telah disesuaikan dan section siap diarsipkan.',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: Color(0xFFCBD5E1),
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _archiveGroup(group),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF475569),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    icon: const Icon(Icons.archive_rounded, size: 13),
+                    label: const Text(
+                      'Arsipkan Section',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
               ],

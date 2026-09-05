@@ -140,6 +140,45 @@ class SeriousModeService {
     return 10; // >15: 10
   }
 
+  /// Perhitungan Poin Bersih untuk Suatu Section Tertentu (termasuk kompensasi hukuman / penalti menyerah)
+  static int calculateSectionPoints(
+    TodoDateGroup g, {
+    Map<String, SeriousGroupPunishmentState>? states,
+  }) {
+    final comp = g.completedCount;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final groupDate = DateTime(g.date.year, g.date.month, g.date.day);
+    final isPast = groupDate.isBefore(today);
+
+    if (!isPast) {
+      // Section hari ini atau masa depan: Poin reguler
+      return calculatePoints(comp);
+    } else {
+      // Section tanggal lampau
+      final state = states != null ? states[g.id] : null;
+      final pending = g.pendingCount;
+
+      if (state != null && state.isFullyCompleted) {
+        // Mode Tebus Hukuman: Seluruh poin jadwal hari itu berhasil dipertahankan
+        final originalTotal = max(g.totalCount, state.assignedPunishmentIds.length + comp);
+        return calculatePoints(originalTotal);
+      } else if (state != null && state.isSurrendered) {
+        // Menyerah: base points dikurangi penalti tugas yang terlewat
+        final penalty = state.assignedPunishmentIds.length;
+        final basePoints = calculatePoints(comp);
+        return basePoints - penalty;
+      } else if (pending == 0) {
+        return calculatePoints(comp);
+      } else {
+        // Belum selesai / belum memilih hukuman:
+        final basePoints = calculatePoints(comp);
+        final remainingMissed = (state != null) ? state.remainingCount : pending;
+        return basePoints - remainingMissed;
+      }
+    }
+  }
+
   /// 2. Evaluasi Section Tanggal yang Telah Lewat dengan Tugas Belum Selesai
   static SeriousSectionEvaluation? evaluateSection(
     TodoDateGroup group, {
@@ -756,47 +795,13 @@ class SeriousModeService {
     }
 
     final allStates = await _getAllPunishmentStates(getUserStorageIdentifier(user));
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
 
     int totalPoints = 0;
     int totalCompleted = 0;
 
     for (final g in groups) {
-      final comp = g.completedCount;
-      totalCompleted += comp;
-
-      final groupDate = DateTime(g.date.year, g.date.month, g.date.day);
-      final isPast = groupDate.isBefore(today);
-
-      if (!isPast) {
-        // Section hari ini atau masa depan: Poin reguler
-        totalPoints += calculatePoints(comp);
-      } else {
-        // Section tanggal lampau
-        final state = allStates[g.id];
-        final pending = g.pendingCount;
-        if (state != null && state.isFullyCompleted) {
-          // Pengguna telah menyelesaikan seluruh hukuman olahraga fisik (Mode Tebus Hukuman)
-          // Poin dipertahankan/ditambahkan penuh sesuai seluruh jadwal hari itu
-          final originalTotal = max(g.totalCount, state.assignedPunishmentIds.length + comp);
-          totalPoints += calculatePoints(originalTotal);
-        } else if (state != null && state.isSurrendered) {
-          // Menyerah: Setiap task yang terlewat dikenakan penalti -1 poin
-          final penalty = state.assignedPunishmentIds.length;
-          final basePoints = calculatePoints(comp);
-          totalPoints += (basePoints - penalty);
-        } else if (pending == 0) {
-          totalPoints += calculatePoints(comp);
-        } else {
-          // Belum selesai / belum memilih hukuman:
-          final basePoints = calculatePoints(comp);
-          final remainingMissed = (state != null)
-              ? state.remainingCount
-              : pending;
-          totalPoints += (basePoints - remainingMissed);
-        }
-      }
+      totalCompleted += g.completedCount;
+      totalPoints += calculateSectionPoints(g, states: allStates);
     }
 
     user.totalPoints = totalPoints;

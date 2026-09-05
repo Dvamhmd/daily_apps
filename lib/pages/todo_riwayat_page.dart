@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:daily_apps/models/model_todo.dart';
+import 'package:daily_apps/models/model_serious_mode.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:daily_apps/widgets/todo_mode_transition_overlay.dart';
@@ -30,6 +31,7 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
   static const Color accentCompleted = Color(0xFF2E7D32);
 
   List<TodoDateGroup> _allGroups = [];
+  Map<String, SeriousGroupPunishmentState> _punishmentStates = {};
   final Set<String> _collapsedGroupIds = {};
   bool _isLoading = true;
   String _searchQuery = '';
@@ -52,6 +54,12 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
 
   Future<void> _loadData() async {
     try {
+      if (widget.isSeriousMode) {
+        final user = await SeriousModeService.getCurrentUser();
+        _punishmentStates = await SeriousModeService.getAllPunishmentStates(user?.id);
+      } else {
+        _punishmentStates = {};
+      }
       final prefs = await SharedPreferences.getInstance();
       final key = await _getEffectiveKey();
       final String? jsonStr = prefs.getString(key);
@@ -662,13 +670,56 @@ class _TodoRiwayatPageState extends State<TodoRiwayatPage> {
                           Row(
                             children: [
                               Text(
-                                '${group.totalCount} Tugas selesai',
+                                group.isAllCompleted
+                                    ? '${group.totalCount} Tugas selesai'
+                                    : '${group.completedCount}/${group.totalCount} Tugas selesai',
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   color: isDark ? const Color(0xFFFDE68A) : accentCompleted,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
+                              const SizedBox(width: 8),
+                              () {
+                                final int sectionPts = widget.isSeriousMode
+                                    ? SeriousModeService.calculateSectionPoints(group, states: _punishmentStates)
+                                    : SeriousModeService.calculatePoints(group.completedCount);
+                                final isNegative = sectionPts < 0;
+                                final ptsText = isNegative ? '$sectionPts PTS' : '+$sectionPts PTS';
+                                final Color ptsBadgeBg = widget.isSeriousMode
+                                    ? (isNegative
+                                        ? const Color(0xFFEF4444).withValues(alpha: 0.2)
+                                        : seriousGold.withValues(alpha: 0.18))
+                                    : accentCompleted.withValues(alpha: 0.15);
+                                final Color ptsBadgeFg = widget.isSeriousMode
+                                    ? (isNegative ? const Color(0xFFF87171) : seriousGold)
+                                    : accentCompleted;
+
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 1.5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: ptsBadgeBg,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: isNegative
+                                        ? Border.all(
+                                            color: const Color(0xFFEF4444).withValues(alpha: 0.4),
+                                            width: 0.8,
+                                          )
+                                        : null,
+                                  ),
+                                  child: Text(
+                                    ptsText,
+                                    style: TextStyle(
+                                      color: ptsBadgeFg,
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                );
+                              }(),
                             ],
                           ),
                         ],
