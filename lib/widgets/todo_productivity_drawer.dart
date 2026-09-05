@@ -6,7 +6,6 @@ import 'package:daily_apps/pages/serious_punishment_config_page.dart';
 import 'package:daily_apps/pages/todo_riwayat_page.dart';
 import 'package:daily_apps/pages/tugas_harian_page.dart';
 import 'package:daily_apps/utils/serious_mode_service.dart';
-import 'package:daily_apps/widgets/serious_mode_auth_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

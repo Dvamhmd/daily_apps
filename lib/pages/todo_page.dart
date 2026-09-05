@@ -2214,7 +2214,6 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
     int targetIndex,
   ) {
     if (_isSeriousMode || itemsToReorder.isEmpty) return;
-    final originalItems = List<TodoItem>.from(group.items);
 
     HapticFeedback.selectionClick();
     setState(() {

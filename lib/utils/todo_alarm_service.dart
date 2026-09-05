@@ -442,6 +442,12 @@ class TodoAlarmService {
   static void _startForegroundTicker() {
     _foregroundTicker?.cancel();
     _foregroundTicker = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_registeredGroups.isEmpty) return;
+
+      if (_triggeredKeys.length > 300) {
+        _triggeredKeys.clear();
+      }
+
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
 

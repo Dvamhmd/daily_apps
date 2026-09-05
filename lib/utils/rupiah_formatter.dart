@@ -3,9 +3,11 @@ import 'package:intl/intl.dart';
 
 
 class RupiahFormatter {
+  static final NumberFormat _formatter = NumberFormat('#,###', 'id_ID');
+  static final RegExp _nonDigitsRegex = RegExp(r'[^0-9]');
+
   static String format(int value) {
-    final formatter = NumberFormat('#,###', 'id_ID');
-    return formatter.format(value).replaceAll(',', '.');
+    return _formatter.format(value).replaceAll(',', '.');
   }
 
   static String formatRaw(int value) {
@@ -14,14 +16,16 @@ class RupiahFormatter {
 
   static int parse(String? text) {
     if (text == null || text.trim().isEmpty) return 0;
-    final digits = text.replaceAll(RegExp(r'[^0-9]'), '');
+    final digits = text.replaceAll(_nonDigitsRegex, '');
     return int.tryParse(digits) ?? 0;
   }
 }
 
 
 class RupiahInputFormatter extends TextInputFormatter {
-  final NumberFormat _formatter = NumberFormat.decimalPattern('id');
+  static final NumberFormat _sharedFormatter = NumberFormat.decimalPattern('id');
+  static final RegExp _nonDigitsRegex = RegExp(r'[^0-9]');
+  static final RegExp _digitRegex = RegExp(r'\d');
 
   @override
   TextEditingValue formatEditUpdate(
@@ -34,7 +38,7 @@ class RupiahInputFormatter extends TextInputFormatter {
     }
 
     // ambil angka saja
-    final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final digits = newValue.text.replaceAll(_nonDigitsRegex, '');
     if (digits.isEmpty) {
       return const TextEditingValue();
     }
@@ -49,17 +53,17 @@ class RupiahInputFormatter extends TextInputFormatter {
     if (offset < 0) offset = newValue.text.length;
     int digitsBeforeCursor = newValue.text
         .substring(0, offset.clamp(0, newValue.text.length))
-        .replaceAll(RegExp(r'[^0-9]'), '')
+        .replaceAll(_nonDigitsRegex, '')
         .length;
 
-    final formatted = _formatter.format(parsed);
+    final formatted = _sharedFormatter.format(parsed);
 
     // cari posisi cursor baru
     int digitCount = 0;
     int newOffset = 0;
 
     for (; newOffset < formatted.length; newOffset++) {
-      if (RegExp(r'\d').hasMatch(formatted[newOffset])) {
+      if (_digitRegex.hasMatch(formatted[newOffset])) {
         digitCount++;
       }
       if (digitCount == digitsBeforeCursor) {

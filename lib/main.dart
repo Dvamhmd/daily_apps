@@ -271,14 +271,29 @@ class _KeuanganPageState extends State<KeuanganPage> {
   bool uangkuOnlyCair = false;
 
   // Total Keuangan Harian
-  int get totalTagihan =>
-      tagihanList.fold<int>(0, (sum, e) => sum + e.jumlah);
+  int get totalTagihan {
+    int sum = 0;
+    for (final e in tagihanList) {
+      sum += e.jumlah;
+    }
+    return sum;
+  }
 
-  int get totalUangku =>
-      uangkuList.fold<int>(0, (sum, e) => sum + e.jumlah);
+  int get totalUangku {
+    int sum = 0;
+    for (final e in uangkuList) {
+      sum += e.jumlah;
+    }
+    return sum;
+  }
 
-  int get totalUangkuCair =>
-      uangkuList.where((e) => e.isCair).fold<int>(0, (sum, e) => sum + e.jumlah);
+  int get totalUangkuCair {
+    int sum = 0;
+    for (final e in uangkuList) {
+      if (e.isCair) sum += e.jumlah;
+    }
+    return sum;
+  }
 
   int get totalUangkuDihitung =>
       uangkuOnlyCair ? totalUangkuCair : totalUangku;
@@ -309,8 +324,41 @@ class _KeuanganPageState extends State<KeuanganPage> {
     return tagihanList;
   }
 
-  int get totalTagihanDanaAman =>
-      filteredTagihanDanaAman.fold<int>(0, (sum, e) => sum + e.jumlah);
+  int get totalTagihanDanaAman {
+    if (danaAmanFilterMode == 'has_deadline') {
+      int sum = 0;
+      for (final t in tagihanList) {
+        if (t.deadline != null) sum += t.jumlah;
+      }
+      return sum;
+    } else if (danaAmanFilterMode == 'custom_date' &&
+        danaAmanCutoffDate != null) {
+      final cutoff = DateTime(
+        danaAmanCutoffDate!.year,
+        danaAmanCutoffDate!.month,
+        danaAmanCutoffDate!.day,
+        23,
+        59,
+        59,
+      );
+      final cutoffDateOnly = DateTime(
+        danaAmanCutoffDate!.year,
+        danaAmanCutoffDate!.month,
+        danaAmanCutoffDate!.day,
+      );
+      int sum = 0;
+      for (final t in tagihanList) {
+        if (t.deadline == null) continue;
+        final d =
+            DateTime(t.deadline!.year, t.deadline!.month, t.deadline!.day);
+        if (d.isBefore(cutoff) || d.isAtSameMomentAs(cutoffDateOnly)) {
+          sum += t.jumlah;
+        }
+      }
+      return sum;
+    }
+    return totalTagihan;
+  }
 
   // Dana Aman untuk Keuangan Harian (disesuaikan dengan filter deadline & filter uangku cair)
   int get danaAman => totalUangkuDihitung - totalTagihanDanaAman;
