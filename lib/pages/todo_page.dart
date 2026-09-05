@@ -4424,13 +4424,14 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                             ),
 
                           // Kartu Evaluasi Mode Serius untuk Section yang Terlewat
-                          () {
-                            final eval = SeriousModeService.evaluateSection(group);
-                            if (eval != null) {
-                              return _buildSeriousEvaluationCard(eval);
-                            }
-                            return const SizedBox.shrink();
-                          }(),
+                          if (_isSeriousMode)
+                            () {
+                              final eval = SeriousModeService.evaluateSection(group);
+                              if (eval != null) {
+                                return _buildSeriousEvaluationCard(eval);
+                              }
+                              return const SizedBox.shrink();
+                            }(),
 
                           // Tombol Arsipkan Section Jika Sudah 100% Selesai
                           if (group.isAllCompleted && group.items.isNotEmpty)
