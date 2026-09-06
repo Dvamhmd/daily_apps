@@ -2640,8 +2640,10 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
     return ValueListenableBuilder<Set<String>>(
       valueListenable: _activeDraggingTaskIdsNotifier,
       builder: (context, activeDraggedIds, _) {
-        final isItemBeingDragged = activeDraggedIds.contains(item.id) ||
-            (_isDraggingTasks && (isSelected || _draggingTaskId == item.id));
+        final isItemBeingDragged = _isDraggingTasks &&
+            (activeDraggedIds.contains(item.id) ||
+                isSelected ||
+                _draggingTaskId == item.id);
 
         return DragTarget<TodoDragPayload>(
           onWillAcceptWithDetails: (details) => true,
@@ -5414,30 +5416,17 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                   ),
                 )
               else ...[
-                Listener(
-                  onPointerDown: (_) {
-                    if (_selectedTaskIds.contains(item.id)) {
-                      _activeDraggingTaskIdsNotifier.value =
-                          Set<String>.from(_selectedTaskIds);
-                    } else {
-                      _activeDraggingTaskIdsNotifier.value = {item.id};
-                    }
-                  },
-                  onPointerCancel: (_) {
-                    _activeDraggingTaskIdsNotifier.value = {};
-                  },
-                  child: ReorderableDragStartListener(
-                    index: index,
-                    child: MouseRegion(
-                      cursor: SystemMouseCursors.grab,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                        color: Colors.transparent,
-                        child: const Icon(
-                          Icons.drag_indicator_rounded,
-                          size: 19,
-                          color: Color(0xFF94A3B8),
-                        ),
+                ReorderableDragStartListener(
+                  index: index,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.grab,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                      color: Colors.transparent,
+                      child: const Icon(
+                        Icons.drag_indicator_rounded,
+                        size: 19,
+                        color: Color(0xFF94A3B8),
                       ),
                     ),
                   ),
