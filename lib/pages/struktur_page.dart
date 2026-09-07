@@ -9120,9 +9120,11 @@ class _StrukturPageState extends State<StrukturPage> {
             // Filter data untuk Tab Laporan Keuangan
             List<StrukturTransaction> activeList;
             if (selectedSubTab == 'pengeluaran') {
-              activeList = allMutasi.where((tx) => tx.isPengeluaran).toList();
+              activeList =
+                  allMutasi.where((tx) => tx.isPurePengeluaran).toList();
             } else if (selectedSubTab == 'pemasukan') {
-              activeList = allMutasi.where((tx) => tx.isPemasukan).toList();
+              activeList =
+                  allMutasi.where((tx) => tx.isPurePemasukan).toList();
             } else {
               activeList = allMutasi;
             }
@@ -11854,13 +11856,15 @@ class _StrukturPageState extends State<StrukturPage> {
             for (int i = 0; i < allTx.length; i++) {
               final tx = allTx[i];
               if (tx.isPemasukan) {
-                countPemasukan++;
-                if (selectedTab == 'pemasukan' || selectedTab == 'semua') {
+                if (tx.isPurePemasukan) countPemasukan++;
+                if ((selectedTab == 'pemasukan' && tx.isPurePemasukan) ||
+                    selectedTab == 'semua') {
                   filteredTx.add(tx);
                 }
               } else if (tx.isPengeluaran) {
-                countPengeluaran++;
-                if (selectedTab == 'pengeluaran' || selectedTab == 'semua') {
+                if (tx.isPurePengeluaran) countPengeluaran++;
+                if ((selectedTab == 'pengeluaran' && tx.isPurePengeluaran) ||
+                    selectedTab == 'semua') {
                   filteredTx.add(tx);
                 }
               }

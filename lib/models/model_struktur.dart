@@ -218,14 +218,29 @@ class StrukturTransaction {
 
   bool get isPemasukan => type == 'pemasukan';
   bool get isPengeluaran => type == 'pengeluaran';
-  bool get isAlokasiInternal =>
-      isInternalTransfer || (!isPemasukan && !isPengeluaran);
+  bool get isAlokasiInternal {
+    if (isInternalTransfer) return true;
+    if (sourceAccount != null && targetAccount != null) return true;
+    final combined =
+        '$title ${note ?? ''} ${ku ?? ''} ${kode ?? ''}'.toLowerCase();
+    if (combined.contains('tarik tunai') ||
+        combined.contains('setor tunai') ||
+        combined.contains('alokasi dana') ||
+        combined.contains('transfer ke on hand') ||
+        combined.contains('transfer dari rekening') ||
+        combined.contains('transfer on hand') ||
+        combined.contains('top-up debit') ||
+        combined.contains('terima tunai dari atm')) {
+      return true;
+    }
+    return !isPemasukan && !isPengeluaran;
+  }
 
   /// Pemasukan murni dari luar yang menambah total saldo struktur
-  bool get isPurePemasukan => isPemasukan && !isInternalTransfer;
+  bool get isPurePemasukan => isPemasukan && !isAlokasiInternal;
 
   /// Pengeluaran murni ke luar yang mengurangi total saldo struktur
-  bool get isPurePengeluaran => isPengeluaran && !isInternalTransfer;
+  bool get isPurePengeluaran => isPengeluaran && !isAlokasiInternal;
 
   /// Helper untuk auto-resolve KU transaksi berdasarkan kata kunci teks keterangan/judul dan daftar kustomisasi KU
   static String resolveKuFromText(String text,
@@ -361,7 +376,9 @@ class StrukturTransaction {
           combined.contains('alokasi dana') ||
           combined.contains('transfer ke on hand') ||
           combined.contains('transfer dari rekening') ||
-          combined.contains('transfer on hand')) {
+          combined.contains('transfer on hand') ||
+          combined.contains('top-up debit') ||
+          combined.contains('terima tunai dari atm')) {
         isInternal = true;
       }
     }
