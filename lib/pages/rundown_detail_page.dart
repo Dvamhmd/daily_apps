@@ -3,6 +3,7 @@ import 'package:daily_apps/models/model_rundown.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:daily_apps/widgets/dialog_tambah_rundown.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
@@ -2176,6 +2177,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     required Widget child,
     required void Function(double delta) onResize,
   }) {
+    final double handleHitWidth = _isResizeMode ? 36.0 : 18.0;
     return SizedBox(
       width: width,
       height: 34.0,
@@ -2184,20 +2186,21 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
         children: [
           Positioned.fill(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 6),
               child: child,
             ),
           ),
           // Column divider resize handle (Google Sheets / Excel style)
           Positioned(
-            right: -8,
+            right: -(handleHitWidth / 2),
             top: 0,
             bottom: 0,
-            width: 16,
+            width: handleHitWidth,
             child: MouseRegion(
               cursor: SystemMouseCursors.resizeColumn,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
+                dragStartBehavior: DragStartBehavior.down,
                 onHorizontalDragUpdate: (details) {
                   onResize(details.delta.dx);
                 },
@@ -2205,18 +2208,18 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 child: Center(
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
-                    width: _isResizeMode ? 3.0 : 1.0,
-                    height: double.infinity,
+                    width: _isResizeMode ? 4.0 : 1.0,
+                    height: _isResizeMode ? 22.0 : double.infinity,
                     decoration: BoxDecoration(
                       color: _isResizeMode
                           ? primaryTeal
                           : const Color(0xFFCBD5E1),
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(2.5),
                       boxShadow: _isResizeMode
                           ? [
                               BoxShadow(
-                                color: primaryTeal.withValues(alpha: 0.4),
-                                blurRadius: 3,
+                                color: primaryTeal.withValues(alpha: 0.45),
+                                blurRadius: 4,
                               ),
                             ]
                           : null,
@@ -2268,10 +2271,10 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 _colMulaiWidth = (_colMulaiWidth + delta).clamp(50.0, 160.0);
               });
             },
-            child: const Align(
-              alignment: Alignment.centerLeft,
+            child: const Center(
               child: Text(
                 'Mulai',
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 11.0,
                   fontWeight: FontWeight.bold,
@@ -2292,10 +2295,10 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                     (_colSelesaiWidth + delta).clamp(50.0, 160.0);
               });
             },
-            child: const Align(
-              alignment: Alignment.centerLeft,
+            child: const Center(
               child: Text(
                 'Selesai',
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 11.0,
                   fontWeight: FontWeight.bold,
@@ -2315,10 +2318,10 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 _colDurasiWidth = (_colDurasiWidth + delta).clamp(45.0, 140.0);
               });
             },
-            child: const Align(
-              alignment: Alignment.centerLeft,
+            child: const Center(
               child: Text(
                 'Durasi',
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 11.0,
                   fontWeight: FontWeight.bold,
@@ -2339,10 +2342,10 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                     (_colKegiatanWidth + delta).clamp(120.0, 600.0);
               });
             },
-            child: const Align(
-              alignment: Alignment.centerLeft,
+            child: const Center(
               child: Text(
                 'Kegiatan',
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 11.0,
                   fontWeight: FontWeight.bold,
@@ -2365,31 +2368,35 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                       (colW + delta).clamp(60.0, 400.0);
                 });
               },
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      colName,
-                      style: const TextStyle(
-                        fontSize: 11.0,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
+              child: Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        colName,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 11.0,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  InkWell(
-                    onTap: () => _deleteCustomColumn(colName),
-                    borderRadius: BorderRadius.circular(10),
-                    child: const Padding(
-                      padding: EdgeInsets.all(2.0),
-                      child: Icon(Icons.close_rounded,
-                          size: 12, color: Colors.redAccent),
+                    InkWell(
+                      onTap: () => _deleteCustomColumn(colName),
+                      borderRadius: BorderRadius.circular(10),
+                      child: const Padding(
+                        padding: EdgeInsets.all(2.0),
+                        child: Icon(Icons.close_rounded,
+                            size: 12, color: Colors.redAccent),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 2),
-                ],
+                  ],
+                ),
               ),
             );
           }),
@@ -2701,12 +2708,13 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
           Positioned(
             left: 0,
             right: 0,
-            bottom: -6,
-            height: 12,
+            bottom: _isResizeMode ? -14.0 : -6.0,
+            height: _isResizeMode ? 28.0 : 12.0,
             child: MouseRegion(
               cursor: SystemMouseCursors.resizeRow,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
+                dragStartBehavior: DragStartBehavior.down,
                 onVerticalDragUpdate: (details) {
                   setState(() {
                     _rowHeight =
@@ -2717,11 +2725,22 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 child: Center(
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
-                    height: _isResizeMode ? 3.0 : 1.0,
-                    width: double.infinity,
-                    color: _isResizeMode
-                        ? primaryTeal.withValues(alpha: 0.8)
-                        : Colors.transparent,
+                    height: _isResizeMode ? 4.0 : 1.0,
+                    width: _isResizeMode ? 56.0 : double.infinity,
+                    decoration: BoxDecoration(
+                      color: _isResizeMode
+                          ? primaryTeal
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(2),
+                      boxShadow: _isResizeMode
+                          ? [
+                              BoxShadow(
+                                color: primaryTeal.withValues(alpha: 0.45),
+                                blurRadius: 3,
+                              ),
+                            ]
+                          : null,
+                    ),
                   ),
                 ),
               ),
