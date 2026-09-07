@@ -1837,24 +1837,34 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: primaryTeal.withValues(alpha: 0.5)),
+        border: Border.all(
+          color: primaryTeal.withValues(alpha: 0.35),
+          width: 1.2,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
+            color: primaryTeal.withValues(alpha: 0.08),
             blurRadius: 10,
-            offset: const Offset(0, 4),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(6),
+            padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
               color: primaryTeal,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(9),
+              boxShadow: [
+                BoxShadow(
+                  color: primaryTeal.withValues(alpha: 0.25),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: const Icon(Icons.open_with_rounded,
                 color: Colors.white, size: 16),
@@ -1868,7 +1878,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 Text(
                   'Mode Kustom Ukuran Aktif',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF0F172A),
                     fontWeight: FontWeight.bold,
                     fontSize: 12.5,
                   ),
@@ -1876,7 +1886,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 Text(
                   'Geser garis pembatas kolom (↔) atau baris (↕) langsung di tabel.',
                   style: TextStyle(
-                    color: Color(0xFF94A3B8),
+                    color: Color(0xFF64748B),
                     fontSize: 11,
                   ),
                 ),
@@ -1907,7 +1917,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             child: const Text(
               'Reset',
               style: TextStyle(
-                color: Color(0xFF38BDF8),
+                color: primaryTeal,
                 fontWeight: FontWeight.bold,
                 fontSize: 11.5,
               ),
@@ -1916,11 +1926,11 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
           // Slider / Opsi Presisi Button
           TextButton.icon(
             onPressed: _openTableDimensionsModal,
-            icon: const Icon(Icons.tune_rounded, size: 14, color: Colors.white70),
+            icon: const Icon(Icons.tune_rounded, size: 14, color: Color(0xFF475569)),
             label: const Text(
               'Slider',
               style: TextStyle(
-                color: Colors.white,
+                color: Color(0xFF475569),
                 fontWeight: FontWeight.bold,
                 fontSize: 11.5,
               ),
