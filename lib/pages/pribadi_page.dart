@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:daily_apps/models/model_pribadi.dart';
 import 'package:daily_apps/utils/custom_rule_import_helper.dart';
+import 'package:daily_apps/utils/pribadi_sync_service.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:file_picker/file_picker.dart';
@@ -264,178 +265,11 @@ class _PribadiPageState extends State<PribadiPage> {
   }
 
   Future<void> _loadData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final monthlyKey = 'pribadi_keuangan_data_$_monthKey';
-    final raw = prefs.getString(monthlyKey);
-
-    if (raw != null) {
-      try {
-        final decoded = jsonDecode(raw);
-        if (decoded is Map<String, dynamic>) {
-          if (mounted) {
-            final loaded = PribadiData.fromJson(decoded);
-            if (loaded.posDanaList.isEmpty) {
-              final totalLegacy = loaded.rekeningPribadi.balance +
-                  loaded.onHandDebit.balance +
-                  loaded.onHandCash.balance;
-              loaded.posDanaList = [
-                PosDana(
-                  id: 'pos_1',
-                  nama: 'Rekening Utama',
-                  balance: loaded.rekeningPribadi.balance > 0
-                      ? loaded.rekeningPribadi.balance
-                      : (totalLegacy > 0 ? totalLegacy : 0),
-                  deskripsi: 'Wadah Utama Pemasukan',
-                  iconName: 'account_balance',
-                ),
-                PosDana(
-                  id: 'pos_2',
-                  nama: 'Dompet & Kas',
-                  balance: (loaded.onHandDebit.balance +
-                              loaded.onHandCash.balance) >
-                          0
-                      ? (loaded.onHandDebit.balance + loaded.onHandCash.balance)
-                      : 0,
-                  deskripsi: 'Dana Operasional & Tunai',
-                  iconName: 'wallet',
-                ),
-                PosDana(
-                  id: 'pos_3',
-                  nama: 'Tabungan & Darurat',
-                  balance: 0,
-                  deskripsi: 'Simpanan Pribadi',
-                  iconName: 'savings',
-                ),
-              ];
-            }
-            _migrateKodeRules(loaded);
-            setState(() {
-              _data = loaded;
-              _isLoading = false;
-            });
-          }
-          return;
-        }
-      } catch (_) {}
-    }
-
-    // Fallback template data dari 'pribadi_keuangan_data'
-    final templateRaw = prefs.getString('pribadi_keuangan_data');
-    if (templateRaw != null) {
-      try {
-        final decoded = jsonDecode(templateRaw);
-        if (decoded is Map<String, dynamic>) {
-          final template = PribadiData.fromJson(decoded);
-          final newPosList = template.posDanaList.isNotEmpty
-              ? template.posDanaList
-                  .map((p) => PosDana(
-                        id: p.id,
-                        nama: p.nama,
-                        balance: 0,
-                        deskripsi: p.deskripsi,
-                        iconName: p.iconName,
-                      ))
-                  .toList()
-              : [
-                  PosDana(
-                    id: 'pos_1',
-                    nama: 'Rekening Utama',
-                    balance: 0,
-                    deskripsi: 'Wadah Utama Pemasukan',
-                    iconName: 'account_balance',
-                  ),
-                  PosDana(
-                    id: 'pos_2',
-                    nama: 'Dompet & Kas',
-                    balance: 0,
-                    deskripsi: 'Dana Operasional & Tunai',
-                    iconName: 'wallet',
-                  ),
-                  PosDana(
-                    id: 'pos_3',
-                    nama: 'Tabungan & Darurat',
-                    balance: 0,
-                    deskripsi: 'Simpanan Pribadi',
-                    iconName: 'savings',
-                  ),
-                ];
-
-          final newMonthData = PribadiData(
-            posDanaList: newPosList,
-            rekeningPribadi: RekeningPribadi(
-              bankName: template.rekeningPribadi.bankName,
-              accountNumber: template.rekeningPribadi.accountNumber,
-              accountHolder: template.rekeningPribadi.accountHolder,
-              balance: 0,
-            ),
-            onHandDebit: OnHandDebit(
-              bankName: template.onHandDebit.bankName,
-              accountNumber: template.onHandDebit.accountNumber,
-              accountHolder: template.onHandDebit.accountHolder,
-              balance: 0,
-            ),
-            onHandCash: OnHandCash(balance: 0),
-            transactions: [],
-            customKodeRules: List.from(template.customKodeRules),
-          );
-          _migrateKodeRules(newMonthData);
-          if (mounted) {
-            setState(() {
-              _data = newMonthData;
-              _isLoading = false;
-            });
-          }
-          await _saveData();
-          return;
-        }
-      } catch (_) {}
-    }
-
-    // Default data baru
-    final defaultData = PribadiData(
-      posDanaList: [
-        PosDana(
-          id: 'pos_1',
-          nama: 'Rekening Utama',
-          balance: 0,
-          deskripsi: 'Wadah Utama Pemasukan',
-          iconName: 'account_balance',
-        ),
-        PosDana(
-          id: 'pos_2',
-          nama: 'Dompet & Kas',
-          balance: 0,
-          deskripsi: 'Dana Operasional & Tunai',
-          iconName: 'wallet',
-        ),
-        PosDana(
-          id: 'pos_3',
-          nama: 'Tabungan & Darurat',
-          balance: 0,
-          deskripsi: 'Simpanan Pribadi',
-          iconName: 'savings',
-        ),
-      ],
-      rekeningPribadi: RekeningPribadi(
-        bankName: 'BCA',
-        accountNumber: '',
-        accountHolder: '',
-        balance: 0,
-      ),
-      onHandDebit: OnHandDebit(
-        bankName: 'BCA',
-        accountNumber: '',
-        accountHolder: '',
-        balance: 0,
-      ),
-      onHandCash: OnHandCash(balance: 0),
-      transactions: [],
-      customKodeRules: PersonalDefaultRules.defaultRules(),
-    );
-
+    final loaded = await PribadiSyncService.loadPribadiData(_monthKey);
+    _migrateKodeRules(loaded);
     if (mounted) {
       setState(() {
-        _data = defaultData;
+        _data = loaded;
         _isLoading = false;
       });
     }
@@ -4037,9 +3871,14 @@ class _PribadiPageState extends State<PribadiPage> {
                                       ),
                                     );
                                     if (confirm == true) {
+                                      final deletedName = pos.nama;
                                       _data.posDanaList.removeWhere(
                                           (p) => p.id == pos.id);
                                       await _saveData();
+                                      await PribadiSyncService.syncHapusPosDanaToUangku(
+                                        monthKey: _monthKey,
+                                        nama: deletedName,
+                                      );
                                       setModalState(() {});
                                       setState(() {});
                                     }
@@ -4171,9 +4010,17 @@ class _PribadiPageState extends State<PribadiPage> {
                     : null;
 
                 if (isEdit) {
+                  final oldName = pos.nama;
                   pos.nama = nama;
                   pos.balance = saldo;
                   pos.deskripsi = desc;
+                  await _saveData();
+                  await PribadiSyncService.syncEditPosDanaToUangku(
+                    monthKey: _monthKey,
+                    namaLama: oldName,
+                    namaBaru: nama,
+                    saldoBaru: saldo,
+                  );
                 } else {
                   _data.posDanaList.add(
                     PosDana(
@@ -4183,10 +4030,15 @@ class _PribadiPageState extends State<PribadiPage> {
                       deskripsi: desc,
                     ),
                   );
+                  await _saveData();
+                  await PribadiSyncService.syncAddPosDanaToUangku(
+                    monthKey: _monthKey,
+                    nama: nama,
+                    saldo: saldo,
+                  );
                 }
 
                 Navigator.pop(ctx);
-                await _saveData();
                 if (mounted) {
                   onSaved?.call();
                 }

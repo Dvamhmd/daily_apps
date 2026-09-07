@@ -223,6 +223,11 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                     ),
                     decoration: InputDecoration(
                       hintText: 'Contoh: 1.000.000',
+                      hintStyle: const TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 15,
+                        fontWeight: FontWeight.normal,
+                      ),
                       filled: true,
                       fillColor: Colors.grey[100],
                       border: OutlineInputBorder(
@@ -395,6 +400,12 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                   fontWeight: FontWeight.w500,
                 ),
                 decoration: InputDecoration(
+                  hintText: 'Pos dana',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 14,
+                    fontWeight: FontWeight.normal,
+                  ),
                   filled: true,
                   fillColor: Colors.grey[100],
                   border: OutlineInputBorder(
@@ -425,6 +436,12 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                   fontWeight: FontWeight.w500,
                 ),
                 decoration: InputDecoration(
+                  hintText: 'Jumlah dana',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 14,
+                    fontWeight: FontWeight.normal,
+                  ),
                   filled: true,
                   fillColor: Colors.grey[100],
                   border: OutlineInputBorder(
@@ -529,6 +546,12 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                   fontWeight: FontWeight.w500,
                 ),
                 decoration: InputDecoration(
+                  hintText: 'Pos dana',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 14,
+                    fontWeight: FontWeight.normal,
+                  ),
                   filled: true,
                   fillColor: Colors.grey[100],
                   border: OutlineInputBorder(
@@ -559,6 +582,12 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                   fontWeight: FontWeight.w500,
                 ),
                 decoration: InputDecoration(
+                  hintText: 'Jumlah dana',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 14,
+                    fontWeight: FontWeight.normal,
+                  ),
                   filled: true,
                   fillColor: Colors.grey[100],
                   border: OutlineInputBorder(

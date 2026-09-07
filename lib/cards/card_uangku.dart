@@ -398,15 +398,13 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     if (isDpEnabled && jumlah > 0 && newUangku.isCair) {
                       await _tambah10PersenKeTagihanDp(jumlah);
                     }
-                    if (jumlah > 0) {
-                      await PribadiSyncService.recordPemasukanFromUangku(
-                        nama: nama,
-                        nominal: jumlah,
-                        date: selectedTanggalCair,
-                        selectedMonth: widget.selectedMonth,
-                        keterangan: nama,
-                      );
-                    }
+                    await PribadiSyncService.recordPemasukanFromUangku(
+                      nama: nama,
+                      nominal: jumlah,
+                      date: selectedTanggalCair,
+                      selectedMonth: widget.selectedMonth,
+                      keterangan: nama,
+                    );
                     await RiwayatService.catatTambahUangku(
                       nama,
                       jumlah,

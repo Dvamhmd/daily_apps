@@ -1145,6 +1145,11 @@ class _KeuanganPageState extends State<KeuanganPage> {
                     ),
                     decoration: InputDecoration(
                       hintText: 'Contoh: 1.000.000',
+                      hintStyle: const TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 15,
+                        fontWeight: FontWeight.normal,
+                      ),
                       filled: true,
                       fillColor: Colors.grey[100],
                       border: OutlineInputBorder(
