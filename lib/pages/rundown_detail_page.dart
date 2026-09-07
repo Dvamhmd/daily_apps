@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:daily_apps/models/model_rundown.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/widgets/custom_toast.dart';
@@ -5,6 +6,7 @@ import 'package:daily_apps/widgets/dialog_tambah_rundown.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RundownDetailPage extends StatefulWidget {
   final Rundown rundown;
@@ -39,6 +41,19 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
   final ScrollController _horizontalScrollController = ScrollController();
   double _currentZoom = 1.0;
 
+  // Mode Kustom Ukuran (Spreadsheet / Excel style interactive drag-to-resize)
+  bool _isResizeMode = false;
+
+  // Customizable Column Widths and Row Height
+  double _rowHeight = 36.0;
+  double _colNoWidth = 36.0;
+  double _colMulaiWidth = 74.0;
+  double _colSelesaiWidth = 74.0;
+  double _colDurasiWidth = 72.0;
+  double _colKegiatanWidth = 240.0;
+  double _colCustomWidth = 140.0;
+  final Map<String, double> _customColWidths = {};
+
   // Touch pointer tracking for highly responsive and accurate pinch-to-zoom
   final Map<int, Offset> _activePointers = {};
   double? _initialPinchDistance;
@@ -50,6 +65,64 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     super.initState();
     _rundown = widget.rundown;
     _ensureDefaultRows();
+    _loadTableSettings();
+  }
+
+  double _getColCustomWidth(String colName) {
+    return _customColWidths[colName] ?? _colCustomWidth;
+  }
+
+  void _toggleResizeMode() {
+    setState(() {
+      _isResizeMode = !_isResizeMode;
+    });
+    if (!_isResizeMode) {
+      _saveTableSettings();
+    }
+  }
+
+  Future<void> _loadTableSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      final customWidthsJson = prefs.getString('rundown_custom_col_widths');
+      if (customWidthsJson != null) {
+        try {
+          final Map<String, dynamic> decoded = jsonDecode(customWidthsJson);
+          _customColWidths.clear();
+          decoded.forEach((k, v) {
+            if (v is num) {
+              _customColWidths[k] = v.toDouble();
+            }
+          });
+        } catch (_) {}
+      }
+      setState(() {
+        _rowHeight = prefs.getDouble('rundown_row_height') ?? 36.0;
+        _colKegiatanWidth =
+            prefs.getDouble('rundown_col_kegiatan_width') ?? 240.0;
+        _colMulaiWidth = prefs.getDouble('rundown_col_mulai_width') ?? 74.0;
+        _colSelesaiWidth = prefs.getDouble('rundown_col_selesai_width') ?? 74.0;
+        _colDurasiWidth = prefs.getDouble('rundown_col_durasi_width') ?? 72.0;
+        _colCustomWidth = prefs.getDouble('rundown_col_custom_width') ?? 140.0;
+        _colNoWidth = prefs.getDouble('rundown_col_no_width') ?? 36.0;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _saveTableSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('rundown_row_height', _rowHeight);
+      await prefs.setDouble('rundown_col_kegiatan_width', _colKegiatanWidth);
+      await prefs.setDouble('rundown_col_mulai_width', _colMulaiWidth);
+      await prefs.setDouble('rundown_col_selesai_width', _colSelesaiWidth);
+      await prefs.setDouble('rundown_col_durasi_width', _colDurasiWidth);
+      await prefs.setDouble('rundown_col_custom_width', _colCustomWidth);
+      await prefs.setDouble('rundown_col_no_width', _colNoWidth);
+      await prefs.setString(
+          'rundown_custom_col_widths', jsonEncode(_customColWidths));
+    } catch (_) {}
   }
 
   @override
@@ -730,6 +803,426 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     }
   }
 
+  // --- CUSTOM TABLE DIMENSIONS (ROW HEIGHT & COLUMN WIDTHS) ---
+
+  Future<void> _openTableDimensionsModal() async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.85,
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Drag Handle
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Header with Reset Button
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.tune_rounded,
+                                color: primaryTeal, size: 22),
+                            SizedBox(width: 8),
+                            Text(
+                              'Kustom Ukuran Tabel',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                        TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _rowHeight = 36.0;
+                              _colKegiatanWidth = 240.0;
+                              _colMulaiWidth = 74.0;
+                              _colSelesaiWidth = 74.0;
+                              _colDurasiWidth = 72.0;
+                              _colCustomWidth = 140.0;
+                              _colNoWidth = 36.0;
+                            });
+                            setModalState(() {});
+                            _saveTableSettings();
+                          },
+                          icon: const Icon(Icons.refresh_rounded,
+                              size: 15, color: primaryTeal),
+                          label: const Text(
+                            'Reset Standar',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: primaryTeal,
+                            ),
+                          ),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Sesuaikan tinggi baris dan lebar kolom agar pas dan nyaman di layar.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                    const SizedBox(height: 12),
+
+                    // Scrollable Settings Content
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 1. TINGGI BARIS SECTION
+                            _buildDimensionSliderSection(
+                              icon: Icons.table_rows_rounded,
+                              title: 'Tinggi Baris (Row Height)',
+                              value: _rowHeight,
+                              min: 26.0,
+                              max: 60.0,
+                              unit: 'px',
+                              presetOptions: [
+                                {'label': 'Kompak', 'value': 30.0},
+                                {'label': 'Standar', 'value': 36.0},
+                                {'label': 'Nyaman', 'value': 42.0},
+                                {'label': 'Luas', 'value': 50.0},
+                              ],
+                              onChanged: (val) {
+                                setState(() => _rowHeight = val);
+                                setModalState(() {});
+                                _saveTableSettings();
+                              },
+                            ),
+
+                            const SizedBox(height: 16),
+                            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                            const SizedBox(height: 16),
+
+                            // 2. LEBAR KOLOM KEGIATAN
+                            _buildDimensionSliderSection(
+                              icon: Icons.event_note_rounded,
+                              title: 'Lebar Kolom Kegiatan',
+                              value: _colKegiatanWidth,
+                              min: 150.0,
+                              max: 450.0,
+                              unit: 'px',
+                              presetOptions: [
+                                {'label': 'Ringkas', 'value': 180.0},
+                                {'label': 'Standar', 'value': 240.0},
+                                {'label': 'Lebar', 'value': 320.0},
+                                {'label': 'Maksimal', 'value': 400.0},
+                              ],
+                              onChanged: (val) {
+                                setState(() => _colKegiatanWidth = val);
+                                setModalState(() {});
+                                _saveTableSettings();
+                              },
+                            ),
+
+                            const SizedBox(height: 16),
+                            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                            const SizedBox(height: 16),
+
+                            // 3. LEBAR KOLOM WAKTU MULAI & SELESAI
+                            _buildDimensionSliderSection(
+                              icon: Icons.access_time_rounded,
+                              title: 'Lebar Kolom Waktu Mulai & Selesai',
+                              value: _colMulaiWidth,
+                              min: 55.0,
+                              max: 120.0,
+                              unit: 'px',
+                              presetOptions: [
+                                {'label': 'Kecil', 'value': 62.0},
+                                {'label': 'Standar', 'value': 74.0},
+                                {'label': 'Lebar', 'value': 90.0},
+                              ],
+                              onChanged: (val) {
+                                setState(() {
+                                  _colMulaiWidth = val;
+                                  _colSelesaiWidth = val;
+                                });
+                                setModalState(() {});
+                                _saveTableSettings();
+                              },
+                            ),
+
+                            const SizedBox(height: 16),
+                            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                            const SizedBox(height: 16),
+
+                            // 4. LEBAR KOLOM DURASI
+                            _buildDimensionSliderSection(
+                              icon: Icons.timer_outlined,
+                              title: 'Lebar Kolom Durasi',
+                              value: _colDurasiWidth,
+                              min: 55.0,
+                              max: 120.0,
+                              unit: 'px',
+                              presetOptions: [
+                                {'label': 'Kecil', 'value': 62.0},
+                                {'label': 'Standar', 'value': 72.0},
+                                {'label': 'Lebar', 'value': 88.0},
+                              ],
+                              onChanged: (val) {
+                                setState(() => _colDurasiWidth = val);
+                                setModalState(() {});
+                                _saveTableSettings();
+                              },
+                            ),
+
+                            const SizedBox(height: 16),
+                            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                            const SizedBox(height: 16),
+
+                            // 5. LEBAR KOLOM TAMBAHAN / KUSTOM
+                            _buildDimensionSliderSection(
+                              icon: Icons.view_column_rounded,
+                              title: 'Lebar Kolom Kustom (Tambahan)',
+                              value: _colCustomWidth,
+                              min: 90.0,
+                              max: 300.0,
+                              unit: 'px',
+                              presetOptions: [
+                                {'label': 'Ramping', 'value': 110.0},
+                                {'label': 'Standar', 'value': 140.0},
+                                {'label': 'Lebar', 'value': 200.0},
+                              ],
+                              onChanged: (val) {
+                                setState(() => _colCustomWidth = val);
+                                setModalState(() {});
+                                _saveTableSettings();
+                              },
+                            ),
+
+                            const SizedBox(height: 16),
+                            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                            const SizedBox(height: 16),
+
+                            // 6. LEBAR KOLOM NO / CHECKLIST
+                            _buildDimensionSliderSection(
+                              icon: Icons.format_list_numbered_rounded,
+                              title: 'Lebar Kolom No / Checklist',
+                              value: _colNoWidth,
+                              min: 30.0,
+                              max: 60.0,
+                              unit: 'px',
+                              presetOptions: [
+                                {'label': 'Kecil', 'value': 32.0},
+                                {'label': 'Standar', 'value': 36.0},
+                                {'label': 'Lebar', 'value': 48.0},
+                              ],
+                              onChanged: (val) {
+                                setState(() => _colNoWidth = val);
+                                setModalState(() {});
+                                _saveTableSettings();
+                              },
+                            ),
+
+                            const SizedBox(height: 20),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Tutup Button
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryTeal,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                        ),
+                        child: const Text(
+                          'Selesai',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildDimensionSliderSection({
+    required IconData icon,
+    required String title,
+    required double value,
+    required double min,
+    required double max,
+    required String unit,
+    required List<Map<String, dynamic>> presetOptions,
+    required ValueChanged<double> onChanged,
+  }) {
+    final int roundedVal = value.round();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 16, color: primaryTeal),
+                const SizedBox(width: 6),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+              ],
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: primaryTeal.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: primaryTeal.withValues(alpha: 0.25),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                '$roundedVal $unit',
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.bold,
+                  color: primaryTeal,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        // Presets Chips
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: presetOptions.map((opt) {
+            final optVal = (opt['value'] as num).toDouble();
+            final isSelected = (value - optVal).abs() < 1.5;
+            return InkWell(
+              onTap: () => onChanged(optVal),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isSelected ? primaryTeal : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isSelected ? primaryTeal : const Color(0xFFCBD5E1),
+                    width: isSelected ? 1.2 : 0.8,
+                  ),
+                ),
+                child: Text(
+                  '${opt['label']} (${optVal.toInt()}$unit)',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: isSelected ? Colors.white : const Color(0xFF334155),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+
+        const SizedBox(height: 6),
+
+        // Slider with - and + step buttons
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.remove_circle_outline_rounded, size: 20),
+              color: value > min ? primaryTeal : const Color(0xFFCBD5E1),
+              onPressed: value > min
+                  ? () => onChanged((value - 2.0).clamp(min, max))
+                  : null,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            ),
+            Expanded(
+              child: SliderTheme(
+                data: SliderThemeData(
+                  activeTrackColor: primaryTeal,
+                  inactiveTrackColor: const Color(0xFFE2E8F0),
+                  thumbColor: primaryTeal,
+                  overlayColor: primaryTeal.withValues(alpha: 0.15),
+                  trackHeight: 4,
+                  thumbShape:
+                      const RoundSliderThumbShape(enabledThumbRadius: 7),
+                ),
+                child: Slider(
+                  value: value.clamp(min, max),
+                  min: min,
+                  max: max,
+                  onChanged: (v) => onChanged(v.roundToDouble()),
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
+              color: value < max ? primaryTeal : const Color(0xFFCBD5E1),
+              onPressed: value < max
+                  ? () => onChanged((value + 2.0).clamp(min, max))
+                  : null,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final activeDay = (_selectedDayIndex < _rundown.days.length)
@@ -763,6 +1256,16 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          IconButton(
+            icon: Icon(
+              _isResizeMode ? Icons.check_rounded : Icons.tune_rounded,
+              color: Colors.white,
+            ),
+            tooltip: _isResizeMode
+                ? 'Selesai Ubah Ukuran'
+                : 'Mode Kustom Ukuran (Geser Kolom & Baris)',
+            onPressed: _toggleResizeMode,
+          ),
           IconButton(
             icon: const Icon(Icons.edit_note_rounded, color: Colors.white, size: 24),
             tooltip: 'Edit Informasi Rundown',
@@ -800,8 +1303,13 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 _buildDayThemeHeader(activeDay),
                 const SizedBox(height: 12),
 
-                // 4. Table Toolbar (Select All, Add Row, Delete Row, Add Column)
+                // 4. Table Toolbar (Select All, Add Row, Delete Row, Add Column, Toggle Resize Mode)
                 _buildTableToolbar(activeDay),
+
+                if (_isResizeMode) ...[
+                  const SizedBox(height: 10),
+                  _buildResizeModeBanner(),
+                ],
 
                 const SizedBox(height: 10),
 
@@ -1047,13 +1555,20 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         child: Row(
           children: [
-            // Select All Checkbox
+            // 1. Select All Checkbox
             InkWell(
               onTap: () {
                 setState(() {
@@ -1067,10 +1582,10 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                   }
                 });
               },
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(8),
               child: Padding(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1088,8 +1603,8 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                     const SizedBox(width: 6),
                     Text(
                       _selectedRowIndices.isNotEmpty
-                          ? 'Pilih Semua (${_selectedRowIndices.length})'
-                          : 'Pilih Semua',
+                          ? 'Semua (${_selectedRowIndices.length})'
+                          : 'Semua',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -1103,88 +1618,213 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
               ),
             ),
 
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             Container(
               height: 20,
               width: 1,
               color: const Color(0xFFE2E8F0),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
 
-            // Tambah Baris Button
-            ElevatedButton.icon(
-              onPressed: _addRow,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryTeal,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(
+            // 2. Tambah Baris Button (Icon Only + Tooltip & Badge)
+            Tooltip(
+              message: _selectedRowIndices.isNotEmpty
+                  ? 'Tambah ${_selectedRowIndices.length} Baris Baru'
+                  : 'Tambah 1 Baris Baru',
+              child: Material(
+                color: primaryTeal,
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  onTap: _addRow,
                   borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    alignment: Alignment.center,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.center,
+                      children: [
+                        const Icon(Icons.add_rounded,
+                            color: Colors.white, size: 20),
+                        if (_selectedRowIndices.length > 1)
+                          Positioned(
+                            top: -4,
+                            right: -4,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF004D40),
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(
+                                  minWidth: 14, minHeight: 14),
+                              child: Text(
+                                '${_selectedRowIndices.length}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-              icon: const Icon(Icons.add_rounded, size: 16),
-              label: Text(
-                _selectedRowIndices.isNotEmpty
-                    ? '+ ${_selectedRowIndices.length} Baris'
-                    : 'Baris',
-                style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.bold),
               ),
             ),
 
             const SizedBox(width: 8),
 
-            // Hapus Baris Button (Active only when rows are checked!)
-            ElevatedButton.icon(
-              onPressed:
-                  _selectedRowIndices.isNotEmpty ? _deleteSelectedRows : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
-                disabledBackgroundColor: const Color(0xFFF1F5F9),
-                foregroundColor: Colors.white,
-                disabledForegroundColor: const Color(0xFF94A3B8),
-                elevation: 0,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              icon: Icon(
-                Icons.delete_outline_rounded,
-                size: 16,
+            // 3. Hapus Baris Button (Icon Only + Tooltip & Badge)
+            Tooltip(
+              message: _selectedRowIndices.isNotEmpty
+                  ? 'Hapus ${_selectedRowIndices.length} Baris Terpilih'
+                  : 'Pilih baris untuk menghapus',
+              child: Material(
                 color: _selectedRowIndices.isNotEmpty
-                    ? Colors.white
-                    : const Color(0xFF94A3B8),
-              ),
-              label: Text(
-                _selectedRowIndices.isNotEmpty
-                    ? 'Hapus (${_selectedRowIndices.length})'
-                    : 'Hapus',
-                style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.bold),
+                    ? Colors.redAccent
+                    : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  onTap: _selectedRowIndices.isNotEmpty
+                      ? _deleteSelectedRows
+                      : null,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    alignment: Alignment.center,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.center,
+                      children: [
+                        Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                          color: _selectedRowIndices.isNotEmpty
+                              ? Colors.white
+                              : const Color(0xFF94A3B8),
+                        ),
+                        if (_selectedRowIndices.isNotEmpty)
+                          Positioned(
+                            top: -4,
+                            right: -4,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF991B1B),
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(
+                                  minWidth: 14, minHeight: 14),
+                              child: Text(
+                                '${_selectedRowIndices.length}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
 
             const SizedBox(width: 8),
-            // Tambah Kolom Button
-            OutlinedButton.icon(
-              onPressed: _addNewColumn,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: primaryTeal,
-                side: const BorderSide(color: primaryTeal, width: 1.2),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(
+
+            // 4. Tambah Kolom Button (Icon Only + Tooltip)
+            Tooltip(
+              message: 'Tambah Kolom Baru',
+              child: Material(
+                color: primaryTeal.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  onTap: _addNewColumn,
                   borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: primaryTeal.withValues(alpha: 0.4),
+                        width: 1.2,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.view_column_rounded,
+                      color: primaryTeal,
+                      size: 19,
+                    ),
+                  ),
                 ),
               ),
-              icon: const Icon(Icons.view_column_rounded, size: 16),
-              label: const Text(
-                '+ Kolom',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+
+            const SizedBox(width: 8),
+            Container(
+              height: 20,
+              width: 1,
+              color: const Color(0xFFE2E8F0),
+            ),
+            const SizedBox(width: 8),
+
+            // 5. Kustom Ukuran Kolom & Baris (Mode Geser Spreadsheet)
+            Tooltip(
+              message: _isResizeMode
+                  ? 'Selesai Ubah Ukuran'
+                  : 'Mode Kustom Ukuran (Geser Kolom & Baris)',
+              child: Material(
+                color: _isResizeMode
+                    ? primaryTeal
+                    : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  onTap: _toggleResizeMode,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _isResizeMode
+                            ? const Color(0xFF004D40)
+                            : const Color(0xFFCBD5E1),
+                        width: 1.2,
+                      ),
+                      boxShadow: _isResizeMode
+                          ? [
+                              BoxShadow(
+                                color: primaryTeal.withValues(alpha: 0.35),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      _isResizeMode
+                          ? Icons.check_rounded
+                          : Icons.tune_rounded,
+                      color: _isResizeMode
+                          ? Colors.white
+                          : const Color(0xFF334155),
+                      size: 19,
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -1193,31 +1833,154 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     );
   }
 
-  static const double _colNoWidth = 36.0;
-  static const double _colMulaiWidth = 74.0;
-  static const double _colSelesaiWidth = 74.0;
-  static const double _colDurasiWidth = 72.0;
-  static const double _colKegiatanWidth = 240.0;
-  static const double _colCustomWidth = 140.0;
+  Widget _buildResizeModeBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: primaryTeal.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: primaryTeal,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.open_with_rounded,
+                color: Colors.white, size: 16),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Mode Kustom Ukuran Aktif',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12.5,
+                  ),
+                ),
+                Text(
+                  'Geser garis pembatas kolom (↔) atau baris (↕) langsung di tabel.',
+                  style: TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          // Reset Button
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _rowHeight = 36.0;
+                _colNoWidth = 36.0;
+                _colMulaiWidth = 74.0;
+                _colSelesaiWidth = 74.0;
+                _colDurasiWidth = 72.0;
+                _colKegiatanWidth = 240.0;
+                _colCustomWidth = 140.0;
+                _customColWidths.clear();
+              });
+              _saveTableSettings();
+            },
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              'Reset',
+              style: TextStyle(
+                color: Color(0xFF38BDF8),
+                fontWeight: FontWeight.bold,
+                fontSize: 11.5,
+              ),
+            ),
+          ),
+          // Slider / Opsi Presisi Button
+          TextButton.icon(
+            onPressed: _openTableDimensionsModal,
+            icon: const Icon(Icons.tune_rounded, size: 14, color: Colors.white70),
+            label: const Text(
+              'Slider',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 11.5,
+              ),
+            ),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+          const SizedBox(width: 4),
+          // Selesai Button
+          ElevatedButton(
+            onPressed: _toggleResizeMode,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryTeal,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Selesai',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   double _calculateBaseTableWidth(RundownDay activeDay) {
+    double customColsTotal = 0;
+    for (final col in activeDay.customColumns) {
+      customColsTotal += _getColCustomWidth(col);
+    }
     return _colNoWidth +
         _colMulaiWidth +
         _colSelesaiWidth +
         _colDurasiWidth +
         _colKegiatanWidth +
-        (activeDay.customColumns.length * _colCustomWidth) +
-        12.0;
+        customColsTotal +
+        16.0;
   }
 
   double _calculateBaseTableHeight(RundownDay activeDay) {
-    const double headerHeight = 32.0;
+    const double headerHeight = 34.0;
     const double dividerHeight = 1.0;
-    const double rowHeight = 34.0;
     if (activeDay.rows.isEmpty) {
       return headerHeight + dividerHeight + 50.0;
     }
-    return headerHeight + dividerHeight + (activeDay.rows.length * rowHeight);
+    return headerHeight + dividerHeight + (activeDay.rows.length * _rowHeight);
   }
 
   Widget _buildZoomControlBar() {
@@ -1316,7 +2079,10 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xFF00897B).withValues(alpha: 0.18),
+          color: _isResizeMode
+              ? primaryTeal
+              : const Color(0xFF00897B).withValues(alpha: 0.18),
+          width: _isResizeMode ? 1.6 : 1.0,
         ),
         boxShadow: [
           BoxShadow(
@@ -1371,7 +2137,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                           height: 50,
                           alignment: Alignment.center,
                           child: const Text(
-                            'Tidak ada baris di tabel. Klik "+ Baris" untuk menambah.',
+                            'Tidak ada baris di tabel. Klik ikon "+" untuk menambah baris.',
                             style: TextStyle(
                                 fontSize: 12, color: Color(0xFF94A3B8)),
                           ),
@@ -1395,33 +2161,104 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     );
   }
 
+  Widget _buildHeaderCellWithResizeHandle({
+    required double width,
+    required Widget child,
+    required void Function(double delta) onResize,
+  }) {
+    return SizedBox(
+      width: width,
+      height: 34.0,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: child,
+            ),
+          ),
+          // Column divider resize handle (Google Sheets / Excel style)
+          Positioned(
+            right: -8,
+            top: 0,
+            bottom: 0,
+            width: 16,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.resizeColumn,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onHorizontalDragUpdate: (details) {
+                  onResize(details.delta.dx);
+                },
+                onHorizontalDragEnd: (_) => _saveTableSettings(),
+                child: Center(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    width: _isResizeMode ? 3.0 : 1.0,
+                    height: double.infinity,
+                    decoration: BoxDecoration(
+                      color: _isResizeMode
+                          ? primaryTeal
+                          : const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(2),
+                      boxShadow: _isResizeMode
+                          ? [
+                              BoxShadow(
+                                color: primaryTeal.withValues(alpha: 0.4),
+                                blurRadius: 3,
+                              ),
+                            ]
+                          : null,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTableHeader(RundownDay activeDay) {
     return Container(
-      height: 32.0,
+      height: 34.0,
       color: primaryTeal.withValues(alpha: 0.08),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // 1. Select Checkbox / No column
-          SizedBox(
+          _buildHeaderCellWithResizeHandle(
             width: _colNoWidth,
-            child: const Text(
-              'No',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 11.0,
-                fontWeight: FontWeight.bold,
-                color: primaryTeal,
+            onResize: (delta) {
+              setState(() {
+                _colNoWidth = (_colNoWidth + delta).clamp(28.0, 100.0);
+              });
+            },
+            child: const Center(
+              child: Text(
+                'No',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11.0,
+                  fontWeight: FontWeight.bold,
+                  color: primaryTeal,
+                ),
               ),
             ),
           ),
 
           // 2. WAKTU MULAI
-          const SizedBox(
+          _buildHeaderCellWithResizeHandle(
             width: _colMulaiWidth,
-            child: Row(
+            onResize: (delta) {
+              setState(() {
+                _colMulaiWidth = (_colMulaiWidth + delta).clamp(50.0, 160.0);
+              });
+            },
+            child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.access_time_rounded, size: 12, color: primaryTeal),
@@ -1443,9 +2280,15 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
           ),
 
           // 3. WAKTU SELESAI (OTOMATIS)
-          const SizedBox(
+          _buildHeaderCellWithResizeHandle(
             width: _colSelesaiWidth,
-            child: Row(
+            onResize: (delta) {
+              setState(() {
+                _colSelesaiWidth =
+                    (_colSelesaiWidth + delta).clamp(50.0, 160.0);
+              });
+            },
+            child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.flag_rounded, size: 12, color: primaryTeal),
@@ -1467,9 +2310,14 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
           ),
 
           // 4. DURASI
-          const SizedBox(
+          _buildHeaderCellWithResizeHandle(
             width: _colDurasiWidth,
-            child: Row(
+            onResize: (delta) {
+              setState(() {
+                _colDurasiWidth = (_colDurasiWidth + delta).clamp(45.0, 140.0);
+              });
+            },
+            child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.timer_outlined, size: 12, color: primaryTeal),
@@ -1491,9 +2339,15 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
           ),
 
           // 5. KEGIATAN
-          const SizedBox(
+          _buildHeaderCellWithResizeHandle(
             width: _colKegiatanWidth,
-            child: Row(
+            onResize: (delta) {
+              setState(() {
+                _colKegiatanWidth =
+                    (_colKegiatanWidth + delta).clamp(120.0, 600.0);
+              });
+            },
+            child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.event_note_rounded, size: 12, color: primaryTeal),
@@ -1516,8 +2370,15 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
           // 6. CUSTOM COLUMNS (e.g. Keterangan, etc.)
           ...activeDay.customColumns.map((colName) {
-            return SizedBox(
-              width: _colCustomWidth,
+            final colW = _getColCustomWidth(colName);
+            return _buildHeaderCellWithResizeHandle(
+              width: colW,
+              onResize: (delta) {
+                setState(() {
+                  _customColWidths[colName] =
+                      (colW + delta).clamp(60.0, 400.0);
+                });
+              },
               child: Row(
                 children: [
                   Expanded(
@@ -1541,7 +2402,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                           size: 12, color: Colors.redAccent),
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 2),
                 ],
               ),
             );
@@ -1558,259 +2419,328 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     bool isSelected,
   ) {
     final isEven = index % 2 == 0;
-    return Container(
-      height: 34.0,
-      decoration: BoxDecoration(
-        color: isSelected
-            ? primaryTeal.withValues(alpha: 0.12)
-            : (isEven ? Colors.white : const Color(0xFFFBFDFA)),
-        border: const Border(
-          bottom: BorderSide(color: Color(0xFFF1F5F9), width: 1),
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
+    return SizedBox(
+      height: _rowHeight,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          // 1. Select Checkbox & Number
-          SizedBox(
-            width: _colNoWidth,
-            child: InkWell(
-              onTap: () {
-                setState(() {
-                  if (isSelected) {
-                    _selectedRowIndices.remove(index);
-                  } else {
-                    _selectedRowIndices.add(index);
-                  }
-                });
-              },
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? primaryTeal.withValues(alpha: 0.12)
+                    : (isEven ? Colors.white : const Color(0xFFFBFDFA)),
+                border: Border(
+                  bottom: BorderSide(
+                    color: _isResizeMode
+                        ? primaryTeal.withValues(alpha: 0.35)
+                        : const Color(0xFFF1F5F9),
+                    width: _isResizeMode ? 1.5 : 1.0,
+                  ),
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Icon(
-                    isSelected
-                        ? Icons.check_box_rounded
-                        : Icons.check_box_outline_blank_rounded,
-                    size: 15,
-                    color: isSelected ? primaryTeal : const Color(0xFFCBD5E1),
-                  ),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${index + 1}',
-                    style: TextStyle(
-                      fontSize: 10.0,
-                      fontWeight: FontWeight.bold,
-                      color: isSelected
-                          ? primaryTeal
-                          : const Color(0xFF64748B),
+                  // 1. Select Checkbox & Number
+                  SizedBox(
+                    width: _colNoWidth,
+                    child: InkWell(
+                      onTap: _isResizeMode
+                          ? null
+                          : () {
+                              setState(() {
+                                if (isSelected) {
+                                  _selectedRowIndices.remove(index);
+                                } else {
+                                  _selectedRowIndices.add(index);
+                                }
+                              });
+                            },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isSelected
+                                ? Icons.check_box_rounded
+                                : Icons.check_box_outline_blank_rounded,
+                            size: 15,
+                            color: isSelected
+                                ? primaryTeal
+                                : const Color(0xFFCBD5E1),
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${index + 1}',
+                            style: TextStyle(
+                              fontSize: 10.0,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected
+                                  ? primaryTeal
+                                  : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
+
+                  // 2. WAKTU MULAI
+                  SizedBox(
+                    width: _colMulaiWidth,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: InkWell(
+                        onTap: _isResizeMode
+                            ? null
+                            : () => _pickRowStartTime(index),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: row.startTime.isNotEmpty
+                                ? primaryTeal.withValues(alpha: 0.1)
+                                : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(5),
+                            border: Border.all(
+                              color: row.startTime.isNotEmpty
+                                  ? primaryTeal.withValues(alpha: 0.3)
+                                  : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.access_time_rounded,
+                                  size: 11,
+                                  color: row.startTime.isNotEmpty
+                                      ? primaryTeal
+                                      : const Color(0xFF94A3B8)),
+                              const SizedBox(width: 2),
+                              Flexible(
+                                child: Text(
+                                  row.startTime.isNotEmpty
+                                      ? row.startTime
+                                      : '--:--',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: row.startTime.isNotEmpty
+                                        ? primaryTeal
+                                        : const Color(0xFF94A3B8),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // 3. WAKTU SELESAI (OTOMATIS)
+                  SizedBox(
+                    width: _colSelesaiWidth,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: row.endTime.isNotEmpty
+                              ? const Color(0xFFF0FDF4)
+                              : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(
+                            color: row.endTime.isNotEmpty
+                                ? primaryTeal.withValues(alpha: 0.25)
+                                : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle_outline_rounded,
+                                size: 10.5,
+                                color: row.endTime.isNotEmpty
+                                    ? primaryTeal
+                                    : const Color(0xFF94A3B8)),
+                            const SizedBox(width: 2),
+                            Flexible(
+                              child: Text(
+                                row.endTime.isNotEmpty ? row.endTime : '--:--',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: row.endTime.isNotEmpty
+                                      ? const Color(0xFF004D40)
+                                      : const Color(0xFF94A3B8),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // 4. DURASI (Klik untuk atur durasi)
+                  SizedBox(
+                    width: _colDurasiWidth,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: InkWell(
+                        onTap: _isResizeMode
+                            ? null
+                            : () => _editRowDuration(index),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(5),
+                            border: Border.all(
+                              color: const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  row.durationText,
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const Icon(Icons.arrow_drop_down_rounded,
+                                  size: 13, color: primaryTeal),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // 5. KEGIATAN (Inline Text Input)
+                  SizedBox(
+                    width: _colKegiatanWidth,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: TextFormField(
+                        key: ValueKey('${row.id}_activity'),
+                        initialValue: row.activity,
+                        enabled: !_isResizeMode,
+                        textCapitalization: TextCapitalization.sentences,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F172A),
+                        ),
+                        decoration: const InputDecoration(
+                          hintText: 'Nama kegiatan...',
+                          hintStyle: TextStyle(
+                            fontSize: 11.0,
+                            color: Color(0xFFCBD5E1),
+                            fontWeight: FontWeight.normal,
+                          ),
+                          isDense: true,
+                          contentPadding:
+                              EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                          border: InputBorder.none,
+                        ),
+                        onChanged: (val) {
+                          row.activity = val;
+                          _notifyChange();
+                        },
+                      ),
+                    ),
+                  ),
+
+                  // 6. CUSTOM COLUMNS
+                  ...activeDay.customColumns.map((colName) {
+                    final val = row.customValues[colName] ?? '';
+                    final colW = _getColCustomWidth(colName);
+                    return SizedBox(
+                      width: colW,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: TextFormField(
+                          key: ValueKey('${row.id}_custom_$colName'),
+                          initialValue: val,
+                          enabled: !_isResizeMode,
+                          textCapitalization: TextCapitalization.sentences,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: Color(0xFF334155),
+                          ),
+                          decoration: InputDecoration(
+                            hintText: '$colName...',
+                            hintStyle: const TextStyle(
+                              fontSize: 11.0,
+                              color: Color(0xFFCBD5E1),
+                            ),
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 3),
+                            border: InputBorder.none,
+                          ),
+                          onChanged: (newVal) {
+                            row.customValues[colName] = newVal;
+                            _notifyChange();
+                          },
+                        ),
+                      ),
+                    );
+                  }),
                 ],
               ),
             ),
           ),
 
-          // 2. WAKTU MULAI
-          SizedBox(
-            width: _colMulaiWidth,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: InkWell(
-                onTap: () => _pickRowStartTime(index),
-                borderRadius: BorderRadius.circular(6),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: row.startTime.isNotEmpty
-                        ? primaryTeal.withValues(alpha: 0.1)
-                        : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(5),
-                    border: Border.all(
-                      color: row.startTime.isNotEmpty
-                          ? primaryTeal.withValues(alpha: 0.3)
-                          : const Color(0xFFE2E8F0),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.access_time_rounded,
-                          size: 11,
-                          color: row.startTime.isNotEmpty
-                              ? primaryTeal
-                              : const Color(0xFF94A3B8)),
-                      const SizedBox(width: 3),
-                      Text(
-                        row.startTime.isNotEmpty ? row.startTime : '--:--',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.bold,
-                          color: row.startTime.isNotEmpty
-                              ? primaryTeal
-                              : const Color(0xFF94A3B8),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // 3. WAKTU SELESAI (OTOMATIS)
-          SizedBox(
-            width: _colSelesaiWidth,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                decoration: BoxDecoration(
-                  color: row.endTime.isNotEmpty
-                      ? const Color(0xFFF0FDF4)
-                      : const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(5),
-                  border: Border.all(
-                    color: row.endTime.isNotEmpty
-                        ? primaryTeal.withValues(alpha: 0.25)
-                        : const Color(0xFFE2E8F0),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.check_circle_outline_rounded,
-                        size: 10.5,
-                        color: row.endTime.isNotEmpty
-                            ? primaryTeal
-                            : const Color(0xFF94A3B8)),
-                    const SizedBox(width: 3),
-                    Text(
-                      row.endTime.isNotEmpty ? row.endTime : '--:--',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.bold,
-                        color: row.endTime.isNotEmpty
-                            ? const Color(0xFF004D40)
-                            : const Color(0xFF94A3B8),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // 4. DURASI (Klik untuk atur durasi)
-          SizedBox(
-            width: _colDurasiWidth,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: InkWell(
-                onTap: () => _editRowDuration(index),
-                borderRadius: BorderRadius.circular(6),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(5),
-                    border: Border.all(
-                      color: const Color(0xFFE2E8F0),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        row.durationText,
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(width: 1),
-                      const Icon(Icons.arrow_drop_down_rounded,
-                          size: 13, color: primaryTeal),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // 5. KEGIATAN (Inline Text Input)
-          SizedBox(
-            width: _colKegiatanWidth,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: TextFormField(
-                key: ValueKey('${row.id}_activity'),
-                initialValue: row.activity,
-                textCapitalization: TextCapitalization.sentences,
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF0F172A),
-                ),
-                decoration: const InputDecoration(
-                  hintText: 'Nama kegiatan...',
-                  hintStyle: TextStyle(
-                    fontSize: 11.0,
-                    color: Color(0xFFCBD5E1),
-                    fontWeight: FontWeight.normal,
-                  ),
-                  isDense: true,
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-                  border: InputBorder.none,
-                ),
-                onChanged: (val) {
-                  row.activity = val;
-                  _notifyChange();
+          // Horizontal Row Bottom Drag Handle (Spreadsheet / Excel style)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: -6,
+            height: 12,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.resizeRow,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onVerticalDragUpdate: (details) {
+                  setState(() {
+                    _rowHeight =
+                        (_rowHeight + details.delta.dy).clamp(26.0, 90.0);
+                  });
                 },
+                onVerticalDragEnd: (_) => _saveTableSettings(),
+                child: Center(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    height: _isResizeMode ? 3.0 : 1.0,
+                    width: double.infinity,
+                    color: _isResizeMode
+                        ? primaryTeal.withValues(alpha: 0.8)
+                        : Colors.transparent,
+                  ),
+                ),
               ),
             ),
           ),
-
-          // 6. CUSTOM COLUMNS
-          ...activeDay.customColumns.map((colName) {
-            final val = row.customValues[colName] ?? '';
-            return SizedBox(
-              width: _colCustomWidth,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: TextFormField(
-                  key: ValueKey('${row.id}_custom_$colName'),
-                  initialValue: val,
-                  textCapitalization: TextCapitalization.sentences,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    color: Color(0xFF334155),
-                  ),
-                  decoration: InputDecoration(
-                    hintText: '$colName...',
-                    hintStyle: const TextStyle(
-                      fontSize: 11.0,
-                      color: Color(0xFFCBD5E1),
-                    ),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 5, vertical: 3),
-                    border: InputBorder.none,
-                  ),
-                  onChanged: (newVal) {
-                    row.customValues[colName] = newVal;
-                    _notifyChange();
-                  },
-                ),
-              ),
-            );
-          }),
         ],
       ),
     );
