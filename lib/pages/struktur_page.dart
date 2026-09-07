@@ -457,10 +457,17 @@ class _StrukturPageState extends State<StrukturPage> {
     required BuildContext context,
     required VoidCallback applyLocalChanges,
   }) async {
-    // 1. Jika konfigurasi Google Sheets belum lengkap atau auto-sync dinonaktifkan, simpan lokal saja
-    if (!_sheetsConfig.isConfigured ||
-        !_sheetsConfig.hasConfiguredCells ||
-        !_sheetsConfig.autoSyncOnInput) {
+    // 1. Muat konfigurasi terkini dari SharedPreferences
+    final cfg = await SheetsConfig.load();
+    if (mounted) {
+      setState(() {
+        _sheetsConfig = cfg;
+      });
+    }
+
+    if (!cfg.isConfigured ||
+        cfg.sheetName.trim().isEmpty ||
+        !cfg.autoSyncOnInput) {
       setState(() {
         applyLocalChanges();
       });
@@ -475,9 +482,20 @@ class _StrukturPageState extends State<StrukturPage> {
           .toList()
         ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
+      final prevRekening = existingMutasi.where((t) {
+        return t.isPemasukan
+            ? (t.targetAccount == 'rekening' || t.targetAccount == null)
+            : (t.sourceAccount == 'rekening' || t.sourceAccount == null);
+      }).length;
+      final prevOnHand = existingMutasi.where((t) {
+        return t.isPemasukan
+            ? (t.targetAccount == 'debit' || t.targetAccount == 'cash')
+            : (t.sourceAccount == 'debit' || t.sourceAccount == 'cash');
+      }).length;
+
       // 3. Fetch data remote dari Spreadsheet untuk memverifikasi keselarasan data eksisting
       final fetchRes = await SheetsSyncService.fetchRemoteTransactions(
-        _sheetsConfig,
+        cfg,
         customRules: _data.customKodeRules,
       );
 
@@ -494,7 +512,7 @@ class _StrukturPageState extends State<StrukturPage> {
           final choice = await SheetsRiskManagementDialog.show(
             context,
             comparison: comparison,
-            sheetName: _sheetsConfig.sheetName,
+            sheetName: cfg.sheetName,
             useRootNavigator: true,
           );
 
@@ -542,8 +560,10 @@ class _StrukturPageState extends State<StrukturPage> {
 
       final res = await SheetsSyncService.syncAllTransactions(
         updatedMutasi,
-        _sheetsConfig,
+        cfg,
         customRules: _data.customKodeRules,
+        prevRekeningCount: prevRekening,
+        prevOnHandCount: prevOnHand,
       );
 
       if (mounted) {
@@ -566,8 +586,24 @@ class _StrukturPageState extends State<StrukturPage> {
 
   /// Melakukan sinkronisasi langsung (tanpa debounce) ke Google Spreadsheet.
   /// Digunakan untuk operasi kritis seperti hapus/rollback yang HARUS ter-sinkron.
-  Future<void> _directSyncToSheets() async {
-    if (!_sheetsConfig.isConfigured || !_sheetsConfig.hasConfiguredCells) {
+  Future<void> _directSyncToSheets({
+    bool force = false,
+    int? prevRekeningCount,
+    int? prevOnHandCount,
+  }) async {
+    final cfg = await SheetsConfig.load();
+    if (mounted) {
+      setState(() {
+        _sheetsConfig = cfg;
+      });
+    }
+
+    if (!cfg.isConfigured || cfg.sheetName.trim().isEmpty) {
+      return;
+    }
+
+    // Hanya sinkron jika autoSyncOnInput aktif atau force sync diminta
+    if (!force && !cfg.autoSyncOnInput) {
       return;
     }
 
@@ -579,8 +615,10 @@ class _StrukturPageState extends State<StrukturPage> {
 
       final res = await SheetsSyncService.syncAllTransactions(
         allMutasi,
-        _sheetsConfig,
+        cfg,
         customRules: _data.customKodeRules,
+        prevRekeningCount: prevRekeningCount,
+        prevOnHandCount: prevOnHandCount,
       );
 
       if (mounted) {
@@ -7304,6 +7342,9 @@ class _StrukturPageState extends State<StrukturPage> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(ctx);
+                final prevRekening = _currentRekeningCount;
+                final prevOnHand = _currentOnHandCount;
+
                 setState(() {
                   // Rollback saldo
                   if (tx.isPemasukan) {
@@ -7330,7 +7371,10 @@ class _StrukturPageState extends State<StrukturPage> {
 
                   _data.transactions.removeWhere((item) => item.id == tx.id);
                 });
-                _saveData().then((_) => _directSyncToSheets());
+                _saveData().then((_) => _directSyncToSheets(
+                      prevRekeningCount: prevRekening,
+                      prevOnHandCount: prevOnHand,
+                    ));
                 onDeleted?.call();
                 CustomToast.showSuccess(
                   context,
@@ -7431,6 +7475,9 @@ class _StrukturPageState extends State<StrukturPage> {
             ElevatedButton.icon(
               onPressed: () {
                 Navigator.pop(ctx);
+                final prevRekening = _currentRekeningCount;
+                final prevOnHand = _currentOnHandCount;
+
                 setState(() {
                   // Rollback saldo semua transaksi
                   for (final tx in _data.transactions) {
@@ -7461,7 +7508,10 @@ class _StrukturPageState extends State<StrukturPage> {
                   // Hapus semua transaksi
                   _data.transactions.clear();
                 });
-                _saveData().then((_) => _directSyncToSheets());
+                _saveData().then((_) => _directSyncToSheets(
+                      prevRekeningCount: prevRekening,
+                      prevOnHandCount: prevOnHand,
+                    ));
                 onDeleted?.call();
                 CustomToast.showSuccess(
                   context,

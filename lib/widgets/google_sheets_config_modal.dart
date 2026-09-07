@@ -387,7 +387,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     _config.dateFormat = _selectedDateFormat.trim().isEmpty
         ? 'dd/MM/yyyy'
         : _selectedDateFormat.trim();
-    if (markCellsConfigured) {
+    if (markCellsConfigured || _config.isConfigured) {
       _config.hasConfiguredCells = true;
     }
 

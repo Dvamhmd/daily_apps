@@ -208,7 +208,9 @@ class SheetsConfig {
       insertImageFormula: json['insertImageFormula'] as bool? ?? false,
       evidenceTargetRow: defaultRow,
       evidenceRowMapping: rowMapping,
-      hasConfiguredCells: json['hasConfiguredCells'] as bool? ?? false,
+      hasConfiguredCells: (json['hasConfiguredCells'] as bool? ?? false) ||
+          ((json['webAppUrl'] as String? ?? '').trim().isNotEmpty &&
+              (json['sheetName'] as String? ?? '').trim().isNotEmpty),
       lastSyncTime: json['lastSyncTime'] != null
           ? DateTime.tryParse(json['lastSyncTime'] as String)
           : null,

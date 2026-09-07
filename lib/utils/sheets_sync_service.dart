@@ -309,12 +309,34 @@ class SheetsSyncService {
     };
   }
 
+  /// Menghasilkan map baris data kosong untuk menimpa sel transaksi yang telah dihapus di Spreadsheet
+  static Map<String, dynamic> emptyTransactionRow({int? indexNumber}) {
+    return {
+      'no': '',
+      'tanggal': '',
+      'ku': '',
+      'kategori': '',
+      'keterangan': '',
+      'debit': '',
+      'kredit': '',
+      'no_onhand': '',
+      'tanggal_onhand': '',
+      'ku_onhand': '',
+      'kategori_onhand': '',
+      'keterangan_onhand': '',
+      'debit_onhand': '',
+      'kredit_onhand': '',
+    };
+  }
+
   /// Melakukan sinkronisasi seluruh tabel transaksi bulan aktif ke Spreadsheet (Tabel Rekening & Tabel Cash On Hand)
   /// Mendukung pengiriman bertahap (batching/chunking) otomatis untuk mencegah batas limit URL di browser/web
   static Future<SheetsSyncResult> syncAllTransactions(
     List<StrukturTransaction> transactions,
     SheetsConfig config, {
     List<CustomKodeRule>? customRules,
+    int? prevRekeningCount,
+    int? prevOnHandCount,
   }) async {
     if (!config.isConfigured) {
       return SheetsSyncResult(
@@ -372,20 +394,44 @@ class SheetsSyncService {
         ));
       }
 
-      final totalCount = rekeningRows.length + onHandRows.length;
+      final actualRekeningCount = rekeningRows.length;
+      final actualOnHandCount = onHandRows.length;
+
+      // Jika terdapat baris yang dihapus / di-rollback, pad baris kosong ("")
+      // agar sel lama di Spreadsheet langsung ditimpa menjadi kosong secara instan
+      if (prevRekeningCount != null && prevRekeningCount > rekeningRows.length) {
+        final padCount = prevRekeningCount - rekeningRows.length;
+        for (int p = 0; p < padCount; p++) {
+          rekeningRows.add(emptyTransactionRow());
+        }
+      } else if (transactions.isEmpty && rekeningRows.isEmpty && prevRekeningCount == null) {
+        // Fallback jika hapus semua tanpa passing count: sediakan minimal 1 baris kosong
+        rekeningRows.add(emptyTransactionRow());
+      }
+
+      if (prevOnHandCount != null && prevOnHandCount > onHandRows.length) {
+        final padCount = prevOnHandCount - onHandRows.length;
+        for (int p = 0; p < padCount; p++) {
+          onHandRows.add(emptyTransactionRow());
+        }
+      } else if (transactions.isEmpty && onHandRows.isEmpty && prevOnHandCount == null) {
+        onHandRows.add(emptyTransactionRow());
+      }
+
+      final totalCount = actualRekeningCount + actualOnHandCount;
 
       // Pengecekan Batas Maksimal Baris (End Row) sebelum pengiriman
-      final isRekExceeded = config.isRekeningExceeded(rekeningRows.length);
-      final isOnExceeded = config.isOnHandExceeded(onHandRows.length);
+      final isRekExceeded = config.isRekeningExceeded(actualRekeningCount);
+      final isOnExceeded = config.isOnHandExceeded(actualOnHandCount);
       if (isRekExceeded || isOnExceeded) {
         final List<String> details = [];
         if (isRekExceeded) {
           details.add(
-              'Rekening: ${rekeningRows.length} data (Batas Baris ${config.startRow} s/d ${config.endRow} = Kapasitas ${config.maxRekeningCapacity} baris)');
+              'Rekening: $actualRekeningCount data (Batas Baris ${config.startRow} s/d ${config.endRow} = Kapasitas ${config.maxRekeningCapacity} baris)');
         }
         if (isOnExceeded) {
           details.add(
-              'Cash On Hand: ${onHandRows.length} data (Batas Baris ${config.startRowOnHand} s/d ${config.endRowOnHand} = Kapasitas ${config.maxOnHandCapacity} baris)');
+              'Cash On Hand: $actualOnHandCount data (Batas Baris ${config.startRowOnHand} s/d ${config.endRowOnHand} = Kapasitas ${config.maxOnHandCapacity} baris)');
         }
         return SheetsSyncResult(
           isSuccess: false,
@@ -396,6 +442,7 @@ class SheetsSyncService {
 
       final payload = {
         'action': 'sync_all',
+        'clearFirst': true,
         'sheetName': config.sheetName.trim(),
         'startRow': config.startRow,
         'endRow': config.endRow ?? 0,
@@ -409,6 +456,8 @@ class SheetsSyncService {
         'rekeningRows': rekeningRows,
         'onHandRows': onHandRows,
         'rows': rekeningRows, // Fallback legacy
+        if (prevRekeningCount != null) 'prevRekeningCount': prevRekeningCount,
+        if (prevOnHandCount != null) 'prevOnHandCount': prevOnHandCount,
       };
 
       final res = await _sendPostRequest(config.webAppUrl, payload);
@@ -1375,22 +1424,24 @@ function processRequest(data) {
             var fVal = blockFormulas[r][colOffset];
             var vVal = blockValues[r][colOffset];
 
-            // Jika ada formula di kolom manapun pada baris ini -> STOP total!
+            // Hanya hentikan jika formula merupakan rumus agregat/footer (SUM, SUBTOTAL)
             if (fVal && fVal.toString().trim() !== "") {
-              hasFormula = true;
-              break;
+              var fUpper = fVal.toString().trim().toUpperCase();
+              if (fUpper.indexOf("SUM(") !== -1 || fUpper.indexOf("SUBTOTAL(") !== -1 || fUpper.indexOf("SUMIF(") !== -1) {
+                hasFormula = true;
+                break;
+              }
             }
 
             if (vVal !== "" && vVal !== null && vVal !== undefined) {
               var strVal = vVal.toString().trim().toUpperCase();
-              // Deteksi kata kunci ringkasan / footer / header / catatan / tanda tangan
+              // Deteksi label ringkasan / footer murni (bukan kata kas/saldo biasa pada judul transaksi)
               if (strVal === "TOTAL" || strVal === "JUMLAH" || strVal === "JUMLAH TOTAL" ||
-                  strVal.indexOf("SALDO") !== -1 || strVal.indexOf("BUKTI") !== -1 ||
-                  strVal.indexOf("CATATAN") !== -1 || strVal.indexOf("REKAP") !== -1 ||
-                  strVal.indexOf("KAS") !== -1 || strVal.indexOf("MENGETAHUI") !== -1 ||
-                  strVal.indexOf("TANDA TANGAN") !== -1 || strVal.indexOf("KETUA") !== -1 ||
-                  strVal.indexOf("BENDAHARA") !== -1 || strVal.indexOf("PEMERIKSA") !== -1 ||
-                  strVal.indexOf("NOTE") !== -1 || strVal.indexOf("NB") !== -1) {
+                  strVal === "GRAND TOTAL" || strVal === "SUBTOTAL" || strVal === "TOTAL SALDO" ||
+                  strVal === "SISA SALDO" || strVal === "SALDO AKHIR" ||
+                  strVal.indexOf("TOTAL ") === 0 || strVal.indexOf("JUMLAH ") === 0 ||
+                  strVal.indexOf("CATATAN:") === 0 || strVal.indexOf("NOTE:") === 0 ||
+                  strVal === "TANDA TANGAN" || strVal === "MENGETAHUI") {
                 isHeaderOrFooter = true;
                 break;
               }
@@ -1399,13 +1450,12 @@ function processRequest(data) {
           }
         }
 
-        // Jika menemukan rumus atau footer/header -> STOP seketika, jangan hapus baris ini dan bawahnya
+        // Jika menemukan rumus agregat atau label ringkasan footer -> STOP seketika
         if (hasFormula || isHeaderOrFooter) break;
 
         // KRUSIAL: Jika baris ini KOSONG (tidak ada data apapun di kolom yang dipetakan),
-        // berarti blok transaksi lama SUDAH SELESAI!
-        // STOP SEKETIKA! Jangan terus memeriksa ke bawah karena data di bawah baris kosong adalah bagian terpisah!
-        if (!hasAnyValue) {
+        // berarti blok transaksi lama sudah selesai
+        if (!hasAnyValue && (!endRowLimit || endRowLimit <= 0 || currentRowNum >= checkStartRow + 5)) {
           break;
         }
 
@@ -1542,10 +1592,11 @@ function processRequest(data) {
                 rowIsBlankInTable = false;
                 var strVal = vVal.toString().trim().toUpperCase();
                 if (strVal === "TOTAL" || strVal === "JUMLAH" || strVal === "JUMLAH TOTAL" ||
-                    strVal.indexOf("SALDO") !== -1 || strVal.indexOf("BUKTI") !== -1 ||
-                    strVal.indexOf("CATATAN") !== -1 || strVal.indexOf("REKAP") !== -1 ||
-                    strVal.indexOf("KAS") !== -1 || strVal.indexOf("MENGETAHUI") !== -1 ||
-                    strVal.indexOf("TANDA TANGAN") !== -1) {
+                    strVal === "GRAND TOTAL" || strVal === "SUBTOTAL" || strVal === "TOTAL SALDO" ||
+                    strVal === "SISA SALDO" || strVal === "SALDO AKHIR" ||
+                    strVal.indexOf("TOTAL ") === 0 || strVal.indexOf("JUMLAH ") === 0 ||
+                    strVal.indexOf("CATATAN:") === 0 || strVal.indexOf("NOTE:") === 0 ||
+                    strVal === "TANDA TANGAN" || strVal === "MENGETAHUI") {
                   rowIsSummaryOrFooter = true;
                 }
               }
@@ -1640,8 +1691,12 @@ function processRequest(data) {
               if (vVal !== "" && vVal !== null && vVal !== undefined) {
                 hasValue = true;
                 var strVal = vVal.toString().trim().toUpperCase();
-                if (strVal === "TOTAL" || strVal === "JUMLAH" || strVal.indexOf("SALDO") !== -1 ||
-                    strVal.indexOf("BUKTI") !== -1 || strVal.indexOf("CATATAN") !== -1) {
+                if (strVal === "TOTAL" || strVal === "JUMLAH" || strVal === "JUMLAH TOTAL" ||
+                    strVal === "GRAND TOTAL" || strVal === "SUBTOTAL" || strVal === "TOTAL SALDO" ||
+                    strVal === "SISA SALDO" || strVal === "SALDO AKHIR" ||
+                    strVal.indexOf("TOTAL ") === 0 || strVal.indexOf("JUMLAH ") === 0 ||
+                    strVal.indexOf("CATATAN:") === 0 || strVal.indexOf("NOTE:") === 0 ||
+                    strVal === "TANDA TANGAN" || strVal === "MENGETAHUI") {
                   isFooter = true;
                 }
               }
