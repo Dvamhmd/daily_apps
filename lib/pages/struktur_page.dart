@@ -7954,7 +7954,6 @@ class _StrukturPageState extends State<StrukturPage> {
         title: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(width: 8),
             Flexible(
               child: Text(
                 'Keuangan Struktur',
