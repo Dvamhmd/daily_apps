@@ -53,6 +53,18 @@ void main() {
       expect(config.hasConfiguredCells, isTrue);
     });
 
+    test('SheetsConfig calculates max capacity accurately', () {
+      final config = SheetsConfig(
+        startRow: 4,
+        endRow: 23,
+        startRowOnHand: 4,
+        endRowOnHand: 23,
+      );
+
+      expect(config.maxRekeningCapacity, 20);
+      expect(config.maxOnHandCapacity, 20);
+    });
+
     test('Apps Script template clearOldTransactionData excludes false positive words like KAS and SALDO', () {
       final script = SheetsSyncService.getGoogleAppsScriptCode();
       expect(script.contains('strVal.indexOf("KAS") !== -1'), isFalse);

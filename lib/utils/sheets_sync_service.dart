@@ -397,24 +397,39 @@ class SheetsSyncService {
       final actualRekeningCount = rekeningRows.length;
       final actualOnHandCount = onHandRows.length;
 
-      // Jika terdapat baris yang dihapus / di-rollback, pad baris kosong ("")
-      // agar sel lama di Spreadsheet langsung ditimpa menjadi kosong secara instan
-      if (prevRekeningCount != null && prevRekeningCount > rekeningRows.length) {
-        final padCount = prevRekeningCount - rekeningRows.length;
-        for (int p = 0; p < padCount; p++) {
-          rekeningRows.add(emptyTransactionRow());
-        }
-      } else if (transactions.isEmpty && rekeningRows.isEmpty && prevRekeningCount == null) {
-        // Fallback jika hapus semua tanpa passing count: sediakan minimal 1 baris kosong
+      // Kapasitas tabel dari config
+      final int maxRekCapacity = config.maxRekeningCapacity;
+      final int maxOnCapacity = config.maxOnHandCapacity;
+
+      // Selalu pastikan seluruh baris tabel (sampai endRow atau prevCount atau minimal 30 baris)
+      // tertimpa dengan sel kosong ("") agar Spreadsheet 100% bersih seketika
+      int targetRekRows = actualRekeningCount;
+      if (prevRekeningCount != null && prevRekeningCount > targetRekRows) {
+        targetRekRows = prevRekeningCount;
+      }
+      if (maxRekCapacity > 0 && maxRekCapacity > targetRekRows) {
+        targetRekRows = maxRekCapacity;
+      } else if (actualRekeningCount == 0 && targetRekRows < 30) {
+        targetRekRows = 30;
+      }
+
+      final padRek = targetRekRows - rekeningRows.length;
+      for (int p = 0; p < padRek; p++) {
         rekeningRows.add(emptyTransactionRow());
       }
 
-      if (prevOnHandCount != null && prevOnHandCount > onHandRows.length) {
-        final padCount = prevOnHandCount - onHandRows.length;
-        for (int p = 0; p < padCount; p++) {
-          onHandRows.add(emptyTransactionRow());
-        }
-      } else if (transactions.isEmpty && onHandRows.isEmpty && prevOnHandCount == null) {
+      int targetOnRows = actualOnHandCount;
+      if (prevOnHandCount != null && prevOnHandCount > targetOnRows) {
+        targetOnRows = prevOnHandCount;
+      }
+      if (maxOnCapacity > 0 && maxOnCapacity > targetOnRows) {
+        targetOnRows = maxOnCapacity;
+      } else if (actualOnHandCount == 0 && targetOnRows < 30) {
+        targetOnRows = 30;
+      }
+
+      final padOn = targetOnRows - onHandRows.length;
+      for (int p = 0; p < padOn; p++) {
         onHandRows.add(emptyTransactionRow());
       }
 
@@ -1407,7 +1422,7 @@ function processRequest(data) {
       var blockFormulas = blockRange.getFormulas();
       var blockValues = blockRange.getValues();
 
-      var consecutiveOldRowsToClear = 0;
+      var rowsToClear = 0;
 
       for (var r = 0; r < maxCheck; r++) {
         var currentRowNum = checkStartRow + r;
@@ -1415,7 +1430,6 @@ function processRequest(data) {
         if (endRowLimit && endRowLimit > 0 && currentRowNum > endRowLimit) break;
 
         var hasFormula = false;
-        var hasAnyValue = false;
         var isHeaderOrFooter = false;
 
         for (var i = 0; i < colIndices.length; i++) {
@@ -1439,13 +1453,10 @@ function processRequest(data) {
               if (strVal === "TOTAL" || strVal === "JUMLAH" || strVal === "JUMLAH TOTAL" ||
                   strVal === "GRAND TOTAL" || strVal === "SUBTOTAL" || strVal === "TOTAL SALDO" ||
                   strVal === "SISA SALDO" || strVal === "SALDO AKHIR" ||
-                  strVal.indexOf("TOTAL ") === 0 || strVal.indexOf("JUMLAH ") === 0 ||
-                  strVal.indexOf("CATATAN:") === 0 || strVal.indexOf("NOTE:") === 0 ||
                   strVal === "TANDA TANGAN" || strVal === "MENGETAHUI") {
                 isHeaderOrFooter = true;
                 break;
               }
-              hasAnyValue = true;
             }
           }
         }
@@ -1453,22 +1464,15 @@ function processRequest(data) {
         // Jika menemukan rumus agregat atau label ringkasan footer -> STOP seketika
         if (hasFormula || isHeaderOrFooter) break;
 
-        // KRUSIAL: Jika baris ini KOSONG (tidak ada data apapun di kolom yang dipetakan),
-        // berarti blok transaksi lama sudah selesai
-        if (!hasAnyValue && (!endRowLimit || endRowLimit <= 0 || currentRowNum >= checkStartRow + 5)) {
-          break;
-        }
-
-        // Baris ini adalah baris data transaksi lama yang tersisa dari sync sebelumnya
-        consecutiveOldRowsToClear++;
+        rowsToClear++;
       }
 
-      // Hapus HANYA baris transaksi lama yang berurutan langsung di bawah data baru
-      if (consecutiveOldRowsToClear > 0) {
+      // Hapus seluruh baris dalam rentang tabel yang aman
+      if (rowsToClear > 0) {
         for (var j = 0; j < colIndices.length; j++) {
           var col = colIndices[j];
           try {
-            targetSheet.getRange(checkStartRow, col, consecutiveOldRowsToClear, 1).clearContent();
+            targetSheet.getRange(checkStartRow, col, rowsToClear, 1).clearContent();
           } catch (eC) {}
         }
       }
@@ -1484,22 +1488,18 @@ function processRequest(data) {
       var targetEndRowOnHand = parseInt(data.endRowOnHand) || endRowOnHand || 0;
       var clearFirst = (data.clearFirst === true || String(data.clearFirst) === "true") || (action === "sync_all" && data.chunkIndex === undefined);
       
-      // Validasi Kapasitas End Row Rekening
-      if (targetEndRowRekening > 0 && (targetStartRowRekening + rekeningRows.length - 1) > targetEndRowRekening) {
+      // Amankan pemotongan kapasitas jika end row diatur
+      if (targetEndRowRekening > 0 && targetEndRowRekening >= targetStartRowRekening) {
         var capRek = targetEndRowRekening - targetStartRowRekening + 1;
-        return jsonResponse({
-          status: "error",
-          message: "Peringatan: Jumlah data transaksi Rekening (" + rekeningRows.length + " data) melebihi batas End Row baris " + targetEndRowRekening + ". Kapasitas dari baris " + targetStartRowRekening + " sampai " + targetEndRowRekening + " hanya " + capRek + " baris. Silakan sesuaikan End Row di aplikasi."
-        });
+        if (rekeningRows.length > capRek) {
+          rekeningRows = rekeningRows.slice(0, capRek);
+        }
       }
-
-      // Validasi Kapasitas End Row On Hand
-      if (targetEndRowOnHand > 0 && (targetStartRowOnHand + onHandRows.length - 1) > targetEndRowOnHand) {
+      if (targetEndRowOnHand > 0 && targetEndRowOnHand >= targetStartRowOnHand) {
         var capOn = targetEndRowOnHand - targetStartRowOnHand + 1;
-        return jsonResponse({
-          status: "error",
-          message: "Peringatan: Jumlah data transaksi Cash On Hand (" + onHandRows.length + " data) melebihi batas End Row baris " + targetEndRowOnHand + ". Kapasitas dari baris " + targetStartRowOnHand + " sampai " + targetEndRowOnHand + " hanya " + capOn + " baris. Silakan sesuaikan End Row di aplikasi."
-        });
+        if (onHandRows.length > capOn) {
+          onHandRows = onHandRows.slice(0, capOn);
+        }
       }
 
       // 1. Bersihkan sisa baris lama untuk kedua tabel secara aman
