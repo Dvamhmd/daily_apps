@@ -2258,24 +2258,18 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 _colMulaiWidth = (_colMulaiWidth + delta).clamp(50.0, 160.0);
               });
             },
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.access_time_rounded, size: 12, color: primaryTeal),
-                SizedBox(width: 3),
-                Flexible(
-                  child: Text(
-                    'Mulai',
-                    style: TextStyle(
-                      fontSize: 11.0,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+            child: const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Mulai',
+                style: TextStyle(
+                  fontSize: 11.0,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
                 ),
-              ],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
 
@@ -2288,24 +2282,18 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                     (_colSelesaiWidth + delta).clamp(50.0, 160.0);
               });
             },
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.flag_rounded, size: 12, color: primaryTeal),
-                SizedBox(width: 3),
-                Flexible(
-                  child: Text(
-                    'Selesai',
-                    style: TextStyle(
-                      fontSize: 11.0,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+            child: const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Selesai',
+                style: TextStyle(
+                  fontSize: 11.0,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
                 ),
-              ],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
 
@@ -2317,24 +2305,18 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 _colDurasiWidth = (_colDurasiWidth + delta).clamp(45.0, 140.0);
               });
             },
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.timer_outlined, size: 12, color: primaryTeal),
-                SizedBox(width: 3),
-                Flexible(
-                  child: Text(
-                    'Durasi',
-                    style: TextStyle(
-                      fontSize: 11.0,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+            child: const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Durasi',
+                style: TextStyle(
+                  fontSize: 11.0,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
                 ),
-              ],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
 
@@ -2347,24 +2329,18 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                     (_colKegiatanWidth + delta).clamp(120.0, 600.0);
               });
             },
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.event_note_rounded, size: 12, color: primaryTeal),
-                SizedBox(width: 3),
-                Flexible(
-                  child: Text(
-                    'Kegiatan',
-                    style: TextStyle(
-                      fontSize: 11.0,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+            child: const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Kegiatan',
+                style: TextStyle(
+                  fontSize: 11.0,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
                 ),
-              ],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
 
