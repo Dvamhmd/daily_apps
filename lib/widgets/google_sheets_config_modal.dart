@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -75,6 +76,37 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
   late TextEditingController _endRowCtrl;
   late TextEditingController _startRowOnHandCtrl;
   late TextEditingController _endRowOnHandCtrl;
+  late TextEditingController _evidenceTargetRowCtrl;
+  late TextEditingController _customDateFormatCtrl;
+
+  late bool _insertImageFormula;
+  late String _selectedDateFormat;
+
+  final Map<String, TextEditingController> _colControllers = {};
+  final Map<String, TextEditingController> _rowControllers = {};
+  final Map<String, bool> _fieldVisibility = {};
+
+  bool _isTesting = false;
+  bool _isSyncing = false;
+  String? _testMessage;
+  bool? _testSuccess;
+
+  Timer? _debounceSaveTimer;
+
+  static String? _cachedScriptCode;
+  static String? _cachedScriptPreview;
+
+  static String get _scriptCode =>
+      _cachedScriptCode ??= SheetsSyncService.getGoogleAppsScriptCode();
+
+  static String get _scriptPreviewCode {
+    if (_cachedScriptPreview != null) return _cachedScriptPreview!;
+    final lines = _scriptCode.split('\n');
+    final previewLines = lines.take(20).join('\n');
+    _cachedScriptPreview =
+        '$previewLines\n\n// ... (dan ${lines.length - 20} baris kode lainnya. Tekan "Salin Teks" atau "Kirim File" untuk kode lengkap)';
+    return _cachedScriptPreview!;
+  }
 
   static const List<Map<String, String>> dateFormatPresets = [
     {
@@ -121,18 +153,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     },
   ];
 
-  late String _selectedDateFormat;
-  late TextEditingController _customDateFormatCtrl;
-
-  final Map<String, TextEditingController> _colControllers = {};
-  final Map<String, bool> _fieldVisibility = {};
-
-  bool _isTesting = false;
-  bool _isSyncing = false;
-  String? _testMessage;
-  bool? _testSuccess;
-
-  final List<Map<String, String>> _rekeningFields = [
+  static final List<Map<String, String>> _rekeningFields = [
     {'key': 'no', 'label': 'Nomor Urut', 'desc': '1, 2, 3, ...'},
     {'key': 'tanggal', 'label': 'Tanggal', 'desc': 'Format Tanggal Transaksi'},
     {'key': 'ku', 'label': 'Kode Unit (KU)', 'desc': 'KU-01, KU-02, dsb.'},
@@ -142,7 +163,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     {'key': 'kredit', 'label': 'Kredit (Pengeluaran)', 'desc': 'Nominal Keluar'},
   ];
 
-  final List<Map<String, String>> _onHandFields = [
+  static final List<Map<String, String>> _onHandFields = [
     {'key': 'no_onhand', 'label': 'Nomor Urut', 'desc': '1, 2, 3, ...'},
     {'key': 'tanggal_onhand', 'label': 'Tanggal', 'desc': 'Format Tanggal Transaksi'},
     {'key': 'ku_onhand', 'label': 'Kode Unit (KU)', 'desc': 'KU-01, KU-02, dsb.'},
@@ -152,7 +173,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     {'key': 'kredit_onhand', 'label': 'Kredit (Pengeluaran)', 'desc': 'Nominal Keluar'},
   ];
 
-  final List<Map<String, String>> _evidenceImageFields = [
+  static final List<Map<String, String>> _evidenceImageFields = [
     {
       'key': 'bukti_saldo_rekening',
       'label': 'Bukti Saldo Rekening',
@@ -196,11 +217,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
         ..._evidenceImageFields,
       ];
 
-  late TextEditingController _evidenceTargetRowCtrl;
-  late bool _insertImageFormula;
-  final Map<String, TextEditingController> _rowControllers = {};
-
-  String _formatPreviewSample(String pattern) {
+  static String _formatPreviewSample(String pattern) {
     try {
       final sampleDate = DateTime(2026, 8, 1, 14, 30);
       return DateFormat(pattern.trim()).format(sampleDate);
@@ -220,7 +237,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     );
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
-        _saveCurrentState();
+        _saveCurrentState(flushImmediately: true);
         if (_activeTab != _tabController.index) {
           setState(() {
             _activeTab = _tabController.index;
@@ -248,7 +265,8 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     _insertImageFormula = _config.insertImageFormula;
 
     _selectedDateFormat = _config.dateFormat;
-    final isPreset = dateFormatPresets.any((p) => p['pattern'] == _selectedDateFormat);
+    final isPreset =
+        dateFormatPresets.any((p) => p['pattern'] == _selectedDateFormat);
     _customDateFormatCtrl = TextEditingController(
       text: isPreset ? '' : _selectedDateFormat,
     );
@@ -274,6 +292,8 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
 
   @override
   void dispose() {
+    _debounceSaveTimer?.cancel();
+    _saveCurrentState(flushImmediately: true);
     _tabController.dispose();
     _urlCtrl.dispose();
     _sheetNameCtrl.dispose();
@@ -292,8 +312,15 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     super.dispose();
   }
 
+  void _scheduleDebouncedSave() {
+    _debounceSaveTimer?.cancel();
+    _debounceSaveTimer = Timer(const Duration(milliseconds: 350), () {
+      _saveCurrentState(flushImmediately: true);
+    });
+  }
+
   void _switchTab(int index) {
-    _saveCurrentState();
+    _saveCurrentState(flushImmediately: true);
     if (_tabController.index != index) {
       _tabController.animateTo(index);
     }
@@ -313,7 +340,9 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
 
     final startRowOnHand = int.tryParse(_startRowOnHandCtrl.text.trim()) ?? 4;
     final endRowOnHand = int.tryParse(_endRowOnHandCtrl.text.trim());
-    if (endRowOnHand != null && endRowOnHand > 0 && endRowOnHand < startRowOnHand) {
+    if (endRowOnHand != null &&
+        endRowOnHand > 0 &&
+        endRowOnHand < startRowOnHand) {
       return 'End Row Cash On Hand ($endRowOnHand) tidak boleh lebih kecil dari Start Row ($startRowOnHand).';
     }
 
@@ -340,7 +369,8 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     return null;
   }
 
-  void _saveCurrentState({bool markCellsConfigured = false}) {
+  void _saveCurrentState(
+      {bool markCellsConfigured = false, bool flushImmediately = false}) {
     _config.webAppUrl = _urlCtrl.text.trim();
     _config.sheetName = _sheetNameCtrl.text.trim();
     _config.startRow = int.tryParse(_startRowCtrl.text.trim()) ?? 4;
@@ -349,7 +379,8 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     _config.startRowOnHand =
         int.tryParse(_startRowOnHandCtrl.text.trim()) ?? 4;
     final eRowOnHand = int.tryParse(_endRowOnHandCtrl.text.trim());
-    _config.endRowOnHand = (eRowOnHand != null && eRowOnHand > 0) ? eRowOnHand : null;
+    _config.endRowOnHand =
+        (eRowOnHand != null && eRowOnHand > 0) ? eRowOnHand : null;
     _config.evidenceTargetRow =
         int.tryParse(_evidenceTargetRowCtrl.text.trim()) ?? 60;
     _config.insertImageFormula = _insertImageFormula;
@@ -383,8 +414,13 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
           : (SheetsConfig.defaultEvidenceRowMapping()[key] ?? 60);
     }
 
-    _config.save();
-    widget.onConfigSaved(_config);
+    if (flushImmediately) {
+      _debounceSaveTimer?.cancel();
+      _config.save();
+      widget.onConfigSaved(_config);
+    } else {
+      _scheduleDebouncedSave();
+    }
   }
 
   Future<void> _handleTestConnection() async {
@@ -399,7 +435,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
       return;
     }
 
-    _saveCurrentState();
+    _saveCurrentState(flushImmediately: true);
     if (!_config.isConfigured) {
       CustomToast.showError(
         context,
@@ -450,7 +486,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
       return;
     }
 
-    _saveCurrentState();
+    _saveCurrentState(flushImmediately: true);
     if (!_config.isConfigured) {
       CustomToast.showError(
         context,
@@ -522,7 +558,8 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
           title: Row(
             children: [
@@ -577,7 +614,10 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                   children: [
                     const Text(
                       'Pengiriman data dibatalkan demi keamanan spreadsheet Anda. Data transaksi di aplikasi melebihi rentang baris (End Row) yang ditentukan:',
-                      style: TextStyle(fontSize: 11.5, color: Color(0xFF7F1D1D), height: 1.4),
+                      style: TextStyle(
+                          fontSize: 11.5,
+                          color: Color(0xFF7F1D1D),
+                          height: 1.4),
                     ),
                     const SizedBox(height: 10),
                     if (isRekExceeded) ...[
@@ -590,7 +630,8 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.account_balance_rounded, size: 16, color: Color(0xFFDC2626)),
+                            const Icon(Icons.account_balance_rounded,
+                                size: 16, color: Color(0xFFDC2626)),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -617,7 +658,8 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.payments_rounded, size: 16, color: Color(0xFFDC2626)),
+                            const Icon(Icons.payments_rounded,
+                                size: 16, color: Color(0xFFDC2626)),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -639,7 +681,8 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
               const SizedBox(height: 12),
               const Text(
                 'Solusi: Buka Tab "Atur Cell", lalu perbesar nilai End Row atau kosongkan End Row jika tabel Anda tidak memiliki batas akhir.',
-                style: TextStyle(fontSize: 11, color: Color(0xFF475569), height: 1.35),
+                style: TextStyle(
+                    fontSize: 11, color: Color(0xFF475569), height: 1.35),
               ),
             ],
           ),
@@ -663,12 +706,14 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                   icon: const Icon(Icons.tune_rounded, size: 16),
                   label: const Text(
                     'Sesuaikan End Row di Atur Cell',
-                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                    style:
+                        TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFDC2626),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -1015,9 +1060,10 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                           final colVal =
                               _colControllers[key]?.text.trim().toUpperCase() ??
                                   '-';
-                          final rowVal =
-                              _rowControllers[key]?.text.trim() ??
-                              (SheetsConfig.defaultEvidenceRowMapping()[key]?.toString() ?? '60');
+                          final rowVal = _rowControllers[key]?.text.trim() ??
+                              (SheetsConfig.defaultEvidenceRowMapping()[key]
+                                      ?.toString() ??
+                                  '60');
                           final isExcluded =
                               !isVisible || colVal.isEmpty || colVal == '-';
 
@@ -1166,7 +1212,8 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(ctx);
-                      _saveCurrentState(markCellsConfigured: true);
+                      _saveCurrentState(
+                          markCellsConfigured: true, flushImmediately: true);
                       _executeSyncAll();
                     },
                     icon: const Icon(Icons.send_rounded, size: 15),
@@ -1236,7 +1283,8 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
             CustomToast.showSuccess(
               context,
               title: 'Data Disesuaikan',
-              subtitle: 'Berhasil menyesuaikan ${comparison.remoteTotalCount} transaksi dari Spreadsheet ke aplikasi!',
+              subtitle:
+                  'Berhasil menyesuaikan ${comparison.remoteTotalCount} transaksi dari Spreadsheet ke aplikasi!',
             );
           }
           return;
@@ -1289,7 +1337,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
       canPop: true,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) {
-          _saveCurrentState();
+          _saveCurrentState(flushImmediately: true);
         }
       },
       child: Container(
@@ -1384,7 +1432,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
               ),
               IconButton(
                 onPressed: () {
-                  _saveCurrentState();
+                  _saveCurrentState(flushImmediately: true);
                   Navigator.pop(context);
                 },
                 icon: const Icon(Icons.close, color: Color(0xFF64748B)),
@@ -1424,62 +1472,54 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
           indicatorSize: TabBarIndicatorSize.tab,
           dividerColor: Colors.transparent,
           labelPadding: EdgeInsets.zero,
+          labelColor: const Color(0xFF107C41),
+          unselectedLabelColor: const Color(0xFF64748B),
+          labelStyle: const TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.bold,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w500,
+          ),
           splashFactory: NoSplash.splashFactory,
           overlayColor: WidgetStateProperty.all(Colors.transparent),
           onTap: (index) {
             _switchTab(index);
           },
-          tabs: [
-            _buildTabItem(0, Icons.link_rounded, 'Koneksi'),
-            _buildTabItem(1, Icons.view_column_rounded, 'Atur Cell'),
-            _buildTabItem(2, Icons.code_rounded, 'Script'),
+          tabs: const [
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.link_rounded, size: 16),
+                  SizedBox(width: 5),
+                  Text('Koneksi'),
+                ],
+              ),
+            ),
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.view_column_rounded, size: 16),
+                  SizedBox(width: 5),
+                  Text('Atur Cell'),
+                ],
+              ),
+            ),
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.code_rounded, size: 16),
+                  SizedBox(width: 5),
+                  Text('Script'),
+                ],
+              ),
+            ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildTabItem(int index, IconData icon, String title) {
-    return Tab(
-      child: AnimatedBuilder(
-        animation: _tabController.animation ?? _tabController,
-        builder: (context, _) {
-          final animVal =
-              _tabController.animation?.value ?? _tabController.index.toDouble();
-          final diff = (animVal - index).abs();
-          final progress = (1.0 - diff).clamp(0.0, 1.0);
-          final iconColor = Color.lerp(
-            const Color(0xFF64748B),
-            const Color(0xFF107C41),
-            progress,
-          );
-          final textColor = Color.lerp(
-            const Color(0xFF64748B),
-            const Color(0xFF0F172A),
-            progress,
-          );
-          final isSelected = diff < 0.5;
-
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 15,
-                color: iconColor,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: textColor,
-                ),
-              ),
-            ],
-          );
-        },
       ),
     );
   }
@@ -1502,8 +1542,8 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: _config.isConfigured
-                    ? [const Color(0xFFF0FDF4), const Color(0xFFDCFCE7)]
-                    : [const Color(0xFFFFFBEB), const Color(0xFFFEF3C7)],
+                    ? const [Color(0xFFF0FDF4), Color(0xFFDCFCE7)]
+                    : const [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -1585,7 +1625,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
             ),
             child: TextField(
               controller: _urlCtrl,
-              onChanged: (v) => _saveCurrentState(),
+              onChanged: (v) => _saveCurrentState(flushImmediately: false),
               style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
               textAlignVertical: TextAlignVertical.center,
               maxLines: 2,
@@ -1607,7 +1647,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                         icon: const Icon(Icons.clear, size: 16),
                         onPressed: () {
                           _urlCtrl.clear();
-                          _saveCurrentState();
+                          _saveCurrentState(flushImmediately: true);
                           setState(() {});
                         },
                       ),
@@ -1619,7 +1659,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                             await Clipboard.getData(Clipboard.kTextPlain);
                         if (data?.text != null) {
                           _urlCtrl.text = data!.text!.trim();
-                          _saveCurrentState();
+                          _saveCurrentState(flushImmediately: true);
                           setState(() {});
                         }
                       },
@@ -1649,7 +1689,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
             ),
             child: TextField(
               controller: _sheetNameCtrl,
-              onChanged: (v) => _saveCurrentState(),
+              onChanged: (v) => _saveCurrentState(flushImmediately: false),
               style: const TextStyle(fontSize: 12.5),
               textAlignVertical: TextAlignVertical.center,
               decoration: const InputDecoration(
@@ -1725,7 +1765,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                     setState(() {
                       _config.autoSyncOnInput = val;
                     });
-                    _saveCurrentState();
+                    _saveCurrentState(flushImmediately: true);
                   },
                 ),
               ],
@@ -1869,7 +1909,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
         _rowControllers[key]?.text = val.toString();
       }
     });
-    _saveCurrentState();
+    _saveCurrentState(flushImmediately: true);
     CustomToast.showSuccess(
       context,
       title: 'Pengaturan Standar',
@@ -1880,251 +1920,27 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
   Widget _buildFieldRow(Map<String, String> f) {
     final key = f['key']!;
     final label = f['label']!;
-    final desc = (key == 'tanggal' || key == 'tanggal_onhand')
-        ? 'Pola: $_selectedDateFormat (${_formatPreviewSample(_selectedDateFormat)})'
-        : f['desc']!;
     final ctrl = _colControllers[key]!;
-    final isVisible = _fieldVisibility[key] ?? true;
-    final isExcluded = !isVisible;
-    final colText = ctrl.text.trim().toUpperCase();
-    final isMissingColumn = isVisible && (colText.isEmpty || colText == '-');
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: isExcluded
-            ? const Color(0xFFF8FAFC)
-            : (isMissingColumn ? const Color(0xFFFFF1F2) : Colors.white),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isExcluded
-              ? const Color(0xFFE2E8F0)
-              : (isMissingColumn
-                  ? const Color(0xFFF87171)
-                  : const Color(0xFFCBD5E1)),
-          width: 1.0,
-        ),
-      ),
-      child: Row(
-        children: [
-          // Badge Kolom
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: isExcluded
-                  ? const Color(0xFFE2E8F0)
-                  : (isMissingColumn
-                      ? const Color(0xFFFEE2E2)
-                      : const Color(0xFF107C41).withValues(alpha: 0.1)),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Center(
-              child: isMissingColumn
-                  ? const Icon(
-                      Icons.priority_high_rounded,
-                      size: 18,
-                      color: Color(0xFFDC2626),
-                    )
-                  : Text(
-                      isExcluded ? '-' : (colText.isEmpty ? '?' : colText),
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: isExcluded
-                            ? const Color(0xFF94A3B8)
-                            : const Color(0xFF107C41),
-                      ),
-                    ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Label & Keterangan
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: isExcluded
-                              ? const Color(0xFF94A3B8)
-                              : (isMissingColumn
-                                  ? const Color(0xFF991B1B)
-                                  : const Color(0xFF1E293B)),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (isExcluded)
-                      Container(
-                        margin: const EdgeInsets.only(left: 6),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'Dikecualikan',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: Color(0xFF64748B),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      )
-                    else if (isMissingColumn)
-                      Container(
-                        margin: const EdgeInsets.only(left: 6),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEE2E2),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: const Color(0xFFFECACA)),
-                        ),
-                        child: const Text(
-                          'Wajib Diisi',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: Color(0xFFDC2626),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                Text(
-                  isExcluded
-                      ? 'Tidak akan dimasukkan ke spreadsheet'
-                      : (isMissingColumn
-                          ? 'Wajib isi kolom (cth: A, B) atau matikan ikon mata'
-                          : desc),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: isExcluded
-                        ? const Color(0xFFCBD5E1)
-                        : (isMissingColumn
-                            ? const Color(0xFFDC2626)
-                            : const Color(0xFF94A3B8)),
-                    fontWeight:
-                        isMissingColumn ? FontWeight.w500 : FontWeight.normal,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Tombol Saklar Kecualikan / Gunakan (Ikon Mata)
-          IconButton(
-            icon: Icon(
-              isExcluded
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
-              size: 20,
-              color: isExcluded
-                  ? const Color(0xFF94A3B8)
-                  : const Color(0xFF107C41),
-            ),
-            tooltip: isExcluded
-                ? 'Gunakan kolom ini'
-                : 'Kecualikan (Jangan gunakan kolom ini)',
-            onPressed: () {
-              setState(() {
-                final willBeVisible = isExcluded;
-                _fieldVisibility[key] = willBeVisible;
-                if (willBeVisible) {
-                  if (ctrl.text.trim().isEmpty || ctrl.text.trim() == '-') {
-                    ctrl.text = SheetsConfig.suggestedColumn(key);
-                  }
-                }
-              });
-              _saveCurrentState();
-            },
-          ),
-          const SizedBox(width: 4),
-          // Input Huruf Kolom
-          SizedBox(
-            width: 48,
-            height: 34,
-            child: TextField(
-              controller: ctrl,
-              enabled: isVisible,
-              textCapitalization: TextCapitalization.characters,
-              textAlign: TextAlign.center,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z]')),
-                LengthLimitingTextInputFormatter(3),
-              ],
-              onChanged: (val) {
-                setState(() {});
-                _saveCurrentState();
-              },
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'monospace',
-                color: isExcluded
-                    ? const Color(0xFF94A3B8)
-                    : (isMissingColumn
-                        ? const Color(0xFFDC2626)
-                        : const Color(0xFF0F172A)),
-              ),
-              decoration: InputDecoration(
-                contentPadding: EdgeInsets.zero,
-                hintText: isExcluded ? '-' : 'A-Z',
-                hintStyle: TextStyle(
-                  fontSize: 10,
-                  color: isMissingColumn
-                      ? const Color(0xFFF87171)
-                      : const Color(0xFF94A3B8),
-                ),
-                filled: isExcluded || isMissingColumn,
-                fillColor: isExcluded
-                    ? const Color(0xFFF1F5F9)
-                    : (isMissingColumn
-                        ? const Color(0xFFFFF1F2)
-                        : Colors.white),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    color: isMissingColumn
-                        ? const Color(0xFFEF4444)
-                        : const Color(0xFFCBD5E1),
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    color: isMissingColumn
-                        ? const Color(0xFFEF4444)
-                        : const Color(0xFFCBD5E1),
-                    width: 1.0,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    color: isMissingColumn
-                        ? const Color(0xFFDC2626)
-                        : const Color(0xFF107C41),
-                    width: 1.8,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+    return _FieldRowItem(
+      fieldKey: key,
+      label: label,
+      desc: f['desc']!,
+      controller: ctrl,
+      dateFormat: _selectedDateFormat,
+      isInitiallyVisible: _fieldVisibility[key] ?? true,
+      onVisibilityChanged: (newVis) {
+        _fieldVisibility[key] = newVis;
+        if (newVis) {
+          if (ctrl.text.trim().isEmpty || ctrl.text.trim() == '-') {
+            ctrl.text = SheetsConfig.suggestedColumn(key);
+          }
+        }
+        _saveCurrentState(flushImmediately: false);
+      },
+      onChanged: () {
+        _saveCurrentState(flushImmediately: false);
+      },
     );
   }
 
@@ -2134,385 +1950,37 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
     final desc = field['desc']!;
     final colCtrl = _colControllers[key]!;
     final rowCtrl = _rowControllers[key]!;
-    final isVisible = _fieldVisibility[key] ?? true;
-    final isExcluded = !isVisible;
-    final colText = colCtrl.text.trim().toUpperCase();
-    final rowText = rowCtrl.text.trim();
-    final rowNum = int.tryParse(rowText);
-    final isMissingColumn = isVisible && (colText.isEmpty || colText == '-');
-    final isMissingRow =
-        isVisible && (rowText.isEmpty || rowNum == null || rowNum <= 0);
-    final hasError = isMissingColumn || isMissingRow;
-    final cellStr = isExcluded
-        ? '-'
-        : (hasError
-            ? (colText.isEmpty ? '?' : colText) +
-                (rowText.isEmpty ? '?' : rowText)
-            : '$colText$rowText');
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: isExcluded
-            ? const Color(0xFFF8FAFC)
-            : (hasError ? const Color(0xFFFFF1F2) : Colors.white),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isExcluded
-              ? const Color(0xFFE2E8F0)
-              : (hasError
-                  ? const Color(0xFFF87171)
-                  : const Color(0xFFCBD5E1).withValues(alpha: 0.8)),
-          width: 1.0,
-        ),
-      ),
-      child: Row(
-        children: [
-          // Target Cell Badge (e.g. I2, J5)
-          Container(
-            width: 46,
-            height: 36,
-            decoration: BoxDecoration(
-              color: isExcluded
-                  ? const Color(0xFFE2E8F0)
-                  : (hasError
-                      ? const Color(0xFFFEE2E2)
-                      : const Color(0xFF107C41).withValues(alpha: 0.1)),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: isExcluded
-                    ? Colors.transparent
-                    : (hasError
-                        ? const Color(0xFFFCA5A5)
-                        : const Color(0xFF107C41).withValues(alpha: 0.25)),
-              ),
-            ),
-            child: Center(
-              child: hasError
-                  ? const Icon(
-                      Icons.priority_high_rounded,
-                      size: 18,
-                      color: Color(0xFFDC2626),
-                    )
-                  : Text(
-                      cellStr,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: isExcluded
-                            ? const Color(0xFF94A3B8)
-                            : const Color(0xFF107C41),
-                      ),
-                    ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          // Label & Keterangan
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: isExcluded
-                              ? const Color(0xFF94A3B8)
-                              : (hasError
-                                  ? const Color(0xFF991B1B)
-                                  : const Color(0xFF1E293B)),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (isExcluded)
-                      Container(
-                        margin: const EdgeInsets.only(left: 6),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'Dikecualikan',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: Color(0xFF64748B),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      )
-                    else if (hasError)
-                      Container(
-                        margin: const EdgeInsets.only(left: 6),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEE2E2),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: const Color(0xFFFECACA)),
-                        ),
-                        child: Text(
-                          isMissingColumn && isMissingRow
-                              ? 'Kolom & Baris Kosong'
-                              : (isMissingColumn
-                                  ? 'Kolom Wajib Diisi'
-                                  : 'Baris Wajib Diisi'),
-                          style: const TextStyle(
-                            fontSize: 8.5,
-                            color: Color(0xFFDC2626),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                Text(
-                  isExcluded
-                      ? 'Tidak akan dimasukkan ke spreadsheet'
-                      : (hasError
-                          ? 'Wajib isi kolom & baris atau matikan ikon mata'
-                          : desc),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: isExcluded
-                        ? const Color(0xFFCBD5E1)
-                        : (hasError
-                            ? const Color(0xFFDC2626)
-                            : const Color(0xFF94A3B8)),
-                    fontWeight: hasError ? FontWeight.w500 : FontWeight.normal,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Tombol Saklar Kecualikan / Gunakan (Ikon Mata)
-          IconButton(
-            icon: Icon(
-              isExcluded
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
-              size: 18,
-              color: isExcluded
-                  ? const Color(0xFF94A3B8)
-                  : const Color(0xFF107C41),
-            ),
-            tooltip: isExcluded
-                ? 'Gunakan kolom ini'
-                : 'Kecualikan (Jangan gunakan)',
-            onPressed: () {
-              setState(() {
-                final willBeVisible = isExcluded;
-                _fieldVisibility[key] = willBeVisible;
-                if (willBeVisible) {
-                  if (colCtrl.text.trim().isEmpty ||
-                      colCtrl.text.trim() == '-') {
-                    colCtrl.text = SheetsConfig.suggestedColumn(key);
-                  }
-                  if (rowCtrl.text.trim().isEmpty ||
-                      (int.tryParse(rowCtrl.text.trim()) ?? 0) <= 0) {
-                    final defRow =
-                        SheetsConfig.defaultEvidenceRowMapping()[key] ?? 60;
-                    rowCtrl.text = defRow.toString();
-                  }
-                }
-              });
-              _saveCurrentState();
-            },
-          ),
-          const SizedBox(width: 4),
-          // Input Huruf Kolom (e.g. I)
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Kolom',
-                style: TextStyle(
-                  fontSize: 8.5,
-                  color: isMissingColumn
-                      ? const Color(0xFFDC2626)
-                      : const Color(0xFF64748B),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 1),
-              SizedBox(
-                width: 38,
-                height: 32,
-                child: TextField(
-                  controller: colCtrl,
-                  enabled: isVisible,
-                  textCapitalization: TextCapitalization.characters,
-                  textAlign: TextAlign.center,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z]')),
-                    LengthLimitingTextInputFormatter(3),
-                  ],
-                  onChanged: (val) {
-                    setState(() {});
-                    _saveCurrentState();
-                  },
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'monospace',
-                    color: isExcluded
-                        ? const Color(0xFF94A3B8)
-                        : (isMissingColumn
-                            ? const Color(0xFFDC2626)
-                            : const Color(0xFF0F172A)),
-                  ),
-                  decoration: InputDecoration(
-                    contentPadding: EdgeInsets.zero,
-                    hintText: isExcluded ? '-' : 'A-Z',
-                    hintStyle: TextStyle(
-                      fontSize: 9.5,
-                      color: isMissingColumn
-                          ? const Color(0xFFF87171)
-                          : const Color(0xFF94A3B8),
-                    ),
-                    filled: isExcluded || isMissingColumn,
-                    fillColor: isExcluded
-                        ? const Color(0xFFF1F5F9)
-                        : (isMissingColumn
-                            ? const Color(0xFFFFF1F2)
-                            : Colors.white),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(
-                        color: isMissingColumn
-                            ? const Color(0xFFEF4444)
-                            : const Color(0xFFCBD5E1),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(
-                        color: isMissingColumn
-                            ? const Color(0xFFEF4444)
-                            : const Color(0xFFCBD5E1),
-                        width: isMissingColumn ? 1.5 : 1.0,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(
-                        color: isMissingColumn
-                            ? const Color(0xFFDC2626)
-                            : const Color(0xFF107C41),
-                        width: 1.8,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 6),
-          // Input Nomor Baris (e.g. 2, 5, 10)
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Baris',
-                style: TextStyle(
-                  fontSize: 8.5,
-                  color: isMissingRow
-                      ? const Color(0xFFDC2626)
-                      : const Color(0xFF64748B),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 1),
-              SizedBox(
-                width: 44,
-                height: 32,
-                child: TextField(
-                  controller: rowCtrl,
-                  enabled: isVisible,
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(4),
-                  ],
-                  onChanged: (val) {
-                    setState(() {});
-                    _saveCurrentState();
-                  },
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'monospace',
-                    color: isExcluded
-                        ? const Color(0xFF94A3B8)
-                        : (isMissingRow
-                            ? const Color(0xFFDC2626)
-                            : const Color(0xFF0F172A)),
-                  ),
-                  decoration: InputDecoration(
-                    contentPadding: EdgeInsets.zero,
-                    hintText: isExcluded ? '-' : '2',
-                    hintStyle: TextStyle(
-                      fontSize: 10,
-                      color: isMissingRow
-                          ? const Color(0xFFF87171)
-                          : const Color(0xFF94A3B8),
-                    ),
-                    filled: isExcluded || isMissingRow,
-                    fillColor: isExcluded
-                        ? const Color(0xFFF1F5F9)
-                        : (isMissingRow
-                            ? const Color(0xFFFFF1F2)
-                            : Colors.white),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(
-                        color: isMissingRow
-                            ? const Color(0xFFEF4444)
-                            : const Color(0xFFCBD5E1),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(
-                        color: isMissingRow
-                            ? const Color(0xFFEF4444)
-                            : const Color(0xFFCBD5E1),
-                        width: isMissingRow ? 1.5 : 1.0,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(
-                        color: isMissingRow
-                            ? const Color(0xFFDC2626)
-                            : const Color(0xFF107C41),
-                        width: 1.8,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+    return _EvidenceFieldRowItem(
+      fieldKey: key,
+      label: label,
+      desc: desc,
+      colController: colCtrl,
+      rowController: rowCtrl,
+      isInitiallyVisible: _fieldVisibility[key] ?? true,
+      onVisibilityChanged: (newVis) {
+        _fieldVisibility[key] = newVis;
+        if (newVis) {
+          if (colCtrl.text.trim().isEmpty || colCtrl.text.trim() == '-') {
+            colCtrl.text = SheetsConfig.suggestedColumn(key);
+          }
+          if (rowCtrl.text.trim().isEmpty ||
+              (int.tryParse(rowCtrl.text.trim()) ?? 0) <= 0) {
+            final defRow = SheetsConfig.defaultEvidenceRowMapping()[key] ?? 60;
+            rowCtrl.text = defRow.toString();
+          }
+        }
+        _saveCurrentState(flushImmediately: false);
+      },
+      onChanged: () {
+        _saveCurrentState(flushImmediately: false);
+      },
     );
   }
 
   Widget _buildDateFormatSection() {
-    final previewText = _formatPreviewSample(_selectedDateFormat);
-    final isCustom = !dateFormatPresets.any((p) => p['pattern'] == _selectedDateFormat);
+    final isCustom =
+        !dateFormatPresets.any((p) => p['pattern'] == _selectedDateFormat);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -2586,8 +2054,10 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
               child: DropdownButton<String>(
                 value: isCustom ? '__custom__' : _selectedDateFormat,
                 isExpanded: true,
-                icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-                style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A)),
+                icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                    color: Color(0xFF64748B)),
+                style:
+                    const TextStyle(fontSize: 12, color: Color(0xFF0F172A)),
                 items: [
                   ...dateFormatPresets.map((preset) {
                     final pattern = preset['pattern']!;
@@ -2609,7 +2079,8 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: const Color(0xFFE2E8F0),
                               borderRadius: BorderRadius.circular(6),
@@ -2641,7 +2112,8 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                             ),
                           ),
                         ),
-                        Icon(Icons.edit_note_rounded, size: 16, color: Color(0xFF0369A1)),
+                        Icon(Icons.edit_note_rounded,
+                            size: 16, color: Color(0xFF0369A1)),
                       ],
                     ),
                   ),
@@ -2657,7 +2129,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                       _selectedDateFormat = newVal;
                     }
                   });
-                  _saveCurrentState();
+                  _saveCurrentState(flushImmediately: true);
                 },
               ),
             ),
@@ -2671,20 +2143,21 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
               style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
               decoration: InputDecoration(
                 hintText: 'Contoh: dd/MM/yyyy atau yyyy-MM-dd',
-                hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                hintStyle:
+                    const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                 labelText: 'Pola DateFormat Kustom',
                 labelStyle: const TextStyle(fontSize: 11.5),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
                 ),
               ),
               onChanged: (val) {
-                setState(() {
-                  _selectedDateFormat = val.trim().isEmpty ? 'dd/MM/yyyy' : val.trim();
-                });
-                _saveCurrentState();
+                _selectedDateFormat =
+                    val.trim().isEmpty ? 'dd/MM/yyyy' : val.trim();
+                _saveCurrentState(flushImmediately: false);
               },
             ),
           ],
@@ -2692,41 +2165,56 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
           const SizedBox(height: 10),
 
           // Live Preview Box
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0FDF4),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFBBF7D0)),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.visibility_rounded,
-                  color: Color(0xFF16A34A),
-                  size: 16,
+          ListenableBuilder(
+            listenable: _customDateFormatCtrl,
+            builder: (context, _) {
+              final pattern = isCustom
+                  ? (_customDateFormatCtrl.text.trim().isEmpty
+                      ? 'dd/MM/yyyy'
+                      : _customDateFormatCtrl.text.trim())
+                  : _selectedDateFormat;
+              final previewText = _formatPreviewSample(pattern);
+
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFBBF7D0)),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: RichText(
-                    text: TextSpan(
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF166534)),
-                      children: [
-                        const TextSpan(text: 'Contoh 1 Agustus 2026 dikirim sebagai: '),
-                        TextSpan(
-                          text: previewText,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF14532D),
-                            fontFamily: 'monospace',
-                          ),
-                        ),
-                      ],
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.visibility_rounded,
+                      color: Color(0xFF16A34A),
+                      size: 16,
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: RichText(
+                        text: TextSpan(
+                          style: const TextStyle(
+                              fontSize: 11, color: Color(0xFF166534)),
+                          children: [
+                            const TextSpan(
+                                text: 'Contoh 1 Agustus 2026 dikirim sebagai: '),
+                            TextSpan(
+                              text: previewText,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF14532D),
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           ),
 
           const SizedBox(height: 8),
@@ -2777,747 +2265,737 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-          if (!_config.hasConfiguredCells) ...[
-            Container(
-              margin: const EdgeInsets.only(bottom: 14),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFFBEB),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFDE68A)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.warning_amber_rounded,
-                      color: Color(0xFFD97706), size: 22),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Pemetaan cell belum pernah dikonfigurasi. Silakan periksa posisi kolom & baris di bawah, lalu klik "Simpan Pemetaan" sebelum mengirim data.',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: Color(0xFF92400E),
-                        fontWeight: FontWeight.w500,
-                        height: 1.35,
-                      ),
+                if (!_config.hasConfiguredCells) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded,
+                            color: Color(0xFFD97706), size: 22),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Pemetaan cell belum pernah dikonfigurasi. Silakan periksa posisi kolom & baris di bawah, lalu klik "Simpan Pemetaan" sebelum mengirim data.',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: Color(0xFF92400E),
+                              fontWeight: FontWeight.w500,
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
-              ),
-            ),
-          ],
-          // Info Box
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFBFDBFE)),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.info_outline_rounded,
-                    color: Color(0xFF2563EB), size: 20),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Atur posisi kolom Google Spreadsheet untuk data transaksi & bukti gambar sesuai format yang Anda inginkan (misal: Kolom A, B, C, dst).',
-                    style: TextStyle(fontSize: 11.5, color: Color(0xFF1E40AF)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // Info Box: Format Visual Spreadsheet 100% Terjaga
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0FDF4),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFBBF7D0)),
-            ),
-            child: const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.auto_awesome_rounded,
-                    color: Color(0xFF16A34A), size: 18),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Format Sel Spreadsheet Terjaga: Pengiriman data hanya mengisi nilai sel (raw data). Seluruh pengaturan font, ukuran huruf, perataan teks (alignment), warna, border, dan format angka (Rp) akan 100% mengikuti format template di Google Sheets Anda tanpa terubah.',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF14532D),
-                      height: 1.35,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Header List Mapping Transaksi Rekening
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                '1. Kolom Transaksi Rekening',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
-              TextButton.icon(
-                onPressed: _resetMappingToDefault,
-                icon: const Icon(Icons.refresh_rounded, size: 14),
-                label: const Text('Reset Standar',
-                    style: TextStyle(fontSize: 11.5)),
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF64748B),
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // Rentang Baris Data Transaksi Rekening (Start Row & End Row)
-          Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFCBD5E1)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.02),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+                // Header List Mapping Transaksi Rekening
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF107C41).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.table_rows_rounded,
-                        color: Color(0xFF107C41),
-                        size: 18,
+                    const Text(
+                      '1. Kolom Transaksi Rekening',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E293B),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Rentang Baris Rekening (Start & End Row)',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E293B),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Tentukan baris mulai dan batas akhir tabel transaksi rekening agar tidak menimpa baris catatan/rumus di bawahnya.',
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              color: const Color(0xFF64748B),
-                              height: 1.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    // Start Row
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Start Row (Mulai)',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF334155),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          TextField(
-                            controller: _startRowCtrl,
-                            keyboardType: TextInputType.number,
-                            textAlign: TextAlign.center,
-                            onChanged: (v) {
-                              setState(() {});
-                              _saveCurrentState();
-                            },
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'monospace',
-                            ),
-                            decoration: InputDecoration(
-                              hintText: '4',
-                              contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // End Row
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: const [
-                              Text(
-                                'End Row (Batas Akhir)',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF334155),
-                                ),
-                              ),
-                              SizedBox(width: 4),
-                              Text(
-                                '(Opsional)',
-                                style: TextStyle(
-                                  fontSize: 9.5,
-                                  color: Color(0xFF94A3B8),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          TextField(
-                            controller: _endRowCtrl,
-                            keyboardType: TextInputType.number,
-                            textAlign: TextAlign.center,
-                            onChanged: (v) {
-                              setState(() {});
-                              _saveCurrentState();
-                            },
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'monospace',
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'Tanpa batas',
-                              hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                              contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                              ),
-                            ),
-                          ),
-                        ],
+                    TextButton.icon(
+                      onPressed: _resetMappingToDefault,
+                      icon: const Icon(Icons.refresh_rounded, size: 14),
+                      label: const Text('Reset Standar',
+                          style: TextStyle(fontSize: 11.5)),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF64748B),
+                        padding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                // Live Capacity Badge
-                Builder(
-                  builder: (context) {
-                    final start = int.tryParse(_startRowCtrl.text.trim()) ?? 4;
-                    final end = int.tryParse(_endRowCtrl.text.trim());
-                    final hasEnd = end != null && end > 0;
-                    final isInvalid = hasEnd && end < start;
-                    final capacity = hasEnd ? (end - start + 1) : null;
 
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: isInvalid
-                            ? const Color(0xFFFEF2F2)
-                            : (hasEnd ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC)),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isInvalid
-                              ? const Color(0xFFFECACA)
-                              : (hasEnd ? const Color(0xFFBBF7D0) : const Color(0xFFE2E8F0)),
-                        ),
+                // Rentang Baris Data Transaksi Rekening (Start Row & End Row)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.02),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
                       ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            isInvalid
-                                ? Icons.error_outline_rounded
-                                : (hasEnd ? Icons.check_circle_outline_rounded : Icons.all_inclusive_rounded),
-                            size: 15,
-                            color: isInvalid
-                                ? const Color(0xFFDC2626)
-                                : (hasEnd ? const Color(0xFF16A34A) : const Color(0xFF64748B)),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              isInvalid
-                                  ? 'End Row ($end) tidak boleh lebih kecil dari Start Row ($start)'
-                                  : (hasEnd
-                                      ? 'Kapasitas Tabel: $capacity baris data (Baris $start s/d $end)'
-                                      : 'Kapasitas: Bebas / Tanpa Batas Akhir (Mulai Baris $start)'),
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.bold,
-                                color: isInvalid
-                                    ? const Color(0xFFDC2626)
-                                    : (hasEnd ? const Color(0xFF15803D) : const Color(0xFF475569)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          // Pengaturan Format & Urutan Tanggal Spreadsheet
-          _buildDateFormatSection(),
-
-          // Daftar Kolom Field Transaksi Rekening
-          ..._rekeningFields.map((f) => _buildFieldRow(f)),
-
-          const SizedBox(height: 20),
-
-          // Section 2: Pemetaan Kolom Transaksi Cash On Hand
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                '2. Kolom Transaksi Cash On Hand',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFCCFBF1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Text(
-                  'Dana On Hand / Tunai',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F766E),
+                    ],
                   ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // Rentang Baris Data Transaksi Cash On Hand (Start Row & End Row)
-          Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFCBD5E1)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.02),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0D9488).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.table_rows_rounded,
-                        color: Color(0xFF0D9488),
-                        size: 18,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Rentang Baris Cash On Hand (Start & End Row)',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E293B),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Tentukan baris mulai dan batas akhir tabel Cash On Hand agar tidak menimpa data di bawahnya.',
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              color: const Color(0xFF64748B),
-                              height: 1.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    // Start Row On Hand
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Start Row (Mulai)',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF334155),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          TextField(
-                            controller: _startRowOnHandCtrl,
-                            keyboardType: TextInputType.number,
-                            textAlign: TextAlign.center,
-                            onChanged: (v) {
-                              setState(() {});
-                              _saveCurrentState();
-                            },
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'monospace',
-                            ),
-                            decoration: InputDecoration(
-                              hintText: '4',
-                              contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // End Row On Hand
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: const [
-                              Text(
-                                'End Row (Batas Akhir)',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF334155),
-                                ),
-                              ),
-                              SizedBox(width: 4),
-                              Text(
-                                '(Opsional)',
-                                style: TextStyle(
-                                  fontSize: 9.5,
-                                  color: Color(0xFF94A3B8),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          TextField(
-                            controller: _endRowOnHandCtrl,
-                            keyboardType: TextInputType.number,
-                            textAlign: TextAlign.center,
-                            onChanged: (v) {
-                              setState(() {});
-                              _saveCurrentState();
-                            },
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'monospace',
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'Tanpa batas',
-                              hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                              contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                // Live Capacity Badge On Hand
-                Builder(
-                  builder: (context) {
-                    final start = int.tryParse(_startRowOnHandCtrl.text.trim()) ?? 4;
-                    final end = int.tryParse(_endRowOnHandCtrl.text.trim());
-                    final hasEnd = end != null && end > 0;
-                    final isInvalid = hasEnd && end < start;
-                    final capacity = hasEnd ? (end - start + 1) : null;
-
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: isInvalid
-                            ? const Color(0xFFFEF2F2)
-                            : (hasEnd ? const Color(0xFFF0FDFA) : const Color(0xFFF8FAFC)),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isInvalid
-                              ? const Color(0xFFFECACA)
-                              : (hasEnd ? const Color(0xFF99F6E4) : const Color(0xFFE2E8F0)),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            isInvalid
-                                ? Icons.error_outline_rounded
-                                : (hasEnd ? Icons.check_circle_outline_rounded : Icons.all_inclusive_rounded),
-                            size: 15,
-                            color: isInvalid
-                                ? const Color(0xFFDC2626)
-                                : (hasEnd ? const Color(0xFF0F766E) : const Color(0xFF64748B)),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              isInvalid
-                                  ? 'End Row ($end) tidak boleh lebih kecil dari Start Row ($start)'
-                                  : (hasEnd
-                                      ? 'Kapasitas Tabel: $capacity baris data (Baris $start s/d $end)'
-                                      : 'Kapasitas: Bebas / Tanpa Batas Akhir (Mulai Baris $start)'),
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.bold,
-                                color: isInvalid
-                                    ? const Color(0xFFDC2626)
-                                    : (hasEnd ? const Color(0xFF0F766E) : const Color(0xFF475569)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          // Daftar Kolom Field Transaksi Cash On Hand
-          ..._onHandFields.map((f) => _buildFieldRow(f)),
-
-          const SizedBox(height: 20),
-
-          // Section 3: Pemetaan Kolom & Baris Bukti Gambar
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                '3. Kolom & Baris Gambar Bukti',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDCFCE7),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Text(
-                  'Bisa Beda Baris Per-Slot',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF15803D),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // Switch / Toggle Sisipkan Gambar di Sel (Native In-Cell Image)
-          Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: _insertImageFormula
-                  ? const Color(0xFFF0FDF4)
-                  : Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: _insertImageFormula
-                    ? const Color(0xFFA7F3D0)
-                    : const Color(0xFFE2E8F0),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Sisipkan Gambar di dalam Sel (Kualitas Tajam / HD)',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
-                        ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF107C41)
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.table_rows_rounded,
+                              color: Color(0xFF107C41),
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Rentang Baris Rekening (Start & End Row)',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF1E293B),
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Tentukan baris mulai dan batas akhir tabel transaksi rekening agar tidak menimpa baris catatan/rumus di bawahnya.',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: Color(0xFF64748B),
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        _insertImageFormula
-                            ? 'Foto disisipkan langsung ke dalam sel (seperti menu Sisipkan > Gambar > Di dalam Sel), kualitas asli jernih & tidak blur.'
-                            : 'Spreadsheet akan menaruh Link URL Google Drive (bisa diklik).',
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          color: Color(0xFF64748B),
-                        ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          // Start Row
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Start Row (Mulai)',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF334155),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                TextField(
+                                  controller: _startRowCtrl,
+                                  keyboardType: TextInputType.number,
+                                  textAlign: TextAlign.center,
+                                  onChanged: (v) {
+                                    _saveCurrentState(flushImmediately: false);
+                                  },
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'monospace',
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: '4',
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        vertical: 8),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(
+                                          color: Color(0xFFCBD5E1)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // End Row
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Row(
+                                  children: [
+                                    Text(
+                                      'End Row (Batas Akhir)',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF334155),
+                                      ),
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      '(Opsional)',
+                                      style: TextStyle(
+                                        fontSize: 9.5,
+                                        color: Color(0xFF94A3B8),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                TextField(
+                                  controller: _endRowCtrl,
+                                  keyboardType: TextInputType.number,
+                                  textAlign: TextAlign.center,
+                                  onChanged: (v) {
+                                    _saveCurrentState(flushImmediately: false);
+                                  },
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'monospace',
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: 'Tanpa batas',
+                                    hintStyle: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF94A3B8)),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        vertical: 8),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(
+                                          color: Color(0xFFCBD5E1)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      // Live Capacity Badge Rekening
+                      ListenableBuilder(
+                        listenable: Listenable.merge(
+                            [_startRowCtrl, _endRowCtrl]),
+                        builder: (context, _) {
+                          final start =
+                              int.tryParse(_startRowCtrl.text.trim()) ?? 4;
+                          final end =
+                              int.tryParse(_endRowCtrl.text.trim());
+                          final hasEnd = end != null && end > 0;
+                          final isInvalid = hasEnd && end < start;
+                          final capacity = hasEnd ? (end - start + 1) : null;
+
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isInvalid
+                                  ? const Color(0xFFFEF2F2)
+                                  : (hasEnd
+                                      ? const Color(0xFFF0FDF4)
+                                      : const Color(0xFFF8FAFC)),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isInvalid
+                                    ? const Color(0xFFFECACA)
+                                    : (hasEnd
+                                        ? const Color(0xFFBBF7D0)
+                                        : const Color(0xFFE2E8F0)),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isInvalid
+                                      ? Icons.error_outline_rounded
+                                      : (hasEnd
+                                          ? Icons.check_circle_outline_rounded
+                                          : Icons.all_inclusive_rounded),
+                                  size: 15,
+                                  color: isInvalid
+                                      ? const Color(0xFFDC2626)
+                                      : (hasEnd
+                                          ? const Color(0xFF16A34A)
+                                          : const Color(0xFF64748B)),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    isInvalid
+                                        ? 'End Row ($end) tidak boleh lebih kecil dari Start Row ($start)'
+                                        : (hasEnd
+                                            ? 'Kapasitas Tabel: $capacity baris data (Baris $start s/d $end)'
+                                            : 'Kapasitas: Bebas / Tanpa Batas Akhir (Mulai Baris $start)'),
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: isInvalid
+                                          ? const Color(0xFFDC2626)
+                                          : (hasEnd
+                                              ? const Color(0xFF15803D)
+                                              : const Color(0xFF475569)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
                 ),
-                Switch(
-                  value: _insertImageFormula,
-                  activeThumbColor: const Color(0xFF107C41),
-                  onChanged: (val) {
-                    setState(() {
-                      _insertImageFormula = val;
-                    });
-                    _saveCurrentState();
-                  },
+
+                // Pengaturan Format & Urutan Tanggal Spreadsheet
+                _buildDateFormatSection(),
+
+                // Daftar Kolom Field Transaksi Rekening
+                ..._rekeningFields.map((f) => _buildFieldRow(f)),
+
+                const SizedBox(height: 20),
+
+                // Section 2: Pemetaan Kolom Transaksi Cash On Hand
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      '2. Kolom Transaksi Cash On Hand',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFCCFBF1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'Dana On Hand / Tunai',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F766E),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 8),
+
+                // Rentang Baris Data Transaksi Cash On Hand (Start Row & End Row)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.02),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0D9488)
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.table_rows_rounded,
+                              color: Color(0xFF0D9488),
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Rentang Baris Cash On Hand (Start & End Row)',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF1E293B),
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Tentukan baris mulai dan batas akhir tabel Cash On Hand agar tidak menimpa data di bawahnya.',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: Color(0xFF64748B),
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          // Start Row On Hand
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Start Row (Mulai)',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF334155),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                TextField(
+                                  controller: _startRowOnHandCtrl,
+                                  keyboardType: TextInputType.number,
+                                  textAlign: TextAlign.center,
+                                  onChanged: (v) {
+                                    _saveCurrentState(flushImmediately: false);
+                                  },
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'monospace',
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: '4',
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        vertical: 8),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(
+                                          color: Color(0xFFCBD5E1)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // End Row On Hand
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Row(
+                                  children: [
+                                    Text(
+                                      'End Row (Batas Akhir)',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF334155),
+                                      ),
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      '(Opsional)',
+                                      style: TextStyle(
+                                        fontSize: 9.5,
+                                        color: Color(0xFF94A3B8),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                TextField(
+                                  controller: _endRowOnHandCtrl,
+                                  keyboardType: TextInputType.number,
+                                  textAlign: TextAlign.center,
+                                  onChanged: (v) {
+                                    _saveCurrentState(flushImmediately: false);
+                                  },
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'monospace',
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: 'Tanpa batas',
+                                    hintStyle: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF94A3B8)),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        vertical: 8),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(
+                                          color: Color(0xFFCBD5E1)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      // Live Capacity Badge On Hand
+                      ListenableBuilder(
+                        listenable: Listenable.merge(
+                            [_startRowOnHandCtrl, _endRowOnHandCtrl]),
+                        builder: (context, _) {
+                          final start =
+                              int.tryParse(_startRowOnHandCtrl.text.trim()) ?? 4;
+                          final end =
+                              int.tryParse(_endRowOnHandCtrl.text.trim());
+                          final hasEnd = end != null && end > 0;
+                          final isInvalid = hasEnd && end < start;
+                          final capacity = hasEnd ? (end - start + 1) : null;
+
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isInvalid
+                                  ? const Color(0xFFFEF2F2)
+                                  : (hasEnd
+                                      ? const Color(0xFFF0FDFA)
+                                      : const Color(0xFFF8FAFC)),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isInvalid
+                                    ? const Color(0xFFFECACA)
+                                    : (hasEnd
+                                        ? const Color(0xFF99F6E4)
+                                        : const Color(0xFFE2E8F0)),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isInvalid
+                                      ? Icons.error_outline_rounded
+                                      : (hasEnd
+                                          ? Icons.check_circle_outline_rounded
+                                          : Icons.all_inclusive_rounded),
+                                  size: 15,
+                                  color: isInvalid
+                                      ? const Color(0xFFDC2626)
+                                      : (hasEnd
+                                          ? const Color(0xFF0F766E)
+                                          : const Color(0xFF64748B)),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    isInvalid
+                                        ? 'End Row ($end) tidak boleh lebih kecil dari Start Row ($start)'
+                                        : (hasEnd
+                                            ? 'Kapasitas Tabel: $capacity baris data (Baris $start s/d $end)'
+                                            : 'Kapasitas: Bebas / Tanpa Batas Akhir (Mulai Baris $start)'),
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: isInvalid
+                                          ? const Color(0xFFDC2626)
+                                          : (hasEnd
+                                              ? const Color(0xFF0F766E)
+                                              : const Color(0xFF475569)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Daftar Kolom Field Transaksi Cash On Hand
+                ..._onHandFields.map((f) => _buildFieldRow(f)),
+
+                const SizedBox(height: 20),
+
+                // Section 3: Pemetaan Kolom & Baris Bukti Gambar
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      '3. Kolom & Baris Gambar Bukti',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'Bisa Beda Baris Per-Slot',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF15803D),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // Switch / Toggle Sisipkan Gambar di Sel (Native In-Cell Image)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _insertImageFormula
+                        ? const Color(0xFFF0FDF4)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _insertImageFormula
+                          ? const Color(0xFFA7F3D0)
+                          : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Sisipkan Gambar di dalam Sel (Kualitas Tajam / HD)',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1E293B),
+                              ),
+                            ),
+                            Text(
+                              _insertImageFormula
+                                  ? 'Foto disisipkan langsung ke dalam sel (seperti menu Sisipkan > Gambar > Di dalam Sel), kualitas asli jernih & tidak blur.'
+                                  : 'Spreadsheet akan menaruh Link URL Google Drive (bisa diklik).',
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: _insertImageFormula,
+                        activeThumbColor: const Color(0xFF107C41),
+                        onChanged: (val) {
+                          setState(() {
+                            _insertImageFormula = val;
+                          });
+                          _saveCurrentState(flushImmediately: true);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Daftar Kolom & Baris Field Gambar Bukti
+                ..._evidenceImageFields.map((f) => _buildEvidenceFieldRow(f)),
+                const SizedBox(height: 12),
               ],
             ),
           ),
+        ),
 
-          // Daftar Kolom & Baris Field Gambar Bukti
-          ..._evidenceImageFields.map((f) => _buildEvidenceFieldRow(f)),
-          const SizedBox(height: 12),
-        ],
-      ),
-    ),
-  ),
-
-  // Sticky Bottom Footer: Simpan Pemetaan Cell
-  Container(
-    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      border: const Border(
-        top: BorderSide(color: Color(0xFFE2E8F0), width: 1),
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.05),
-          blurRadius: 10,
-          offset: const Offset(0, -4),
+        // Sticky Bottom Footer: Simpan Pemetaan Cell
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: const Border(
+              top: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                final err = _getMappingValidationError();
+                if (err != null) {
+                  CustomToast.showError(
+                    context,
+                    title: 'Pemetaan Cell Tidak Valid',
+                    subtitle: err,
+                  );
+                  return;
+                }
+                setState(() {
+                  _saveCurrentState(
+                      markCellsConfigured: true, flushImmediately: true);
+                });
+                CustomToast.showSuccess(
+                  context,
+                  title: 'Konfigurasi Berhasil',
+                  subtitle: 'Konfigurasi pemetaan cell berhasil disimpan.',
+                );
+              },
+              icon: const Icon(Icons.check_circle_rounded, size: 18),
+              label: const Text(
+                'Simpan Pemetaan Cell',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF107C41),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 0,
+              ),
+            ),
+          ),
         ),
       ],
-    ),
-    child: SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: () {
-          final err = _getMappingValidationError();
-          if (err != null) {
-            CustomToast.showError(
-              context,
-              title: 'Pemetaan Cell Tidak Valid',
-              subtitle: err,
-            );
-            return;
-          }
-          setState(() {
-            _saveCurrentState(markCellsConfigured: true);
-          });
-          CustomToast.showSuccess(
-            context,
-            title: 'Konfigurasi Berhasil',
-            subtitle: 'Konfigurasi pemetaan cell berhasil disimpan.',
-          );
-        },
-        icon: const Icon(Icons.check_circle_rounded, size: 18),
-        label: const Text(
-          'Simpan Pemetaan Cell',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF107C41),
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 13),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          elevation: 0,
-        ),
-      ),
-    ),
-  ),
-],
-);
-}
+    );
+  }
 
   Future<void> _shareScriptFile(String scriptCode) async {
     final box = context.findRenderObject() as RenderBox?;
@@ -3557,8 +3035,6 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
 
   // --- TAB 3: SCRIPT & PANDUAN ---
   Widget _buildScriptGuideTab() {
-    final scriptCode = SheetsSyncService.getGoogleAppsScriptCode();
-
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.all(16),
@@ -3586,12 +3062,12 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                const Row(
                   children: [
-                    const Icon(Icons.integration_instructions_rounded,
+                    Icon(Icons.integration_instructions_rounded,
                         color: Colors.white, size: 28),
-                    const SizedBox(width: 12),
-                    const Expanded(
+                    SizedBox(width: 12),
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -3621,7 +3097,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                     Expanded(
                       flex: 6,
                       child: ElevatedButton.icon(
-                        onPressed: () => _shareScriptFile(scriptCode),
+                        onPressed: () => _shareScriptFile(_scriptCode),
                         icon: const Icon(Icons.share_rounded, size: 15),
                         label: const Text(
                           'Kirim File (.txt)',
@@ -3648,11 +3124,12 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                       flex: 4,
                       child: OutlinedButton.icon(
                         onPressed: () {
-                          Clipboard.setData(ClipboardData(text: scriptCode));
+                          Clipboard.setData(ClipboardData(text: _scriptCode));
                           CustomToast.showSuccess(
                             context,
                             title: 'Tersalin ke Clipboard',
-                            subtitle: 'Kode Google Apps Script berhasil disalin.',
+                            subtitle:
+                                'Kode Google Apps Script berhasil disalin.',
                           );
                         },
                         icon: const Icon(Icons.copy_rounded,
@@ -3754,7 +3231,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
 
           const SizedBox(height: 16),
 
-          // Code Preview Box
+          // Code Preview Box (Lightweight rendered snippet)
           const Text(
             'Pratinjau Kode Script',
             style: TextStyle(
@@ -3772,7 +3249,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              scriptCode,
+              _scriptPreviewCode,
               style: const TextStyle(
                 fontSize: 10,
                 color: Color(0xFF94A3B8),
@@ -3865,6 +3342,720 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
   }
 }
 
+// Widget row field transaksi terisolasi untuk performa render maksimal di Android
+class _FieldRowItem extends StatefulWidget {
+  final String fieldKey;
+  final String label;
+  final String desc;
+  final TextEditingController controller;
+  final String dateFormat;
+  final bool isInitiallyVisible;
+  final Function(bool) onVisibilityChanged;
+  final VoidCallback onChanged;
+
+  const _FieldRowItem({
+    required this.fieldKey,
+    required this.label,
+    required this.desc,
+    required this.controller,
+    required this.dateFormat,
+    required this.isInitiallyVisible,
+    required this.onVisibilityChanged,
+    required this.onChanged,
+  });
+
+  @override
+  State<_FieldRowItem> createState() => _FieldRowItemState();
+}
+
+class _FieldRowItemState extends State<_FieldRowItem> {
+  late bool _isVisible;
+
+  @override
+  void initState() {
+    super.initState();
+    _isVisible = widget.isInitiallyVisible;
+  }
+
+  @override
+  void didUpdateWidget(covariant _FieldRowItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isInitiallyVisible != widget.isInitiallyVisible) {
+      _isVisible = widget.isInitiallyVisible;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final key = widget.fieldKey;
+    final label = widget.label;
+    final desc = (key == 'tanggal' || key == 'tanggal_onhand')
+        ? 'Pola: ${widget.dateFormat} (${_GoogleSheetsConfigModalState._formatPreviewSample(widget.dateFormat)})'
+        : widget.desc;
+    final isExcluded = !_isVisible;
+
+    return ListenableBuilder(
+      listenable: widget.controller,
+      builder: (context, _) {
+        final colText = widget.controller.text.trim().toUpperCase();
+        final isMissingColumn =
+            _isVisible && (colText.isEmpty || colText == '-');
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: isExcluded
+                ? const Color(0xFFF8FAFC)
+                : (isMissingColumn ? const Color(0xFFFFF1F2) : Colors.white),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isExcluded
+                  ? const Color(0xFFE2E8F0)
+                  : (isMissingColumn
+                      ? const Color(0xFFF87171)
+                      : const Color(0xFFCBD5E1)),
+              width: 1.0,
+            ),
+          ),
+          child: Row(
+            children: [
+              // Badge Kolom
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: isExcluded
+                      ? const Color(0xFFE2E8F0)
+                      : (isMissingColumn
+                          ? const Color(0xFFFEE2E2)
+                          : const Color(0xFF107C41).withValues(alpha: 0.1)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(
+                  child: isMissingColumn
+                      ? const Icon(
+                          Icons.priority_high_rounded,
+                          size: 18,
+                          color: Color(0xFFDC2626),
+                        )
+                      : Text(
+                          isExcluded ? '-' : (colText.isEmpty ? '?' : colText),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: isExcluded
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF107C41),
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Label & Keterangan
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isExcluded
+                                  ? const Color(0xFF94A3B8)
+                                  : (isMissingColumn
+                                      ? const Color(0xFF991B1B)
+                                      : const Color(0xFF1E293B)),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isExcluded)
+                          Container(
+                            margin: const EdgeInsets.only(left: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'Dikecualikan',
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: Color(0xFF64748B),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          )
+                        else if (isMissingColumn)
+                          Container(
+                            margin: const EdgeInsets.only(left: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEE2E2),
+                              borderRadius: BorderRadius.circular(4),
+                              border:
+                                  Border.all(color: const Color(0xFFFECACA)),
+                            ),
+                            child: const Text(
+                              'Wajib Diisi',
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: Color(0xFFDC2626),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    Text(
+                      isExcluded
+                          ? 'Tidak akan dimasukkan ke spreadsheet'
+                          : (isMissingColumn
+                              ? 'Wajib isi kolom (cth: A, B) atau matikan ikon mata'
+                              : desc),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: isExcluded
+                            ? const Color(0xFFCBD5E1)
+                            : (isMissingColumn
+                                ? const Color(0xFFDC2626)
+                                : const Color(0xFF94A3B8)),
+                        fontWeight: isMissingColumn
+                            ? FontWeight.w500
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Tombol Saklar Kecualikan / Gunakan (Ikon Mata)
+              IconButton(
+                icon: Icon(
+                  isExcluded
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  size: 20,
+                  color: isExcluded
+                      ? const Color(0xFF94A3B8)
+                      : const Color(0xFF107C41),
+                ),
+                tooltip: isExcluded
+                    ? 'Gunakan kolom ini'
+                    : 'Kecualikan (Jangan gunakan kolom ini)',
+                onPressed: () {
+                  setState(() {
+                    _isVisible = !_isVisible;
+                  });
+                  widget.onVisibilityChanged(_isVisible);
+                },
+              ),
+              const SizedBox(width: 4),
+              // Input Huruf Kolom
+              SizedBox(
+                width: 48,
+                height: 34,
+                child: TextField(
+                  controller: widget.controller,
+                  enabled: _isVisible,
+                  textCapitalization: TextCapitalization.characters,
+                  textAlign: TextAlign.center,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z]')),
+                    LengthLimitingTextInputFormatter(3),
+                  ],
+                  onChanged: (val) {
+                    widget.onChanged();
+                  },
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'monospace',
+                    color: isExcluded
+                        ? const Color(0xFF94A3B8)
+                        : (isMissingColumn
+                            ? const Color(0xFFDC2626)
+                            : const Color(0xFF0F172A)),
+                  ),
+                  decoration: InputDecoration(
+                    contentPadding: EdgeInsets.zero,
+                    hintText: isExcluded ? '-' : 'A-Z',
+                    hintStyle: TextStyle(
+                      fontSize: 10,
+                      color: isMissingColumn
+                          ? const Color(0xFFF87171)
+                          : const Color(0xFF94A3B8),
+                    ),
+                    filled: isExcluded || isMissingColumn,
+                    fillColor: isExcluded
+                        ? const Color(0xFFF1F5F9)
+                        : (isMissingColumn
+                            ? const Color(0xFFFFF1F2)
+                            : Colors.white),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: isMissingColumn
+                            ? const Color(0xFFEF4444)
+                            : const Color(0xFFCBD5E1),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: isMissingColumn
+                            ? const Color(0xFFEF4444)
+                            : const Color(0xFFCBD5E1),
+                        width: isMissingColumn ? 1.5 : 1.0,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: isMissingColumn
+                            ? const Color(0xFFDC2626)
+                            : const Color(0xFF107C41),
+                        width: 1.8,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// Widget row field gambar bukti terisolasi untuk performa maksimal di Android
+class _EvidenceFieldRowItem extends StatefulWidget {
+  final String fieldKey;
+  final String label;
+  final String desc;
+  final TextEditingController colController;
+  final TextEditingController rowController;
+  final bool isInitiallyVisible;
+  final Function(bool) onVisibilityChanged;
+  final VoidCallback onChanged;
+
+  const _EvidenceFieldRowItem({
+    required this.fieldKey,
+    required this.label,
+    required this.desc,
+    required this.colController,
+    required this.rowController,
+    required this.isInitiallyVisible,
+    required this.onVisibilityChanged,
+    required this.onChanged,
+  });
+
+  @override
+  State<_EvidenceFieldRowItem> createState() => _EvidenceFieldRowItemState();
+}
+
+class _EvidenceFieldRowItemState extends State<_EvidenceFieldRowItem> {
+  late bool _isVisible;
+
+  @override
+  void initState() {
+    super.initState();
+    _isVisible = widget.isInitiallyVisible;
+  }
+
+  @override
+  void didUpdateWidget(covariant _EvidenceFieldRowItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isInitiallyVisible != widget.isInitiallyVisible) {
+      _isVisible = widget.isInitiallyVisible;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = widget.label;
+    final desc = widget.desc;
+    final isExcluded = !_isVisible;
+
+    return ListenableBuilder(
+      listenable: Listenable.merge(
+          [widget.colController, widget.rowController]),
+      builder: (context, _) {
+        final colText = widget.colController.text.trim().toUpperCase();
+        final rowText = widget.rowController.text.trim();
+        final rowNum = int.tryParse(rowText);
+        final isMissingColumn =
+            _isVisible && (colText.isEmpty || colText == '-');
+        final isMissingRow =
+            _isVisible && (rowText.isEmpty || rowNum == null || rowNum <= 0);
+        final hasError = isMissingColumn || isMissingRow;
+        final cellStr = isExcluded
+            ? '-'
+            : (hasError
+                ? (colText.isEmpty ? '?' : colText) +
+                    (rowText.isEmpty ? '?' : rowText)
+                : '$colText$rowText');
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: isExcluded
+                ? const Color(0xFFF8FAFC)
+                : (hasError ? const Color(0xFFFFF1F2) : Colors.white),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isExcluded
+                  ? const Color(0xFFE2E8F0)
+                  : (hasError
+                      ? const Color(0xFFF87171)
+                      : const Color(0xFFCBD5E1).withValues(alpha: 0.8)),
+              width: 1.0,
+            ),
+          ),
+          child: Row(
+            children: [
+              // Target Cell Badge (e.g. I2, J5)
+              Container(
+                width: 46,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: isExcluded
+                      ? const Color(0xFFE2E8F0)
+                      : (hasError
+                          ? const Color(0xFFFEE2E2)
+                          : const Color(0xFF107C41).withValues(alpha: 0.1)),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isExcluded
+                        ? Colors.transparent
+                        : (hasError
+                            ? const Color(0xFFFCA5A5)
+                            : const Color(0xFF107C41).withValues(alpha: 0.25)),
+                  ),
+                ),
+                child: Center(
+                  child: hasError
+                      ? const Icon(
+                          Icons.priority_high_rounded,
+                          size: 18,
+                          color: Color(0xFFDC2626),
+                        )
+                      : Text(
+                          cellStr,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isExcluded
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF107C41),
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Label & Keterangan
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isExcluded
+                                  ? const Color(0xFF94A3B8)
+                                  : (hasError
+                                      ? const Color(0xFF991B1B)
+                                      : const Color(0xFF1E293B)),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isExcluded)
+                          Container(
+                            margin: const EdgeInsets.only(left: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'Dikecualikan',
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: Color(0xFF64748B),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          )
+                        else if (hasError)
+                          Container(
+                            margin: const EdgeInsets.only(left: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEE2E2),
+                              borderRadius: BorderRadius.circular(4),
+                              border:
+                                  Border.all(color: const Color(0xFFFECACA)),
+                            ),
+                            child: Text(
+                              isMissingColumn && isMissingRow
+                                  ? 'Kolom & Baris Kosong'
+                                  : (isMissingColumn
+                                      ? 'Kolom Wajib Diisi'
+                                      : 'Baris Wajib Diisi'),
+                              style: const TextStyle(
+                                fontSize: 8.5,
+                                color: Color(0xFFDC2626),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    Text(
+                      isExcluded
+                          ? 'Tidak akan dimasukkan ke spreadsheet'
+                          : (hasError
+                              ? 'Wajib isi kolom & baris atau matikan ikon mata'
+                              : desc),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: isExcluded
+                            ? const Color(0xFFCBD5E1)
+                            : (hasError
+                                ? const Color(0xFFDC2626)
+                                : const Color(0xFF94A3B8)),
+                        fontWeight:
+                            hasError ? FontWeight.w500 : FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Tombol Saklar Kecualikan / Gunakan (Ikon Mata)
+              IconButton(
+                icon: Icon(
+                  isExcluded
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  size: 18,
+                  color: isExcluded
+                      ? const Color(0xFF94A3B8)
+                      : const Color(0xFF107C41),
+                ),
+                tooltip: isExcluded
+                    ? 'Gunakan kolom ini'
+                    : 'Kecualikan (Jangan gunakan)',
+                onPressed: () {
+                  setState(() {
+                    _isVisible = !_isVisible;
+                  });
+                  widget.onVisibilityChanged(_isVisible);
+                },
+              ),
+              const SizedBox(width: 4),
+              // Input Huruf Kolom (e.g. I)
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Kolom',
+                    style: TextStyle(
+                      fontSize: 8.5,
+                      color: isMissingColumn
+                          ? const Color(0xFFDC2626)
+                          : const Color(0xFF64748B),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  SizedBox(
+                    width: 38,
+                    height: 32,
+                    child: TextField(
+                      controller: widget.colController,
+                      enabled: _isVisible,
+                      textCapitalization: TextCapitalization.characters,
+                      textAlign: TextAlign.center,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z]')),
+                        LengthLimitingTextInputFormatter(3),
+                      ],
+                      onChanged: (val) {
+                        widget.onChanged();
+                      },
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace',
+                        color: isExcluded
+                            ? const Color(0xFF94A3B8)
+                            : (isMissingColumn
+                                ? const Color(0xFFDC2626)
+                                : const Color(0xFF0F172A)),
+                      ),
+                      decoration: InputDecoration(
+                        contentPadding: EdgeInsets.zero,
+                        hintText: isExcluded ? '-' : 'A-Z',
+                        hintStyle: TextStyle(
+                          fontSize: 9.5,
+                          color: isMissingColumn
+                              ? const Color(0xFFF87171)
+                              : const Color(0xFF94A3B8),
+                        ),
+                        filled: isExcluded || isMissingColumn,
+                        fillColor: isExcluded
+                            ? const Color(0xFFF1F5F9)
+                            : (isMissingColumn
+                                ? const Color(0xFFFFF1F2)
+                                : Colors.white),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(
+                            color: isMissingColumn
+                                ? const Color(0xFFEF4444)
+                                : const Color(0xFFCBD5E1),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(
+                            color: isMissingColumn
+                                ? const Color(0xFFEF4444)
+                                : const Color(0xFFCBD5E1),
+                            width: isMissingColumn ? 1.5 : 1.0,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(
+                            color: isMissingColumn
+                                ? const Color(0xFFDC2626)
+                                : const Color(0xFF107C41),
+                            width: 1.8,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 6),
+              // Input Nomor Baris (e.g. 2, 5, 10)
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Baris',
+                    style: TextStyle(
+                      fontSize: 8.5,
+                      color: isMissingRow
+                          ? const Color(0xFFDC2626)
+                          : const Color(0xFF64748B),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  SizedBox(
+                    width: 44,
+                    height: 32,
+                    child: TextField(
+                      controller: widget.rowController,
+                      enabled: _isVisible,
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(4),
+                      ],
+                      onChanged: (val) {
+                        widget.onChanged();
+                      },
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace',
+                        color: isExcluded
+                            ? const Color(0xFF94A3B8)
+                            : (isMissingRow
+                                ? const Color(0xFFDC2626)
+                                : const Color(0xFF0F172A)),
+                      ),
+                      decoration: InputDecoration(
+                        contentPadding: EdgeInsets.zero,
+                        hintText: isExcluded ? '-' : '2',
+                        hintStyle: TextStyle(
+                          fontSize: 10,
+                          color: isMissingRow
+                              ? const Color(0xFFF87171)
+                              : const Color(0xFF94A3B8),
+                        ),
+                        filled: isExcluded || isMissingRow,
+                        fillColor: isExcluded
+                            ? const Color(0xFFF1F5F9)
+                            : (isMissingRow
+                                ? const Color(0xFFFFF1F2)
+                                : Colors.white),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(
+                            color: isMissingRow
+                                ? const Color(0xFFEF4444)
+                                : const Color(0xFFCBD5E1),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(
+                            color: isMissingRow
+                                ? const Color(0xFFEF4444)
+                                : const Color(0xFFCBD5E1),
+                            width: isMissingRow ? 1.5 : 1.0,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(
+                            color: isMissingRow
+                                ? const Color(0xFFDC2626)
+                                : const Color(0xFF107C41),
+                            width: 1.8,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _KeepAliveWrapper extends StatefulWidget {
   final Widget child;
   const _KeepAliveWrapper({required this.child});
@@ -3884,4 +4075,3 @@ class _KeepAliveWrapperState extends State<_KeepAliveWrapper>
     return widget.child;
   }
 }
-
