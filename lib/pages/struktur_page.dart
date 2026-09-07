@@ -933,6 +933,330 @@ class _StrukturPageState extends State<StrukturPage> {
     );
   }
 
+  String _formatNominal(num value) {
+    return RupiahFormatter.format(value, decimalDigits: _data.decimalDigits);
+  }
+
+  // --- MODAL SETTING FORMAT ANGKA DESIMAL (ANGKA DI BELAKANG KOMA) ---
+  void _showDecimalConfigModal() {
+    int tempDigits = _data.decimalDigits;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetCtx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final sampleNominal = 1500000;
+            final formattedSample = RupiahFormatter.format(sampleNominal,
+                decimalDigits: tempDigits);
+
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Handle Bar
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: primaryPurple.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.pin_outlined,
+                          color: primaryPurple,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Format Angka Desimal',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                            Text(
+                              'Atur jumlah digit di belakang koma untuk tampilan dana',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(bottomSheetCtx),
+                        icon: const Icon(Icons.close_rounded,
+                            color: Color(0xFF94A3B8)),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Live Preview Box
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          primaryPurple.withValues(alpha: 0.08),
+                          primaryTeal.withValues(alpha: 0.08),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: primaryPurple.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.visibility_outlined,
+                                size: 15, color: primaryPurple),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Pratinjau Tampilan Nominal ($tempDigits Desimal):',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: primaryPurple,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Rp $formattedSample',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  // Pilihan Cepat (Preset)
+                  const Text(
+                    'Pilihan Cepat:',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF334155),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      for (int d in [0, 1, 2, 3]) ...[
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setModalState(() => tempDigits = d),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 9),
+                              decoration: BoxDecoration(
+                                color: tempDigits == d
+                                    ? primaryPurple
+                                    : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: tempDigits == d
+                                      ? primaryPurple
+                                      : const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    '$d Digit',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: tempDigits == d
+                                          ? Colors.white
+                                          : const Color(0xFF334155),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    d == 0 ? ',0 (tanpa)' : ',${'0' * d}',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: tempDigits == d
+                                          ? Colors.white70
+                                          : const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (d != 3) const SizedBox(width: 8),
+                      ],
+                    ],
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  // Stepper Kustom Counter
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Jumlah Angka di Belakang Koma',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1E293B),
+                              ),
+                            ),
+                            Text(
+                              'Batas pilihan: 0 hingga 6 digit desimal',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            IconButton(
+                              onPressed: tempDigits > 0
+                                  ? () => setModalState(() => tempDigits--)
+                                  : null,
+                              icon: const Icon(
+                                  Icons.remove_circle_outline_rounded),
+                              color: primaryPurple,
+                              iconSize: 26,
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border:
+                                    Border.all(color: const Color(0xFFCBD5E1)),
+                              ),
+                              child: Text(
+                                '$tempDigits',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: tempDigits < 6
+                                  ? () => setModalState(() => tempDigits++)
+                                  : null,
+                              icon:
+                                  const Icon(Icons.add_circle_outline_rounded),
+                              color: primaryPurple,
+                              iconSize: 26,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Tombol Terapkan
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(bottomSheetCtx);
+                      setState(() {
+                        _data.decimalDigits = tempDigits;
+                      });
+                      _saveData();
+                      CustomToast.showSuccess(
+                        context,
+                        title: 'Format Desimal Disimpan',
+                        subtitle: tempDigits == 0
+                            ? 'Tampilan dana diatur tanpa angka di belakang koma.'
+                            : 'Tampilan dana diatur dengan $tempDigits angka di belakang koma (,${'0' * tempDigits}).',
+                      );
+                    },
+                    icon: const Icon(Icons.check_circle_outline_rounded,
+                        size: 18),
+                    label: const Text(
+                      'Terapkan Format Desimal',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 13.5),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryPurple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 2,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   // --- MODAL KELOLA KUSTOM ATURAN TRANSAKSI (2 TAB: KU & KATEGORI) ---
   void _showKelolaKustomKodeModal() {
     String selectedTab = 'ku'; // 'ku' atau 'kategori'
@@ -7598,7 +7922,7 @@ class _StrukturPageState extends State<StrukturPage> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Rp ${RupiahFormatter.format(balance)}',
+                'Rp ${_formatNominal(balance)}',
                 style: TextStyle(
                   fontSize: 10.5,
                   fontWeight: FontWeight.bold,
@@ -7620,7 +7944,7 @@ class _StrukturPageState extends State<StrukturPage> {
       backgroundColor: const Color(0xFFF7F9FC),
       appBar: AppBar(
         backgroundColor: primaryPurple,
-        centerTitle: true,
+        centerTitle: false,
         iconTheme: const IconThemeData(color: Colors.white),
         systemOverlayStyle: const SystemUiOverlayStyle(
           statusBarColor: Colors.black,
@@ -7630,19 +7954,26 @@ class _StrukturPageState extends State<StrukturPage> {
         title: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.corporate_fare_rounded, color: Colors.white, size: 22),
             SizedBox(width: 8),
-            Text(
-              'Keuangan Struktur',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
+            Flexible(
+              child: Text(
+                'Keuangan Struktur',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.pin_outlined, color: Colors.white),
+            tooltip: 'Format Desimal (Angka di Belakang Koma)',
+            onPressed: () => _showDecimalConfigModal(),
+          ),
           IconButton(
             icon: const Icon(Icons.table_chart_rounded, color: Colors.white),
             tooltip: 'Pengaturan Google Sheets',
@@ -7965,7 +8296,7 @@ class _StrukturPageState extends State<StrukturPage> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Text(
-                  'Rp ${RupiahFormatter.format(_data.totalDanaStruktur)}',
+                  'Rp ${_formatNominal(_data.totalDanaStruktur)}',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 22,
@@ -7983,7 +8314,7 @@ class _StrukturPageState extends State<StrukturPage> {
                   ),
                 ),
                 Text(
-                  'Rp ${RupiahFormatter.format(_data.totalDanaOperasional)}',
+                  'Rp ${_formatNominal(_data.totalDanaOperasional)}',
                   style: const TextStyle(
                     color: Color(0xFFFEF08A), // Kuning soft
                     fontSize: 20,
@@ -8025,7 +8356,7 @@ class _StrukturPageState extends State<StrukturPage> {
                               style: TextStyle(
                                   color: Colors.white70, fontSize: 10)),
                           Text(
-                            '+Rp ${RupiahFormatter.format(_data.totalPemasukan)}',
+                            '+Rp ${_formatNominal(_data.totalPemasukan)}',
                             style: const TextStyle(
                               color: Color(0xFF34D399),
                               fontWeight: FontWeight.bold,
@@ -8063,7 +8394,7 @@ class _StrukturPageState extends State<StrukturPage> {
                               style: TextStyle(
                                   color: Colors.white70, fontSize: 10)),
                           Text(
-                            '-Rp ${RupiahFormatter.format(_data.totalPengeluaran)}',
+                            '-Rp ${_formatNominal(_data.totalPengeluaran)}',
                             style: const TextStyle(
                               color: Color(0xFFFB7185),
                               fontWeight: FontWeight.bold,
@@ -8129,7 +8460,7 @@ class _StrukturPageState extends State<StrukturPage> {
         ),
         const SizedBox(height: 2),
         Text(
-          'Rp ${RupiahFormatter.format(amount)}',
+          'Rp ${_formatNominal(amount)}',
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -8257,7 +8588,7 @@ class _StrukturPageState extends State<StrukturPage> {
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'Rp ${RupiahFormatter.format(_data.rekeningStruktur.balance)}',
+                      'Rp ${_formatNominal(_data.rekeningStruktur.balance)}',
                       style: const TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.bold,
@@ -8451,7 +8782,7 @@ class _StrukturPageState extends State<StrukturPage> {
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'Rp ${RupiahFormatter.format(_data.totalOnHand)}',
+                      'Rp ${_formatNominal(_data.totalOnHand)}',
                       style: const TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.bold,
@@ -8508,7 +8839,7 @@ class _StrukturPageState extends State<StrukturPage> {
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerRight,
                           child: Text(
-                            'Rp ${RupiahFormatter.format(_data.onHandDebit.balance)}',
+                            'Rp ${_formatNominal(_data.onHandDebit.balance)}',
                             style: const TextStyle(
                               fontSize: 9.5,
                               fontWeight: FontWeight.bold,
@@ -8549,7 +8880,7 @@ class _StrukturPageState extends State<StrukturPage> {
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerRight,
                           child: Text(
-                            'Rp ${RupiahFormatter.format(_data.onHandCash.balance)}',
+                            'Rp ${_formatNominal(_data.onHandCash.balance)}',
                             style: const TextStyle(
                               fontSize: 9.5,
                               fontWeight: FontWeight.bold,
@@ -8987,7 +9318,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: Text(
-                                      'Rp ${RupiahFormatter.format(tx.amount)}',
+                                      'Rp ${_formatNominal(tx.amount)}',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 12,
@@ -9377,7 +9708,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                   child: Align(
                                     alignment: Alignment.centerRight,
                                     child: Text(
-                                      'Rp ${RupiahFormatter.format(amount)}',
+                                      'Rp ${_formatNominal(amount)}',
                                       style: TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.bold,
@@ -9447,7 +9778,7 @@ class _StrukturPageState extends State<StrukturPage> {
                               child: Align(
                                 alignment: Alignment.centerRight,
                                 child: Text(
-                                  'Rp ${RupiahFormatter.format(totalAmount)}',
+                                  'Rp ${_formatNominal(totalAmount)}',
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
@@ -10245,7 +10576,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                             .centerRight,
                                                         child: isDebit
                                                             ? Text(
-                                                                'Rp ${RupiahFormatter.format(tx.amount)}',
+                                                                'Rp ${_formatNominal(tx.amount)}',
                                                                 style:
                                                                     const TextStyle(
                                                                   fontWeight:
@@ -10290,7 +10621,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                             .centerRight,
                                                         child: isKredit
                                                             ? Text(
-                                                                'Rp ${RupiahFormatter.format(tx.amount)}',
+                                                                'Rp ${_formatNominal(tx.amount)}',
                                                                 style:
                                                                     const TextStyle(
                                                                   fontWeight:
@@ -10446,7 +10777,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                   alignment:
                                                       Alignment.centerRight,
                                                   child: Text(
-                                                    'Rp ${RupiahFormatter.format(debitTotal)}',
+                                                    'Rp ${_formatNominal(debitTotal)}',
                                                     style: const TextStyle(
                                                       fontWeight:
                                                           FontWeight.bold,
@@ -10468,7 +10799,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                   alignment:
                                                       Alignment.centerRight,
                                                   child: Text(
-                                                    'Rp ${RupiahFormatter.format(kreditTotal)}',
+                                                    'Rp ${_formatNominal(kreditTotal)}',
                                                     style: const TextStyle(
                                                       fontWeight:
                                                           FontWeight.bold,
@@ -10884,7 +11215,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                             ),
                                           ),
                                           child: Text(
-                                            'Rp ${RupiahFormatter.format(totalLaporanNominal)}',
+                                            'Rp ${_formatNominal(totalLaporanNominal)}',
                                             style: TextStyle(
                                               fontSize: 14,
                                               fontWeight: FontWeight.bold,
@@ -11079,7 +11410,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                         ),
                                       ),
                                       Text(
-                                        'Rp ${RupiahFormatter.format(totalPengeluaranNominal)}',
+                                        'Rp ${_formatNominal(totalPengeluaranNominal)}',
                                         style: const TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
@@ -11259,7 +11590,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                     child: Align(
                                       alignment: Alignment.centerRight,
                                       child: Text(
-                                        'Rp ${RupiahFormatter.format(amount)}',
+                                        'Rp ${_formatNominal(amount)}',
                                         style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.bold,
@@ -11334,7 +11665,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                       ),
                                     ),
                                     Text(
-                                      'Rp ${RupiahFormatter.format(totalPemasukanNonDPNominal)}',
+                                      'Rp ${_formatNominal(totalPemasukanNonDPNominal)}',
                                       style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,
@@ -11556,7 +11887,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                 alignment:
                                                     Alignment.centerRight,
                                                 child: Text(
-                                                  'Rp ${RupiahFormatter.format(totalPemasukanNonDPNominal)}',
+                                                  'Rp ${_formatNominal(totalPemasukanNonDPNominal)}',
                                                   style: const TextStyle(
                                                     fontSize: 13.5,
                                                     fontWeight:
@@ -11630,7 +11961,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                                 alignment:
                                                     Alignment.centerRight,
                                                 child: Text(
-                                                  'Rp ${RupiahFormatter.format(totalPengeluaranNominal)}',
+                                                  'Rp ${_formatNominal(totalPengeluaranNominal)}',
                                                   style: const TextStyle(
                                                     fontSize: 13.5,
                                                     fontWeight:
@@ -11704,8 +12035,8 @@ class _StrukturPageState extends State<StrukturPage> {
                                                     Alignment.centerRight,
                                                 child: Text(
                                                   sisaSaldo < 0
-                                                      ? '-Rp ${RupiahFormatter.format(sisaSaldo.abs())}'
-                                                      : 'Rp ${RupiahFormatter.format(sisaSaldo)}',
+                                                      ? '-Rp ${_formatNominal(sisaSaldo.abs())}'
+                                                      : 'Rp ${_formatNominal(sisaSaldo)}',
                                                   style: TextStyle(
                                                     fontSize: 14.5,
                                                     fontWeight:
@@ -11805,7 +12136,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                             bottom: Radius.circular(13)),
                                       ),
                                       child: Text(
-                                        'Rp ${RupiahFormatter.format(totalPemasukanDP)}',
+                                        'Rp ${_formatNominal(totalPemasukanDP)}',
                                         style: TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.bold,
@@ -12184,7 +12515,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                           CrossAxisAlignment.end,
                                       children: [
                                         Text(
-                                          '$amountPrefix Rp ${RupiahFormatter.format(tx.amount)}',
+                                          '$amountPrefix Rp ${_formatNominal(tx.amount)}',
                                           style: TextStyle(
                                             fontSize: 13.5,
                                             fontWeight: FontWeight.bold,

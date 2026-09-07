@@ -411,6 +411,7 @@ class StrukturData {
   List<StrukturTransaction> transactions;
   List<CustomKodeRule> customKodeRules;
   bool isSaldoRekeningUnlocked;
+  int decimalDigits;
 
   StrukturData({
     RekeningStruktur? rekeningStruktur,
@@ -419,13 +420,15 @@ class StrukturData {
     List<StrukturTransaction>? transactions,
     List<CustomKodeRule>? customKodeRules,
     bool? isSaldoRekeningUnlocked,
+    int? decimalDigits,
   })  : rekeningStruktur = rekeningStruktur ?? RekeningStruktur(),
         onHandDebit = onHandDebit ?? OnHandDebit(),
         onHandCash = onHandCash ?? OnHandCash(),
         transactions = (transactions ?? [])
           ..sort((a, b) => a.timestamp.compareTo(b.timestamp)),
         customKodeRules = customKodeRules ?? [],
-        isSaldoRekeningUnlocked = isSaldoRekeningUnlocked ?? false;
+        isSaldoRekeningUnlocked = isSaldoRekeningUnlocked ?? false,
+        decimalDigits = decimalDigits ?? 0;
 
   int get totalOnHand =>
       (onHandDebit.balance + onHandCash.balance) < 0
@@ -488,6 +491,7 @@ class StrukturData {
         'transactions': transactions.map((e) => e.toJson()).toList(),
         'customKodeRules': customKodeRules.map((e) => e.toJson()).toList(),
         'isSaldoRekeningUnlocked': isSaldoRekeningUnlocked,
+        'decimalDigits': decimalDigits,
       };
 
   factory StrukturData.fromJson(Map<String, dynamic> json) {
@@ -516,6 +520,7 @@ class StrukturData {
           [],
       isSaldoRekeningUnlocked:
           json['isSaldoRekeningUnlocked'] as bool? ?? false,
+      decimalDigits: (json['decimalDigits'] as num?)?.toInt() ?? 0,
     );
   }
 }

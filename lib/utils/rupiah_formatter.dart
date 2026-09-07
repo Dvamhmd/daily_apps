@@ -6,8 +6,19 @@ class RupiahFormatter {
   static final NumberFormat _formatter = NumberFormat('#,###', 'id_ID');
   static final RegExp _nonDigitsRegex = RegExp(r'[^0-9]');
 
-  static String format(int value) {
-    return _formatter.format(value).replaceAll(',', '.');
+  static String format(num value, {int decimalDigits = 0}) {
+    final int roundVal = value.truncate();
+    final String base = _formatter.format(roundVal).replaceAll(',', '.');
+    if (decimalDigits <= 0) {
+      return base;
+    }
+    final fracPart = (value - roundVal).abs();
+    if (fracPart == 0) {
+      return '$base,${'0' * decimalDigits}';
+    } else {
+      final fracStr = fracPart.toStringAsFixed(decimalDigits).substring(2);
+      return '$base,$fracStr';
+    }
   }
 
   static String formatRaw(int value) {
