@@ -238,11 +238,11 @@ class SheetsRiskManagementDialog extends StatelessWidget {
     required Color bgColor,
     required Color borderColor,
     required int rekeningCount,
-    required int rekeningDebit,
-    required int rekeningKredit,
+    required num rekeningDebit,
+    required num rekeningKredit,
     required int onHandCount,
-    required int onHandDebit,
-    required int onHandKredit,
+    required num onHandDebit,
+    required num onHandKredit,
   }) {
     return Container(
       padding: const EdgeInsets.all(10),

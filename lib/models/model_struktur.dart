@@ -2,7 +2,7 @@ class RekeningStruktur {
   String bankName;
   String accountNumber;
   String accountHolder;
-  int balance;
+  num balance;
 
   RekeningStruktur({
     this.bankName = 'BCA',
@@ -23,7 +23,7 @@ class RekeningStruktur {
       bankName: json['bankName'] as String? ?? 'BCA',
       accountNumber: json['accountNumber'] as String? ?? '',
       accountHolder: json['accountHolder'] as String? ?? '',
-      balance: (json['balance'] as num?)?.toInt() ?? 0,
+      balance: (json['balance'] as num?) ?? 0,
     );
   }
 }
@@ -32,7 +32,7 @@ class OnHandDebit {
   String bankName;
   String accountNumber;
   String accountHolder;
-  int balance;
+  num balance;
 
   OnHandDebit({
     this.bankName = 'BCA',
@@ -53,13 +53,13 @@ class OnHandDebit {
       bankName: json['bankName'] as String? ?? 'BCA',
       accountNumber: json['accountNumber'] as String? ?? '',
       accountHolder: json['accountHolder'] as String? ?? '',
-      balance: (json['balance'] as num?)?.toInt() ?? 0,
+      balance: (json['balance'] as num?) ?? 0,
     );
   }
 }
 
 class OnHandCash {
-  int balance;
+  num balance;
 
   OnHandCash({
     this.balance = 0,
@@ -71,7 +71,7 @@ class OnHandCash {
 
   factory OnHandCash.fromJson(Map<String, dynamic> json) {
     return OnHandCash(
-      balance: (json['balance'] as num?)?.toInt() ?? 0,
+      balance: (json['balance'] as num?) ?? 0,
     );
   }
 }
@@ -190,8 +190,8 @@ class StrukturTransaction {
   final String? sourceAccount; // 'rekening', 'debit', 'cash'
   final String? targetAccount; // 'rekening', 'debit', 'cash'
   final String? manualSource; // Asal dana untuk pemasukan (cth: 'DP KK Angkatan')
-  final int amount;
-  final int adminFee;
+  final num amount;
+  final num adminFee;
   final DateTime timestamp;
   final String? note;
   final String? ku;
@@ -214,7 +214,7 @@ class StrukturTransaction {
     this.isInternalTransfer = false,
   }) : timestamp = timestamp ?? DateTime.now();
 
-  int get totalDeduction => amount + adminFee;
+  num get totalDeduction => amount + adminFee;
 
   bool get isPemasukan => type == 'pemasukan';
   bool get isPengeluaran => type == 'pengeluaran';
@@ -391,8 +391,8 @@ class StrukturTransaction {
       sourceAccount: json['sourceAccount'] as String?,
       targetAccount: json['targetAccount'] as String?,
       manualSource: json['manualSource'] as String?,
-      amount: (json['amount'] as num?)?.toInt() ?? 0,
-      adminFee: (json['adminFee'] as num?)?.toInt() ?? 0,
+      amount: (json['amount'] as num?) ?? 0,
+      adminFee: (json['adminFee'] as num?) ?? 0,
       timestamp: json['timestamp'] != null
           ? DateTime.parse(json['timestamp'] as String)
           : DateTime.now(),
@@ -430,20 +430,20 @@ class StrukturData {
         isSaldoRekeningUnlocked = isSaldoRekeningUnlocked ?? false,
         decimalDigits = decimalDigits ?? 0;
 
-  int get totalOnHand =>
+  num get totalOnHand =>
       (onHandDebit.balance + onHandCash.balance) < 0
           ? 0
           : (onHandDebit.balance + onHandCash.balance);
-  int get totalDanaStruktur =>
+  num get totalDanaStruktur =>
       (rekeningStruktur.balance + onHandDebit.balance + onHandCash.balance) < 0
           ? 0
           : (rekeningStruktur.balance +
               onHandDebit.balance +
               onHandCash.balance);
 
-  int getTotalPemasukanDP({List<CustomKodeRule>? customRules}) {
+  num getTotalPemasukanDP({List<CustomKodeRule>? customRules}) {
     final rules = customRules ?? customKodeRules;
-    int sum = 0;
+    num sum = 0;
     for (int i = 0; i < transactions.length; i++) {
       final t = transactions[i];
       if (t.isPurePemasukan && t.isDPTransaction(customRules: rules)) {
@@ -453,19 +453,19 @@ class StrukturData {
     return sum;
   }
 
-  int get totalPemasukanDP => getTotalPemasukanDP();
+  num get totalPemasukanDP => getTotalPemasukanDP();
 
   /// Menghitung dana operasional murni (Total Dana Struktur - Dana Pemasukan DP yang nantinya disetor ke atas)
-  int getTotalDanaOperasional({List<CustomKodeRule>? customRules}) {
+  num getTotalDanaOperasional({List<CustomKodeRule>? customRules}) {
     final dp = getTotalPemasukanDP(customRules: customRules);
     final op = totalDanaStruktur - dp;
     return op < 0 ? 0 : op;
   }
 
-  int get totalDanaOperasional => getTotalDanaOperasional();
+  num get totalDanaOperasional => getTotalDanaOperasional();
 
-  int get totalPemasukan {
-    int sum = 0;
+  num get totalPemasukan {
+    num sum = 0;
     for (int i = 0; i < transactions.length; i++) {
       final t = transactions[i];
       if (t.isPurePemasukan) sum += t.amount;
@@ -473,8 +473,8 @@ class StrukturData {
     return sum;
   }
 
-  int get totalPengeluaran {
-    int sum = 0;
+  num get totalPengeluaran {
+    num sum = 0;
     for (int i = 0; i < transactions.length; i++) {
       final t = transactions[i];
       if (t.isPurePengeluaran) {

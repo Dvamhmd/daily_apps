@@ -346,14 +346,14 @@ class PribadiData {
         customKodeRules = customKodeRules ?? [],
         isSaldoRekeningUnlocked = isSaldoRekeningUnlocked ?? false;
 
-  int get totalOnHand =>
+  num get totalOnHand =>
       (onHandDebit.balance < 0 ? 0 : onHandDebit.balance) +
       (onHandCash.balance < 0 ? 0 : onHandCash.balance);
 
   int get totalPosDana =>
       posDanaList.fold<int>(0, (sum, p) => sum + (p.balance < 0 ? 0 : p.balance));
 
-  int get totalDanaPribadi {
+  num get totalDanaPribadi {
     final val = posDanaList.isNotEmpty
         ? totalPosDana
         : ((rekeningPribadi.balance < 0 ? 0 : rekeningPribadi.balance) +
@@ -361,9 +361,9 @@ class PribadiData {
     return val < 0 ? 0 : val;
   }
 
-  int getTotalPemasukanDP({List<CustomKodeRule>? customRules}) {
+  num getTotalPemasukanDP({List<CustomKodeRule>? customRules}) {
     final rules = customRules ?? customKodeRules;
-    int sum = 0;
+    num sum = 0;
     for (int i = 0; i < transactions.length; i++) {
       final t = transactions[i];
       if (t.isPemasukan && t.isDPTransaction(customRules: rules)) {
@@ -373,16 +373,16 @@ class PribadiData {
     return sum;
   }
 
-  int get totalPemasukanDP => getTotalPemasukanDP();
+  num get totalPemasukanDP => getTotalPemasukanDP();
 
   /// Menghitung dana operasional / dana bebas pribadi
-  int getTotalDanaOperasional({List<CustomKodeRule>? customRules}) {
+  num getTotalDanaOperasional({List<CustomKodeRule>? customRules}) {
     final dp = getTotalPemasukanDP(customRules: customRules);
     final op = totalDanaPribadi - dp;
     return op < 0 ? 0 : op;
   }
 
-  int get totalDanaOperasional => getTotalDanaOperasional();
+  num get totalDanaOperasional => getTotalDanaOperasional();
 
   int get totalPemasukan {
     int sum = 0;

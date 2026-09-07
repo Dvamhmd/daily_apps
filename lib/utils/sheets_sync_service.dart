@@ -43,18 +43,18 @@ class SheetsFetchResult {
 
 class SheetsSyncComparison {
   final int localRekeningCount;
-  final int localRekeningDebit;
-  final int localRekeningKredit;
+  final num localRekeningDebit;
+  final num localRekeningKredit;
   final int localOnHandCount;
-  final int localOnHandDebit;
-  final int localOnHandKredit;
+  final num localOnHandDebit;
+  final num localOnHandKredit;
 
   final int remoteRekeningCount;
-  final int remoteRekeningDebit;
-  final int remoteRekeningKredit;
+  final num remoteRekeningDebit;
+  final num remoteRekeningKredit;
   final int remoteOnHandCount;
-  final int remoteOnHandDebit;
-  final int remoteOnHandKredit;
+  final num remoteOnHandDebit;
+  final num remoteOnHandKredit;
 
   final bool hasDiscrepancy;
   final List<String> discrepancyReasons;
@@ -80,10 +80,10 @@ class SheetsSyncComparison {
 
   int get localTotalCount => localRekeningCount + localOnHandCount;
   int get remoteTotalCount => remoteRekeningCount + remoteOnHandCount;
-  int get localTotalDebit => localRekeningDebit + localOnHandDebit;
-  int get localTotalKredit => localRekeningKredit + localOnHandKredit;
-  int get remoteTotalDebit => remoteRekeningDebit + remoteOnHandDebit;
-  int get remoteTotalKredit => remoteRekeningKredit + remoteOnHandKredit;
+  num get localTotalDebit => localRekeningDebit + localOnHandDebit;
+  num get localTotalKredit => localRekeningKredit + localOnHandKredit;
+  num get remoteTotalDebit => remoteRekeningDebit + remoteOnHandDebit;
+  num get remoteTotalKredit => remoteRekeningKredit + remoteOnHandKredit;
 }
 
 class SheetsSyncService {
@@ -832,8 +832,8 @@ class SheetsSyncService {
       }
     }).toList();
 
-    int localRekDebit = 0;
-    int localRekKredit = 0;
+    num localRekDebit = 0;
+    num localRekKredit = 0;
     for (var tx in localRekening) {
       if (tx.isPemasukan) {
         localRekDebit += tx.amount;
@@ -842,8 +842,8 @@ class SheetsSyncService {
       }
     }
 
-    int localOnHandDebit = 0;
-    int localOnHandKredit = 0;
+    num localOnHandDebit = 0;
+    num localOnHandKredit = 0;
     for (var tx in localOnHand) {
       if (tx.isPemasukan) {
         localOnHandDebit += tx.amount;

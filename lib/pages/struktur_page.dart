@@ -418,9 +418,9 @@ class _StrukturPageState extends State<StrukturPage> {
   /// berdasarkan seluruh transaksi yang ada di _data.transactions.
   /// Digunakan setelah data transaksi diganti dari sumber eksternal (Spreadsheet).
   void _recalculateBalancesFromTransactions() {
-    int rekeningBalance = 0;
-    int debitBalance = 0;
-    int cashBalance = 0;
+    num rekeningBalance = 0;
+    num debitBalance = 0;
+    num cashBalance = 0;
 
     for (final tx in _data.transactions) {
       if (tx.isPemasukan) {
@@ -3654,7 +3654,18 @@ class _StrukturPageState extends State<StrukturPage> {
                             const SizedBox(height: 8),
                             TextField(
                               controller: saldoRekCtrl,
-                              keyboardType: TextInputType.number,
+                              keyboardType: _data.decimalDigits > 0
+                                  ? const TextInputType.numberWithOptions(
+                                      decimal: true)
+                                  : TextInputType.number,
+                              inputFormatters: [
+                                RupiahInputFormatter(
+                                  allowDecimal: _data.decimalDigits > 0,
+                                  maxDecimalDigits: _data.decimalDigits > 0
+                                      ? _data.decimalDigits
+                                      : 2,
+                                ),
+                              ],
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -3683,18 +3694,6 @@ class _StrukturPageState extends State<StrukturPage> {
                                 ),
                               ),
                               onChanged: (v) {
-                                final raw =
-                                    v.replaceAll(RegExp(r'[^0-9]'), '');
-                                final numVal = int.tryParse(raw) ?? 0;
-                                final formatted =
-                                    RupiahFormatter.format(numVal);
-                                if (formatted != v && raw.isNotEmpty) {
-                                  saldoRekCtrl.value = TextEditingValue(
-                                    text: formatted,
-                                    selection: TextSelection.collapsed(
-                                        offset: formatted.length),
-                                  );
-                                }
                                 setModalState(() {});
                               },
                             ),
@@ -3869,10 +3868,8 @@ class _StrukturPageState extends State<StrukturPage> {
                             _data.rekeningStruktur.accountNumber = noRek;
                             _data.rekeningStruktur.accountHolder = holder;
                             if (_data.isSaldoRekeningUnlocked) {
-                              final cleanSaldo = saldoRekCtrl.text
-                                  .replaceAll(RegExp(r'[^0-9]'), '');
-                              final newBalance = int.tryParse(cleanSaldo) ??
-                                  _data.rekeningStruktur.balance;
+                              final newBalance =
+                                  RupiahFormatter.parseToNum(saldoRekCtrl.text);
                               _data.rekeningStruktur.balance = newBalance;
                             }
                           });
@@ -3914,9 +3911,9 @@ class _StrukturPageState extends State<StrukturPage> {
     final holderCtrl =
         TextEditingController(text: _data.onHandDebit.accountHolder);
     final saldoDebitCtrl = TextEditingController(
-        text: RupiahFormatter.format(_data.onHandDebit.balance));
+        text: _formatNominal(_data.onHandDebit.balance));
     final saldoCashCtrl = TextEditingController(
-        text: RupiahFormatter.format(_data.onHandCash.balance));
+        text: _formatNominal(_data.onHandCash.balance));
 
     showModalBottomSheet(
       context: context,
@@ -4025,7 +4022,18 @@ class _StrukturPageState extends State<StrukturPage> {
                             const SizedBox(height: 8),
                             TextField(
                               controller: saldoDebitCtrl,
-                              keyboardType: TextInputType.number,
+                              keyboardType: _data.decimalDigits > 0
+                                  ? const TextInputType.numberWithOptions(
+                                      decimal: true)
+                                  : TextInputType.number,
+                              inputFormatters: [
+                                RupiahInputFormatter(
+                                  allowDecimal: _data.decimalDigits > 0,
+                                  maxDecimalDigits: _data.decimalDigits > 0
+                                      ? _data.decimalDigits
+                                      : 2,
+                                ),
+                              ],
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -4054,18 +4062,6 @@ class _StrukturPageState extends State<StrukturPage> {
                                 ),
                               ),
                               onChanged: (v) {
-                                final raw =
-                                    v.replaceAll(RegExp(r'[^0-9]'), '');
-                                final numVal = int.tryParse(raw) ?? 0;
-                                final formatted =
-                                    RupiahFormatter.format(numVal);
-                                if (formatted != v && raw.isNotEmpty) {
-                                  saldoDebitCtrl.value = TextEditingValue(
-                                    text: formatted,
-                                    selection: TextSelection.collapsed(
-                                        offset: formatted.length),
-                                  );
-                                }
                                 setModalState(() {});
                               },
                             ),
@@ -4112,7 +4108,18 @@ class _StrukturPageState extends State<StrukturPage> {
                             const SizedBox(height: 8),
                             TextField(
                               controller: saldoCashCtrl,
-                              keyboardType: TextInputType.number,
+                              keyboardType: _data.decimalDigits > 0
+                                  ? const TextInputType.numberWithOptions(
+                                      decimal: true)
+                                  : TextInputType.number,
+                              inputFormatters: [
+                                RupiahInputFormatter(
+                                  allowDecimal: _data.decimalDigits > 0,
+                                  maxDecimalDigits: _data.decimalDigits > 0
+                                      ? _data.decimalDigits
+                                      : 2,
+                                ),
+                              ],
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -4141,18 +4148,6 @@ class _StrukturPageState extends State<StrukturPage> {
                                 ),
                               ),
                               onChanged: (v) {
-                                final raw =
-                                    v.replaceAll(RegExp(r'[^0-9]'), '');
-                                final numVal = int.tryParse(raw) ?? 0;
-                                final formatted =
-                                    RupiahFormatter.format(numVal);
-                                if (formatted != v && raw.isNotEmpty) {
-                                  saldoCashCtrl.value = TextEditingValue(
-                                    text: formatted,
-                                    selection: TextSelection.collapsed(
-                                        offset: formatted.length),
-                                  );
-                                }
                                 setModalState(() {});
                               },
                             ),
@@ -4273,16 +4268,12 @@ class _StrukturPageState extends State<StrukturPage> {
                             _data.onHandDebit.accountHolder =
                                 holderCtrl.text.trim();
                             if (_data.isSaldoRekeningUnlocked) {
-                              final cleanDebit = saldoDebitCtrl.text
-                                  .replaceAll(RegExp(r'[^0-9]'), '');
-                              final newDebit = int.tryParse(cleanDebit) ??
-                                  _data.onHandDebit.balance;
+                              final newDebit = RupiahFormatter.parseToNum(
+                                  saldoDebitCtrl.text);
                               _data.onHandDebit.balance = newDebit;
 
-                              final cleanCash = saldoCashCtrl.text
-                                  .replaceAll(RegExp(r'[^0-9]'), '');
-                              final newCash = int.tryParse(cleanCash) ??
-                                  _data.onHandCash.balance;
+                              final newCash =
+                                  RupiahFormatter.parseToNum(saldoCashCtrl.text);
                               _data.onHandCash.balance = newCash;
                             }
                           });
@@ -4346,12 +4337,11 @@ class _StrukturPageState extends State<StrukturPage> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-            final cleanText = amountCtrl.text.replaceAll('.', '').trim();
-            final nominal = int.tryParse(cleanText) ?? 0;
+            final nominal = RupiahFormatter.parseToNum(amountCtrl.text);
 
             String wadahName = '';
             Color wadahColor = primaryPurple;
-            int currentWadahBalance = 0;
+            num currentWadahBalance = 0;
             if (targetWadah == 'rekening') {
               wadahName =
                   'Rekening Struktur (${_data.rekeningStruktur.bankName})';
@@ -4590,10 +4580,15 @@ class _StrukturPageState extends State<StrukturPage> {
                           TextField(
                             controller: amountCtrl,
                             focusNode: amountFocus,
-                            keyboardType: TextInputType.number,
+                            keyboardType: _data.decimalDigits > 0
+                                ? const TextInputType.numberWithOptions(
+                                    decimal: true)
+                                : TextInputType.number,
                             inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              RupiahInputFormatter(),
+                              RupiahInputFormatter(
+                                allowDecimal: _data.decimalDigits > 0,
+                                maxDecimalDigits: _data.decimalDigits,
+                              ),
                             ],
                             style: const TextStyle(
                                 fontSize: 17,
@@ -4757,7 +4752,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                     fontWeight: FontWeight.w600,
                                     color: Color(0xFF1E293B))),
                             Text(
-                              'Rp ${RupiahFormatter.format(currentWadahBalance + nominal)}',
+                              'Rp ${RupiahFormatter.format(currentWadahBalance + nominal, decimalDigits: _data.decimalDigits)}',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
@@ -4896,7 +4891,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                     context,
                                     title: 'Pemasukan Dicatat',
                                     subtitle:
-                                        'Pemasukan Rp ${RupiahFormatter.format(nominal)} berhasil dicatat!',
+                                        'Pemasukan Rp ${RupiahFormatter.format(nominal, decimalDigits: _data.decimalDigits)} berhasil dicatat!',
                                   );
                                 }
                               },
@@ -4964,10 +4959,9 @@ class _StrukturPageState extends State<StrukturPage> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-            final cleanText = amountCtrl.text.replaceAll('.', '').trim();
-            final nominal = int.tryParse(cleanText) ?? 0;
+            final nominal = RupiahFormatter.parseToNum(amountCtrl.text);
 
-            int sourceBalance = 0;
+            num sourceBalance = 0;
             String sourceName = '';
             Color sourceColor = primaryPurple;
 
@@ -5208,7 +5202,7 @@ class _StrukturPageState extends State<StrukturPage> {
                         InkWell(
                           onTap: () {
                             amountCtrl.text =
-                                RupiahFormatter.format(sourceBalance);
+                                RupiahFormatter.format(sourceBalance, decimalDigits: _data.decimalDigits);
                             if (amountHasError && sourceBalance > 0) {
                               amountHasError = false;
                             }
@@ -5234,10 +5228,15 @@ class _StrukturPageState extends State<StrukturPage> {
                           TextField(
                             controller: amountCtrl,
                             focusNode: amountFocus,
-                            keyboardType: TextInputType.number,
+                            keyboardType: _data.decimalDigits > 0
+                                ? const TextInputType.numberWithOptions(
+                                    decimal: true)
+                                : TextInputType.number,
                             inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              RupiahInputFormatter(),
+                              RupiahInputFormatter(
+                                allowDecimal: _data.decimalDigits > 0,
+                                maxDecimalDigits: _data.decimalDigits,
+                              ),
                             ],
                             style: const TextStyle(
                                 fontSize: 17,
@@ -5295,7 +5294,7 @@ class _StrukturPageState extends State<StrukturPage> {
                               child: Text(
                                 nominal <= 0
                                     ? '⚠️ Jumlah pengeluaran harus lebih dari 0'
-                                    : '⚠️ Saldo $sourceName tidak mencukupi (Saldo: Rp ${RupiahFormatter.format(sourceBalance)})',
+                                    : '⚠️ Saldo $sourceName tidak mencukupi (Saldo: Rp ${RupiahFormatter.format(sourceBalance, decimalDigits: _data.decimalDigits)})',
                                 style: const TextStyle(
                                   fontSize: 11.5,
                                   color: Colors.redAccent,
@@ -5311,7 +5310,7 @@ class _StrukturPageState extends State<StrukturPage> {
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
-                          '⚠️ Saldo $sourceName tidak mencukupi (Saldo: Rp ${RupiahFormatter.format(sourceBalance)}).',
+                          '⚠️ Saldo $sourceName tidak mencukupi (Saldo: Rp ${RupiahFormatter.format(sourceBalance, decimalDigits: _data.decimalDigits)}).',
                           style: const TextStyle(
                               fontSize: 11.5,
                               color: Colors.redAccent,
@@ -5415,7 +5414,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                     fontWeight: FontWeight.w600,
                                     color: Color(0xFF1E293B))),
                             Text(
-                              'Rp ${RupiahFormatter.format(sourceBalance - nominal)}',
+                              'Rp ${RupiahFormatter.format(sourceBalance - nominal, decimalDigits: _data.decimalDigits)}',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
@@ -5474,7 +5473,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                     context,
                                     title: 'Saldo Tidak Cukup',
                                     subtitle:
-                                        'Saldo $sourceName tidak mencukupi! (Saldo: Rp ${RupiahFormatter.format(sourceBalance)})',
+                                        'Saldo $sourceName tidak mencukupi! (Saldo: Rp ${RupiahFormatter.format(sourceBalance, decimalDigits: _data.decimalDigits)})',
                                   );
                                   return;
                                 }
@@ -5578,7 +5577,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                     context,
                                     title: 'Pengeluaran Dicatat',
                                     subtitle:
-                                        'Pengeluaran Rp ${RupiahFormatter.format(nominal)} berhasil dicatat!',
+                                        'Pengeluaran Rp ${RupiahFormatter.format(nominal, decimalDigits: _data.decimalDigits)} berhasil dicatat!',
                                   );
                                 }
                               },
@@ -5661,8 +5660,7 @@ class _StrukturPageState extends State<StrukturPage> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-            final cleanText = amountCtrl.text.replaceAll('.', '').trim();
-            final nominal = int.tryParse(cleanText) ?? 0;
+            final nominal = RupiahFormatter.parseToNum(amountCtrl.text);
 
             // List of target options based on source
             final List<String> availableTargets = ['rekening', 'debit', 'cash']
@@ -5674,7 +5672,7 @@ class _StrukturPageState extends State<StrukturPage> {
             }
 
             // Sumber Saldo
-            int sourceBalance = 0;
+            num sourceBalance = 0;
             String sourceName = '';
             Color sourceColor = primaryPurple;
 
@@ -5946,7 +5944,7 @@ class _StrukturPageState extends State<StrukturPage> {
                             final targetKey = availableTargets[i];
                             String tTitle = '';
                             String tSub = '';
-                            int tBal = 0;
+                            num tBal = 0;
                             IconData tIcon = Icons.account_balance_rounded;
                             Color tColor = primaryPurple;
 
@@ -6032,7 +6030,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                 ? (sourceBalance - adminFee)
                                 : 0;
                             amountCtrl.text =
-                                RupiahFormatter.format(maxNominal);
+                                RupiahFormatter.format(maxNominal, decimalDigits: _data.decimalDigits);
                             if (amountHasError && maxNominal > 0) {
                               amountHasError = false;
                             }
@@ -6058,10 +6056,15 @@ class _StrukturPageState extends State<StrukturPage> {
                           TextField(
                             controller: amountCtrl,
                             focusNode: amountFocus,
-                            keyboardType: TextInputType.number,
+                            keyboardType: _data.decimalDigits > 0
+                                ? const TextInputType.numberWithOptions(
+                                    decimal: true)
+                                : TextInputType.number,
                             inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              RupiahInputFormatter(),
+                              RupiahInputFormatter(
+                                allowDecimal: _data.decimalDigits > 0,
+                                maxDecimalDigits: _data.decimalDigits,
+                              ),
                             ],
                             style: const TextStyle(
                                 fontSize: 17, fontWeight: FontWeight.bold),
@@ -6113,7 +6116,7 @@ class _StrukturPageState extends State<StrukturPage> {
                               child: Text(
                                 nominal <= 0
                                     ? '⚠️ Nominal alokasi harus lebih dari 0'
-                                    : '⚠️ Saldo $sourceName tidak mencukupi (Saldo: Rp ${RupiahFormatter.format(sourceBalance)})',
+                                    : '⚠️ Saldo $sourceName tidak mencukupi (Saldo: Rp ${RupiahFormatter.format(sourceBalance, decimalDigits: _data.decimalDigits)})',
                                 style: const TextStyle(
                                   fontSize: 11.5,
                                   color: Colors.redAccent,
@@ -6138,11 +6141,11 @@ class _StrukturPageState extends State<StrukturPage> {
                         1000000,
                       ].map((amt) {
                         return ActionChip(
-                          label: Text(RupiahFormatter.format(amt),
+                          label: Text(RupiahFormatter.format(amt, decimalDigits: _data.decimalDigits),
                               style: const TextStyle(fontSize: 11)),
                           backgroundColor: const Color(0xFFF1F5F9),
                           onPressed: () {
-                            amountCtrl.text = RupiahFormatter.format(amt);
+                            amountCtrl.text = RupiahFormatter.format(amt, decimalDigits: _data.decimalDigits);
                             if (amountHasError && amt > 0) {
                               amountHasError = false;
                             }
@@ -6164,8 +6167,8 @@ class _StrukturPageState extends State<StrukturPage> {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isInterBankTransfer && !isBankSama && nominal > 0
-                              ? Colors.amber
-                              : primaryTeal.withValues(alpha: 0.3),
+                            ? Colors.amber
+                            : primaryTeal.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Column(
@@ -6195,7 +6198,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                       color: Color(0xFF475569))),
                               Text(
                                 adminFee > 0
-                                    ? 'Rp ${RupiahFormatter.format(adminFee)} (Beda Bank)'
+                                    ? 'Rp ${RupiahFormatter.format(adminFee, decimalDigits: _data.decimalDigits)} (Beda Bank)'
                                     : 'Rp 0 (Bebas Admin)',
                                 style: TextStyle(
                                   fontSize: 12,
@@ -6217,7 +6220,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                       fontWeight: FontWeight.bold,
                                       color: Color(0xFF1E293B))),
                               Text(
-                                'Rp ${RupiahFormatter.format(totalPotongan)}',
+                                'Rp ${RupiahFormatter.format(totalPotongan, decimalDigits: _data.decimalDigits)}',
                                 style: TextStyle(
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.bold,
@@ -6236,7 +6239,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                       fontWeight: FontWeight.w600,
                                       color: Color(0xFF475569))),
                               Text(
-                                '+Rp ${RupiahFormatter.format(nominal)}',
+                                '+Rp ${RupiahFormatter.format(nominal, decimalDigits: _data.decimalDigits)}',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
@@ -6254,7 +6257,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                       fontSize: 11,
                                       color: Color(0xFF64748B))),
                               Text(
-                                'Rp ${RupiahFormatter.format(sourceBalance - totalPotongan > 0 ? sourceBalance - totalPotongan : 0)}',
+                                'Rp ${RupiahFormatter.format(sourceBalance - totalPotongan > 0 ? sourceBalance - totalPotongan : 0, decimalDigits: _data.decimalDigits)}',
                                 style: const TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold),
@@ -6269,7 +6272,7 @@ class _StrukturPageState extends State<StrukturPage> {
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
-                          '⚠️ Saldo $sourceName tidak mencukupi untuk distribusi ini (Saldo: Rp ${RupiahFormatter.format(sourceBalance)}).',
+                          '⚠️ Saldo $sourceName tidak mencukupi untuk distribusi ini (Saldo: Rp ${RupiahFormatter.format(sourceBalance, decimalDigits: _data.decimalDigits)}).',
                           style: const TextStyle(
                               fontSize: 11.5,
                               color: Colors.redAccent,
@@ -6345,7 +6348,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                     context,
                                     title: 'Saldo Tidak Cukup',
                                     subtitle:
-                                        'Saldo $sourceName tidak mencukupi untuk distribusi ini! (Saldo: Rp ${RupiahFormatter.format(sourceBalance)})',
+                                        'Saldo $sourceName tidak mencukupi untuk distribusi ini! (Saldo: Rp ${RupiahFormatter.format(sourceBalance, decimalDigits: _data.decimalDigits)})',
                                   );
                                   return;
                                 }
@@ -6645,7 +6648,7 @@ class _StrukturPageState extends State<StrukturPage> {
     final noteCtrl = TextEditingController(
         text: (tx.note != null && tx.note!.isNotEmpty) ? tx.note! : cleanTitle);
     final amountCtrl =
-        TextEditingController(text: RupiahFormatter.format(tx.amount));
+        TextEditingController(text: RupiahFormatter.format(tx.amount, decimalDigits: _data.decimalDigits));
 
     String manualKu = (tx.ku != null && tx.ku!.trim().isNotEmpty && tx.ku != '-')
         ? tx.ku!.trim()
@@ -6714,9 +6717,7 @@ class _StrukturPageState extends State<StrukturPage> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-            final cleanAmountText =
-                amountCtrl.text.replaceAll('.', '').trim();
-            final newAmount = int.tryParse(cleanAmountText) ?? 0;
+            final newAmount = RupiahFormatter.parseToNum(amountCtrl.text);
             final currentNote = noteCtrl.text.trim();
 
             // Auto-resolved KU & Kategori preview
@@ -6730,9 +6731,9 @@ class _StrukturPageState extends State<StrukturPage> {
             );
 
             // Hitung saldo base akun jika transaksi lama di-rollback
-            int simulatedRekeningBalance = _data.rekeningStruktur.balance;
-            int simulatedDebitBalance = _data.onHandDebit.balance;
-            int simulatedCashBalance = _data.onHandCash.balance;
+            num simulatedRekeningBalance = _data.rekeningStruktur.balance;
+            num simulatedDebitBalance = _data.onHandDebit.balance;
+            num simulatedCashBalance = _data.onHandCash.balance;
 
             if (isPemasukan) {
               if (tx.targetAccount == 'rekening' || tx.targetAccount == null) {
@@ -6756,7 +6757,7 @@ class _StrukturPageState extends State<StrukturPage> {
             if (simulatedDebitBalance < 0) simulatedDebitBalance = 0;
             if (simulatedCashBalance < 0) simulatedCashBalance = 0;
 
-            int availableBalance = 0;
+            num availableBalance = 0;
             String accountName = '';
             Color accountColor = primaryPurple;
 
@@ -6804,7 +6805,7 @@ class _StrukturPageState extends State<StrukturPage> {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.grey[300],
+                           color: Colors.grey[300],
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
@@ -7007,10 +7008,14 @@ class _StrukturPageState extends State<StrukturPage> {
                           TextField(
                             controller: amountCtrl,
                             focusNode: amountFocus,
-                            keyboardType: TextInputType.number,
+                            keyboardType: _data.decimalDigits > 0
+                                ? const TextInputType.numberWithOptions(decimal: true)
+                                : TextInputType.number,
                             inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              RupiahInputFormatter(),
+                              RupiahInputFormatter(
+                                allowDecimal: _data.decimalDigits > 0,
+                                maxDecimalDigits: _data.decimalDigits,
+                              ),
                             ],
                             style: TextStyle(
                               fontSize: 17,
@@ -7070,7 +7075,7 @@ class _StrukturPageState extends State<StrukturPage> {
                               child: Text(
                                 newAmount <= 0
                                     ? '⚠️ Jumlah nominal harus lebih dari 0'
-                                    : '⚠️ Saldo $accountName tidak mencukupi (Tersedia: Rp ${RupiahFormatter.format(availableBalance)})',
+                                    : '⚠️ Saldo $accountName tidak mencukupi (Tersedia: Rp ${RupiahFormatter.format(availableBalance, decimalDigits: _data.decimalDigits)})',
                                 style: const TextStyle(
                                   fontSize: 11.5,
                                   color: Colors.redAccent,
@@ -7086,7 +7091,7 @@ class _StrukturPageState extends State<StrukturPage> {
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
-                          '⚠️ Saldo $accountName tidak mencukupi (Tersedia: Rp ${RupiahFormatter.format(availableBalance)}).',
+                          '⚠️ Saldo $accountName tidak mencukupi (Tersedia: Rp ${RupiahFormatter.format(availableBalance, decimalDigits: _data.decimalDigits)}).',
                           style: const TextStyle(
                               fontSize: 11.5,
                               color: Colors.redAccent,
@@ -7316,7 +7321,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                   color: Color(0xFF1E293B)),
                             ),
                             Text(
-                              'Rp ${RupiahFormatter.format(isPemasukan ? availableBalance + newAmount : availableBalance - newAmount)}',
+                              'Rp ${RupiahFormatter.format(isPemasukan ? availableBalance + newAmount : availableBalance - newAmount, decimalDigits: _data.decimalDigits)}',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
@@ -7375,7 +7380,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                     context,
                                     title: 'Saldo Tidak Cukup',
                                     subtitle:
-                                        'Saldo $accountName tidak mencukupi! (Tersedia: Rp ${RupiahFormatter.format(availableBalance)})',
+                                        'Saldo $accountName tidak mencukupi! (Tersedia: Rp ${RupiahFormatter.format(availableBalance, decimalDigits: _data.decimalDigits)})',
                                   );
                                   return;
                                 }
@@ -7863,7 +7868,7 @@ class _StrukturPageState extends State<StrukturPage> {
   Widget _buildAccountSelectorCard({
     required String title,
     required String subtitle,
-    required int balance,
+    required num balance,
     required IconData icon,
     required bool isSelected,
     required Color activeColor,
@@ -8441,7 +8446,7 @@ class _StrukturPageState extends State<StrukturPage> {
 
   Widget _buildBannerSubStat({
     required String label,
-    required int amount,
+    required num amount,
     required IconData icon,
   }) {
     return Column(
@@ -9437,14 +9442,14 @@ class _StrukturPageState extends State<StrukturPage> {
             final pemasukanList =
                 allMutasi.where((tx) => tx.isPurePemasukan).toList();
 
-            final int totalPengeluaranNominal =
-                pengeluaranList.fold<int>(0, (sum, tx) => sum + tx.amount);
+            final num totalPengeluaranNominal =
+                pengeluaranList.fold<num>(0, (sum, tx) => sum + tx.amount);
 
             final pemasukanDPList = pemasukanList
                 .where((tx) => tx.isDPTransaction(
                     customRules: _data.customKodeRules))
                 .toList();
-            final int totalPemasukanDP = pemasukanDPList.fold<int>(
+            final num totalPemasukanDP = pemasukanDPList.fold<num>(
                 0, (sum, tx) => sum + tx.amount);
 
             // Filter data untuk Tab Laporan Keuangan
@@ -9481,7 +9486,7 @@ class _StrukturPageState extends State<StrukturPage> {
               }).toList();
             }
 
-            int totalLaporanNominal = 0;
+            num totalLaporanNominal = 0;
             for (final tx in activeList) {
               totalLaporanNominal += tx.amount;
             }
@@ -9497,9 +9502,9 @@ class _StrukturPageState extends State<StrukturPage> {
               required String tableTitle,
               required String colHeaderLeft,
               required String colHeaderRight,
-              required Map<String, int> dataMap,
+              required Map<String, num> dataMap,
               required Map<String, int> countMap,
-              required int totalAmount,
+              required num totalAmount,
               required bool isPengeluaran,
               required bool isKuType,
             }) {
@@ -10061,8 +10066,8 @@ class _StrukturPageState extends State<StrukturPage> {
                             }
                           }).toList();
 
-                          int rekeningDebit = 0;
-                          int rekeningKredit = 0;
+                          num rekeningDebit = 0;
+                          num rekeningKredit = 0;
                           for (final tx in rekeningList) {
                             if (tx.isPemasukan) {
                               rekeningDebit += tx.amount;
@@ -10071,8 +10076,8 @@ class _StrukturPageState extends State<StrukturPage> {
                             }
                           }
 
-                          int onHandDebit = 0;
-                          int onHandKredit = 0;
+                          num onHandDebit = 0;
+                          num onHandKredit = 0;
                           for (final tx in onHandList) {
                             if (tx.isPemasukan) {
                               onHandDebit += tx.amount;
@@ -10089,8 +10094,8 @@ class _StrukturPageState extends State<StrukturPage> {
                             required Color headerBgColor,
                             required Color borderColor,
                             required List<StrukturTransaction> list,
-                            required int debitTotal,
-                            required int kreditTotal,
+                            required num debitTotal,
+                            required num kreditTotal,
                             required bool isRekening,
                           }) {
                             return Container(
@@ -11240,7 +11245,7 @@ class _StrukturPageState extends State<StrukturPage> {
                         // ------------------------------------
                         if (mainTab == 'pengeluaran') {
                           // Tabel 1: Agregasi Berdasarkan Kategori Pengeluaran (Kategori mengandung "DP", "Saldo Awal", dan "Dana dari S3" tidak dimasukkan)
-                          final Map<String, int> pengeluaranKategoriMap = {};
+                          final Map<String, num> pengeluaranKategoriMap = {};
                           final Map<String, int> pengeluaranKategoriCountMap =
                               {};
 
@@ -11311,12 +11316,12 @@ class _StrukturPageState extends State<StrukturPage> {
                                     1;
                           }
 
-                          final int totalPengeluaranKategoriNominal =
+                          final num totalPengeluaranKategoriNominal =
                               pengeluaranKategoriMap.values
-                                  .fold<int>(0, (sum, v) => sum + v);
+                                  .fold<num>(0, (sum, v) => sum + v);
 
                           // Tabel 2: Agregasi Berdasarkan Dana Kuasa Usaha (KU)
-                          final Map<String, int> pengeluaranKuMap = {};
+                          final Map<String, num> pengeluaranKuMap = {};
                           final Map<String, int> pengeluaranKuCountMap = {};
 
                           // Tambahkan KU yang sudah dikonfigurasi
@@ -11462,16 +11467,16 @@ class _StrukturPageState extends State<StrukturPage> {
                             .where((tx) => !tx.isDPTransaction(
                                 customRules: _data.customKodeRules))
                             .toList();
-                        final int totalPemasukanNonDPNominal = pemasukanNonDPList
-                            .fold<int>(0, (sum, tx) => sum + tx.amount);
+                        final num totalPemasukanNonDPNominal = pemasukanNonDPList
+                            .fold<num>(0, (sum, tx) => sum + tx.amount);
 
                         // Agregasi Berdasarkan Kategori Pemasukan (Non-DP) & Default Layout
-                        int saldoAwalNominal = 0;
+                        num saldoAwalNominal = 0;
                         int saldoAwalCount = 0;
-                        int danaS3Nominal = 0;
+                        num danaS3Nominal = 0;
                         int danaS3Count = 0;
 
-                        final Map<String, int> pemasukanLainMap = {};
+                        final Map<String, num> pemasukanLainMap = {};
                         final Map<String, int> pemasukanLainCountMap = {};
 
                         // Agregasi dari transaksi pemasukan non-DP
@@ -11513,13 +11518,13 @@ class _StrukturPageState extends State<StrukturPage> {
                         }
 
                         // Sisa Saldo = Total Pemasukan (Non-DP) - Total Pengeluaran
-                        final int sisaSaldo = totalPemasukanNonDPNominal -
+                        final num sisaSaldo = totalPemasukanNonDPNominal -
                             totalPengeluaranNominal;
 
                         Widget buildPemasukanItemRow({
                           required String title,
                           required int count,
-                          required int amount,
+                          required num amount,
                           required bool isEven,
                           Color? customTextColor,
                         }) {

@@ -220,9 +220,9 @@ void main() {
       final pemasukanNonDP = pemasukanList.where((tx) => !tx.isDPTransaction(customRules: customRules)).toList();
       final pemasukanDP = pemasukanList.where((tx) => tx.isDPTransaction(customRules: customRules)).toList();
 
-      int saldoAwalNominal = 0;
-      int danaS3Nominal = 0;
-      final Map<String, int> pemasukanLainMap = {};
+      num saldoAwalNominal = 0;
+      num danaS3Nominal = 0;
+      final Map<String, num> pemasukanLainMap = {};
 
       for (final tx in pemasukanNonDP) {
         final rawKategori = tx.getDisplayKode(customRules: customRules).trim();
@@ -243,9 +243,9 @@ void main() {
         }
       }
 
-      final totalPemasukanNonDP = pemasukanNonDP.fold<int>(0, (sum, tx) => sum + tx.amount);
-      final totalPemasukanDP = pemasukanDP.fold<int>(0, (sum, tx) => sum + tx.amount);
-      final totalPengeluaran = pengeluaranList.fold<int>(0, (sum, tx) => sum + tx.amount);
+      final totalPemasukanNonDP = pemasukanNonDP.fold<num>(0, (sum, tx) => sum + tx.amount);
+      final totalPemasukanDP = pemasukanDP.fold<num>(0, (sum, tx) => sum + tx.amount);
+      final totalPengeluaran = pengeluaranList.fold<num>(0, (sum, tx) => sum + tx.amount);
       final sisaSaldo = totalPemasukanNonDP - totalPengeluaran;
 
       expect(saldoAwalNominal, equals(500000));
@@ -291,7 +291,7 @@ void main() {
         CustomKodeRule(keyword: 'ATK', kode: 'ATK'),
       ];
 
-      final pengeluaranKategoriMap = <String, int>{};
+      final pengeluaranKategoriMap = <String, num>{};
       final pengeluaranKategoriCountMap = <String, int>{};
 
       // 1. Initial categories from customKodeRules (type != 'ku')
