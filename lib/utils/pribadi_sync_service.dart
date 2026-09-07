@@ -201,6 +201,7 @@ class PribadiSyncService {
     final autoKode = PribadiTransaction.resolveKodeFromText(
       titleText,
       customRules: data.customKodeRules,
+      type: 'pemasukan',
     );
     final autoKu = PribadiTransaction.resolveKuFromText(
       titleText,
@@ -270,6 +271,7 @@ class PribadiSyncService {
     final autoKode = PribadiTransaction.resolveKodeFromText(
       titleText,
       customRules: data.customKodeRules,
+      type: 'pengeluaran',
     );
     final autoKu = PribadiTransaction.resolveKuFromText(
       titleText,
@@ -352,6 +354,7 @@ class PribadiSyncService {
         final autoKode = PribadiTransaction.resolveKodeFromText(
           namaBaru,
           customRules: data.customKodeRules,
+          type: existingTx.type,
         );
         final autoKu = PribadiTransaction.resolveKuFromText(
           namaBaru,

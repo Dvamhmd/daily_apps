@@ -320,7 +320,7 @@ class SeriousModeService {
   static final http.Client _httpClient = http.Client();
   static List<SeriousUser>? _cachedRemoteUsers;
   static DateTime? _lastFetchTime;
-  static const Duration _cacheTtl = Duration(seconds: 20);
+  static const Duration _cacheTtl = Duration(minutes: 2);
 
   static const String prefKeySeriousWebAppUrl = 'daily_apps_serious_webapp_url';
 
@@ -346,7 +346,7 @@ class SeriousModeService {
   /// Helper untuk mengirim HTTP Request ke Google Apps Script Web App (Mendukung Flutter Web & Mobile)
   static Future<Map<String, dynamic>?> _sendSpreadsheetRequest(
     Map<String, dynamic> payload, {
-    Duration timeout = const Duration(seconds: 8),
+    Duration timeout = const Duration(seconds: 20),
   }) async {
     final targetUrl = await getEffectiveSpreadsheetUrl();
     if (targetUrl.isEmpty) return null;
@@ -387,9 +387,11 @@ class SeriousModeService {
       } catch (e) {
         debugPrint('Spreadsheet POST request error: $e');
       }
+      return null;
     }
 
     // 2. Gunakan GET query parameter (Paling cepat untuk read request & Flutter Web fallback)
+    bool isTimeout = false;
     try {
       final getUri = uri.replace(
         queryParameters: {
@@ -404,12 +406,15 @@ class SeriousModeService {
           return decoded;
         }
       }
+    } on TimeoutException catch (e) {
+      isTimeout = true;
+      debugPrint('Spreadsheet GET request timeout: $e');
     } catch (e) {
       debugPrint('Spreadsheet GET request error: $e');
     }
 
-    // 3. Fallback POST jika sebelumnya belum mencoba POST
-    if (!isMutation && bodyJson.length <= 500) {
+    // 3. Fallback POST jika GET gagal bukan karena Timeout (misal format error / URL length)
+    if (!isTimeout && !isMutation && bodyJson.length <= 500) {
       try {
         final postRes = await _httpClient.post(
           uri,
@@ -822,11 +827,11 @@ class SeriousModeService {
   }
 
   /// Ambil Leaderboard Seluruh Users dari Spreadsheet (Diurutkan berdasarkan poin tertinggi)
-  static Future<List<SeriousUser>> getLeaderboard() async {
+  static Future<List<SeriousUser>> getLeaderboard({bool forceRefresh = false}) async {
     final List<SeriousUser> users = [];
 
     // 1. Ambil data online langsung dari Spreadsheet
-    final remoteUsers = await fetchUsersFromSpreadsheet();
+    final remoteUsers = await fetchUsersFromSpreadsheet(forceRefresh: forceRefresh);
     if (remoteUsers.isNotEmpty) {
       users.addAll(remoteUsers);
     }
@@ -868,6 +873,42 @@ class SeriousModeService {
     }
 
     // 4. Urutkan berdasarkan total poin tertinggi (Rank #1, #2, #3, ...)
+    users.sort((a, b) {
+      final cmp = b.totalPoints.compareTo(a.totalPoints);
+      if (cmp != 0) return cmp;
+      return b.totalTasksCompleted.compareTo(a.totalTasksCompleted);
+    });
+
+    return users;
+  }
+
+  /// Ambil Leaderboard dari Cache / Penyimpanan Lokal (Instan, offline-ready)
+  static Future<List<SeriousUser>> getLocalLeaderboard() async {
+    final List<SeriousUser> users = [];
+    if (_cachedRemoteUsers != null && _cachedRemoteUsers!.isNotEmpty) {
+      users.addAll(_cachedRemoteUsers!);
+    } else {
+      final localUsers = await _getAllLocalUsers();
+      users.addAll(localUsers);
+    }
+
+    final currentUser = await getCurrentUser();
+    if (currentUser != null && currentUser.username.isNotEmpty) {
+      final idx = users.indexWhere(
+        (u) =>
+            (u.id.isNotEmpty && u.id == currentUser.id) ||
+            (u.username.isNotEmpty &&
+                u.username.toLowerCase() == currentUser.username.toLowerCase()),
+      );
+      if (idx == -1) {
+        users.add(currentUser);
+      } else {
+        if (currentUser.totalPoints >= users[idx].totalPoints) {
+          users[idx] = currentUser;
+        }
+      }
+    }
+
     users.sort((a, b) {
       final cmp = b.totalPoints.compareTo(a.totalPoints);
       if (cmp != 0) return cmp;

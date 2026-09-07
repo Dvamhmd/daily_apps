@@ -308,6 +308,7 @@ class _PribadiPageState extends State<PribadiPage> {
                 ),
               ];
             }
+            _migrateKodeRules(loaded);
             setState(() {
               _data = loaded;
               _isLoading = false;
@@ -377,6 +378,7 @@ class _PribadiPageState extends State<PribadiPage> {
             transactions: [],
             customKodeRules: List.from(template.customKodeRules),
           );
+          _migrateKodeRules(newMonthData);
           if (mounted) {
             setState(() {
               _data = newMonthData;
@@ -440,6 +442,31 @@ class _PribadiPageState extends State<PribadiPage> {
     await _saveData();
   }
 
+  void _migrateKodeRules(PribadiData data) {
+    for (final rule in data.customKodeRules) {
+      if (rule.type == 'kategori') {
+        final lowerKode = rule.kode.toLowerCase();
+        final lowerKw = rule.keyword.toLowerCase();
+        if (lowerKode.contains('pemasukan') ||
+            lowerKode.contains('gaji') ||
+            lowerKode.contains('bonus') ||
+            lowerKode.contains('thr') ||
+            lowerKode.contains('freelance') ||
+            lowerKode.contains('investasi') ||
+            lowerKode.contains('pendapatan') ||
+            lowerKw == 'gaji' ||
+            lowerKw == 'salary' ||
+            lowerKw == 'bonus' ||
+            lowerKw == 'freelance' ||
+            lowerKw == 'investasi') {
+          rule.type = 'pemasukan';
+        } else {
+          rule.type = 'pengeluaran';
+        }
+      }
+    }
+  }
+
   Future<void> _saveData() async {
     final prefs = await SharedPreferences.getInstance();
     final monthlyKey = 'pribadi_keuangan_data_$_monthKey';
@@ -449,7 +476,7 @@ class _PribadiPageState extends State<PribadiPage> {
   }
 
   // ==========================================
-  // MODAL KELOLA KATEGORI KUSTOM (LIGHT THEMED)
+  // MODAL KELOLA KATEGORI KUSTOM (LIGHT THEMED, 2 TABS)
   // ==========================================
   void _showKelolaKustomKodeModal() {
     showModalBottomSheet(
@@ -459,86 +486,188 @@ class _PribadiPageState extends State<PribadiPage> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (modalContext, setModalState) {
-            return Container(
-              height: MediaQuery.of(context).size.height * 0.85,
-              decoration: const BoxDecoration(
-                color: lightCard,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Column(
-                children: [
-                  // Header handle
-                  Container(
-                    margin: const EdgeInsets.only(top: 12, bottom: 8),
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
+            final pemasukanCount = _data.customKodeRules
+                .where((r) =>
+                    r.type == 'pemasukan' || r.type == 'kategori_pemasukan')
+                .length;
+            final pengeluaranCount = _data.customKodeRules
+                .where((r) =>
+                    r.type == 'pengeluaran' ||
+                    r.type == 'kategori_pengeluaran' ||
+                    r.type == 'kategori')
+                .length;
+
+            return DefaultTabController(
+              length: 2,
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.85,
+                decoration: const BoxDecoration(
+                  color: lightCard,
+                  borderRadius:
+                      BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                child: Column(
+                  children: [
+                    // Header handle
+                    Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 8),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 16, 12),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: primaryGreen.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 16, 8),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: primaryGreen.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.rule_folder_rounded,
+                              color: primaryGreen,
+                              size: 22,
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.rule_folder_rounded,
-                            color: primaryGreen,
-                            size: 22,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Kelola Kategori Pribadi',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: textDark,
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Kelola Kategori Pribadi',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: textDark,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                'Aturan otomatisasi kata kunci kategori transaksi',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: textMuted,
+                                Text(
+                                  'Aturan otomatisasi kata kunci kategori transaksi',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: textMuted,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.file_upload_outlined,
-                              color: primaryGreen),
-                          tooltip: 'Impor Aturan',
-                          onPressed: () {
-                            _showImportKustomKodeDialog(
-                                modalContext, setModalState);
-                          },
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded,
-                              color: textMuted),
-                          onPressed: () => Navigator.pop(ctx),
-                        ),
-                      ],
+                          IconButton(
+                            icon: const Icon(Icons.file_upload_outlined,
+                                color: primaryGreen),
+                            tooltip: 'Impor Aturan',
+                            onPressed: () {
+                              _showImportKustomKodeDialog(
+                                  modalContext, setModalState);
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded,
+                                color: textMuted),
+                            onPressed: () => Navigator.pop(ctx),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const Divider(color: lightBorder, height: 1),
-                  Expanded(
-                    child: _buildKodeRuleList(
-                        'kategori', modalContext, setModalState),
-                  ),
-                ],
+                    const Divider(color: lightBorder, height: 1),
+                    // 2 TAB HEADER: PEMASUKAN | PENGELUARAN
+                    Container(
+                      decoration: const BoxDecoration(
+                        color: lightCard,
+                        border: Border(
+                          bottom: BorderSide(color: lightBorder, width: 1),
+                        ),
+                      ),
+                      child: TabBar(
+                        indicatorColor: primaryGreen,
+                        indicatorWeight: 3,
+                        labelColor: textDark,
+                        unselectedLabelColor: textMuted,
+                        labelStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        unselectedLabelStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        tabs: [
+                          Tab(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.arrow_downward_rounded,
+                                    size: 16, color: primaryGreen),
+                                const SizedBox(width: 6),
+                                const Text('Pemasukan'),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: primaryGreen.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    '$pemasukanCount',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: primaryGreen,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Tab(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.arrow_upward_rounded,
+                                    size: 16, color: primaryRose),
+                                const SizedBox(width: 6),
+                                const Text('Pengeluaran'),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: primaryRose.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    '$pengeluaranCount',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: primaryRose,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: TabBarView(
+                        children: [
+                          _buildKodeRuleList(
+                              'pemasukan', modalContext, setModalState),
+                          _buildKodeRuleList(
+                              'pengeluaran', modalContext, setModalState),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -552,63 +681,104 @@ class _PribadiPageState extends State<PribadiPage> {
     BuildContext modalContext,
     StateSetter setModalState,
   ) {
-    final rules = _data.customKodeRules.where((r) => r.type == type).toList();
+    final isPemasukan = type == 'pemasukan';
+    final rules = _data.customKodeRules.where((r) {
+      if (isPemasukan) {
+        return r.type == 'pemasukan' || r.type == 'kategori_pemasukan';
+      } else {
+        return r.type == 'pengeluaran' ||
+            r.type == 'kategori_pengeluaran' ||
+            r.type == 'kategori';
+      }
+    }).toList();
+
+    // Urutkan otomatis tanpa tombol secara ascending:
+    // Berdasarkan kategori yang sama dulu, lalu berdasarkan abjad kata kunci
+    rules.sort((a, b) {
+      final catComp =
+          a.kode.trim().toLowerCase().compareTo(b.kode.trim().toLowerCase());
+      if (catComp != 0) return catComp;
+      return a.keyword
+          .trim()
+          .toLowerCase()
+          .compareTo(b.keyword.trim().toLowerCase());
+    });
+
+    final accentColor = isPemasukan ? primaryGreen : primaryRose;
+    final typeLabel = isPemasukan ? 'Pemasukan' : 'Pengeluaran';
 
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Total: ${rules.length} Aturan Kategori',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: textMuted,
+              Expanded(
+                child: Text(
+                  'Total: ${rules.length} Aturan',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: textMuted,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Row(
-                children: [
-                  if (rules.isNotEmpty)
-                    TextButton.icon(
-                      icon: const Icon(Icons.delete_sweep_outlined,
-                          size: 16, color: primaryRose),
-                      label: const Text(
-                        'Reset',
-                        style: TextStyle(fontSize: 11, color: primaryRose),
-                      ),
-                      onPressed: () {
-                        _confirmClearAllKodeRules(type, () {
-                          setModalState(() {});
-                          setState(() {});
-                        });
-                      },
-                    ),
-                  const SizedBox(width: 4),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      _showFormKustomKodeDialog(
-                        modalContext,
-                        setModalState,
-                        defaultType: type,
-                      );
-                    },
-                    icon: const Icon(Icons.add_rounded, size: 16),
-                    label: const Text('Tambah Kategori',
-                        style: TextStyle(fontSize: 12)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryGreen,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+              const SizedBox(width: 8),
+              if (rules.isNotEmpty) ...[
+                TextButton.icon(
+                  icon: const Icon(Icons.delete_sweep_outlined,
+                      size: 16, color: primaryRose),
+                  label: const Text(
+                    'Reset',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: primaryRose),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: primaryRose,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                ],
+                  onPressed: () {
+                    _confirmClearAllKodeRules(type, () {
+                      setModalState(() {});
+                      setState(() {});
+                    });
+                  },
+                ),
+                const SizedBox(width: 6),
+              ],
+              ElevatedButton.icon(
+                onPressed: () {
+                  _showFormKustomKodeDialog(
+                    modalContext,
+                    setModalState,
+                    defaultType: type,
+                  );
+                },
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text(
+                  'Tambah',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: accentColor,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
               ),
             ],
           ),
@@ -623,9 +793,9 @@ class _PribadiPageState extends State<PribadiPage> {
                       Icon(Icons.inbox_rounded,
                           size: 48, color: Colors.grey[300]),
                       const SizedBox(height: 8),
-                      const Text(
-                        'Belum ada aturan Kategori',
-                        style: TextStyle(
+                      Text(
+                        'Belum ada aturan Kategori $typeLabel',
+                        style: const TextStyle(
                             color: textMuted, fontSize: 13),
                       ),
                     ],
@@ -657,15 +827,15 @@ class _PribadiPageState extends State<PribadiPage> {
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: primaryGreen.withValues(alpha: 0.1),
+                                        color: accentColor.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
-                                      child: const Text(
+                                      child: Text(
                                         'Kata Kunci',
                                         style: TextStyle(
                                           fontSize: 9,
                                           fontWeight: FontWeight.bold,
-                                          color: primaryGreen,
+                                          color: accentColor,
                                         ),
                                       ),
                                     ),
@@ -741,17 +911,26 @@ class _PribadiPageState extends State<PribadiPage> {
     BuildContext modalContext,
     StateSetter setModalState, {
     CustomKodeRule? existingRule,
-    String defaultType = 'kategori',
+    String defaultType = 'pengeluaran',
   }) {
     final keywordCtrl =
         TextEditingController(text: existingRule?.keyword ?? '');
     final kodeCtrl = TextEditingController(text: existingRule?.kode ?? '');
+    String selectedType = existingRule != null
+        ? ((existingRule.type == 'pemasukan' ||
+                existingRule.type == 'kategori_pemasukan')
+            ? 'pemasukan'
+            : 'pengeluaran')
+        : (defaultType == 'pemasukan' ? 'pemasukan' : 'pengeluaran');
 
     showDialog(
       context: modalContext,
       builder: (dlgCtx) {
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) {
+            final isPemasukan = selectedType == 'pemasukan';
+            final accentColor = isPemasukan ? primaryGreen : primaryRose;
+
             return AlertDialog(
               backgroundColor: lightCard,
               shape: RoundedRectangleBorder(
@@ -759,7 +938,9 @@ class _PribadiPageState extends State<PribadiPage> {
                 side: const BorderSide(color: lightBorder),
               ),
               title: Text(
-                existingRule == null ? 'Tambah Kategori' : 'Edit Kategori',
+                existingRule == null
+                    ? 'Tambah Kategori ${isPemasukan ? 'Pemasukan' : 'Pengeluaran'}'
+                    : 'Edit Kategori',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
@@ -772,6 +953,111 @@ class _PribadiPageState extends State<PribadiPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const Text('Tipe Transaksi',
+                        style: TextStyle(fontSize: 12, color: textMuted)),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () {
+                              setDialogState(() {
+                                selectedType = 'pemasukan';
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isPemasukan
+                                    ? primaryGreen.withValues(alpha: 0.15)
+                                    : lightCardElevated,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color:
+                                      isPemasukan ? primaryGreen : lightBorder,
+                                  width: isPemasukan ? 1.5 : 1,
+                                ),
+                              ),
+                              alignment: Alignment.center,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.arrow_downward_rounded,
+                                      size: 14,
+                                      color: isPemasukan
+                                          ? primaryGreen
+                                          : textMuted),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Pemasukan',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: isPemasukan
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: isPemasukan
+                                          ? primaryGreen
+                                          : textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () {
+                              setDialogState(() {
+                                selectedType = 'pengeluaran';
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: !isPemasukan
+                                    ? primaryRose.withValues(alpha: 0.15)
+                                    : lightCardElevated,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color:
+                                      !isPemasukan ? primaryRose : lightBorder,
+                                  width: !isPemasukan ? 1.5 : 1,
+                                ),
+                              ),
+                              alignment: Alignment.center,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.arrow_upward_rounded,
+                                      size: 14,
+                                      color: !isPemasukan
+                                          ? primaryRose
+                                          : textMuted),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Pengeluaran',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: !isPemasukan
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: !isPemasukan
+                                          ? primaryRose
+                                          : textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
                     const Text('Kata Kunci (Pemicu)',
                         style: TextStyle(fontSize: 12, color: textMuted)),
                     const SizedBox(height: 6),
@@ -779,7 +1065,9 @@ class _PribadiPageState extends State<PribadiPage> {
                       controller: keywordCtrl,
                       style: const TextStyle(color: textDark, fontSize: 13),
                       decoration: InputDecoration(
-                        hintText: 'Contoh: makan, bensin, gaji, wifi',
+                        hintText: isPemasukan
+                            ? 'Contoh: gaji, bonus, freelance'
+                            : 'Contoh: makan, bensin, belanja, wifi',
                         hintStyle: const TextStyle(color: Colors.grey),
                         filled: true,
                         fillColor: lightCardElevated,
@@ -794,7 +1082,7 @@ class _PribadiPageState extends State<PribadiPage> {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide:
-                              const BorderSide(color: primaryGreen, width: 1.5),
+                              BorderSide(color: accentColor, width: 1.5),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 10),
@@ -810,7 +1098,9 @@ class _PribadiPageState extends State<PribadiPage> {
                       controller: kodeCtrl,
                       style: const TextStyle(color: textDark, fontSize: 13),
                       decoration: InputDecoration(
-                        hintText: 'Contoh: Makanan & Minuman, Transportasi',
+                        hintText: isPemasukan
+                            ? 'Contoh: Pemasukan Gaji, Bonus & THR'
+                            : 'Contoh: Makanan & Minuman, Transportasi',
                         hintStyle: const TextStyle(color: Colors.grey),
                         filled: true,
                         fillColor: lightCardElevated,
@@ -825,7 +1115,7 @@ class _PribadiPageState extends State<PribadiPage> {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide:
-                              const BorderSide(color: primaryGreen, width: 1.5),
+                              BorderSide(color: accentColor, width: 1.5),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 10),
@@ -849,25 +1139,27 @@ class _PribadiPageState extends State<PribadiPage> {
                     if (existingRule != null) {
                       existingRule.keyword = kw;
                       existingRule.kode = kd;
-                      existingRule.type = 'kategori';
+                      existingRule.type = selectedType;
                     } else {
                       _data.customKodeRules.add(
                         CustomKodeRule(
                           keyword: kw,
                           kode: kd,
-                          type: 'kategori',
+                          type: selectedType,
                         ),
                       );
                     }
                     await _saveData();
+                    if (dlgCtx.mounted) {
+                      Navigator.of(dlgCtx).pop();
+                    }
                     if (mounted) {
                       setModalState(() {});
                       setState(() {});
-                      Navigator.of(context).pop();
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryGreen,
+                    backgroundColor: accentColor,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -884,6 +1176,9 @@ class _PribadiPageState extends State<PribadiPage> {
   }
 
   void _confirmClearAllKodeRules(String type, VoidCallback onReset) {
+    final isPemasukan = type == 'pemasukan';
+    final typeLabel = isPemasukan ? 'Pemasukan' : 'Pengeluaran';
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -892,14 +1187,14 @@ class _PribadiPageState extends State<PribadiPage> {
           borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: lightBorder),
         ),
-        title: const Text('Reset Aturan Kategori?',
-            style: TextStyle(
+        title: Text('Reset Aturan $typeLabel?',
+            style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
                 color: textDark)),
-        content: const Text(
-          'Seluruh aturan Kategori akan dihapus dan dikembalikan ke daftar kategori bawaan.',
-          style: TextStyle(fontSize: 13, color: textMuted),
+        content: Text(
+          'Seluruh aturan Kategori $typeLabel akan dihapus dan dikembalikan ke daftar kategori bawaan.',
+          style: const TextStyle(fontSize: 13, color: textMuted),
         ),
         actions: [
           TextButton(
@@ -910,10 +1205,19 @@ class _PribadiPageState extends State<PribadiPage> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              _data.customKodeRules.removeWhere((r) => r.type == 'kategori');
-              final defaults =
-                  PersonalDefaultRules.defaultRules().where((r) => r.type == 'kategori');
-              _data.customKodeRules.addAll(defaults);
+              if (isPemasukan) {
+                _data.customKodeRules.removeWhere((r) =>
+                    r.type == 'pemasukan' || r.type == 'kategori_pemasukan');
+                _data.customKodeRules
+                    .addAll(PersonalDefaultRules.defaultPemasukanRules());
+              } else {
+                _data.customKodeRules.removeWhere((r) =>
+                    r.type == 'pengeluaran' ||
+                    r.type == 'kategori_pengeluaran' ||
+                    r.type == 'kategori');
+                _data.customKodeRules
+                    .addAll(PersonalDefaultRules.defaultPengeluaranRules());
+              }
               await _saveData();
               onReset();
             },
@@ -964,7 +1268,7 @@ class _PribadiPageState extends State<PribadiPage> {
                 maxLines: 5,
                 style: const TextStyle(color: textDark, fontSize: 12),
                 decoration: InputDecoration(
-                  hintText: 'makan\tMakanan & Minuman\npln\tTagihan',
+                  hintText: 'makan\tMakanan & Minuman\ngaji\tPemasukan Gaji',
                   hintStyle: const TextStyle(color: Colors.grey),
                   filled: true,
                   fillColor: lightCardElevated,
@@ -1072,6 +1376,7 @@ class _PribadiPageState extends State<PribadiPage> {
             final autoKode = PribadiTransaction.resolveKodeFromText(
               keteranganCtrl.text,
               customRules: _data.customKodeRules,
+              type: 'pemasukan',
             );
 
             return Container(
@@ -1544,6 +1849,7 @@ class _PribadiPageState extends State<PribadiPage> {
             final autoKode = PribadiTransaction.resolveKodeFromText(
               keteranganCtrl.text,
               customRules: _data.customKodeRules,
+              type: 'pengeluaran',
             );
 
             return Container(

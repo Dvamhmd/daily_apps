@@ -35,51 +35,58 @@ class RekeningPribadi {
 
 class PersonalDefaultRules {
   static List<CustomKodeRule> defaultRules() => [
-        // Aturan Kategori Keuangan Pribadi
-        CustomKodeRule(keyword: 'gaji', kode: 'Pemasukan Gaji', type: 'kategori'),
-        CustomKodeRule(keyword: 'salary', kode: 'Pemasukan Gaji', type: 'kategori'),
-        CustomKodeRule(keyword: 'bonus', kode: 'Bonus & THR', type: 'kategori'),
-        CustomKodeRule(keyword: 'freelance', kode: 'Pendapatan Tambahan', type: 'kategori'),
-        CustomKodeRule(keyword: 'investasi', kode: 'Investasi & Saham', type: 'kategori'),
-        CustomKodeRule(keyword: 'makan', kode: 'Makanan & Minuman', type: 'kategori'),
-        CustomKodeRule(keyword: 'restoran', kode: 'Makanan & Minuman', type: 'kategori'),
-        CustomKodeRule(keyword: 'kafe', kode: 'Makanan & Minuman', type: 'kategori'),
-        CustomKodeRule(keyword: 'kopi', kode: 'Makanan & Minuman', type: 'kategori'),
-        CustomKodeRule(keyword: 'grabfood', kode: 'Makanan & Minuman', type: 'kategori'),
-        CustomKodeRule(keyword: 'gofood', kode: 'Makanan & Minuman', type: 'kategori'),
-        CustomKodeRule(keyword: 'shopeefood', kode: 'Makanan & Minuman', type: 'kategori'),
-        CustomKodeRule(keyword: 'belanja', kode: 'Belanja & Kebutuhan', type: 'kategori'),
-        CustomKodeRule(keyword: 'supermarket', kode: 'Belanja & Kebutuhan', type: 'kategori'),
-        CustomKodeRule(keyword: 'minimarket', kode: 'Belanja & Kebutuhan', type: 'kategori'),
-        CustomKodeRule(keyword: 'indomaret', kode: 'Belanja & Kebutuhan', type: 'kategori'),
-        CustomKodeRule(keyword: 'alfamart', kode: 'Belanja & Kebutuhan', type: 'kategori'),
-        CustomKodeRule(keyword: 'bensin', kode: 'Transportasi', type: 'kategori'),
-        CustomKodeRule(keyword: 'pertalite', kode: 'Transportasi', type: 'kategori'),
-        CustomKodeRule(keyword: 'pertamax', kode: 'Transportasi', type: 'kategori'),
-        CustomKodeRule(keyword: 'parkir', kode: 'Transportasi', type: 'kategori'),
-        CustomKodeRule(keyword: 'tol', kode: 'Transportasi', type: 'kategori'),
-        CustomKodeRule(keyword: 'gojek', kode: 'Transportasi', type: 'kategori'),
-        CustomKodeRule(keyword: 'grab', kode: 'Transportasi', type: 'kategori'),
-        CustomKodeRule(keyword: 'listrik', kode: 'Tagihan & Utilitas', type: 'kategori'),
-        CustomKodeRule(keyword: 'pln', kode: 'Tagihan & Utilitas', type: 'kategori'),
-        CustomKodeRule(keyword: 'air', kode: 'Tagihan & Utilitas', type: 'kategori'),
-        CustomKodeRule(keyword: 'pdam', kode: 'Tagihan & Utilitas', type: 'kategori'),
-        CustomKodeRule(keyword: 'internet', kode: 'Komunikasi & Kuota', type: 'kategori'),
-        CustomKodeRule(keyword: 'wifi', kode: 'Komunikasi & Kuota', type: 'kategori'),
-        CustomKodeRule(keyword: 'pulsa', kode: 'Komunikasi & Kuota', type: 'kategori'),
-        CustomKodeRule(keyword: 'kuota', kode: 'Komunikasi & Kuota', type: 'kategori'),
-        CustomKodeRule(keyword: 'sewa', kode: 'Tempat Tinggal & Kos', type: 'kategori'),
-        CustomKodeRule(keyword: 'kos', kode: 'Tempat Tinggal & Kos', type: 'kategori'),
-        CustomKodeRule(keyword: 'kesehatan', kode: 'Kesehatan & Obat', type: 'kategori'),
-        CustomKodeRule(keyword: 'obat', kode: 'Kesehatan & Obat', type: 'kategori'),
-        CustomKodeRule(keyword: 'dokter', kode: 'Kesehatan & Obat', type: 'kategori'),
-        CustomKodeRule(keyword: 'hiburan', kode: 'Hiburan & Hobi', type: 'kategori'),
-        CustomKodeRule(keyword: 'bioskop', kode: 'Hiburan & Hobi', type: 'kategori'),
-        CustomKodeRule(keyword: 'game', kode: 'Hiburan & Hobi', type: 'kategori'),
-        CustomKodeRule(keyword: 'sedekah', kode: 'Sosial & Donasi', type: 'kategori'),
-        CustomKodeRule(keyword: 'infaq', kode: 'Sosial & Donasi', type: 'kategori'),
-        CustomKodeRule(keyword: 'zakat', kode: 'Sosial & Donasi', type: 'kategori'),
-        CustomKodeRule(keyword: 'admin', kode: 'Biaya Admin Bank', type: 'kategori'),
+        ...defaultPemasukanRules(),
+        ...defaultPengeluaranRules(),
+      ];
+
+  static List<CustomKodeRule> defaultPemasukanRules() => [
+        CustomKodeRule(keyword: 'gaji', kode: 'Pemasukan Gaji', type: 'pemasukan'),
+        CustomKodeRule(keyword: 'salary', kode: 'Pemasukan Gaji', type: 'pemasukan'),
+        CustomKodeRule(keyword: 'bonus', kode: 'Bonus & THR', type: 'pemasukan'),
+        CustomKodeRule(keyword: 'freelance', kode: 'Pendapatan Tambahan', type: 'pemasukan'),
+        CustomKodeRule(keyword: 'investasi', kode: 'Investasi & Saham', type: 'pemasukan'),
+      ];
+
+  static List<CustomKodeRule> defaultPengeluaranRules() => [
+        CustomKodeRule(keyword: 'makan', kode: 'Makanan & Minuman', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'restoran', kode: 'Makanan & Minuman', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'kafe', kode: 'Makanan & Minuman', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'kopi', kode: 'Makanan & Minuman', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'grabfood', kode: 'Makanan & Minuman', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'gofood', kode: 'Makanan & Minuman', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'shopeefood', kode: 'Makanan & Minuman', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'belanja', kode: 'Belanja & Kebutuhan', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'supermarket', kode: 'Belanja & Kebutuhan', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'minimarket', kode: 'Belanja & Kebutuhan', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'indomaret', kode: 'Belanja & Kebutuhan', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'alfamart', kode: 'Belanja & Kebutuhan', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'bensin', kode: 'Transportasi', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'pertalite', kode: 'Transportasi', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'pertamax', kode: 'Transportasi', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'parkir', kode: 'Transportasi', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'tol', kode: 'Transportasi', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'gojek', kode: 'Transportasi', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'grab', kode: 'Transportasi', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'listrik', kode: 'Tagihan & Utilitas', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'pln', kode: 'Tagihan & Utilitas', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'air', kode: 'Tagihan & Utilitas', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'pdam', kode: 'Tagihan & Utilitas', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'internet', kode: 'Komunikasi & Kuota', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'wifi', kode: 'Komunikasi & Kuota', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'pulsa', kode: 'Komunikasi & Kuota', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'kuota', kode: 'Komunikasi & Kuota', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'sewa', kode: 'Tempat Tinggal & Kos', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'kos', kode: 'Tempat Tinggal & Kos', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'kesehatan', kode: 'Kesehatan & Obat', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'obat', kode: 'Kesehatan & Obat', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'dokter', kode: 'Kesehatan & Obat', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'hiburan', kode: 'Hiburan & Hobi', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'bioskop', kode: 'Hiburan & Hobi', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'game', kode: 'Hiburan & Hobi', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'sedekah', kode: 'Sosial & Donasi', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'infaq', kode: 'Sosial & Donasi', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'zakat', kode: 'Sosial & Donasi', type: 'pengeluaran'),
+        CustomKodeRule(keyword: 'admin', kode: 'Biaya Admin Bank', type: 'pengeluaran'),
       ];
 }
 
@@ -140,11 +147,26 @@ class PribadiTransaction {
   }
 
   /// Helper untuk auto-resolve Kategori transaksi berdasarkan kata kunci teks keterangan/judul dan daftar kustomisasi Kategori
+  /// [type] dapat diisi 'pemasukan' atau 'pengeluaran' agar kata kunci yang sama tidak bertabrakan/nyangkut.
   static String resolveKodeFromText(String text,
-      {List<CustomKodeRule>? customRules}) {
+      {List<CustomKodeRule>? customRules, String? type}) {
     if (text.trim().isEmpty) return '-';
     final lower = text.toLowerCase();
-    final rules = (customRules ?? []).where((r) => r.type != 'ku').toList();
+    final rules = (customRules ?? []).where((r) {
+      if (r.type == 'ku') return false;
+      if (type != null && type.isNotEmpty) {
+        if (type == 'pemasukan') {
+          return r.type == 'pemasukan' || r.type == 'kategori_pemasukan';
+        }
+        if (type == 'pengeluaran') {
+          return r.type == 'pengeluaran' ||
+              r.type == 'kategori_pengeluaran' ||
+              r.type == 'kategori';
+        }
+        return r.type == type;
+      }
+      return true;
+    }).toList();
     if (rules.isEmpty) return '-';
 
     // Urutkan aturan dari keyword terpanjang ke terpendek agar match spesifik didahulukan
@@ -161,8 +183,8 @@ class PribadiTransaction {
   }
 
   static String resolveKategoriFromText(String text,
-          {List<CustomKodeRule>? customRules}) =>
-      resolveKodeFromText(text, customRules: customRules);
+          {List<CustomKodeRule>? customRules, String? type}) =>
+      resolveKodeFromText(text, customRules: customRules, type: type);
 
   /// Getter untuk mendapatkan KU transaksi baik yang disimpan atau auto-resolved
   String getDisplayKu({List<CustomKodeRule>? customRules}) {
@@ -188,21 +210,26 @@ class PribadiTransaction {
   String get displayKu => getDisplayKu();
 
   /// Getter untuk mendapatkan Kategori transaksi baik yang disimpan atau auto-resolved
+  /// Otomatis memfilter berdasarkan tipe transaksi (pemasukan vs pengeluaran) agar tidak bertabrakan
   String getDisplayKode({List<CustomKodeRule>? customRules}) {
     if (kode != null && kode!.trim().isNotEmpty && kode!.trim() != '-') {
       return kode!.trim();
     }
+    final txType = isPemasukan
+        ? 'pemasukan'
+        : (isPengeluaran ? 'pengeluaran' : null);
+
     if (note != null && note!.trim().isNotEmpty) {
       final autoFromNote =
-          resolveKodeFromText(note!, customRules: customRules);
+          resolveKodeFromText(note!, customRules: customRules, type: txType);
       if (autoFromNote != '-') return autoFromNote;
     }
     final autoFromTitle =
-        resolveKodeFromText(title, customRules: customRules);
+        resolveKodeFromText(title, customRules: customRules, type: txType);
     if (autoFromTitle != '-') return autoFromTitle;
     if (manualSource != null && manualSource!.trim().isNotEmpty) {
       final autoFromSource =
-          resolveKodeFromText(manualSource!, customRules: customRules);
+          resolveKodeFromText(manualSource!, customRules: customRules, type: txType);
       if (autoFromSource != '-') return autoFromSource;
     }
     return '-';

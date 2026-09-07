@@ -138,10 +138,9 @@ class BackupService {
 
     int countUangku = 0;
     int countTagihan = 0;
-    int countTabungan = (prefs.getStringList('tabungan') ?? []).length;
-    int countTagihanLunas = (prefs.getStringList('tagihan_lunas') ?? []).length;
-    int countRiwayatKeuangan =
-        (prefs.getStringList('riwayat_keuangan_list') ?? []).length;
+    int countTabungan = 0;
+    int countTagihanLunas = 0;
+    int countRiwayatKeuangan = 0;
     int countStrukturMonths = 0;
     int countStrukturTransactions = 0;
     int countPribadiMonths = 0;
@@ -152,80 +151,75 @@ class BackupService {
     int countTodoHistoryGroups = 0;
     int countTodoHistoryItems = 0;
 
-    // Scan seluruh key SharedPreferences
+    // Scan seluruh key SharedPreferences dengan pengecekan tipe yang aman
     for (final key in keys) {
-      if (key.startsWith('uangku_') || key == 'uangku') {
-        final list = prefs.getStringList(key) ?? [];
-        countUangku += list.length;
-      } else if (key.startsWith('tagihan_') && key != 'tagihan_lunas') {
-        final list = prefs.getStringList(key) ?? [];
-        countTagihan += list.length;
-      } else if (key == 'tagihan') {
-        final list = prefs.getStringList(key) ?? [];
-        countTagihan += list.length;
-      } else if (key.startsWith('struktur_keuangan_data')) {
-        countStrukturMonths++;
-        final raw = prefs.getString(key);
-        if (raw != null) {
+      final value = prefs.get(key);
+
+      if (value is List) {
+        if (key == 'tabungan') {
+          countTabungan = value.length;
+        } else if (key == 'tagihan_lunas') {
+          countTagihanLunas = value.length;
+        } else if (key == 'riwayat_keuangan_list') {
+          countRiwayatKeuangan = value.length;
+        } else if (key == 'rundowns_data') {
+          countRundowns = value.length;
+        } else if (key == 'uangku' ||
+            (key.startsWith('uangku_') && key != 'uangku_only_cair')) {
+          countUangku += value.length;
+        } else if (key == 'tagihan' ||
+            (key.startsWith('tagihan_') && key != 'tagihan_lunas')) {
+          countTagihan += value.length;
+        }
+      } else if (value is String) {
+        if (key.startsWith('struktur_keuangan_data')) {
+          countStrukturMonths++;
           try {
-            final decoded = jsonDecode(raw);
+            final decoded = jsonDecode(value);
             if (decoded is Map<String, dynamic>) {
               final data = StrukturData.fromJson(decoded);
               countStrukturTransactions += data.transactions.length;
             }
           } catch (_) {}
-        }
-      } else if (key.startsWith('pribadi_keuangan_data')) {
-        countPribadiMonths++;
-        final raw = prefs.getString(key);
-        if (raw != null) {
+        } else if (key.startsWith('pribadi_keuangan_data')) {
+          countPribadiMonths++;
           try {
-            final decoded = jsonDecode(raw);
+            final decoded = jsonDecode(value);
             if (decoded is Map<String, dynamic>) {
               final data = PribadiData.fromJson(decoded);
               countPribadiTransactions += data.transactions.length;
             }
           } catch (_) {}
+        } else if (key == 'todo_list_data' ||
+            (key.startsWith('todo_list_data_') && !key.contains('undo'))) {
+          try {
+            final decoded = jsonDecode(value);
+            if (decoded is List) {
+              countTodoGroups += decoded.length;
+              for (final g in decoded) {
+                if (g is Map<String, dynamic>) {
+                  final group = TodoDateGroup.fromJson(g);
+                  countTodoActiveItems += group.items.length;
+                }
+              }
+            }
+          } catch (_) {}
+        } else if (key == 'todo_history_data' ||
+            key.startsWith('todo_history_data_')) {
+          try {
+            final decoded = jsonDecode(value);
+            if (decoded is List) {
+              countTodoHistoryGroups += decoded.length;
+              for (final g in decoded) {
+                if (g is Map<String, dynamic>) {
+                  final group = TodoDateGroup.fromJson(g);
+                  countTodoHistoryItems += group.items.length;
+                }
+              }
+            }
+          } catch (_) {}
         }
       }
-    }
-
-    // Rundowns
-    final rawRundowns = prefs.getStringList('rundowns_data') ?? [];
-    countRundowns = rawRundowns.length;
-
-    // Todo List Aktif
-    final rawTodos = prefs.getString('todo_list_data');
-    if (rawTodos != null && rawTodos.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(rawTodos);
-        if (decoded is List) {
-          countTodoGroups = decoded.length;
-          for (final g in decoded) {
-            if (g is Map<String, dynamic>) {
-              final group = TodoDateGroup.fromJson(g);
-              countTodoActiveItems += group.items.length;
-            }
-          }
-        }
-      } catch (_) {}
-    }
-
-    // Todo List Riwayat
-    final rawTodoHistory = prefs.getString('todo_history_data');
-    if (rawTodoHistory != null && rawTodoHistory.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(rawTodoHistory);
-        if (decoded is List) {
-          countTodoHistoryGroups = decoded.length;
-          for (final g in decoded) {
-            if (g is Map<String, dynamic>) {
-              final group = TodoDateGroup.fromJson(g);
-              countTodoHistoryItems += group.items.length;
-            }
-          }
-        }
-      } catch (_) {}
     }
 
     return BackupSummary(
@@ -471,8 +465,8 @@ class BackupService {
         final type = valObj['type']?.toString();
         final rawVal = valObj['value'];
 
-        if (type == 'string' && rawVal is String) {
-          await prefs.setString(key, rawVal);
+        if (type == 'string' && rawVal != null) {
+          await prefs.setString(key, rawVal.toString());
         } else if (type == 'string_list' && rawVal is List) {
           final stringList = rawVal.map((e) => e.toString()).toList();
           await prefs.setStringList(key, stringList);
@@ -480,6 +474,8 @@ class BackupService {
           await prefs.setInt(key, rawVal.toInt());
         } else if (type == 'bool' && rawVal is bool) {
           await prefs.setBool(key, rawVal);
+        } else if (type == 'bool' && rawVal != null) {
+          await prefs.setBool(key, rawVal.toString().toLowerCase() == 'true');
         } else if (type == 'double' && rawVal is num) {
           await prefs.setDouble(key, rawVal.toDouble());
         } else if (rawVal is String) {
@@ -491,7 +487,20 @@ class BackupService {
           await prefs.setInt(key, rawVal);
         } else if (rawVal is bool) {
           await prefs.setBool(key, rawVal);
+        } else if (rawVal is double) {
+          await prefs.setDouble(key, rawVal);
         }
+      } else if (valObj is String) {
+        await prefs.setString(key, valObj);
+      } else if (valObj is List) {
+        await prefs.setStringList(
+            key, valObj.map((e) => e.toString()).toList());
+      } else if (valObj is bool) {
+        await prefs.setBool(key, valObj);
+      } else if (valObj is int) {
+        await prefs.setInt(key, valObj);
+      } else if (valObj is double) {
+        await prefs.setDouble(key, valObj);
       }
     }
 

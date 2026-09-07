@@ -35,9 +35,21 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
     _loadLeaderboard();
   }
 
-  Future<void> _loadLeaderboard() async {
+  Future<void> _loadLeaderboard({bool forceRefresh = false}) async {
     final curUser = await SeriousModeService.getCurrentUser();
-    final list = await SeriousModeService.getLeaderboard();
+    
+    // 1. Tampilkan data dari cache / lokal terlebih dahulu agar instan
+    final localList = await SeriousModeService.getLocalLeaderboard();
+    if (mounted && localList.isNotEmpty) {
+      setState(() {
+        _currentUser = curUser;
+        _users = localList;
+        _isLoading = false;
+      });
+    }
+
+    // 2. Muat data terbaru dari Spreadsheets di background
+    final list = await SeriousModeService.getLeaderboard(forceRefresh: forceRefresh);
     if (mounted) {
       setState(() {
         _currentUser = curUser;
@@ -223,7 +235,7 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
                   icon: const Icon(Icons.refresh_rounded, color: accentGold, size: 20),
                   onPressed: () {
                     setState(() => _isLoading = true);
-                    _loadLeaderboard();
+                    _loadLeaderboard(forceRefresh: true);
                   },
                 ),
                 IconButton(
@@ -254,9 +266,6 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
                               _buildTop3Podium(top3),
                               const SizedBox(height: 28),
                             ],
-
-                            _buildTop10TableHeader(totalUsers: _users.length),
-                            const SizedBox(height: 12),
 
                             _buildTop10Table(top10),
 
@@ -463,52 +472,7 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
     );
   }
 
-  /// Header Section untuk Tabel Top 10
-  Widget _buildTop10TableHeader({required int totalUsers}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B).withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF334155), width: 1),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.table_chart_rounded, color: accentGold, size: 16),
-          const SizedBox(width: 8),
-          const Expanded(
-            child: Text(
-              'TABEL TOP 10 PENGGUNA',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.6,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              '$totalUsers Peserta',
-              style: const TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 10.5,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   /// Tabel Top 10 Pemain (Menampilkan Rank, Profil, Nama Panggilan, Username, Task Selesai, Total Point)
   Widget _buildTop10Table(List<SeriousUser> topUsers) {

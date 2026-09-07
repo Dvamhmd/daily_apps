@@ -238,15 +238,19 @@ class CustomRuleImportHelper {
         continue;
       }
 
-      // Tentukan tipe 'ku' atau 'kategori'
-      String normalizedType = 'kategori';
+      // Tentukan tipe 'ku', 'pemasukan', atau 'pengeluaran'
+      String normalizedType = defaultType ?? 'pengeluaran';
       final typeLower = rawType.toLowerCase();
       if (typeLower.contains('ku') || typeLower == 'k') {
         normalizedType = 'ku';
+      } else if (typeLower.contains('masuk') || typeLower == 'pemasukan') {
+        normalizedType = 'pemasukan';
+      } else if (typeLower.contains('keluar') || typeLower == 'pengeluaran') {
+        normalizedType = 'pengeluaran';
       } else if (typeLower.contains('kat') || typeLower.contains('category')) {
-        normalizedType = 'kategori';
+        normalizedType = defaultType ?? 'pengeluaran';
       } else if (defaultType != null && defaultType.isNotEmpty) {
-        normalizedType = defaultType == 'ku' ? 'ku' : 'kategori';
+        normalizedType = defaultType;
       }
 
       parsedRules.add(
