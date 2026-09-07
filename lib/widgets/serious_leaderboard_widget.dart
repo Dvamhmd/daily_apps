@@ -28,11 +28,18 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
   List<SeriousUser> _users = [];
   SeriousUser? _currentUser;
   bool _isLoading = true;
+  final ScrollController _tableScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _loadLeaderboard();
+  }
+
+  @override
+  void dispose() {
+    _tableScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadLeaderboard({bool forceRefresh = false}) async {
@@ -108,13 +115,30 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
 
   @override
   Widget build(BuildContext context) {
-    final top3 = _users.take(3).toList();
-    final top10 = _users.take(10).toList();
-    final beyondTop10 = _users.length > 10 ? _users.skip(10).toList() : <SeriousUser>[];
+    // Pastikan user saat ini selalu ada dalam daftar tampilan
+    final List<SeriousUser> displayUsers = List<SeriousUser>.from(_users);
+    final myRankIndex = displayUsers.indexWhere((u) =>
+        (u.id.isNotEmpty && u.id == _currentUser?.id) ||
+        (u.username.isNotEmpty &&
+            u.username.toLowerCase() ==
+                _currentUser?.username.toLowerCase()));
+
+    if (_currentUser != null && myRankIndex == -1) {
+      displayUsers.add(_currentUser!);
+    }
+
+    final top3 = displayUsers.take(3).toList();
+    final effectiveMyRankIndex = displayUsers.indexWhere((u) =>
+        (u.id.isNotEmpty && u.id == _currentUser?.id) ||
+        (u.username.isNotEmpty &&
+            u.username.toLowerCase() ==
+                _currentUser?.username.toLowerCase()));
     
-    final myRankIndex = _users.indexWhere((u) => u.id == _currentUser?.id || u.username.toLowerCase() == _currentUser?.username.toLowerCase());
-    final isMeOutsideTop10 = _currentUser != null && myRankIndex >= 10;
-    final myUserInList = myRankIndex != -1 ? _users[myRankIndex] : _currentUser;
+    // Akun pengguna jika di luar top 10 (rank 11+)
+    final isMeOutsideTop10 = _currentUser != null && effectiveMyRankIndex >= 10;
+    final myUserInList = effectiveMyRankIndex != -1
+        ? displayUsers[effectiveMyRankIndex]
+        : _currentUser;
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.90,
@@ -202,7 +226,7 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
                               ),
                             ),
                             child: const Text(
-                              'TOP 10',
+                              'RANKING',
                               style: TextStyle(
                                 color: accentGold,
                                 fontSize: 9.5,
@@ -257,26 +281,29 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
                   )
                 : (_users.isEmpty
                     ? _buildEmptyState()
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                    : Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // 1. Top 3 Podium (Tetap di atas, tidak tergeser)
                             if (top3.isNotEmpty) ...[
                               _buildTop3Podium(top3),
-                              const SizedBox(height: 28),
+                              const SizedBox(height: 14),
                             ],
 
-                            _buildTop10Table(top10),
+                            // 2. Tabel Daftar Pemain (Menampilkan ~4 baris, sisanya di-scroll)
+                            Expanded(
+                              child: _buildPlayerTable(displayUsers),
+                            ),
 
+                            // 3. Akun Pengguna (Muncul di paling bawah jika berada di luar Top 10)
                             if (isMeOutsideTop10 && myUserInList != null) ...[
-                              const SizedBox(height: 16),
-                              _buildMyPinnedRankCard(myUserInList, myRankIndex + 1),
-                            ],
-
-                            if (beyondTop10.isNotEmpty) ...[
-                              const SizedBox(height: 16),
-                              _buildBeyondTop10Expansion(beyondTop10),
+                              const SizedBox(height: 10),
+                              _buildMyPinnedRankCard(
+                                myUserInList,
+                                effectiveMyRankIndex + 1,
+                              ),
                             ],
                           ],
                         ),
@@ -302,16 +329,19 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
             child: _buildPodiumColumn(
               user: second,
               rank: 2,
-              height: 120,
+              height: 110,
               badgeColor: const Color(0xFF94A3B8),
               crownIcon: '🥈',
-              isCurrent: _currentUser?.id == second.id,
+              isCurrent: _currentUser?.id == second.id ||
+                  (_currentUser?.username.isNotEmpty == true &&
+                      _currentUser?.username.toLowerCase() ==
+                          second.username.toLowerCase()),
             ),
           )
         else
           const Spacer(),
 
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
 
         // Juara 1 (Emas - Tertinggi di Tengah)
         if (first != null)
@@ -319,16 +349,19 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
             child: _buildPodiumColumn(
               user: first,
               rank: 1,
-              height: 155,
+              height: 140,
               badgeColor: accentGold,
               crownIcon: '👑',
-              isCurrent: _currentUser?.id == first.id,
+              isCurrent: _currentUser?.id == first.id ||
+                  (_currentUser?.username.isNotEmpty == true &&
+                      _currentUser?.username.toLowerCase() ==
+                          first.username.toLowerCase()),
             ),
           )
         else
           const Spacer(),
 
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
 
         // Juara 3 (Perunggu)
         if (third != null)
@@ -336,10 +369,13 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
             child: _buildPodiumColumn(
               user: third,
               rank: 3,
-              height: 95,
+              height: 85,
               badgeColor: const Color(0xFFD97706),
               crownIcon: '🥉',
-              isCurrent: _currentUser?.id == third.id,
+              isCurrent: _currentUser?.id == third.id ||
+                  (_currentUser?.username.isNotEmpty == true &&
+                      _currentUser?.username.toLowerCase() ==
+                          third.username.toLowerCase()),
             ),
           )
         else
@@ -370,22 +406,22 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
               Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: badgeColor, width: 2.5),
+                  border: Border.all(color: badgeColor, width: 2.2),
                   boxShadow: [
                     BoxShadow(
                       color: badgeColor.withValues(alpha: rank == 1 ? 0.45 : 0.3),
-                      blurRadius: rank == 1 ? 14 : 10,
-                      spreadRadius: rank == 1 ? 1.5 : 0,
+                      blurRadius: rank == 1 ? 12 : 8,
+                      spreadRadius: rank == 1 ? 1.0 : 0,
                     ),
                   ],
                 ),
-                child: _buildAvatar(user, size: rank == 1 ? 58 : 48),
+                child: _buildAvatar(user, size: rank == 1 ? 52 : 42),
               ),
               Positioned(
                 bottom: 0,
                 right: 0,
                 child: Container(
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(3.5),
                   decoration: BoxDecoration(
                     color: badgeColor,
                     shape: BoxShape.circle,
@@ -394,7 +430,7 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
                     '#$rank',
                     style: const TextStyle(
                       color: Colors.black,
-                      fontSize: 9.5,
+                      fontSize: 9,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -403,7 +439,7 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
             ],
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
 
         // Nama & Poin
         Text(
@@ -413,7 +449,7 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
           style: TextStyle(
             color: isCurrent ? accentGold : Colors.white,
             fontWeight: FontWeight.bold,
-            fontSize: rank == 1 ? 13 : 11.5,
+            fontSize: rank == 1 ? 12 : 10.5,
           ),
         ),
         Text(
@@ -421,10 +457,10 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
           style: TextStyle(
             color: badgeColor,
             fontWeight: FontWeight.w900,
-            fontSize: rank == 1 ? 12.5 : 11,
+            fontSize: rank == 1 ? 11.5 : 10,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 5),
 
         // Podium Block
         Container(
@@ -439,7 +475,7 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
             border: Border.all(
               color: badgeColor.withValues(alpha: 0.4),
               width: 1.5,
@@ -453,16 +489,16 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
                 style: TextStyle(
                   color: badgeColor,
                   fontWeight: FontWeight.w900,
-                  fontSize: 12,
-                  letterSpacing: 0.8,
+                  fontSize: 11,
+                  letterSpacing: 0.6,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 '${user.totalTasksCompleted} Selesai',
                 style: const TextStyle(
                   color: Colors.white70,
-                  fontSize: 10,
+                  fontSize: 9.5,
                 ),
               ),
             ],
@@ -472,10 +508,9 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
     );
   }
 
-
-
-  /// Tabel Top 10 Pemain (Menampilkan Rank, Profil, Nama Panggilan, Username, Task Selesai, Total Point)
-  Widget _buildTop10Table(List<SeriousUser> topUsers) {
+  /// Tabel Daftar Pemain (Menampilkan Rank, Profil, Nama Panggilan, Username, Task Selesai, Total Point)
+  /// Dilengkapi scrollbar internal sehingga daftar dapat di-scroll dengan mulus tanpa menggeser Top 3 podium.
+  Widget _buildPlayerTable(List<SeriousUser> allUsers) {
     return Container(
       decoration: BoxDecoration(
         color: cardBg,
@@ -556,31 +591,45 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
           ),
           const Divider(height: 1, color: Color(0xFF334155)),
 
-          // Baris-baris Data Pengguna (Rank 1 - 10)
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: topUsers.length,
-            separatorBuilder: (_, __) => const Divider(
-              height: 1,
-              color: Color(0xFF1E293B),
-              indent: 10,
-              endIndent: 10,
-            ),
-            itemBuilder: (context, index) {
-              final rank = index + 1;
-              final user = topUsers[index];
-              final isMe = _currentUser != null &&
-                  (_currentUser?.id == user.id ||
-                      _currentUser?.username.toLowerCase() ==
-                          user.username.toLowerCase());
+          // Area Baris-baris Data Pengguna yang dapat di-scroll
+          Expanded(
+            child: RawScrollbar(
+              controller: _tableScrollController,
+              thumbVisibility: true,
+              trackVisibility: false,
+              thickness: 4,
+              radius: const Radius.circular(8),
+              thumbColor: accentGold.withValues(alpha: 0.6),
+              child: ListView.separated(
+                controller: _tableScrollController,
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
+                ),
+                itemCount: allUsers.length,
+                separatorBuilder: (_, __) => const Divider(
+                  height: 1,
+                  color: Color(0xFF1E293B),
+                  indent: 10,
+                  endIndent: 10,
+                ),
+                itemBuilder: (context, index) {
+                  final rank = index + 1;
+                  final user = allUsers[index];
+                  final isMe = _currentUser != null &&
+                      ((_currentUser?.id.isNotEmpty == true &&
+                              _currentUser?.id == user.id) ||
+                          (_currentUser?.username.isNotEmpty == true &&
+                              _currentUser?.username.toLowerCase() ==
+                                  user.username.toLowerCase()));
 
-              return _buildTableRowItem(
-                rank: rank,
-                user: user,
-                isMe: isMe,
-              );
-            },
+                  return _buildTableRowItem(
+                    rank: rank,
+                    user: user,
+                    isMe: isMe,
+                  );
+                },
+              ),
+            ),
           ),
         ],
       ),
@@ -942,51 +991,6 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
     );
   }
 
-  /// Section Expandable untuk Peserta di Luar Top 10 (Rank 11+)
-  Widget _buildBeyondTop10Expansion(List<SeriousUser> remaining) {
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E293B).withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF334155), width: 0.8),
-        ),
-        child: ExpansionTile(
-          collapsedIconColor: const Color(0xFF94A3B8),
-          iconColor: accentGold,
-          title: Text(
-            'Lihat Peserta Lainnya (+${remaining.length} Pemain)',
-            style: const TextStyle(
-              color: Color(0xFF94A3B8),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-              child: Column(
-                children: remaining.asMap().entries.map((entry) {
-                  final rank = entry.key + 11;
-                  final user = entry.value;
-                  final isMe = _currentUser != null &&
-                      (_currentUser?.id == user.id ||
-                          _currentUser?.username.toLowerCase() ==
-                              user.username.toLowerCase());
-                  return _buildTableRowItem(
-                    rank: rank,
-                    user: user,
-                    isMe: isMe,
-                  );
-                }).toList(),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildEmptyState() {
     return Center(
