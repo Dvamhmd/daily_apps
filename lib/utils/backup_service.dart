@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:daily_apps/models/model_pribadi.dart';
 import 'package:daily_apps/models/model_struktur.dart';
 import 'package:daily_apps/models/model_todo.dart';
@@ -114,28 +115,29 @@ class BackupDataModel {
       };
 
   factory BackupDataModel.fromJson(Map<String, dynamic> json) {
+    final prefsMap = json['preferences'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(json['preferences'] as Map)
+        : <String, dynamic>{};
+
+    // Selalu hitung summary langsung dari payload preferences untuk akurasi maksimal
+    final calculatedSummary =
+        BackupService.calculateSummaryFromRawMap(prefsMap);
+
     return BackupDataModel(
       version: (json['version'] as num?)?.toInt() ?? 1,
       appName: json['appName'] as String? ?? 'Daily Apps',
       exportedAt: json['exportedAt'] != null
           ? DateTime.tryParse(json['exportedAt'].toString()) ?? DateTime.now()
           : DateTime.now(),
-      summary: json['summary'] is Map<String, dynamic>
-          ? BackupSummary.fromJson(json['summary'] as Map<String, dynamic>)
-          : const BackupSummary(),
-      preferences: json['preferences'] is Map<String, dynamic>
-          ? Map<String, dynamic>.from(json['preferences'] as Map)
-          : {},
+      summary: calculatedSummary,
+      preferences: prefsMap,
     );
   }
 }
 
 class BackupService {
-  /// Menghitung ringkasan data yang tersimpan di perangkat saat ini
-  static Future<BackupSummary> getLiveSummary() async {
-    final prefs = await SharedPreferences.getInstance();
-    final keys = prefs.getKeys();
-
+  /// Menghitung ringkasan data secara komprehensif dari Map key-value SharedPreferences
+  static BackupSummary calculateSummaryFromRawMap(Map<String, dynamic> rawMap) {
     int countUangku = 0;
     int countTagihan = 0;
     int countTabungan = 0;
@@ -151,73 +153,191 @@ class BackupService {
     int countTodoHistoryGroups = 0;
     int countTodoHistoryItems = 0;
 
-    // Scan seluruh key SharedPreferences dengan pengecekan tipe yang aman
-    for (final key in keys) {
-      final value = prefs.get(key);
+    final seenActiveGroupIds = <String>{};
+    final seenHistoryGroupIds = <String>{};
 
-      if (value is List) {
-        if (key == 'tabungan') {
-          countTabungan = value.length;
-        } else if (key == 'tagihan_lunas') {
-          countTagihanLunas = value.length;
-        } else if (key == 'riwayat_keuangan_list') {
-          countRiwayatKeuangan = value.length;
-        } else if (key == 'rundowns_data') {
-          countRundowns = value.length;
-        } else if (key == 'uangku' ||
-            (key.startsWith('uangku_') && key != 'uangku_only_cair')) {
-          countUangku += value.length;
-        } else if (key == 'tagihan' ||
-            (key.startsWith('tagihan_') && key != 'tagihan_lunas')) {
-          countTagihan += value.length;
-        }
-      } else if (value is String) {
-        if (key.startsWith('struktur_keuangan_data')) {
-          countStrukturMonths++;
+    for (final entry in rawMap.entries) {
+      final key = entry.key;
+      dynamic value = entry.value;
+
+      // Jika value disimpan dengan format wrapper preferences ({'type': ..., 'value': ...})
+      if (value is Map && value.containsKey('value')) {
+        value = value['value'];
+      }
+
+      // 1. Tabungan
+      if (key == 'tabungan') {
+        if (value is List) {
+          countTabungan += value.length;
+        } else if (value is String) {
           try {
-            final decoded = jsonDecode(value);
-            if (decoded is Map<String, dynamic>) {
-              final data = StrukturData.fromJson(decoded);
+            final dec = jsonDecode(value);
+            if (dec is List) countTabungan += dec.length;
+          } catch (_) {}
+        }
+      }
+      // 2. Tagihan Lunas
+      else if (key == 'tagihan_lunas' || key.startsWith('tagihan_lunas_')) {
+        if (value is List) {
+          countTagihanLunas += value.length;
+        } else if (value is String) {
+          try {
+            final dec = jsonDecode(value);
+            if (dec is List) countTagihanLunas += dec.length;
+          } catch (_) {}
+        }
+      }
+      // 3. Riwayat Keuangan
+      else if (key == 'riwayat_keuangan' ||
+          key.startsWith('riwayat_keuangan_') ||
+          key == 'riwayat_keuangan_list' ||
+          key.startsWith('riwayat_keuangan_list_')) {
+        if (value is List) {
+          countRiwayatKeuangan += value.length;
+        } else if (value is String) {
+          try {
+            final dec = jsonDecode(value);
+            if (dec is List) countRiwayatKeuangan += dec.length;
+          } catch (_) {}
+        }
+      }
+      // 4. Rundowns
+      else if (key == 'rundowns_data' || key.startsWith('rundowns_data_')) {
+        if (value is List) {
+          countRundowns += value.length;
+        } else if (value is String) {
+          try {
+            final dec = jsonDecode(value);
+            if (dec is List) countRundowns += dec.length;
+          } catch (_) {}
+        }
+      }
+      // 5. Uangku
+      else if (key == 'uangku' ||
+          (key.startsWith('uangku_') && key != 'uangku_only_cair')) {
+        if (value is List) {
+          countUangku += value.length;
+        } else if (value is String) {
+          try {
+            final dec = jsonDecode(value);
+            if (dec is List) countUangku += dec.length;
+          } catch (_) {}
+        }
+      }
+      // 6. Tagihan (Aktif)
+      else if (key == 'tagihan' ||
+          (key.startsWith('tagihan_') && !key.startsWith('tagihan_lunas'))) {
+        if (value is List) {
+          countTagihan += value.length;
+        } else if (value is String) {
+          try {
+            final dec = jsonDecode(value);
+            if (dec is List) countTagihan += dec.length;
+          } catch (_) {}
+        }
+      }
+      // 7. Keuangan Struktur
+      else if (key == 'struktur_keuangan_data' ||
+          key.startsWith('struktur_keuangan_data_')) {
+        countStrukturMonths++;
+        if (value is String) {
+          try {
+            final dec = jsonDecode(value);
+            if (dec is Map<String, dynamic>) {
+              final data = StrukturData.fromJson(dec);
               countStrukturTransactions += data.transactions.length;
             }
           } catch (_) {}
-        } else if (key.startsWith('pribadi_keuangan_data')) {
-          countPribadiMonths++;
+        } else if (value is Map<String, dynamic>) {
           try {
-            final decoded = jsonDecode(value);
-            if (decoded is Map<String, dynamic>) {
-              final data = PribadiData.fromJson(decoded);
+            final data = StrukturData.fromJson(value);
+            countStrukturTransactions += data.transactions.length;
+          } catch (_) {}
+        }
+      }
+      // 8. Keuangan Pribadi
+      else if (key == 'pribadi_keuangan_data' ||
+          key.startsWith('pribadi_keuangan_data_')) {
+        countPribadiMonths++;
+        if (value is String) {
+          try {
+            final dec = jsonDecode(value);
+            if (dec is Map<String, dynamic>) {
+              final data = PribadiData.fromJson(dec);
               countPribadiTransactions += data.transactions.length;
             }
           } catch (_) {}
-        } else if (key == 'todo_list_data' ||
-            (key.startsWith('todo_list_data_') && !key.contains('undo'))) {
+        } else if (value is Map<String, dynamic>) {
           try {
-            final decoded = jsonDecode(value);
-            if (decoded is List) {
-              countTodoGroups += decoded.length;
-              for (final g in decoded) {
-                if (g is Map<String, dynamic>) {
-                  final group = TodoDateGroup.fromJson(g);
+            final data = PribadiData.fromJson(value);
+            countPribadiTransactions += data.transactions.length;
+          } catch (_) {}
+        }
+      }
+      // 9. Todo Groups & Items (Mendeteksi Normal, Serious, User-scoped, & Legacy keys)
+      else if (key == 'daily_apps_todo_groups_v1' ||
+          key == 'daily_apps_serious_todo_groups_v1' ||
+          key.startsWith('daily_apps_todo_groups_v1_') ||
+          key.startsWith('daily_apps_serious_todo_groups_v1_') ||
+          key == 'todo_date_groups_v1' ||
+          key.startsWith('todo_date_groups_v1_') ||
+          key == 'todo_list_data' ||
+          (key.startsWith('todo_list_data_') && !key.contains('undo')) ||
+          key == 'todo_history_data' ||
+          key.startsWith('todo_history_data_')) {
+        void processGroupJson(dynamic groupJson) {
+          if (groupJson == null) return;
+          try {
+            Map<String, dynamic>? groupMap;
+            if (groupJson is String) {
+              final dec = jsonDecode(groupJson);
+              if (dec is Map<String, dynamic>) {
+                groupMap = dec;
+              } else if (dec is Map) {
+                groupMap = Map<String, dynamic>.from(dec);
+              }
+            } else if (groupJson is Map<String, dynamic>) {
+              groupMap = groupJson;
+            } else if (groupJson is Map) {
+              groupMap = Map<String, dynamic>.from(groupJson);
+            }
+
+            if (groupMap != null) {
+              final group = TodoDateGroup.fromJson(groupMap);
+              final gid = group.id.isNotEmpty
+                  ? group.id
+                  : 'g_${key}_${group.date.millisecondsSinceEpoch}_${group.items.length}';
+
+              if (group.isArchived) {
+                if (seenHistoryGroupIds.add(gid)) {
+                  countTodoHistoryGroups++;
+                  countTodoHistoryItems += group.items.length;
+                }
+              } else {
+                if (seenActiveGroupIds.add(gid)) {
+                  countTodoGroups++;
                   countTodoActiveItems += group.items.length;
                 }
               }
             }
           } catch (_) {}
-        } else if (key == 'todo_history_data' ||
-            key.startsWith('todo_history_data_')) {
+        }
+
+        if (value is String) {
           try {
-            final decoded = jsonDecode(value);
-            if (decoded is List) {
-              countTodoHistoryGroups += decoded.length;
-              for (final g in decoded) {
-                if (g is Map<String, dynamic>) {
-                  final group = TodoDateGroup.fromJson(g);
-                  countTodoHistoryItems += group.items.length;
-                }
+            final dec = jsonDecode(value);
+            if (dec is List) {
+              for (final item in dec) {
+                processGroupJson(item);
               }
+            } else if (dec is Map) {
+              processGroupJson(dec);
             }
           } catch (_) {}
+        } else if (value is List) {
+          for (final item in value) {
+            processGroupJson(item);
+          }
         }
       }
     }
@@ -238,6 +358,19 @@ class BackupService {
       totalTodoHistoryGroups: countTodoHistoryGroups,
       totalTodoHistoryItems: countTodoHistoryItems,
     );
+  }
+
+  /// Menghitung ringkasan data yang tersimpan di perangkat saat ini
+  static Future<BackupSummary> getLiveSummary() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs.getKeys();
+    final Map<String, dynamic> rawMap = {};
+
+    for (final key in keys) {
+      rawMap[key] = prefs.get(key);
+    }
+
+    return calculateSummaryFromRawMap(rawMap);
   }
 
   /// Membuat payload data cadangan lengkap dari SharedPreferences
@@ -300,53 +433,51 @@ class BackupService {
     final backupData = await generateBackupData();
     const encoder = JsonEncoder.withIndent('  ');
     final jsonString = encoder.convert(backupData.toJson());
-    final bytes = Uint8List.fromList(utf8.encode(jsonString));
 
     final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-    final fileName = customFileName ?? 'DailyApps_Backup_$timestamp.json';
+    final defaultFileName = customFileName ?? 'DailyApps_Backup_$timestamp.json';
 
     if (kIsWeb) {
-      return await saveFileWeb(bytes, fileName, askLocation: true);
+      final saved = await saveFileWeb(
+        Uint8List.fromList(utf8.encode(jsonString)),
+        defaultFileName,
+        askLocation: true,
+      );
+      return saved;
     }
 
-    final outputPath = await FilePicker.platform.saveFile(
-      dialogTitle: 'Pilih Lokasi Simpan File Cadangan',
-      fileName: fileName,
+    final outputFile = await FilePicker.platform.saveFile(
+      dialogTitle: 'Pilih Lokasi & Simpan File Cadangan',
+      fileName: defaultFileName,
       type: FileType.custom,
       allowedExtensions: ['json'],
-      bytes: bytes,
     );
 
-    if (outputPath == null) {
-      // Pengguna membatalkan pemilihan lokasi
-      return null;
-    }
+    if (outputFile == null) return null;
 
-    try {
-      final file = File(outputPath);
-      if (!await file.exists() || (await file.length()) == 0) {
-        await file.writeAsString(jsonString, flush: true);
-      }
-    } catch (_) {}
-
-    return outputPath;
+    final file = File(outputFile);
+    await file.writeAsString(jsonString, flush: true);
+    return file.path;
   }
 
-  /// Menyimpan file backup JSON langsung ke folder Download perangkat / browser download
+  /// Mengekspor file backup langsung ke folder Download perangkat / browser
   static Future<String> saveBackupToDefaultDownload({
     String? customFileName,
   }) async {
     final backupData = await generateBackupData();
     const encoder = JsonEncoder.withIndent('  ');
     final jsonString = encoder.convert(backupData.toJson());
-    final bytes = Uint8List.fromList(utf8.encode(jsonString));
 
     final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
     final fileName = customFileName ?? 'DailyApps_Backup_$timestamp.json';
 
     if (kIsWeb) {
-      final res = await saveFileWeb(bytes, fileName, askLocation: false);
-      return res ?? fileName;
+      await saveFileWeb(
+        Uint8List.fromList(utf8.encode(jsonString)),
+        fileName,
+        askLocation: false,
+      );
+      return fileName;
     }
 
     Directory? targetDir;

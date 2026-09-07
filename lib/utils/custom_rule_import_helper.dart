@@ -248,7 +248,7 @@ class CustomRuleImportHelper {
       } else if (typeLower.contains('keluar') || typeLower == 'pengeluaran') {
         normalizedType = 'pengeluaran';
       } else if (typeLower.contains('kat') || typeLower.contains('category')) {
-        normalizedType = defaultType ?? 'pengeluaran';
+        normalizedType = defaultType ?? 'kategori';
       } else if (defaultType != null && defaultType.isNotEmpty) {
         normalizedType = defaultType;
       }

@@ -788,12 +788,23 @@ class SheetsSyncService {
       }
     }
 
+    int parseAmount(dynamic val) {
+      if (val == null) return 0;
+      if (val is num) return val.toInt();
+      final str = val.toString().trim();
+      if (str.isEmpty || str == '-') return 0;
+      final d = double.tryParse(str.replaceAll(',', ''));
+      if (d != null) return d.toInt();
+      final clean = str.replaceAll(RegExp(r'[^0-9]'), '');
+      return int.tryParse(clean) ?? 0;
+    }
+
     // 2. Hitung agregat remote (Spreadsheet)
     int remoteRekDebit = 0;
     int remoteRekKredit = 0;
     for (var r in remoteFetchResult.rekeningRows) {
-      final d = (r['debit'] is num) ? (r['debit'] as num).toInt() : (int.tryParse(r['debit']?.toString() ?? '0') ?? 0);
-      final k = (r['kredit'] is num) ? (r['kredit'] as num).toInt() : (int.tryParse(r['kredit']?.toString() ?? '0') ?? 0);
+      final d = parseAmount(r['debit']);
+      final k = parseAmount(r['kredit']);
       remoteRekDebit += d;
       remoteRekKredit += k;
     }
@@ -801,12 +812,8 @@ class SheetsSyncService {
     int remoteOnHandDebit = 0;
     int remoteOnHandKredit = 0;
     for (var r in remoteFetchResult.onHandRows) {
-      final d = (r['debit_onhand'] is num)
-          ? (r['debit_onhand'] as num).toInt()
-          : (r['debit'] is num ? (r['debit'] as num).toInt() : (int.tryParse((r['debit_onhand'] ?? r['debit'])?.toString() ?? '0') ?? 0));
-      final k = (r['kredit_onhand'] is num)
-          ? (r['kredit_onhand'] as num).toInt()
-          : (r['kredit'] is num ? (r['kredit'] as num).toInt() : (int.tryParse((r['kredit_onhand'] ?? r['kredit'])?.toString() ?? '0') ?? 0));
+      final d = parseAmount(r['debit_onhand'] ?? r['debit']);
+      final k = parseAmount(r['kredit_onhand'] ?? r['kredit']);
       remoteOnHandDebit += d;
       remoteOnHandKredit += k;
     }
@@ -814,25 +821,22 @@ class SheetsSyncService {
     final int remoteRekCount = remoteFetchResult.rekeningRows.length;
     final int remoteOnHandCount = remoteFetchResult.onHandRows.length;
 
-    // 3. Deteksi apakah ada perbedaan
+    // 3. Deteksi apakah ada perbedaan JUMLAH TRANSAKSI (count) saja
     final List<String> reasons = [];
 
     // Jika spreadsheet sama sekali kosong, tidak dianggap konflik
     final isRemoteEmpty = remoteRekCount == 0 && remoteOnHandCount == 0;
 
     if (!isRemoteEmpty) {
+      // Hanya perbedaan JUMLAH (count) transaksi yang memicu peringatan risiko
       if (localRekening.length != remoteRekCount) {
         reasons.add('Jumlah transaksi Rekening berbeda (Aplikasi: ${localRekening.length}, Sheets: $remoteRekCount)');
       }
       if (localOnHand.length != remoteOnHandCount) {
         reasons.add('Jumlah transaksi On Hand berbeda (Aplikasi: ${localOnHand.length}, Sheets: $remoteOnHandCount)');
       }
-      if (localRekDebit != remoteRekDebit || localRekKredit != remoteRekKredit) {
-        reasons.add('Total nominal transaksi Rekening berbeda');
-      }
-      if (localOnHandDebit != remoteOnHandDebit || localOnHandKredit != remoteOnHandKredit) {
-        reasons.add('Total nominal transaksi On Hand berbeda');
-      }
+      // Catatan: perbedaan nominal TIDAK memicu peringatan risiko,
+      // hanya perbedaan jumlah transaksi yang dianggap konflik kritis.
     }
 
     final hasDiscrepancy = reasons.isNotEmpty;
@@ -893,36 +897,36 @@ class SheetsSyncService {
     final kategoriStr = (row['kategori'] ?? row['kategori_onhand'] ?? '').toString().trim();
     final keteranganStr = (row['keterangan'] ?? row['keterangan_onhand'] ?? '').toString().trim();
 
-    final debitVal = (row['debit'] ?? row['debit_onhand']);
-    final kreditVal = (row['kredit'] ?? row['kredit_onhand']);
-
-    int debit = 0;
-    if (debitVal is num) {
-      debit = debitVal.toInt();
-    } else if (debitVal != null) {
-      debit = int.tryParse(debitVal.toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    int parseAmount(dynamic val) {
+      if (val == null) return 0;
+      if (val is num) return val.toInt();
+      final str = val.toString().trim();
+      if (str.isEmpty || str == '-') return 0;
+      final d = double.tryParse(str.replaceAll(',', ''));
+      if (d != null) return d.toInt();
+      final clean = str.replaceAll(RegExp(r'[^0-9]'), '');
+      return int.tryParse(clean) ?? 0;
     }
 
-    int kredit = 0;
-    if (kreditVal is num) {
-      kredit = kreditVal.toInt();
-    } else if (kreditVal != null) {
-      kredit = int.tryParse(kreditVal.toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-    }
+    final debit = parseAmount(row['debit'] ?? row['debit_onhand']);
+    final kredit = parseAmount(row['kredit'] ?? row['kredit_onhand']);
 
-    if (debit == 0 && kredit == 0 && keteranganStr.isEmpty) {
+    if (debit == 0 && kredit == 0 && keteranganStr.isEmpty && kategoriStr.isEmpty && kuStr.isEmpty) {
       return null;
     }
 
-    final title = keteranganStr.isNotEmpty ? keteranganStr : 'Transaksi dari Spreadsheet';
+    final rawNo = (row['no'] ?? row['no_onhand'] ?? '').toString().trim();
+    final title = keteranganStr.isNotEmpty
+        ? keteranganStr
+        : (kategoriStr.isNotEmpty ? kategoriStr : (rawNo.isNotEmpty ? 'Transaksi #$rawNo' : 'Transaksi dari Spreadsheet'));
     final targetAcc = isRekening ? 'rekening' : 'debit';
     final sourceAcc = isRekening ? 'rekening' : 'debit';
 
     final isIncome = debit > 0;
-    final amount = isIncome ? debit : kredit;
+    final amount = isIncome ? debit : (kredit > 0 ? kredit : 0);
 
     return StrukturTransaction(
-      id: '${parsedDate.millisecondsSinceEpoch}_${row['no'] ?? row['no_onhand'] ?? DateTime.now().microsecondsSinceEpoch}',
+      id: '${parsedDate.millisecondsSinceEpoch}_${rawNo.isNotEmpty ? rawNo : DateTime.now().microsecondsSinceEpoch}',
       title: title,
       type: isIncome ? 'pemasukan' : 'pengeluaran',
       amount: amount,
@@ -1701,30 +1705,30 @@ function processRequest(data) {
 
         var range = sheet.getRange(startRowIdx, 1, numRows, maxCol);
         var values = range.getValues();
-        var formulas = range.getFormulas();
+        var consecutiveBlankRows = 0;
 
         for (var r = 0; r < numRows; r++) {
           var rowObj = {};
           var hasAnyData = false;
-          var isTotalOrHeader = false;
+          var isFooterSummary = false;
 
           for (var i = 0; i < fieldsList.length; i++) {
             var field = fieldsList[i];
             var colIdx = activeMappingObj[field];
             if (colIdx && colIdx > 0 && colIdx <= maxCol) {
               var val = values[r][colIdx - 1];
-              var formula = formulas[r][colIdx - 1];
-              if (formula && formula.toString().trim() !== "") {
-                isTotalOrHeader = true;
-                break;
-              }
               if (val !== null && val !== undefined && val !== "") {
                 var strVal = val.toString().trim().toUpperCase();
-                if (strVal === "TOTAL" || strVal === "JUMLAH TOTAL" || strVal.indexOf("SALDO") !== -1 ||
-                    strVal.indexOf("BUKTI") !== -1 || strVal.indexOf("REKAP") !== -1 ||
-                    strVal.indexOf("MENGETAHUI") !== -1) {
-                  isTotalOrHeader = true;
-                  break;
+                // Deteksi khusus jika baris ini merupakan baris Footer / Total di tabel
+                if (field === 'keterangan' || field === 'keterangan_onhand' || 
+                    field === 'kategori' || field === 'kategori_onhand' || 
+                    field === 'no' || field === 'no_onhand') {
+                  if (strVal === "TOTAL" || strVal === "JUMLAH" || strVal === "JUMLAH TOTAL" || 
+                      strVal === "GRAND TOTAL" || strVal === "TOTAL KESELURUHAN" ||
+                      strVal.indexOf("TANDA TANGAN") !== -1 || strVal.indexOf("MENGETAHUI") !== -1) {
+                    isFooterSummary = true;
+                    break;
+                  }
                 }
                 hasAnyData = true;
                 if (val instanceof Date) {
@@ -1741,9 +1745,16 @@ function processRequest(data) {
             }
           }
 
-          if (isTotalOrHeader) break;
+          if (isFooterSummary) break;
           if (hasAnyData) {
+            consecutiveBlankRows = 0;
             rows.push(rowObj);
+          } else {
+            consecutiveBlankRows++;
+            // Jika lebih dari 10 baris berturut-turut kosong dan tidak ada batas endRow, hentikan pemindaian
+            if (consecutiveBlankRows >= 10 && (!endRowLimit || endRowLimit <= 0)) {
+              break;
+            }
           }
         }
         return rows;

@@ -697,26 +697,30 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                     style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                   ),
                 ),
-                const Spacer(),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    _switchTab(1);
-                  },
-                  icon: const Icon(Icons.tune_rounded, size: 16),
-                  label: const Text(
-                    'Sesuaikan End Row di Atur Cell',
-                    style:
-                        TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFDC2626),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _switchTab(1);
+                    },
+                    icon: const Icon(Icons.tune_rounded, size: 15),
+                    label: const Text(
+                      'Sesuaikan End Row',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFDC2626),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 10),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                 ),
@@ -802,24 +806,30 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'Sheet Tujuan:',
-                              style: TextStyle(
-                                  fontSize: 11.5, color: Color(0xFF475569)),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFDCFCE7),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
+                            const Expanded(
                               child: Text(
-                                sheetName,
-                                style: const TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF15803D),
+                                'Sheet Tujuan:',
+                                style: TextStyle(
+                                    fontSize: 11.5, color: Color(0xFF475569)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFDCFCE7),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  sheetName,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF15803D),
+                                  ),
                                 ),
                               ),
                             ),
@@ -827,62 +837,89 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                         ),
                         const SizedBox(height: 6),
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'Rentang Baris Rekening:',
-                              style: TextStyle(
-                                  fontSize: 11.5, color: Color(0xFF475569)),
+                            const Expanded(
+                              flex: 5,
+                              child: Text(
+                                'Rekening:',
+                                style: TextStyle(
+                                    fontSize: 11.5, color: Color(0xFF475569)),
+                              ),
                             ),
-                            Text(
-                              (endRow != null && endRow > 0)
-                                  ? 'Baris $startRow - $endRow (Maks ${_config.maxRekeningCapacity} data)'
-                                  : 'Baris $startRow s/d Selesai (Tanpa Batas)',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 6,
+                              child: Text(
+                                (endRow != null && endRow > 0)
+                                    ? 'Baris $startRow - $endRow'
+                                    : 'Baris $startRow s/d Selesai',
+                                textAlign: TextAlign.end,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                ),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 6),
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'Rentang Baris On Hand:',
-                              style: TextStyle(
-                                  fontSize: 11.5, color: Color(0xFF475569)),
+                            const Expanded(
+                              flex: 5,
+                              child: Text(
+                                'On Hand:',
+                                style: TextStyle(
+                                    fontSize: 11.5, color: Color(0xFF475569)),
+                              ),
                             ),
-                            Text(
-                              (endRowOnHand != null && endRowOnHand > 0)
-                                  ? 'Baris $startRowOnHand - $endRowOnHand (Maks ${_config.maxOnHandCapacity} data)'
-                                  : 'Baris $startRowOnHand s/d Selesai (Tanpa Batas)',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 6,
+                              child: Text(
+                                (endRowOnHand != null && endRowOnHand > 0)
+                                    ? 'Baris $startRowOnHand - $endRowOnHand'
+                                    : 'Baris $startRowOnHand s/d Selesai',
+                                textAlign: TextAlign.end,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                ),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 6),
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'Format Tanggal:',
-                              style: TextStyle(
-                                  fontSize: 11.5, color: Color(0xFF475569)),
+                            const Expanded(
+                              flex: 5,
+                              child: Text(
+                                'Format Tanggal:',
+                                style: TextStyle(
+                                    fontSize: 11.5, color: Color(0xFF475569)),
+                              ),
                             ),
-                            Text(
-                              '$dateFormat ($dateSample)',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
-                                fontFamily: 'monospace',
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 6,
+                              child: Text(
+                                '$dateFormat ($dateSample)',
+                                textAlign: TextAlign.end,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                  fontFamily: 'monospace',
+                                ),
                               ),
                             ),
                           ],
@@ -925,15 +962,19 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                label,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: isExcluded
-                                      ? const Color(0xFF94A3B8)
-                                      : const Color(0xFF334155),
+                              Expanded(
+                                child: Text(
+                                  label,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isExcluded
+                                        ? const Color(0xFF94A3B8)
+                                        : const Color(0xFF334155),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
+                              const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 6, vertical: 1.5),
@@ -996,15 +1037,19 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                label,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: isExcluded
-                                      ? const Color(0xFF94A3B8)
-                                      : const Color(0xFF334155),
+                              Expanded(
+                                child: Text(
+                                  label,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isExcluded
+                                        ? const Color(0xFF94A3B8)
+                                        : const Color(0xFF334155),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
+                              const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 6, vertical: 1.5),
@@ -1084,6 +1129,7 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
+                                const SizedBox(width: 8),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 6, vertical: 1.5),
@@ -1092,7 +1138,6 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                                         ? const Color(0xFFF1F5F9)
                                         : const Color(0xFF0284C7)
                                             .withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(5),
                                   ),
                                   child: Text(
                                     isExcluded
@@ -1115,11 +1160,14 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'Format Sisipkan Bukti:',
-                              style: TextStyle(
-                                  fontSize: 10.5, color: Color(0xFF64748B)),
+                            const Expanded(
+                              child: Text(
+                                'Format Sisipkan Bukti:',
+                                style: TextStyle(
+                                    fontSize: 10.5, color: Color(0xFF64748B)),
+                              ),
                             ),
+                            const SizedBox(width: 8),
                             Text(
                               _insertImageFormula
                                   ? 'Sisipkan di Sel (HD)'
@@ -1178,37 +1226,46 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
             Row(
               children: [
                 Expanded(
+                  flex: 5,
                   child: OutlinedButton.icon(
                     onPressed: () {
                       Navigator.pop(ctx);
                       _switchTab(1);
                     },
-                    icon: const Icon(Icons.tune_rounded, size: 15),
+                    icon: const Icon(Icons.tune_rounded, size: 14),
                     label: const Text(
                       'Cell',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style:
                           TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF107C41),
                       side: const BorderSide(color: Color(0xFF107C41)),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 9, horizontal: 4),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 9, horizontal: 8),
+                  ),
                   child: const Text(
                     'Batal',
                     style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Expanded(
+                  flex: 6,
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(ctx);
@@ -1216,16 +1273,19 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                           markCellsConfigured: true, flushImmediately: true);
                       _executeSyncAll();
                     },
-                    icon: const Icon(Icons.send_rounded, size: 15),
+                    icon: const Icon(Icons.send_rounded, size: 14),
                     label: const Text(
                       'Konfirmasi',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style:
                           TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF107C41),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 9, horizontal: 4),
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -2298,12 +2358,15 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      '1. Kolom Transaksi Rekening',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
+                    const Expanded(
+                      child: Text(
+                        '1. Kolom Transaksi Rekening',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     TextButton.icon(
@@ -2398,6 +2461,8 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                                     fontWeight: FontWeight.bold,
                                     color: Color(0xFF334155),
                                   ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 4),
                                 TextField(
@@ -2432,25 +2497,28 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Row(
-                                  children: [
-                                    Text(
-                                      'End Row (Batas Akhir)',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF334155),
+                                const Text.rich(
+                                  TextSpan(
+                                    children: [
+                                      TextSpan(
+                                        text: 'End Row (Batas Akhir) ',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF334155),
+                                        ),
                                       ),
-                                    ),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      '(Opsional)',
-                                      style: TextStyle(
-                                        fontSize: 9.5,
-                                        color: Color(0xFF94A3B8),
+                                      TextSpan(
+                                        text: '(Opsional)',
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          color: Color(0xFF94A3B8),
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 4),
                                 TextField(
@@ -2571,14 +2639,18 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      '2. Kolom Transaksi Cash On Hand',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
+                    const Expanded(
+                      child: Text(
+                        '2. Kolom Transaksi Cash On Hand',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 7, vertical: 2),
@@ -2676,6 +2748,8 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                                     fontWeight: FontWeight.bold,
                                     color: Color(0xFF334155),
                                   ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 4),
                                 TextField(
@@ -2710,25 +2784,28 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Row(
-                                  children: [
-                                    Text(
-                                      'End Row (Batas Akhir)',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF334155),
+                                const Text.rich(
+                                  TextSpan(
+                                    children: [
+                                      TextSpan(
+                                        text: 'End Row (Batas Akhir) ',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF334155),
+                                        ),
                                       ),
-                                    ),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      '(Opsional)',
-                                      style: TextStyle(
-                                        fontSize: 9.5,
-                                        color: Color(0xFF94A3B8),
+                                      TextSpan(
+                                        text: '(Opsional)',
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          color: Color(0xFF94A3B8),
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 4),
                                 TextField(
@@ -2846,14 +2923,18 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      '3. Kolom & Baris Gambar Bukti',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
+                    const Expanded(
+                      child: Text(
+                        '3. Kolom & Baris Gambar Bukti',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 7, vertical: 2),
@@ -3540,6 +3621,8 @@ class _FieldRowItemState extends State<_FieldRowItem> {
               ),
               // Tombol Saklar Kecualikan / Gunakan (Ikon Mata)
               IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 icon: Icon(
                   isExcluded
                       ? Icons.visibility_off_outlined
@@ -3855,6 +3938,8 @@ class _EvidenceFieldRowItemState extends State<_EvidenceFieldRowItem> {
               ),
               // Tombol Saklar Kecualikan / Gunakan (Ikon Mata)
               IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
                 icon: Icon(
                   isExcluded
                       ? Icons.visibility_off_outlined

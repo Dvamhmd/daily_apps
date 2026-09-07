@@ -8,6 +8,7 @@ import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:daily_apps/utils/sheets_sync_service.dart';
 import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:daily_apps/widgets/google_sheets_config_modal.dart';
+import 'package:daily_apps/widgets/sheets_risk_management_dialog.dart';
 import 'package:daily_apps/widgets/upload_evidence_modal.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -400,11 +401,8 @@ class _StrukturPageState extends State<StrukturPage> {
     await _saveData();
   }
 
-  Timer? _autoSyncDebounceTimer;
-
   @override
   void dispose() {
-    _autoSyncDebounceTimer?.cancel();
     super.dispose();
   }
 
@@ -416,32 +414,182 @@ class _StrukturPageState extends State<StrukturPage> {
     await prefs.setString('struktur_keuangan_data', jsonEncode(_data.toJson()));
   }
 
-  void _triggerAutoSyncSheets({bool force = false}) {
+  /// Menghitung ulang saldo ketiga akun (Rekening, Debit, Cash) dari nol
+  /// berdasarkan seluruh transaksi yang ada di _data.transactions.
+  /// Digunakan setelah data transaksi diganti dari sumber eksternal (Spreadsheet).
+  void _recalculateBalancesFromTransactions() {
+    int rekeningBalance = 0;
+    int debitBalance = 0;
+    int cashBalance = 0;
+
+    for (final tx in _data.transactions) {
+      if (tx.isPemasukan) {
+        final target = tx.targetAccount ?? 'rekening';
+        if (target == 'rekening') {
+          rekeningBalance += tx.amount;
+        } else if (target == 'debit') {
+          debitBalance += tx.amount;
+        } else if (target == 'cash') {
+          cashBalance += tx.amount;
+        }
+      } else if (tx.isPengeluaran) {
+        final source = tx.sourceAccount ?? 'rekening';
+        if (source == 'rekening') {
+          rekeningBalance -= tx.totalDeduction;
+        } else if (source == 'debit') {
+          debitBalance -= tx.totalDeduction;
+        } else if (source == 'cash') {
+          cashBalance -= tx.totalDeduction;
+        }
+      }
+    }
+
+    _data.rekeningStruktur.balance = rekeningBalance < 0 ? 0 : rekeningBalance;
+    _data.onHandDebit.balance = debitBalance < 0 ? 0 : debitBalance;
+    _data.onHandCash.balance = cashBalance < 0 ? 0 : cashBalance;
+  }
+
+
+  /// Melakukan pengecekan sinkronisasi dengan Google Sheets sebelum mutasi baru diterapkan & disimpan.
+  /// Mengembalikan true jika aman untuk lanjut menyimpan & menyinkronkan data,
+  /// atau false jika proses dibatalkan oleh pengguna (misal karena memilih batal pada dialog manajemen risiko).
+  Future<bool> _preCheckAndSyncBeforeSave({
+    required BuildContext context,
+    required VoidCallback applyLocalChanges,
+  }) async {
+    // 1. Jika konfigurasi Google Sheets belum lengkap atau auto-sync dinonaktifkan, simpan lokal saja
+    if (!_sheetsConfig.isConfigured ||
+        !_sheetsConfig.hasConfiguredCells ||
+        !_sheetsConfig.autoSyncOnInput) {
+      setState(() {
+        applyLocalChanges();
+      });
+      await _saveData();
+      return true;
+    }
+
+    try {
+      // 2. Ambil data transaksi yang SUDAH ADA saat ini (sebelum data baru diterapkan)
+      final existingMutasi = _data.transactions
+          .where((tx) => tx.isPemasukan || tx.isPengeluaran)
+          .toList()
+        ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+      // 3. Fetch data remote dari Spreadsheet untuk memverifikasi keselarasan data eksisting
+      final fetchRes = await SheetsSyncService.fetchRemoteTransactions(
+        _sheetsConfig,
+        customRules: _data.customKodeRules,
+      );
+
+      if (!mounted) return false;
+
+      // 4. Jika fetch berhasil dan spreadsheet berisi data, bandingkan keselarasan
+      if (fetchRes.isSuccess && !fetchRes.isEmpty) {
+        final comparison = SheetsSyncService.compareData(
+          localTransactions: existingMutasi,
+          remoteFetchResult: fetchRes,
+        );
+
+        if (comparison.hasDiscrepancy) {
+          final choice = await SheetsRiskManagementDialog.show(
+            context,
+            comparison: comparison,
+            sheetName: _sheetsConfig.sheetName,
+            useRootNavigator: true,
+          );
+
+          if (!mounted) return false;
+
+          if (choice == null || choice == SheetsConflictChoice.cancel) {
+            return false; // Pengguna membatalkan, data baru jangan disimpan
+          }
+
+          if (choice == SheetsConflictChoice.useSheetData) {
+            // Sesuaikan data aplikasi mengikuti Spreadsheet
+            setState(() {
+              _data.transactions =
+                  List<StrukturTransaction>.from(comparison.remoteTransactions)
+                    ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+              _recalculateBalancesFromTransactions();
+            });
+            await _saveData();
+            if (mounted) {
+              CustomToast.showSuccess(
+                context,
+                title: 'Data Disesuaikan',
+                subtitle:
+                    'Berhasil menyesuaikan ${comparison.remoteTotalCount} transaksi dari Spreadsheet ke aplikasi!',
+              );
+            }
+            return false; // Jangan lanjut simpan data baru dulu agar pengguna dapat meninjau data
+          }
+
+          // Jika choice == useAppData, pengguna memilih abaikan dan menimpa dengan data lokal
+        }
+      }
+
+      // 5. Terapkan perubahan mutasi baru ke penyimpanan lokal
+      setState(() {
+        applyLocalChanges();
+      });
+      await _saveData();
+
+      // 6. Kirim seluruh mutasi yang sudah ter-update ke Google Spreadsheet
+      final updatedMutasi = _data.transactions
+          .where((tx) => tx.isPemasukan || tx.isPengeluaran)
+          .toList()
+        ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+      final res = await SheetsSyncService.syncAllTransactions(
+        updatedMutasi,
+        _sheetsConfig,
+        customRules: _data.customKodeRules,
+      );
+
+      if (mounted) {
+        debugPrint(
+            'Direct sync Sheets result: ${res.isSuccess} - ${res.message}');
+        setState(() {});
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Error during _preCheckAndSyncBeforeSave: $e');
+      // Fallback: jika terjadi kegagalan jaringan, tetap simpan data secara lokal
+      setState(() {
+        applyLocalChanges();
+      });
+      await _saveData();
+      return true;
+    }
+  }
+
+  /// Melakukan sinkronisasi langsung (tanpa debounce) ke Google Spreadsheet.
+  /// Digunakan untuk operasi kritis seperti hapus/rollback yang HARUS ter-sinkron.
+  Future<void> _directSyncToSheets() async {
     if (!_sheetsConfig.isConfigured || !_sheetsConfig.hasConfiguredCells) {
       return;
     }
-    if (!force && !_sheetsConfig.autoSyncOnInput) {
-      return;
-    }
 
-    _autoSyncDebounceTimer?.cancel();
-    _autoSyncDebounceTimer = Timer(const Duration(milliseconds: 300), () {
+    try {
       final allMutasi = _data.transactions
           .where((tx) => tx.isPemasukan || tx.isPengeluaran)
           .toList()
         ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
-      SheetsSyncService.syncAllTransactions(
+      final res = await SheetsSyncService.syncAllTransactions(
         allMutasi,
         _sheetsConfig,
         customRules: _data.customKodeRules,
-      ).then((res) {
-        if (mounted) {
-          debugPrint('Auto-sync Sheets result: ${res.isSuccess} - ${res.message}');
-          setState(() {});
-        }
-      });
-    });
+      );
+
+      if (mounted) {
+        debugPrint(
+            'Direct sync (delete/rollback) result: ${res.isSuccess} - ${res.message}');
+      }
+    } catch (e) {
+      debugPrint('Direct sync (delete/rollback) exception: $e');
+    }
   }
 
   void _showGoogleSheetsConfigModal({
@@ -470,6 +618,14 @@ class _StrukturPageState extends State<StrukturPage> {
       },
       onSyncCompleted: () {
         setState(() {});
+      },
+      onImportFromSheets: (importedTx) {
+        setState(() {
+          _data.transactions = List<StrukturTransaction>.from(importedTx)
+            ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+          _recalculateBalancesFromTransactions();
+        });
+        _saveData();
       },
     );
   }
@@ -3818,6 +3974,7 @@ class _StrukturPageState extends State<StrukturPage> {
 
     bool amountHasError = false;
     bool noteHasError = false;
+    bool isSubmitting = false;
 
     showModalBottomSheet(
       context: context,
@@ -4257,105 +4414,130 @@ class _StrukturPageState extends State<StrukturPage> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: () {
-                          if (nominal <= 0) {
-                            setModalState(() => amountHasError = true);
-                            if (amountKey.currentContext != null) {
-                              Scrollable.ensureVisible(
-                                amountKey.currentContext!,
-                                duration: const Duration(milliseconds: 350),
-                                curve: Curves.easeInOut,
-                                alignment: 0.3,
-                              );
-                            }
-                            amountFocus.requestFocus();
-                            CustomToast.showWarning(
-                              context,
-                              title: 'Jumlah Dana Kosong',
-                              subtitle: 'Silakan masukkan Jumlah Dana (Rp)!',
-                            );
-                            return;
-                          }
+                        onPressed: isSubmitting
+                            ? null
+                            : () async {
+                                // Tutup keyboard terlebih dahulu
+                                FocusScope.of(context).unfocus();
 
-                          if (noteCtrl.text.trim().isEmpty) {
-                            setModalState(() => noteHasError = true);
-                            if (noteKey.currentContext != null) {
-                              Scrollable.ensureVisible(
-                                noteKey.currentContext!,
-                                duration: const Duration(milliseconds: 350),
-                                curve: Curves.easeInOut,
-                                alignment: 0.3,
-                              );
-                            }
-                            noteFocus.requestFocus();
-                            CustomToast.showWarning(
-                              context,
-                              title: 'Keterangan Kosong',
-                              subtitle: 'Keterangan pemasukan wajib diisi!',
-                            );
-                            return;
-                          }
+                                bool hasErr = false;
+                                if (nominal <= 0) {
+                                  amountHasError = true;
+                                  hasErr = true;
+                                  amountFocus.requestFocus();
+                                  Scrollable.ensureVisible(
+                                    amountKey.currentContext ?? context,
+                                    duration:
+                                        const Duration(milliseconds: 300),
+                                    curve: Curves.easeInOut,
+                                  );
+                                } else {
+                                  amountHasError = false;
+                                }
 
-                          if (_isAccountExceeded(targetWadah, additionalCount: 1)) {
-                            final isOnHand = targetWadah == 'debit' || targetWadah == 'cash';
-                            _showCapacityExceededDialog(
-                              accountType: targetWadah,
-                              currentCount: isOnHand ? _currentOnHandCount : _currentRekeningCount,
-                              targetContext: context,
-                            );
-                            return;
-                          }
+                                if (noteCtrl.text.trim().isEmpty) {
+                                  noteHasError = true;
+                                  hasErr = true;
+                                  if (!amountHasError) {
+                                    noteFocus.requestFocus();
+                                    Scrollable.ensureVisible(
+                                      noteKey.currentContext ?? context,
+                                      duration:
+                                          const Duration(milliseconds: 300),
+                                      curve: Curves.easeInOut,
+                                    );
+                                  }
+                                } else {
+                                  noteHasError = false;
+                                }
 
-                          final noteText = noteCtrl.text.trim();
-                          final autoKu =
-                              StrukturTransaction.resolveKuFromText(
-                                  noteText,
-                                  customRules: _data.customKodeRules);
-                          final autoKode =
-                              StrukturTransaction.resolveKodeFromText(
-                                  noteText,
-                                  customRules: _data.customKodeRules);
+                                if (hasErr) {
+                                  setModalState(() {});
+                                  return;
+                                }
 
-                          final newTx = StrukturTransaction(
-                            id: DateTime.now()
-                                .microsecondsSinceEpoch
-                                .toString(),
-                            title: noteText,
-                            type: 'pemasukan',
-                            targetAccount: targetWadah,
-                            amount: nominal,
-                            adminFee: 0,
-                            note: noteText,
-                            ku: autoKu != '-' ? autoKu : null,
-                            kode: autoKode != '-' ? autoKode : null,
-                            timestamp: selectedDate,
-                          );
+                                if (_isAccountExceeded(targetWadah,
+                                    additionalCount: 1)) {
+                                  final isOnHand = targetWadah == 'debit' ||
+                                      targetWadah == 'cash';
+                                  _showCapacityExceededDialog(
+                                    accountType: targetWadah,
+                                    currentCount: isOnHand
+                                        ? _currentOnHandCount
+                                        : _currentRekeningCount,
+                                    targetContext: context,
+                                  );
+                                  return;
+                                }
 
-                          setState(() {
-                            // 1. Tambah Saldo Wadah
-                            if (targetWadah == 'rekening') {
-                              _data.rekeningStruktur.balance += nominal;
-                            } else if (targetWadah == 'debit') {
-                              _data.onHandDebit.balance += nominal;
-                            } else {
-                              _data.onHandCash.balance += nominal;
-                            }
+                                setModalState(() => isSubmitting = true);
 
-                            // 2. Catat Transaksi (Tambahkan dan urutkan chronological berdasarkan tanggal)
-                            _data.transactions.add(newTx);
-                            _data.transactions.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-                          });
+                                final noteText = noteCtrl.text.trim();
+                                final autoKu =
+                                    StrukturTransaction.resolveKuFromText(
+                                        noteText,
+                                        customRules:
+                                            _data.customKodeRules);
+                                final autoKode =
+                                    StrukturTransaction.resolveKodeFromText(
+                                        noteText,
+                                        customRules:
+                                            _data.customKodeRules);
 
-                          _saveData();
-                          _triggerAutoSyncSheets();
-                          Navigator.pop(ctx);
+                                final newTx = StrukturTransaction(
+                                  id: DateTime.now()
+                                      .microsecondsSinceEpoch
+                                      .toString(),
+                                  title: noteText,
+                                  type: 'pemasukan',
+                                  targetAccount: targetWadah,
+                                  amount: nominal,
+                                  adminFee: 0,
+                                  note: noteText,
+                                  ku: autoKu != '-' ? autoKu : null,
+                                  kode: autoKode != '-' ? autoKode : null,
+                                  timestamp: selectedDate,
+                                );
 
-                          CustomToast.showSuccess(
-                            context,
-                            title: 'Pemasukan Dicatat',
-                            subtitle: 'Pemasukan Rp ${RupiahFormatter.format(nominal)} berhasil dicatat!',
-                          );
-                        },
+                                final isSaved =
+                                    await _preCheckAndSyncBeforeSave(
+                                  context: context,
+                                  applyLocalChanges: () {
+                                    // 1. Tambah Saldo Wadah
+                                    if (targetWadah == 'rekening') {
+                                      _data.rekeningStruktur.balance +=
+                                          nominal;
+                                    } else if (targetWadah == 'debit') {
+                                      _data.onHandDebit.balance += nominal;
+                                    } else {
+                                      _data.onHandCash.balance += nominal;
+                                    }
+
+                                    // 2. Catat Transaksi
+                                    _data.transactions.add(newTx);
+                                    _data.transactions.sort((a, b) =>
+                                        a.timestamp.compareTo(b.timestamp));
+                                  },
+                                );
+
+                                if (!isSaved) {
+                                  if (mounted) {
+                                    setModalState(
+                                        () => isSubmitting = false);
+                                  }
+                                  return;
+                                }
+
+                                if (mounted) {
+                                  Navigator.pop(ctx);
+                                  CustomToast.showSuccess(
+                                    context,
+                                    title: 'Pemasukan Dicatat',
+                                    subtitle:
+                                        'Pemasukan Rp ${RupiahFormatter.format(nominal)} berhasil dicatat!',
+                                  );
+                                }
+                              },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF059669),
                           foregroundColor: Colors.white,
@@ -4363,11 +4545,21 @@ class _StrukturPageState extends State<StrukturPage> {
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: const Text(
-                          'Simpan Pemasukan',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 15),
-                        ),
+                        child: isSubmitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Simpan Pemasukan',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15),
+                              ),
                       ),
                     ),
                   ],
@@ -4400,6 +4592,7 @@ class _StrukturPageState extends State<StrukturPage> {
 
     bool amountHasError = false;
     bool noteHasError = false;
+    bool isSubmitting = false;
 
     showModalBottomSheet(
       context: context,
@@ -4879,124 +5072,154 @@ class _StrukturPageState extends State<StrukturPage> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: () {
-                          if (nominal <= 0) {
-                            setModalState(() => amountHasError = true);
-                            if (amountKey.currentContext != null) {
-                              Scrollable.ensureVisible(
-                                amountKey.currentContext!,
-                                duration: const Duration(milliseconds: 350),
-                                curve: Curves.easeInOut,
-                                alignment: 0.3,
-                              );
-                            }
-                            amountFocus.requestFocus();
-                            CustomToast.showWarning(
-                              context,
-                              title: 'Nominal Kosong',
-                              subtitle: 'Silakan masukkan Jumlah Pengeluaran (Rp)!',
-                            );
-                            return;
-                          }
+                        onPressed: isSubmitting
+                            ? null
+                            : () async {
+                                if (nominal <= 0) {
+                                  setModalState(() => amountHasError = true);
+                                  if (amountKey.currentContext != null) {
+                                    Scrollable.ensureVisible(
+                                      amountKey.currentContext!,
+                                      duration:
+                                          const Duration(milliseconds: 350),
+                                      curve: Curves.easeInOut,
+                                      alignment: 0.3,
+                                    );
+                                  }
+                                  amountFocus.requestFocus();
+                                  CustomToast.showWarning(
+                                    context,
+                                    title: 'Nominal Kosong',
+                                    subtitle:
+                                        'Silakan masukkan Jumlah Pengeluaran (Rp)!',
+                                  );
+                                  return;
+                                }
 
-                          if (!isSaldoCukup) {
-                            setModalState(() => amountHasError = true);
-                            if (amountKey.currentContext != null) {
-                              Scrollable.ensureVisible(
-                                amountKey.currentContext!,
-                                duration: const Duration(milliseconds: 350),
-                                curve: Curves.easeInOut,
-                                alignment: 0.3,
-                              );
-                            }
-                            amountFocus.requestFocus();
-                            CustomToast.showError(
-                              context,
-                              title: 'Saldo Tidak Cukup',
-                              subtitle: 'Saldo $sourceName tidak mencukupi! (Saldo: Rp ${RupiahFormatter.format(sourceBalance)})',
-                            );
-                            return;
-                          }
+                                if (!isSaldoCukup) {
+                                  setModalState(() => amountHasError = true);
+                                  if (amountKey.currentContext != null) {
+                                    Scrollable.ensureVisible(
+                                      amountKey.currentContext!,
+                                      duration:
+                                          const Duration(milliseconds: 350),
+                                      curve: Curves.easeInOut,
+                                      alignment: 0.3,
+                                    );
+                                  }
+                                  amountFocus.requestFocus();
+                                  CustomToast.showError(
+                                    context,
+                                    title: 'Saldo Tidak Cukup',
+                                    subtitle:
+                                        'Saldo $sourceName tidak mencukupi! (Saldo: Rp ${RupiahFormatter.format(sourceBalance)})',
+                                  );
+                                  return;
+                                }
 
-                          if (noteCtrl.text.trim().isEmpty) {
-                            setModalState(() => noteHasError = true);
-                            if (noteKey.currentContext != null) {
-                              Scrollable.ensureVisible(
-                                noteKey.currentContext!,
-                                duration: const Duration(milliseconds: 350),
-                                curve: Curves.easeInOut,
-                                alignment: 0.3,
-                              );
-                            }
-                            noteFocus.requestFocus();
-                            CustomToast.showWarning(
-                              context,
-                              title: 'Keperluan Kosong',
-                              subtitle: 'Keterangan Keperluan wajib diisi!',
-                            );
-                            return;
-                          }
+                                if (noteCtrl.text.trim().isEmpty) {
+                                  setModalState(() => noteHasError = true);
+                                  if (noteKey.currentContext != null) {
+                                    Scrollable.ensureVisible(
+                                      noteKey.currentContext!,
+                                      duration:
+                                          const Duration(milliseconds: 350),
+                                      curve: Curves.easeInOut,
+                                      alignment: 0.3,
+                                    );
+                                  }
+                                  noteFocus.requestFocus();
+                                  CustomToast.showWarning(
+                                    context,
+                                    title: 'Keperluan Kosong',
+                                    subtitle:
+                                        'Keterangan Keperluan wajib diisi!',
+                                  );
+                                  return;
+                                }
 
-                          if (_isAccountExceeded(sourceAccount, additionalCount: 1)) {
-                            final isOnHand = sourceAccount == 'debit' || sourceAccount == 'cash';
-                            _showCapacityExceededDialog(
-                              accountType: sourceAccount,
-                              currentCount: isOnHand ? _currentOnHandCount : _currentRekeningCount,
-                              targetContext: context,
-                            );
-                            return;
-                          }
+                                if (_isAccountExceeded(sourceAccount,
+                                    additionalCount: 1)) {
+                                  final isOnHand = sourceAccount == 'debit' ||
+                                      sourceAccount == 'cash';
+                                  _showCapacityExceededDialog(
+                                    accountType: sourceAccount,
+                                    currentCount: isOnHand
+                                        ? _currentOnHandCount
+                                        : _currentRekeningCount,
+                                    targetContext: context,
+                                  );
+                                  return;
+                                }
 
-                          final keterangan = noteCtrl.text.trim();
-                          final autoKu =
-                              StrukturTransaction.resolveKuFromText(
-                                  keterangan,
-                                  customRules: _data.customKodeRules);
-                          final autoKode =
-                              StrukturTransaction.resolveKodeFromText(
-                                  keterangan,
-                                  customRules: _data.customKodeRules);
+                                setModalState(() => isSubmitting = true);
 
-                          final newTx = StrukturTransaction(
-                            id: DateTime.now()
-                                .microsecondsSinceEpoch
-                                .toString(),
-                            title: keterangan,
-                            type: 'pengeluaran',
-                            sourceAccount: sourceAccount,
-                            amount: nominal,
-                            adminFee: 0,
-                            note: keterangan,
-                            ku: autoKu != '-' ? autoKu : null,
-                            kode: autoKode != '-' ? autoKode : null,
-                            timestamp: selectedDate,
-                          );
+                                final keterangan = noteCtrl.text.trim();
+                                final autoKu =
+                                    StrukturTransaction.resolveKuFromText(
+                                        keterangan,
+                                        customRules:
+                                            _data.customKodeRules);
+                                final autoKode =
+                                    StrukturTransaction.resolveKodeFromText(
+                                        keterangan,
+                                        customRules:
+                                            _data.customKodeRules);
 
-                          setState(() {
-                            // 1. Kurangi Saldo Sumber
-                            if (sourceAccount == 'rekening') {
-                              _data.rekeningStruktur.balance -= nominal;
-                            } else if (sourceAccount == 'debit') {
-                              _data.onHandDebit.balance -= nominal;
-                            } else {
-                              _data.onHandCash.balance -= nominal;
-                            }
+                                final newTx = StrukturTransaction(
+                                  id: DateTime.now()
+                                      .microsecondsSinceEpoch
+                                      .toString(),
+                                  title: keterangan,
+                                  type: 'pengeluaran',
+                                  sourceAccount: sourceAccount,
+                                  amount: nominal,
+                                  adminFee: 0,
+                                  note: keterangan,
+                                  ku: autoKu != '-' ? autoKu : null,
+                                  kode: autoKode != '-' ? autoKode : null,
+                                  timestamp: selectedDate,
+                                );
 
-                            // 2. Catat Transaksi (Tambahkan dan urutkan chronological berdasarkan tanggal)
-                            _data.transactions.add(newTx);
-                            _data.transactions.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-                          });
+                                final isSaved =
+                                    await _preCheckAndSyncBeforeSave(
+                                  context: context,
+                                  applyLocalChanges: () {
+                                    // 1. Kurangi Saldo Sumber
+                                    if (sourceAccount == 'rekening') {
+                                      _data.rekeningStruktur.balance -=
+                                          nominal;
+                                    } else if (sourceAccount == 'debit') {
+                                      _data.onHandDebit.balance -= nominal;
+                                    } else {
+                                      _data.onHandCash.balance -= nominal;
+                                    }
 
-                          _saveData();
-                          _triggerAutoSyncSheets();
-                          Navigator.pop(ctx);
+                                    // 2. Catat Transaksi
+                                    _data.transactions.add(newTx);
+                                    _data.transactions.sort((a, b) =>
+                                        a.timestamp.compareTo(b.timestamp));
+                                  },
+                                );
 
-                          CustomToast.showSuccess(
-                            context,
-                            title: 'Pengeluaran Dicatat',
-                            subtitle: 'Pengeluaran Rp ${RupiahFormatter.format(nominal)} berhasil dicatat!',
-                          );
-                        },
+                                if (!isSaved) {
+                                  if (mounted) {
+                                    setModalState(
+                                        () => isSubmitting = false);
+                                  }
+                                  return;
+                                }
+
+                                if (mounted) {
+                                  Navigator.pop(ctx);
+                                  CustomToast.showSuccess(
+                                    context,
+                                    title: 'Pengeluaran Dicatat',
+                                    subtitle:
+                                        'Pengeluaran Rp ${RupiahFormatter.format(nominal)} berhasil dicatat!',
+                                  );
+                                }
+                              },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFE11D48),
                           foregroundColor: Colors.white,
@@ -5004,11 +5227,21 @@ class _StrukturPageState extends State<StrukturPage> {
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: const Text(
-                          'Simpan Pengeluaran',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 15),
-                        ),
+                        child: isSubmitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Simpan Pengeluaran',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15),
+                              ),
                       ),
                     ),
                   ],
@@ -5056,6 +5289,7 @@ class _StrukturPageState extends State<StrukturPage> {
     final amountFocus = FocusNode();
 
     bool amountHasError = false;
+    bool isSubmitting = false;
 
     showModalBottomSheet(
       context: context,
@@ -5709,219 +5943,295 @@ class _StrukturPageState extends State<StrukturPage> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: () {
-                          if (nominal <= 0) {
-                            setModalState(() => amountHasError = true);
-                            if (amountKey.currentContext != null) {
-                              Scrollable.ensureVisible(
-                                amountKey.currentContext!,
-                                duration: const Duration(milliseconds: 350),
-                                curve: Curves.easeInOut,
-                                alignment: 0.3,
-                              );
-                            }
-                            amountFocus.requestFocus();
-                            CustomToast.showWarning(
-                              context,
-                              title: 'Nominal Kosong',
-                              subtitle: 'Silakan masukkan Nominal Alokasi (Rp)!',
-                            );
-                            return;
-                          }
+                        onPressed: isSubmitting
+                            ? null
+                            : () async {
+                                if (nominal <= 0) {
+                                  setModalState(() => amountHasError = true);
+                                  if (amountKey.currentContext != null) {
+                                    Scrollable.ensureVisible(
+                                      amountKey.currentContext!,
+                                      duration:
+                                          const Duration(milliseconds: 350),
+                                      curve: Curves.easeInOut,
+                                      alignment: 0.3,
+                                    );
+                                  }
+                                  amountFocus.requestFocus();
+                                  CustomToast.showWarning(
+                                    context,
+                                    title: 'Nominal Kosong',
+                                    subtitle:
+                                        'Silakan masukkan Nominal Alokasi (Rp)!',
+                                  );
+                                  return;
+                                }
 
-                          if (!isSaldoCukup) {
-                            setModalState(() => amountHasError = true);
-                            if (amountKey.currentContext != null) {
-                              Scrollable.ensureVisible(
-                                amountKey.currentContext!,
-                                duration: const Duration(milliseconds: 350),
-                                curve: Curves.easeInOut,
-                                alignment: 0.3,
-                              );
-                            }
-                            amountFocus.requestFocus();
-                            CustomToast.showError(
-                              context,
-                              title: 'Saldo Tidak Cukup',
-                              subtitle: 'Saldo $sourceName tidak mencukupi untuk distribusi ini! (Saldo: Rp ${RupiahFormatter.format(sourceBalance)})',
-                            );
-                            return;
-                          }
+                                if (!isSaldoCukup) {
+                                  setModalState(() => amountHasError = true);
+                                  if (amountKey.currentContext != null) {
+                                    Scrollable.ensureVisible(
+                                      amountKey.currentContext!,
+                                      duration:
+                                          const Duration(milliseconds: 350),
+                                      curve: Curves.easeInOut,
+                                      alignment: 0.3,
+                                    );
+                                  }
+                                  amountFocus.requestFocus();
+                                  CustomToast.showError(
+                                    context,
+                                    title: 'Saldo Tidak Cukup',
+                                    subtitle:
+                                        'Saldo $sourceName tidak mencukupi untuk distribusi ini! (Saldo: Rp ${RupiahFormatter.format(sourceBalance)})',
+                                  );
+                                  return;
+                                }
 
-                          int addedToRekening = 0;
-                          int addedToOnHand = 0;
+                                int addedToRekening = 0;
+                                int addedToOnHand = 0;
 
-                          if (sourceAccount == 'rekening') {
-                            addedToRekening += (adminFee > 0 ? 2 : 1);
-                          } else {
-                            addedToOnHand += (adminFee > 0 ? 2 : 1);
-                          }
+                                if (sourceAccount == 'rekening') {
+                                  addedToRekening += (adminFee > 0 ? 2 : 1);
+                                } else {
+                                  addedToOnHand += (adminFee > 0 ? 2 : 1);
+                                }
 
-                          if (targetAccount == 'rekening') {
-                            addedToRekening += 1;
-                          } else {
-                            addedToOnHand += 1;
-                          }
+                                if (targetAccount == 'rekening') {
+                                  addedToRekening += 1;
+                                } else {
+                                  addedToOnHand += 1;
+                                }
 
-                          if (addedToRekening > 0 && _sheetsConfig.isRekeningExceeded(_currentRekeningCount + addedToRekening)) {
-                            _showCapacityExceededDialog(
-                              accountType: 'rekening',
-                              currentCount: _currentRekeningCount,
-                              targetContext: context,
-                            );
-                            return;
-                          }
+                                if (addedToRekening > 0 &&
+                                    _sheetsConfig.isRekeningExceeded(
+                                        _currentRekeningCount +
+                                            addedToRekening)) {
+                                  _showCapacityExceededDialog(
+                                    accountType: 'rekening',
+                                    currentCount: _currentRekeningCount,
+                                    targetContext: context,
+                                  );
+                                  return;
+                                }
 
-                          if (addedToOnHand > 0 && _sheetsConfig.isOnHandExceeded(_currentOnHandCount + addedToOnHand)) {
-                            _showCapacityExceededDialog(
-                              accountType: 'onhand',
-                              currentCount: _currentOnHandCount,
-                              targetContext: context,
-                            );
-                            return;
-                          }
+                                if (addedToOnHand > 0 &&
+                                    _sheetsConfig.isOnHandExceeded(
+                                        _currentOnHandCount + addedToOnHand)) {
+                                  _showCapacityExceededDialog(
+                                    accountType: 'onhand',
+                                    currentCount: _currentOnHandCount,
+                                    targetContext: context,
+                                  );
+                                  return;
+                                }
 
-                          setState(() {
-                            // 1. Kurangi Saldo Sumber
-                            if (sourceAccount == 'rekening') {
-                              _data.rekeningStruktur.balance -= totalPotongan;
-                            } else if (sourceAccount == 'debit') {
-                              _data.onHandDebit.balance -= totalPotongan;
-                            } else {
-                              _data.onHandCash.balance -= totalPotongan;
-                            }
+                                setModalState(() => isSubmitting = true);
 
-                            // 2. Tambah Saldo Tujuan
-                            if (targetAccount == 'rekening') {
-                              _data.rekeningStruktur.balance += nominal;
-                            } else if (targetAccount == 'debit') {
-                              _data.onHandDebit.balance += nominal;
-                            } else {
-                              _data.onHandCash.balance += nominal;
-                            }
+                                final noteText = noteCtrl.text.trim();
 
-                            final noteText = noteCtrl.text.trim();
+                                // Penentuan deskripsi default untuk akun sumber (Kredit/Keluar) & target (Debit/Masuk)
+                                String defaultSourceTitle = '';
+                                String defaultTargetTitle = '';
 
-                            // Penentuan deskripsi default untuk akun sumber (Kredit/Keluar) & target (Debit/Masuk)
-                            String defaultSourceTitle = '';
-                            String defaultTargetTitle = '';
+                                if (sourceAccount == 'rekening' &&
+                                    targetAccount == 'cash') {
+                                  defaultSourceTitle =
+                                      'Tarik Tunai ke Kas (On Hand)';
+                                  defaultTargetTitle =
+                                      'Tarik Tunai dari Rekening';
+                                } else if (sourceAccount == 'rekening' &&
+                                    targetAccount == 'debit') {
+                                  defaultSourceTitle =
+                                      'Transfer ke On Hand Debit';
+                                  defaultTargetTitle =
+                                      'Transfer dari Rekening Struktur';
+                                } else if (sourceAccount == 'cash' &&
+                                    targetAccount == 'rekening') {
+                                  defaultSourceTitle =
+                                      'Setor Tunai ke Rekening Struktur';
+                                  defaultTargetTitle =
+                                      'Setor Tunai dari Kas On Hand';
+                                } else if (sourceAccount == 'debit' &&
+                                    targetAccount == 'rekening') {
+                                  defaultSourceTitle =
+                                      'Transfer On Hand Debit ke Rekening';
+                                  defaultTargetTitle =
+                                      'Transfer dari On Hand Debit';
+                                } else if (sourceAccount == 'debit' &&
+                                    targetAccount == 'cash') {
+                                  defaultSourceTitle =
+                                      'Tarik Tunai via ATM Debit';
+                                  defaultTargetTitle =
+                                      'Terima Tunai dari ATM Debit';
+                                } else if (sourceAccount == 'cash' &&
+                                    targetAccount == 'debit') {
+                                  defaultSourceTitle =
+                                      'Setor Tunai ke On Hand Debit';
+                                  defaultTargetTitle =
+                                      'Top-up Debit dari Kas Tunai';
+                                } else {
+                                  defaultSourceTitle = flowLabel;
+                                  defaultTargetTitle = flowLabel;
+                                }
 
-                            if (sourceAccount == 'rekening' && targetAccount == 'cash') {
-                              defaultSourceTitle = 'Tarik Tunai ke Kas (On Hand)';
-                              defaultTargetTitle = 'Tarik Tunai dari Rekening';
-                            } else if (sourceAccount == 'rekening' && targetAccount == 'debit') {
-                              defaultSourceTitle = 'Transfer ke On Hand Debit';
-                              defaultTargetTitle = 'Transfer dari Rekening Struktur';
-                            } else if (sourceAccount == 'cash' && targetAccount == 'rekening') {
-                              defaultSourceTitle = 'Setor Tunai ke Rekening Struktur';
-                              defaultTargetTitle = 'Setor Tunai dari Kas On Hand';
-                            } else if (sourceAccount == 'debit' && targetAccount == 'rekening') {
-                              defaultSourceTitle = 'Transfer On Hand Debit ke Rekening';
-                              defaultTargetTitle = 'Transfer dari On Hand Debit';
-                            } else if (sourceAccount == 'debit' && targetAccount == 'cash') {
-                              defaultSourceTitle = 'Tarik Tunai via ATM Debit';
-                              defaultTargetTitle = 'Terima Tunai dari ATM Debit';
-                            } else if (sourceAccount == 'cash' && targetAccount == 'debit') {
-                              defaultSourceTitle = 'Setor Tunai ke On Hand Debit';
-                              defaultTargetTitle = 'Top-up Debit dari Kas Tunai';
-                            } else {
-                              defaultSourceTitle = flowLabel;
-                              defaultTargetTitle = flowLabel;
-                            }
+                                final txSourceTitle = noteText.isNotEmpty
+                                    ? noteText
+                                    : defaultSourceTitle;
+                                final txTargetTitle = noteText.isNotEmpty
+                                    ? noteText
+                                    : defaultTargetTitle;
 
-                            final txSourceTitle = noteText.isNotEmpty ? noteText : defaultSourceTitle;
-                            final txTargetTitle = noteText.isNotEmpty ? noteText : defaultTargetTitle;
+                                final autoKuSource =
+                                    StrukturTransaction.resolveKuFromText(
+                                  txSourceTitle,
+                                  customRules: _data.customKodeRules,
+                                );
+                                final autoKodeSource =
+                                    StrukturTransaction.resolveKodeFromText(
+                                  txSourceTitle,
+                                  customRules: _data.customKodeRules,
+                                );
 
-                            final autoKuSource = StrukturTransaction.resolveKuFromText(
-                              txSourceTitle,
-                              customRules: _data.customKodeRules,
-                            );
-                            final autoKodeSource = StrukturTransaction.resolveKodeFromText(
-                              txSourceTitle,
-                              customRules: _data.customKodeRules,
-                            );
+                                final autoKuTarget =
+                                    StrukturTransaction.resolveKuFromText(
+                                  txTargetTitle,
+                                  customRules: _data.customKodeRules,
+                                );
+                                final autoKodeTarget =
+                                    StrukturTransaction.resolveKodeFromText(
+                                  txTargetTitle,
+                                  customRules: _data.customKodeRules,
+                                );
 
-                            final autoKuTarget = StrukturTransaction.resolveKuFromText(
-                              txTargetTitle,
-                              customRules: _data.customKodeRules,
-                            );
-                            final autoKodeTarget = StrukturTransaction.resolveKodeFromText(
-                              txTargetTitle,
-                              customRules: _data.customKodeRules,
-                            );
+                                final nowMicro =
+                                    DateTime.now().microsecondsSinceEpoch;
 
-                            final nowMicro = DateTime.now().microsecondsSinceEpoch;
-
-                            // 3. Catat Transaksi KREDIT (Pengeluaran / Keluar) pada Akun Sumber
-                            final kreditTx = StrukturTransaction(
-                              id: nowMicro.toString(),
-                              title: txSourceTitle,
-                              type: 'pengeluaran',
-                              sourceAccount: sourceAccount,
-                              targetAccount: targetAccount,
-                              amount: nominal,
-                              adminFee: 0,
-                              note: noteText.isNotEmpty ? noteText : defaultSourceTitle,
-                              ku: autoKuSource != '-' ? autoKuSource : null,
-                              kode: autoKodeSource != '-' ? autoKodeSource : null,
-                              timestamp: selectedDate,
-                              isInternalTransfer: true,
-                            );
-                            _data.transactions.add(kreditTx);
-
-                            // 4. Catat Transaksi DEBIT (Pemasukan / Masuk) pada Akun Tujuan
-                            final debitTx = StrukturTransaction(
-                              id: (nowMicro + 1).toString(),
-                              title: txTargetTitle,
-                              type: 'pemasukan',
-                              sourceAccount: sourceAccount,
-                              targetAccount: targetAccount,
-                              amount: nominal,
-                              adminFee: 0,
-                              note: noteText.isNotEmpty ? noteText : defaultTargetTitle,
-                              ku: autoKuTarget != '-' ? autoKuTarget : null,
-                              kode: autoKodeTarget != '-' ? autoKodeTarget : null,
-                              timestamp: selectedDate,
-                              isInternalTransfer: true,
-                            );
-                            _data.transactions.add(debitTx);
-
-                            // 5. Catat Pengeluaran untuk Admin Bank jika ada
-                            if (adminFee > 0) {
-                              final feeKu = StrukturTransaction.resolveKuFromText('Admin bank', customRules: _data.customKodeRules);
-                              final feeKode = StrukturTransaction.resolveKodeFromText('Adm Bank/Pajak', customRules: _data.customKodeRules);
-
-                              _data.transactions.add(
-                                StrukturTransaction(
-                                  id: (nowMicro + 2).toString(),
-                                  title: 'Admin bank transfer beda bank',
+                                // 3. Catat Transaksi KREDIT (Pengeluaran / Keluar) pada Akun Sumber
+                                final kreditTx = StrukturTransaction(
+                                  id: nowMicro.toString(),
+                                  title: txSourceTitle,
                                   type: 'pengeluaran',
                                   sourceAccount: sourceAccount,
-                                  amount: adminFee,
+                                  targetAccount: targetAccount,
+                                  amount: nominal,
                                   adminFee: 0,
                                   note: noteText.isNotEmpty
-                                      ? 'Admin bank - $noteText'
-                                      : 'Admin bank transfer beda bank',
-                                  ku: feeKu != '-' ? feeKu : 'SDK',
-                                  kode: feeKode != '-' ? feeKode : 'Adm Bank/Pajak',
+                                      ? noteText
+                                      : defaultSourceTitle,
+                                  ku: autoKuSource != '-' ? autoKuSource : null,
+                                  kode: autoKodeSource != '-'
+                                      ? autoKodeSource
+                                      : null,
                                   timestamp: selectedDate,
-                                ),
-                              );
-                            }
+                                  isInternalTransfer: true,
+                                );
 
-                            _data.transactions.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-                          });
+                                // 4. Catat Transaksi DEBIT (Pemasukan / Masuk) pada Akun Tujuan
+                                final debitTx = StrukturTransaction(
+                                  id: (nowMicro + 1).toString(),
+                                  title: txTargetTitle,
+                                  type: 'pemasukan',
+                                  sourceAccount: sourceAccount,
+                                  targetAccount: targetAccount,
+                                  amount: nominal,
+                                  adminFee: 0,
+                                  note: noteText.isNotEmpty
+                                      ? noteText
+                                      : defaultTargetTitle,
+                                  ku: autoKuTarget != '-' ? autoKuTarget : null,
+                                  kode: autoKodeTarget != '-'
+                                      ? autoKodeTarget
+                                      : null,
+                                  timestamp: selectedDate,
+                                  isInternalTransfer: true,
+                                );
 
-                          _saveData();
-                          _triggerAutoSyncSheets();
-                          Navigator.pop(ctx);
+                                // 5. Catat Pengeluaran untuk Admin Bank jika ada
+                                StrukturTransaction? feeTx;
+                                if (adminFee > 0) {
+                                  final feeKu =
+                                      StrukturTransaction.resolveKuFromText(
+                                          'Admin bank',
+                                          customRules: _data.customKodeRules);
+                                  final feeKode =
+                                      StrukturTransaction.resolveKodeFromText(
+                                          'Adm Bank/Pajak',
+                                          customRules: _data.customKodeRules);
 
-                          CustomToast.showSuccess(
-                            context,
-                            title: 'Alokasi Berhasil',
-                            subtitle: 'Alokasi dana berhasil ($flowLabel)!',
-                          );
-                        },
+                                  feeTx = StrukturTransaction(
+                                    id: (nowMicro + 2).toString(),
+                                    title: 'Admin bank transfer beda bank',
+                                    type: 'pengeluaran',
+                                    sourceAccount: sourceAccount,
+                                    amount: adminFee,
+                                    adminFee: 0,
+                                    note: noteText.isNotEmpty
+                                        ? 'Admin bank - $noteText'
+                                        : 'Admin bank transfer beda bank',
+                                    ku: feeKu != '-' ? feeKu : 'SDK',
+                                    kode: feeKode != '-'
+                                        ? feeKode
+                                        : 'Adm Bank/Pajak',
+                                    timestamp: selectedDate,
+                                  );
+                                }
+
+                                final isSaved =
+                                    await _preCheckAndSyncBeforeSave(
+                                  context: context,
+                                  applyLocalChanges: () {
+                                    // 1. Kurangi Saldo Sumber
+                                    if (sourceAccount == 'rekening') {
+                                      _data.rekeningStruktur.balance -=
+                                          totalPotongan;
+                                    } else if (sourceAccount == 'debit') {
+                                      _data.onHandDebit.balance -=
+                                          totalPotongan;
+                                    } else {
+                                      _data.onHandCash.balance -=
+                                          totalPotongan;
+                                    }
+
+                                    // 2. Tambah Saldo Tujuan
+                                    if (targetAccount == 'rekening') {
+                                      _data.rekeningStruktur.balance +=
+                                          nominal;
+                                    } else if (targetAccount == 'debit') {
+                                      _data.onHandDebit.balance += nominal;
+                                    } else {
+                                      _data.onHandCash.balance += nominal;
+                                    }
+
+                                    _data.transactions.add(kreditTx);
+                                    _data.transactions.add(debitTx);
+                                    if (feeTx != null) {
+                                      _data.transactions.add(feeTx);
+                                    }
+
+                                    _data.transactions.sort((a, b) =>
+                                        a.timestamp.compareTo(b.timestamp));
+                                  },
+                                );
+
+                                if (!isSaved) {
+                                  if (mounted) {
+                                    setModalState(
+                                        () => isSubmitting = false);
+                                  }
+                                  return;
+                                }
+
+                                if (mounted) {
+                                  Navigator.pop(ctx);
+                                  CustomToast.showSuccess(
+                                    context,
+                                    title: 'Alokasi Berhasil',
+                                    subtitle:
+                                        'Alokasi dana berhasil ($flowLabel)!',
+                                  );
+                                }
+                              },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryPurple,
                           foregroundColor: Colors.white,
@@ -5929,11 +6239,21 @@ class _StrukturPageState extends State<StrukturPage> {
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: const Text(
-                          'Konfirmasi Alokasi Dana',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 15),
-                        ),
+                        child: isSubmitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Konfirmasi Alokasi Dana',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15),
+                              ),
                       ),
                     ),
                   ],
@@ -5979,6 +6299,7 @@ class _StrukturPageState extends State<StrukturPage> {
 
     bool amountHasError = false;
     bool noteHasError = false;
+    bool isSubmitting = false;
 
     // Kumpulkan daftar opsi KU unik
     final List<String> kuOptions = [
@@ -6652,201 +6973,253 @@ class _StrukturPageState extends State<StrukturPage> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton.icon(
-                        onPressed: () async {
-                          if (newAmount <= 0) {
-                            setModalState(() => amountHasError = true);
-                            if (amountKey.currentContext != null) {
-                              Scrollable.ensureVisible(
-                                amountKey.currentContext!,
-                                duration: const Duration(milliseconds: 350),
-                                curve: Curves.easeInOut,
-                                alignment: 0.3,
-                              );
-                            }
-                            amountFocus.requestFocus();
-                            CustomToast.showWarning(
-                              context,
-                              title: 'Nominal Kosong',
-                              subtitle: 'Silakan masukkan Jumlah Nominal (Rp)!',
-                            );
-                            return;
-                          }
+                        onPressed: isSubmitting
+                            ? null
+                            : () async {
+                                if (newAmount <= 0) {
+                                  setModalState(() => amountHasError = true);
+                                  if (amountKey.currentContext != null) {
+                                    Scrollable.ensureVisible(
+                                      amountKey.currentContext!,
+                                      duration:
+                                          const Duration(milliseconds: 350),
+                                      curve: Curves.easeInOut,
+                                      alignment: 0.3,
+                                    );
+                                  }
+                                  amountFocus.requestFocus();
+                                  CustomToast.showWarning(
+                                    context,
+                                    title: 'Nominal Kosong',
+                                    subtitle:
+                                        'Silakan masukkan Jumlah Nominal (Rp)!',
+                                  );
+                                  return;
+                                }
 
-                          if (!isSaldoCukup) {
-                            setModalState(() => amountHasError = true);
-                            if (amountKey.currentContext != null) {
-                              Scrollable.ensureVisible(
-                                amountKey.currentContext!,
-                                duration: const Duration(milliseconds: 350),
-                                curve: Curves.easeInOut,
-                                alignment: 0.3,
-                              );
-                            }
-                            amountFocus.requestFocus();
-                            CustomToast.showError(
-                              context,
-                              title: 'Saldo Tidak Cukup',
-                              subtitle: 'Saldo $accountName tidak mencukupi! (Tersedia: Rp ${RupiahFormatter.format(availableBalance)})',
-                            );
-                            return;
-                          }
+                                if (!isSaldoCukup) {
+                                  setModalState(() => amountHasError = true);
+                                  if (amountKey.currentContext != null) {
+                                    Scrollable.ensureVisible(
+                                      amountKey.currentContext!,
+                                      duration:
+                                          const Duration(milliseconds: 350),
+                                      curve: Curves.easeInOut,
+                                      alignment: 0.3,
+                                    );
+                                  }
+                                  amountFocus.requestFocus();
+                                  CustomToast.showError(
+                                    context,
+                                    title: 'Saldo Tidak Cukup',
+                                    subtitle:
+                                        'Saldo $accountName tidak mencukupi! (Tersedia: Rp ${RupiahFormatter.format(availableBalance)})',
+                                  );
+                                  return;
+                                }
 
-                          if (noteCtrl.text.trim().isEmpty) {
-                            setModalState(() => noteHasError = true);
-                            if (noteKey.currentContext != null) {
-                              Scrollable.ensureVisible(
-                                noteKey.currentContext!,
-                                duration: const Duration(milliseconds: 350),
-                                curve: Curves.easeInOut,
-                                alignment: 0.3,
-                              );
-                            }
-                            noteFocus.requestFocus();
-                            CustomToast.showWarning(
-                              context,
-                              title: 'Keterangan Kosong',
-                              subtitle: 'Keterangan transaksi wajib diisi!',
-                            );
-                            return;
-                          }
+                                if (noteCtrl.text.trim().isEmpty) {
+                                  setModalState(() => noteHasError = true);
+                                  if (noteKey.currentContext != null) {
+                                    Scrollable.ensureVisible(
+                                      noteKey.currentContext!,
+                                      duration:
+                                          const Duration(milliseconds: 350),
+                                      curve: Curves.easeInOut,
+                                      alignment: 0.3,
+                                    );
+                                  }
+                                  noteFocus.requestFocus();
+                                  CustomToast.showWarning(
+                                    context,
+                                    title: 'Keterangan Kosong',
+                                    subtitle:
+                                        'Keterangan transaksi wajib diisi!',
+                                  );
+                                  return;
+                                }
 
-                          final bool oldIsOnHand = tx.isPemasukan
-                              ? (tx.targetAccount == 'debit' || tx.targetAccount == 'cash')
-                              : (tx.sourceAccount == 'debit' || tx.sourceAccount == 'cash');
-                          final bool newIsOnHand = selectedAccount == 'debit' || selectedAccount == 'cash';
+                                final bool oldIsOnHand = tx.isPemasukan
+                                    ? (tx.targetAccount == 'debit' ||
+                                        tx.targetAccount == 'cash')
+                                    : (tx.sourceAccount == 'debit' ||
+                                        tx.sourceAccount == 'cash');
+                                final bool newIsOnHand =
+                                    selectedAccount == 'debit' ||
+                                        selectedAccount == 'cash';
 
-                          if (!oldIsOnHand && newIsOnHand) {
-                            if (_isAccountExceeded(selectedAccount, additionalCount: 1)) {
-                              _showCapacityExceededDialog(
-                                accountType: selectedAccount,
-                                currentCount: _currentOnHandCount,
-                                targetContext: context,
-                              );
-                              return;
-                            }
-                          } else if (oldIsOnHand && !newIsOnHand) {
-                            if (_isAccountExceeded(selectedAccount, additionalCount: 1)) {
-                              _showCapacityExceededDialog(
-                                accountType: selectedAccount,
-                                currentCount: _currentRekeningCount,
-                                targetContext: context,
-                              );
-                              return;
-                            }
-                          }
+                                if (!oldIsOnHand && newIsOnHand) {
+                                  if (_isAccountExceeded(selectedAccount,
+                                      additionalCount: 1)) {
+                                    _showCapacityExceededDialog(
+                                      accountType: selectedAccount,
+                                      currentCount: _currentOnHandCount,
+                                      targetContext: context,
+                                    );
+                                    return;
+                                  }
+                                } else if (oldIsOnHand && !newIsOnHand) {
+                                  if (_isAccountExceeded(selectedAccount,
+                                      additionalCount: 1)) {
+                                    _showCapacityExceededDialog(
+                                      accountType: selectedAccount,
+                                      currentCount: _currentRekeningCount,
+                                      targetContext: context,
+                                    );
+                                    return;
+                                  }
+                                }
 
-                          final noteText = noteCtrl.text.trim();
+                                setModalState(() => isSubmitting = true);
 
-                          setState(() {
-                            // 1. Rollback saldo transaksi lama
-                            if (tx.isPemasukan) {
-                              if (tx.targetAccount == 'rekening' || tx.targetAccount == null) {
-                                _data.rekeningStruktur.balance -= tx.amount;
-                              } else if (tx.targetAccount == 'debit') {
-                                _data.onHandDebit.balance -= tx.amount;
-                              } else if (tx.targetAccount == 'cash') {
-                                _data.onHandCash.balance -= tx.amount;
-                              }
-                            } else if (tx.isPengeluaran) {
-                              if (tx.sourceAccount == 'rekening' || tx.sourceAccount == null) {
-                                _data.rekeningStruktur.balance += tx.totalDeduction;
-                              } else if (tx.sourceAccount == 'debit') {
-                                _data.onHandDebit.balance += tx.totalDeduction;
-                              } else if (tx.sourceAccount == 'cash') {
-                                _data.onHandCash.balance += tx.totalDeduction;
-                              }
-                            }
+                                final noteText = noteCtrl.text.trim();
+                                final resolvedKu = manualKu != '-'
+                                    ? manualKu
+                                    : (autoKuPreview != '-'
+                                        ? autoKuPreview
+                                        : null);
+                                final resolvedKode = manualKode != '-'
+                                    ? manualKode
+                                    : (autoKodePreview != '-'
+                                        ? autoKodePreview
+                                        : null);
 
-                            if (_data.rekeningStruktur.balance < 0) _data.rekeningStruktur.balance = 0;
-                            if (_data.onHandDebit.balance < 0) _data.onHandDebit.balance = 0;
-                            if (_data.onHandCash.balance < 0) _data.onHandCash.balance = 0;
+                                final updatedTx = StrukturTransaction(
+                                  id: tx.id,
+                                  title: noteText,
+                                  type: tx.type,
+                                  sourceAccount: isPengeluaran
+                                      ? selectedAccount
+                                      : tx.sourceAccount,
+                                  targetAccount: isPemasukan
+                                      ? selectedAccount
+                                      : tx.targetAccount,
+                                  manualSource: tx.manualSource,
+                                  amount: newAmount,
+                                  adminFee: tx.adminFee,
+                                  note: noteText,
+                                  ku: resolvedKu,
+                                  kode: resolvedKode,
+                                  timestamp: selectedDate,
+                                  isInternalTransfer: tx.isInternalTransfer,
+                                );
 
-                            // 2. Tambah/Kurangi saldo baru
-                            if (isPemasukan) {
-                              if (selectedAccount == 'rekening') {
-                                _data.rekeningStruktur.balance += newAmount;
-                              } else if (selectedAccount == 'debit') {
-                                _data.onHandDebit.balance += newAmount;
-                              } else if (selectedAccount == 'cash') {
-                                _data.onHandCash.balance += newAmount;
-                              }
-                            } else if (isPengeluaran) {
-                              if (selectedAccount == 'rekening') {
-                                _data.rekeningStruktur.balance -= newAmount;
-                              } else if (selectedAccount == 'debit') {
-                                _data.onHandDebit.balance -= newAmount;
-                              } else if (selectedAccount == 'cash') {
-                                _data.onHandCash.balance -= newAmount;
-                              }
-                            }
+                                final isSaved =
+                                    await _preCheckAndSyncBeforeSave(
+                                  context: context,
+                                  applyLocalChanges: () {
+                                    // 1. Rollback saldo transaksi lama
+                                    if (tx.isPemasukan) {
+                                      if (tx.targetAccount == 'rekening' ||
+                                          tx.targetAccount == null) {
+                                        _data.rekeningStruktur.balance -=
+                                            tx.amount;
+                                      } else if (tx.targetAccount == 'debit') {
+                                        _data.onHandDebit.balance -=
+                                            tx.amount;
+                                      } else if (tx.targetAccount == 'cash') {
+                                        _data.onHandCash.balance -=
+                                            tx.amount;
+                                      }
+                                    } else if (tx.isPengeluaran) {
+                                      if (tx.sourceAccount == 'rekening' ||
+                                          tx.sourceAccount == null) {
+                                        _data.rekeningStruktur.balance +=
+                                            tx.totalDeduction;
+                                      } else if (tx.sourceAccount == 'debit') {
+                                        _data.onHandDebit.balance +=
+                                            tx.totalDeduction;
+                                      } else if (tx.sourceAccount == 'cash') {
+                                        _data.onHandCash.balance +=
+                                            tx.totalDeduction;
+                                      }
+                                    }
 
-                            // 3. Update objek transaksi
-                            final resolvedKu = manualKu != '-' ? manualKu : (autoKuPreview != '-' ? autoKuPreview : null);
-                            final resolvedKode = manualKode != '-' ? manualKode : (autoKodePreview != '-' ? autoKodePreview : null);
+                                    if (_data.rekeningStruktur.balance < 0) {
+                                      _data.rekeningStruktur.balance = 0;
+                                    }
+                                    if (_data.onHandDebit.balance < 0) {
+                                      _data.onHandDebit.balance = 0;
+                                    }
+                                    if (_data.onHandCash.balance < 0) {
+                                      _data.onHandCash.balance = 0;
+                                    }
 
-                            final updatedTx = StrukturTransaction(
-                              id: tx.id,
-                              title: noteText,
-                              type: tx.type,
-                              sourceAccount: isPengeluaran ? selectedAccount : tx.sourceAccount,
-                              targetAccount: isPemasukan ? selectedAccount : tx.targetAccount,
-                              manualSource: tx.manualSource,
-                              amount: newAmount,
-                              adminFee: tx.adminFee,
-                              note: noteText,
-                              ku: resolvedKu,
-                              kode: resolvedKode,
-                              timestamp: selectedDate,
-                              isInternalTransfer: tx.isInternalTransfer,
-                            );
+                                    // 2. Tambah/Kurangi saldo baru
+                                    if (isPemasukan) {
+                                      if (selectedAccount == 'rekening') {
+                                        _data.rekeningStruktur.balance +=
+                                            newAmount;
+                                      } else if (selectedAccount == 'debit') {
+                                        _data.onHandDebit.balance +=
+                                            newAmount;
+                                      } else if (selectedAccount == 'cash') {
+                                        _data.onHandCash.balance +=
+                                            newAmount;
+                                      }
+                                    } else if (isPengeluaran) {
+                                      if (selectedAccount == 'rekening') {
+                                        _data.rekeningStruktur.balance -=
+                                            newAmount;
+                                      } else if (selectedAccount == 'debit') {
+                                        _data.onHandDebit.balance -=
+                                            newAmount;
+                                      } else if (selectedAccount == 'cash') {
+                                        _data.onHandCash.balance -=
+                                            newAmount;
+                                      }
+                                    }
 
-                            final txIndex = _data.transactions.indexWhere((item) => item.id == tx.id);
-                            if (txIndex != -1) {
-                              _data.transactions[txIndex] = updatedTx;
-                            } else {
-                              _data.transactions.add(updatedTx);
-                            }
-                            _data.transactions.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-                          });
+                                    final txIndex = _data.transactions
+                                        .indexWhere((item) => item.id == tx.id);
+                                    if (txIndex != -1) {
+                                      _data.transactions[txIndex] = updatedTx;
+                                    } else {
+                                      _data.transactions.add(updatedTx);
+                                    }
+                                    _data.transactions.sort((a, b) =>
+                                        a.timestamp.compareTo(b.timestamp));
+                                  },
+                                );
 
-                          _saveData();
+                                if (!isSaved) {
+                                  if (mounted) {
+                                    setModalState(
+                                        () => isSubmitting = false);
+                                  }
+                                  return;
+                                }
 
-                          // 4. Sinkronisasi Otomatis ke Google Spreadsheets
-                          if (_sheetsConfig.isConfigured && _sheetsConfig.hasConfiguredCells) {
-                            final allMutasi = _data.transactions
-                                .where((t) => t.isPemasukan || t.isPengeluaran)
-                                .toList()
-                              ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
-
-                            SheetsSyncService.syncAllTransactions(
-                              allMutasi,
-                              _sheetsConfig,
-                              customRules: _data.customKodeRules,
-                            ).then((res) {
-                              if (mounted) {
-                                debugPrint('Edit transaction sync result: ${res.isSuccess} - ${res.message}');
-                              }
-                            });
-                          } else {
-                            _triggerAutoSyncSheets();
-                          }
-
-                          onSaved?.call();
-                          Navigator.pop(ctx);
-
-                          CustomToast.showSuccess(
-                            context,
-                            title: 'Transaksi Diperbarui',
-                            subtitle: _sheetsConfig.isConfigured
-                                ? 'Transaksi berhasil diperbarui & disinkronkan ke Spreadsheets!'
-                                : 'Transaksi berhasil diperbarui!',
-                          );
-                        },
-                        icon: const Icon(Icons.cloud_sync_rounded, size: 18),
-                        label: const Text(
-                          'Simpan & Sinkronkan',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                        ),
+                                onSaved?.call();
+                                if (mounted) {
+                                  Navigator.pop(ctx);
+                                  CustomToast.showSuccess(
+                                    context,
+                                    title: 'Transaksi Diperbarui',
+                                    subtitle: _sheetsConfig.isConfigured
+                                        ? 'Transaksi berhasil diperbarui & disinkronkan ke Spreadsheets!'
+                                        : 'Transaksi berhasil diperbarui!',
+                                  );
+                                }
+                              },
+                        icon: isSubmitting
+                            ? null
+                            : const Icon(Icons.cloud_sync_rounded, size: 18),
+                        label: isSubmitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Simpan & Sinkronkan',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15),
+                              ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF107C41),
                           foregroundColor: Colors.white,
@@ -6957,8 +7330,7 @@ class _StrukturPageState extends State<StrukturPage> {
 
                   _data.transactions.removeWhere((item) => item.id == tx.id);
                 });
-                _saveData();
-                _triggerAutoSyncSheets(force: true);
+                _saveData().then((_) => _directSyncToSheets());
                 onDeleted?.call();
                 CustomToast.showSuccess(
                   context,
@@ -7089,8 +7461,7 @@ class _StrukturPageState extends State<StrukturPage> {
                   // Hapus semua transaksi
                   _data.transactions.clear();
                 });
-                _saveData();
-                _triggerAutoSyncSheets(force: true);
+                _saveData().then((_) => _directSyncToSheets());
                 onDeleted?.call();
                 CustomToast.showSuccess(
                   context,
