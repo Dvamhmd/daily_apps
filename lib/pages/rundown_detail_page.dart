@@ -57,9 +57,15 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
   // Touch pointer tracking for highly responsive and accurate pinch-to-zoom
   final Map<int, Offset> _activePointers = {};
+  int? _pinchPointer1;
+  int? _pinchPointer2;
   double? _initialPinchDistance;
   double _pinchStartZoom = 1.0;
   bool _isPinching = false;
+
+  // Active resize state tracking to lock scrolling and prevent jumping/shifting
+  bool _isResizingColumn = false;
+  bool _isResizingRow = false;
 
   @override
   void initState() {
@@ -136,8 +142,12 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
   void _handlePointerDown(PointerDownEvent event) {
     _activePointers[event.pointer] = event.position;
     if (_activePointers.length >= 2) {
-      final points = _activePointers.values.toList();
-      _initialPinchDistance = (points[0] - points[1]).distance;
+      final keys = _activePointers.keys.toList();
+      _pinchPointer1 = keys[0];
+      _pinchPointer2 = keys[1];
+      final p1 = _activePointers[_pinchPointer1]!;
+      final p2 = _activePointers[_pinchPointer2]!;
+      _initialPinchDistance = (p1 - p2).distance;
       _pinchStartZoom = _currentZoom;
       if (!_isPinching) {
         setState(() {
@@ -151,41 +161,66 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     if (!_activePointers.containsKey(event.pointer)) return;
     _activePointers[event.pointer] = event.position;
 
-    if (_activePointers.length >= 2 &&
-        _initialPinchDistance != null &&
-        _initialPinchDistance! > 8.0) {
-      final points = _activePointers.values.toList();
-      final currentDistance = (points[0] - points[1]).distance;
-      final scaleFactor = currentDistance / _initialPinchDistance!;
-      final newZoom = (_pinchStartZoom * scaleFactor).clamp(0.4, 2.2);
+    if (_isPinching &&
+        _pinchPointer1 != null &&
+        _pinchPointer2 != null &&
+        _activePointers.containsKey(_pinchPointer1) &&
+        _activePointers.containsKey(_pinchPointer2)) {
+      final p1 = _activePointers[_pinchPointer1]!;
+      final p2 = _activePointers[_pinchPointer2]!;
+      final currentDistance = (p1 - p2).distance;
 
-      if ((newZoom - _currentZoom).abs() > 0.003) {
-        setState(() {
-          _currentZoom = newZoom;
-        });
+      if (_initialPinchDistance != null && _initialPinchDistance! > 10.0) {
+        final scaleFactor = currentDistance / _initialPinchDistance!;
+        final newZoom = (_pinchStartZoom * scaleFactor).clamp(0.4, 2.2);
+
+        if ((newZoom - _currentZoom).abs() > 0.002) {
+          setState(() {
+            _currentZoom = newZoom;
+          });
+        }
       }
     }
   }
 
   void _handlePointerUp(PointerUpEvent event) {
     _activePointers.remove(event.pointer);
-    if (_activePointers.length < 2) {
+    if (event.pointer == _pinchPointer1 || event.pointer == _pinchPointer2) {
+      if (_activePointers.length >= 2) {
+        final keys = _activePointers.keys.toList();
+        _pinchPointer1 = keys[0];
+        _pinchPointer2 = keys[1];
+        final p1 = _activePointers[_pinchPointer1]!;
+        final p2 = _activePointers[_pinchPointer2]!;
+        _initialPinchDistance = (p1 - p2).distance;
+        _pinchStartZoom = _currentZoom;
+      } else {
+        _pinchPointer1 = null;
+        _pinchPointer2 = null;
+        _initialPinchDistance = null;
+        if (_isPinching) {
+          setState(() {
+            _isPinching = false;
+          });
+        }
+      }
+    } else if (_activePointers.length < 2) {
+      _pinchPointer1 = null;
+      _pinchPointer2 = null;
       _initialPinchDistance = null;
       if (_isPinching) {
         setState(() {
           _isPinching = false;
         });
       }
-    } else if (_activePointers.length == 2) {
-      final points = _activePointers.values.toList();
-      _initialPinchDistance = (points[0] - points[1]).distance;
-      _pinchStartZoom = _currentZoom;
     }
   }
 
   void _handlePointerCancel(PointerCancelEvent event) {
     _activePointers.remove(event.pointer);
     if (_activePointers.length < 2) {
+      _pinchPointer1 = null;
+      _pinchPointer2 = null;
       _initialPinchDistance = null;
       if (_isPinching) {
         setState(() {
@@ -1280,7 +1315,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
         ],
       ),
       body: SingleChildScrollView(
-        physics: _isPinching
+        physics: (_isPinching || _isResizingColumn || _isResizingRow)
             ? const NeverScrollableScrollPhysics()
             : const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
@@ -1306,11 +1341,6 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
                 // 4. Table Toolbar (Select All, Add Row, Delete Row, Add Column, Toggle Resize Mode)
                 _buildTableToolbar(activeDay),
-
-                if (_isResizeMode) ...[
-                  const SizedBox(height: 10),
-                  _buildResizeModeBanner(),
-                ],
 
                 const SizedBox(height: 10),
 
@@ -1784,7 +1814,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             Tooltip(
               message: _isResizeMode
                   ? 'Selesai Ubah Ukuran'
-                  : 'Mode Kustom Ukuran (Geser Kolom & Baris)',
+                  : 'Mode Kustom Ukuran (Geser Kolom & Baris)\n(Tahan untuk buka slider presisi)',
               child: Material(
                 color: _isResizeMode
                     ? primaryTeal
@@ -1792,6 +1822,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 borderRadius: BorderRadius.circular(10),
                 child: InkWell(
                   onTap: _toggleResizeMode,
+                  onLongPress: _openTableDimensionsModal,
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     width: 36,
@@ -1834,143 +1865,6 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     );
   }
 
-  Widget _buildResizeModeBanner() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: primaryTeal.withValues(alpha: 0.35),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: primaryTeal.withValues(alpha: 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: primaryTeal,
-              borderRadius: BorderRadius.circular(9),
-              boxShadow: [
-                BoxShadow(
-                  color: primaryTeal.withValues(alpha: 0.25),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: const Icon(Icons.open_with_rounded,
-                color: Colors.white, size: 16),
-          ),
-          const SizedBox(width: 10),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Mode Kustom Ukuran Aktif',
-                  style: TextStyle(
-                    color: Color(0xFF0F172A),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12.5,
-                  ),
-                ),
-                Text(
-                  'Geser garis pembatas kolom (↔) atau baris (↕) langsung di tabel.',
-                  style: TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 6),
-          // Reset Button
-          TextButton(
-            onPressed: () {
-              setState(() {
-                _rowHeight = 36.0;
-                _colNoWidth = 36.0;
-                _colMulaiWidth = 74.0;
-                _colSelesaiWidth = 74.0;
-                _colDurasiWidth = 72.0;
-                _colKegiatanWidth = 240.0;
-                _colCustomWidth = 140.0;
-                _customColWidths.clear();
-              });
-              _saveTableSettings();
-            },
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: const Text(
-              'Reset',
-              style: TextStyle(
-                color: primaryTeal,
-                fontWeight: FontWeight.bold,
-                fontSize: 11.5,
-              ),
-            ),
-          ),
-          // Slider / Opsi Presisi Button
-          TextButton.icon(
-            onPressed: _openTableDimensionsModal,
-            icon: const Icon(Icons.tune_rounded, size: 14, color: Color(0xFF475569)),
-            label: const Text(
-              'Slider',
-              style: TextStyle(
-                color: Color(0xFF475569),
-                fontWeight: FontWeight.bold,
-                fontSize: 11.5,
-              ),
-            ),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ),
-          const SizedBox(width: 4),
-          // Selesai Button
-          ElevatedButton(
-            onPressed: _toggleResizeMode,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryTeal,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text(
-              'Selesai',
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   double _calculateBaseTableWidth(RundownDay activeDay) {
     double customColsTotal = 0;
     for (final col in activeDay.customColumns) {
@@ -1986,7 +1880,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
   }
 
   double _calculateBaseTableHeight(RundownDay activeDay) {
-    const double headerHeight = 34.0;
+    const double headerHeight = 36.0;
     const double dividerHeight = 1.0;
     if (activeDay.rows.isEmpty) {
       return headerHeight + dividerHeight + 50.0;
@@ -2085,83 +1979,89 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     final scaledWidth = baseWidth * _currentZoom;
     final scaledHeight = baseHeight * _currentZoom;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _isResizeMode
-              ? primaryTeal
-              : const Color(0xFF00897B).withValues(alpha: 0.18),
-          width: _isResizeMode ? 1.6 : 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+    return Listener(
+      onPointerDown: _handlePointerDown,
+      onPointerMove: _handlePointerMove,
+      onPointerUp: _handlePointerUp,
+      onPointerCancel: _handlePointerCancel,
+      behavior: HitTestBehavior.translucent,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: _isResizeMode
+                ? primaryTeal
+                : const Color(0xFF00897B).withValues(alpha: 0.18),
+            width: _isResizeMode ? 1.6 : 1.0,
           ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: SingleChildScrollView(
-        controller: _horizontalScrollController,
-        scrollDirection: Axis.horizontal,
-        physics: _isPinching
-            ? const NeverScrollableScrollPhysics()
-            : const BouncingScrollPhysics(),
-        child: SizedBox(
-          width: scaledWidth,
-          height: scaledHeight,
-          child: Listener(
-            onPointerDown: _handlePointerDown,
-            onPointerMove: _handlePointerMove,
-            onPointerUp: _handlePointerUp,
-            onPointerCancel: _handlePointerCancel,
-            behavior: HitTestBehavior.translucent,
-            child: OverflowBox(
-              minWidth: baseWidth,
-              maxWidth: baseWidth,
-              minHeight: baseHeight,
-              maxHeight: baseHeight,
-              alignment: Alignment.topLeft,
-              child: Transform.scale(
-                scale: _currentZoom,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(
+            overscroll: false,
+            physics: const ClampingScrollPhysics(),
+          ),
+          child: SingleChildScrollView(
+            controller: _horizontalScrollController,
+            scrollDirection: Axis.horizontal,
+            physics: (_isPinching || _isResizingColumn || _isResizingRow)
+                ? const NeverScrollableScrollPhysics()
+                : const ClampingScrollPhysics(),
+            child: SizedBox(
+              width: scaledWidth,
+              height: scaledHeight,
+              child: OverflowBox(
+                minWidth: baseWidth,
+                maxWidth: baseWidth,
+                minHeight: baseHeight,
+                maxHeight: baseHeight,
                 alignment: Alignment.topLeft,
-                child: SizedBox(
-                  width: baseWidth,
-                  height: baseHeight,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // TABLE HEADER
-                      _buildTableHeader(activeDay),
+                child: Transform.scale(
+                  scale: _currentZoom,
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(
+                    width: baseWidth,
+                    height: baseHeight,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // TABLE HEADER
+                        _buildTableHeader(activeDay),
 
-                      const Divider(
-                          height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
+                        const Divider(
+                            height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
 
-                      // TABLE BODY ROWS
-                      if (activeDay.rows.isEmpty)
-                        Container(
-                          width: baseWidth,
-                          height: 50,
-                          alignment: Alignment.center,
-                          child: const Text(
-                            'Tidak ada baris di tabel. Klik ikon "+" untuk menambah baris.',
-                            style: TextStyle(
-                                fontSize: 12, color: Color(0xFF94A3B8)),
-                          ),
-                        )
-                      else
-                        ...List.generate(activeDay.rows.length, (index) {
-                          final row = activeDay.rows[index];
-                          final isSelected =
-                              _selectedRowIndices.contains(index);
-                          return _buildTableRow(
-                              activeDay, row, index, isSelected);
-                        }),
-                    ],
+                        // TABLE BODY ROWS
+                        if (activeDay.rows.isEmpty)
+                          Container(
+                            width: baseWidth,
+                            height: 50,
+                            alignment: Alignment.center,
+                            child: const Text(
+                              'Tidak ada baris di tabel. Klik ikon "+" untuk menambah baris.',
+                              style: TextStyle(
+                                  fontSize: 12, color: Color(0xFF94A3B8)),
+                            ),
+                          )
+                        else
+                          ...List.generate(activeDay.rows.length, (index) {
+                            final row = activeDay.rows[index];
+                            final isSelected =
+                                _selectedRowIndices.contains(index);
+                            return _buildTableRow(
+                                activeDay, row, index, isSelected);
+                          }),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -2177,16 +2077,16 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     required Widget child,
     required void Function(double delta) onResize,
   }) {
-    final double handleHitWidth = _isResizeMode ? 36.0 : 18.0;
+    final double handleHitWidth = _isResizeMode ? 46.0 : 24.0;
     return SizedBox(
       width: width,
-      height: 34.0,
+      height: 36.0,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Positioned.fill(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
               child: child,
             ),
           ),
@@ -2201,29 +2101,81 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 dragStartBehavior: DragStartBehavior.down,
+                onHorizontalDragDown: (_) {
+                  setState(() {
+                    _isResizingColumn = true;
+                  });
+                },
+                onHorizontalDragStart: (_) {
+                  setState(() {
+                    _isResizingColumn = true;
+                  });
+                },
                 onHorizontalDragUpdate: (details) {
                   onResize(details.delta.dx);
                 },
-                onHorizontalDragEnd: (_) => _saveTableSettings(),
+                onHorizontalDragEnd: (_) {
+                  setState(() {
+                    _isResizingColumn = false;
+                  });
+                  _saveTableSettings();
+                },
+                onHorizontalDragCancel: () {
+                  setState(() {
+                    _isResizingColumn = false;
+                  });
+                },
                 child: Center(
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    width: _isResizeMode ? 4.0 : 1.0,
-                    height: _isResizeMode ? 22.0 : double.infinity,
-                    decoration: BoxDecoration(
-                      color: _isResizeMode
-                          ? primaryTeal
-                          : const Color(0xFFCBD5E1),
-                      borderRadius: BorderRadius.circular(2.5),
-                      boxShadow: _isResizeMode
-                          ? [
-                              BoxShadow(
-                                color: primaryTeal.withValues(alpha: 0.45),
-                                blurRadius: 4,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    clipBehavior: Clip.none,
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        width: _isResizeMode ? 3.5 : 1.0,
+                        height: _isResizeMode ? 26.0 : 36.0,
+                        decoration: BoxDecoration(
+                          color: _isResizeMode
+                              ? primaryTeal
+                              : const Color(0xFFCBD5E1),
+                          borderRadius: BorderRadius.circular(2.5),
+                          boxShadow: _isResizeMode
+                              ? [
+                                  BoxShadow(
+                                    color: primaryTeal.withValues(alpha: 0.45),
+                                    blurRadius: 4,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                      ),
+                      if (_isResizeMode)
+                        Positioned(
+                          top: 1,
+                          child: Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: primaryTeal,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: primaryTeal.withValues(alpha: 0.35),
+                                  blurRadius: 3,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.code_rounded,
+                                size: 9,
+                                color: Colors.white,
                               ),
-                            ]
-                          : null,
-                    ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -2236,7 +2188,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
   Widget _buildTableHeader(RundownDay activeDay) {
     return Container(
-      height: 34.0,
+      height: 36.0,
       color: primaryTeal.withValues(alpha: 0.08),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -2440,42 +2392,45 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                   // 1. Select Checkbox & Number
                   SizedBox(
                     width: _colNoWidth,
-                    child: InkWell(
-                      onTap: _isResizeMode
-                          ? null
-                          : () {
-                              setState(() {
-                                if (isSelected) {
-                                  _selectedRowIndices.remove(index);
-                                } else {
-                                  _selectedRowIndices.add(index);
-                                }
-                              });
-                            },
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isSelected
-                                ? Icons.check_box_rounded
-                                : Icons.check_box_outline_blank_rounded,
-                            size: 15,
-                            color: isSelected
-                                ? primaryTeal
-                                : const Color(0xFFCBD5E1),
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            '${index + 1}',
-                            style: TextStyle(
-                              fontSize: 10.0,
-                              fontWeight: FontWeight.bold,
+                    child: Center(
+                      child: InkWell(
+                        onTap: _isResizeMode
+                            ? null
+                            : () {
+                                setState(() {
+                                  if (isSelected) {
+                                    _selectedRowIndices.remove(index);
+                                  } else {
+                                    _selectedRowIndices.add(index);
+                                  }
+                                });
+                              },
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              isSelected
+                                  ? Icons.check_box_rounded
+                                  : Icons.check_box_outline_blank_rounded,
+                              size: 15,
                               color: isSelected
                                   ? primaryTeal
-                                  : const Color(0xFF64748B),
+                                  : const Color(0xFFCBD5E1),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 2),
+                            Text(
+                              '${index + 1}',
+                              style: TextStyle(
+                                fontSize: 10.0,
+                                fontWeight: FontWeight.bold,
+                                color: isSelected
+                                    ? primaryTeal
+                                    : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -2484,7 +2439,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                   SizedBox(
                     width: _colMulaiWidth,
                     child: Align(
-                      alignment: Alignment.centerLeft,
+                      alignment: Alignment.center,
                       child: InkWell(
                         onTap: _isResizeMode
                             ? null
@@ -2506,6 +2461,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(Icons.access_time_rounded,
                                   size: 11,
@@ -2518,6 +2474,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                                   row.startTime.isNotEmpty
                                       ? row.startTime
                                       : '--:--',
+                                  textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontSize: 10.5,
                                     fontWeight: FontWeight.bold,
@@ -2540,7 +2497,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                   SizedBox(
                     width: _colSelesaiWidth,
                     child: Align(
-                      alignment: Alignment.centerLeft,
+                      alignment: Alignment.center,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 4, vertical: 2),
@@ -2557,6 +2514,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(Icons.check_circle_outline_rounded,
                                 size: 10.5,
@@ -2567,6 +2525,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                             Flexible(
                               child: Text(
                                 row.endTime.isNotEmpty ? row.endTime : '--:--',
+                                textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.bold,
@@ -2588,7 +2547,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                   SizedBox(
                     width: _colDurasiWidth,
                     child: Align(
-                      alignment: Alignment.centerLeft,
+                      alignment: Alignment.center,
                       child: InkWell(
                         onTap: _isResizeMode
                             ? null
@@ -2606,10 +2565,12 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Flexible(
                                 child: Text(
                                   row.durationText,
+                                  textAlign: TextAlign.center,
                                   style: const TextStyle(
                                     fontSize: 10.5,
                                     fontWeight: FontWeight.bold,
@@ -2632,10 +2593,11 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                   SizedBox(
                     width: _colKegiatanWidth,
                     child: Padding(
-                      padding: const EdgeInsets.only(right: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
                       child: TextFormField(
                         key: ValueKey('${row.id}_activity'),
                         initialValue: row.activity,
+                        textAlign: TextAlign.center,
                         enabled: !_isResizeMode,
                         textCapitalization: TextCapitalization.sentences,
                         style: const TextStyle(
@@ -2670,10 +2632,11 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                     return SizedBox(
                       width: colW,
                       child: Padding(
-                        padding: const EdgeInsets.only(right: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
                         child: TextFormField(
                           key: ValueKey('${row.id}_custom_$colName'),
                           initialValue: val,
+                          textAlign: TextAlign.center,
                           enabled: !_isResizeMode,
                           textCapitalization: TextCapitalization.sentences,
                           style: const TextStyle(
@@ -2708,35 +2671,56 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
           Positioned(
             left: 0,
             right: 0,
-            bottom: _isResizeMode ? -14.0 : -6.0,
-            height: _isResizeMode ? 28.0 : 12.0,
+            bottom: _isResizeMode ? -16.0 : -7.0,
+            height: _isResizeMode ? 32.0 : 14.0,
             child: MouseRegion(
               cursor: SystemMouseCursors.resizeRow,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 dragStartBehavior: DragStartBehavior.down,
+                onVerticalDragDown: (_) {
+                  setState(() {
+                    _isResizingRow = true;
+                  });
+                },
+                onVerticalDragStart: (_) {
+                  setState(() {
+                    _isResizingRow = true;
+                  });
+                },
                 onVerticalDragUpdate: (details) {
                   setState(() {
                     _rowHeight =
                         (_rowHeight + details.delta.dy).clamp(26.0, 90.0);
                   });
                 },
-                onVerticalDragEnd: (_) => _saveTableSettings(),
+                onVerticalDragEnd: (_) {
+                  setState(() {
+                    _isResizingRow = false;
+                  });
+                  _saveTableSettings();
+                },
+                onVerticalDragCancel: () {
+                  setState(() {
+                    _isResizingRow = false;
+                  });
+                },
                 child: Center(
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
-                    height: _isResizeMode ? 4.0 : 1.0,
-                    width: _isResizeMode ? 56.0 : double.infinity,
+                    height: _isResizeMode ? 5.0 : 1.0,
+                    width: _isResizeMode ? 64.0 : 0.0,
                     decoration: BoxDecoration(
                       color: _isResizeMode
                           ? primaryTeal
                           : Colors.transparent,
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(3),
                       boxShadow: _isResizeMode
                           ? [
                               BoxShadow(
                                 color: primaryTeal.withValues(alpha: 0.45),
-                                blurRadius: 3,
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
                               ),
                             ]
                           : null,

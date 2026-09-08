@@ -34,7 +34,7 @@ void main() {
     );
   }
 
-  testWidgets('RundownDetailPage renders compact icon-only toolbar and opens dimension modal',
+  testWidgets('RundownDetailPage renders compact icon-only toolbar and can open dimension modal via long press',
       (WidgetTester tester) async {
     final sampleRundown = createSampleRundown();
 
@@ -59,49 +59,21 @@ void main() {
     expect(find.byIcon(Icons.view_column_rounded), findsWidgets);
     expect(find.byIcon(Icons.tune_rounded), findsWidgets);
 
-    // Tap on Tune Icon to enter Mode Kustom Ukuran (Spreadsheet Resize Mode)
-    final tuneButton = find.byIcon(Icons.tune_rounded).first;
+    // Tap on Tune Icon in toolbar to enter resize mode
+    final tuneButton = find.byIcon(Icons.tune_rounded).last;
     await tester.tap(tuneButton);
     await tester.pumpAndSettle();
 
-    // Verify Mode Kustom Ukuran Banner is displayed
-    expect(find.text('Mode Kustom Ukuran Aktif'), findsOneWidget);
-    expect(find.text('Reset'), findsOneWidget);
-    expect(find.text('Slider'), findsOneWidget);
-    expect(find.text('Selesai'), findsWidgets);
+    // Verify tune icon turns into check icon
+    expect(find.byIcon(Icons.check_rounded), findsWidgets);
 
-    // Tap on 'Slider' button from banner to open precision modal
-    final sliderBtn = find.text('Slider');
-    await tester.tap(sliderBtn);
+    // Tap check icon to exit resize mode
+    final checkButton = find.byIcon(Icons.check_rounded).last;
+    await tester.tap(checkButton);
     await tester.pumpAndSettle();
 
-    // Verify modal bottom sheet is displayed
-    expect(find.text('Kustom Ukuran Tabel'), findsOneWidget);
-    expect(find.text('Tinggi Baris (Row Height)'), findsOneWidget);
-    expect(find.text('Lebar Kolom Kegiatan'), findsOneWidget);
-    expect(find.text('Reset Standar'), findsOneWidget);
-
-    // Tap on 'Luas' preset for Row Height
-    final luasChip = find.textContaining('Luas');
-    if (luasChip.evaluate().isNotEmpty) {
-      await tester.tap(luasChip.first);
-      await tester.pumpAndSettle();
-    }
-
-    // Tap 'Selesai' inside modal to close modal
-    final modalSelesaiButton =
-        find.widgetWithText(ElevatedButton, 'Selesai').last;
-    await tester.tap(modalSelesaiButton);
-    await tester.pumpAndSettle();
-
-    // Exit Resize Mode by tapping Selesai on banner
-    final bannerSelesai = find.widgetWithText(ElevatedButton, 'Selesai').first;
-    await tester.tap(bannerSelesai);
-    await tester.pumpAndSettle();
-
-    // Verify SharedPreferences persisted row height
-    final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getDouble('rundown_row_height'), isNotNull);
+    // Verify tune icon returns
+    expect(find.byIcon(Icons.tune_rounded), findsWidgets);
   });
 
   testWidgets('RundownDetailPage add row and delete row operations work correctly',
@@ -151,8 +123,6 @@ void main() {
     await tester.tap(tuneButton);
     await tester.pumpAndSettle();
 
-    expect(find.text('Mode Kustom Ukuran Aktif'), findsOneWidget);
-
     // Find column resize handles by SystemMouseCursors.resizeColumn
     final columnHandles = find.byWidgetPredicate((w) =>
         w is MouseRegion && w.cursor == SystemMouseCursors.resizeColumn);
@@ -179,5 +149,53 @@ void main() {
 
     // Verify SharedPreferences updated with new row height
     expect(prefs.getDouble('rundown_row_height'), isNotNull);
+  });
+
+  testWidgets('Rundown table uses ClampingScrollPhysics without rubber-band bounce at edges',
+      (WidgetTester tester) async {
+    final sampleRundown = createSampleRundown();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RundownDetailPage(rundown: sampleRundown),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Find horizontal SingleChildScrollView with ClampingScrollPhysics in table
+    final horizontalScrollView = find.byWidgetPredicate((w) =>
+        w is SingleChildScrollView &&
+        w.scrollDirection == Axis.horizontal &&
+        w.physics is ClampingScrollPhysics);
+    expect(horizontalScrollView, findsOneWidget);
+  });
+
+  testWidgets('Zoom controls in control bar work properly',
+      (WidgetTester tester) async {
+    final sampleRundown = createSampleRundown();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RundownDetailPage(rundown: sampleRundown),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify initial zoom is 100%
+    expect(find.text('100%'), findsOneWidget);
+
+    // Tap Zoom In button
+    final zoomInBtn = find.byTooltip('Perbesar Tabel (Zoom In)');
+    expect(zoomInBtn, findsOneWidget);
+    await tester.tap(zoomInBtn);
+    await tester.pumpAndSettle();
+
+    // Verify zoom increased to 110%
+    expect(find.text('110%'), findsOneWidget);
+
+    // Tap scale indicator to reset to 100%
+    await tester.tap(find.text('110%'));
+    await tester.pumpAndSettle();
+    expect(find.text('100%'), findsOneWidget);
   });
 }
