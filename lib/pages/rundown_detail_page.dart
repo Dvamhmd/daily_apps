@@ -3086,310 +3086,278 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
         clipBehavior: Clip.none,
         children: [
           Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onLongPress:
-                  _isResizeMode ? null : () => _toggleRowSelection(index),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? primaryTeal.withValues(alpha: 0.12)
-                      : (isEven ? Colors.white : const Color(0xFFFBFDFA)),
-                  border: Border(
-                    bottom: BorderSide(
-                      color: _isResizeMode
-                          ? const Color(0xFFCBD5E1)
-                          : const Color(0xFFF1F5F9),
-                      width: 1.0,
+            child: Material(
+              color: isSelected
+                  ? primaryTeal.withValues(alpha: 0.14)
+                  : (isEven ? Colors.white : const Color(0xFFFBFDFA)),
+              child: InkWell(
+                splashColor: primaryTeal.withValues(alpha: 0.28),
+                highlightColor: primaryTeal.withValues(alpha: 0.16),
+                onTap: _isResizeMode
+                    ? null
+                    : () {
+                        if (_selectedRowIndices.isNotEmpty) {
+                          _toggleRowSelection(index);
+                        }
+                      },
+                onLongPress:
+                    _isResizeMode ? null : () => _toggleRowSelection(index),
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: _isResizeMode
+                            ? const Color(0xFFCBD5E1)
+                            : const Color(0xFFF1F5F9),
+                        width: 1.0,
+                      ),
                     ),
                   ),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // 1. Select Checkbox & Number (Tekan lama tahan untuk mulai memilih baris)
-                    Container(
-                      width: _colNoWidth,
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          right: BorderSide(
-                            color: Color(0xFFE2E8F0),
-                            width: 1.0,
-                          ),
-                        ),
-                      ),
-                      child: Align(
-                        alignment: _getAlignment(_getDataColAlignment('no')),
-                        child: InkWell(
-                          onTap: _isResizeMode
-                              ? null
-                              : () {
-                                  if (_selectedRowIndices.isNotEmpty) {
-                                    _toggleRowSelection(index);
-                                  }
-                                },
-                          onLongPress: _isResizeMode
-                              ? null
-                              : () => _toggleRowSelection(index),
-                          borderRadius: BorderRadius.circular(4),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 2, vertical: 2),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              mainAxisAlignment: _getMainAxisAlignment(
-                                  _getDataColAlignment('no')),
-                              children: [
-                                if (_selectedRowIndices.isNotEmpty) ...[
-                                  Icon(
-                                    isSelected
-                                        ? Icons.check_box_rounded
-                                        : Icons.check_box_outline_blank_rounded,
-                                    size: 13.5,
-                                    color: isSelected
-                                        ? primaryTeal
-                                        : const Color(0xFF94A3B8),
-                                  ),
-                                  const SizedBox(width: 2),
-                                ],
-                                Text(
-                                  '${index + 1}',
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: isSelected
-                                        ? primaryTeal
-                                        : const Color(0xFF64748B),
-                                  ),
-                                ),
-                              ],
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // 1. Select Checkbox & Number (Tekan lama tahan untuk mulai memilih baris)
+                      Container(
+                        width: _colNoWidth,
+                        decoration: const BoxDecoration(
+                          border: Border(
+                            right: BorderSide(
+                              color: Color(0xFFE2E8F0),
+                              width: 1.0,
                             ),
                           ),
-                        ),
-                      ),
-                    ),
-
-                    // 2. WAKTU MULAI
-                    Container(
-                      width: _colMulaiWidth,
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          right: BorderSide(
-                            color: Color(0xFFE2E8F0),
-                            width: 1.0,
-                          ),
-                        ),
-                      ),
-                      child: Align(
-                        alignment: _getAlignment(_getDataColAlignment('mulai')),
-                        child: InkWell(
-                          onTap: _isResizeMode
-                              ? null
-                              : () {
-                                  if (_selectedRowIndices.isNotEmpty) {
-                                    _toggleRowSelection(index);
-                                  } else {
-                                    _pickRowStartTime(index);
-                                  }
-                                },
-                          onLongPress: _isResizeMode
-                              ? null
-                              : () => _toggleRowSelection(index),
-                          borderRadius: BorderRadius.circular(4),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 4, vertical: 4),
-                            child: Text(
-                              row.startTime.isNotEmpty ? row.startTime : '--:--',
-                              textAlign:
-                                  _getTextAlign(_getDataColAlignment('mulai')),
-                              style: TextStyle(
-                                fontSize: 11.0,
-                                fontWeight: FontWeight.w600,
-                                color: row.startTime.isNotEmpty
-                                    ? const Color(0xFF0F172A)
-                                    : const Color(0xFF94A3B8),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // 3. WAKTU SELESAI (OTOMATIS)
-                    Container(
-                      width: _colSelesaiWidth,
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          right: BorderSide(
-                            color: Color(0xFFE2E8F0),
-                            width: 1.0,
-                          ),
-                        ),
-                      ),
-                      child: Align(
-                        alignment: _getAlignment(_getDataColAlignment('selesai')),
-                        child: InkWell(
-                          onTap: _isResizeMode
-                              ? null
-                              : () {
-                                  if (_selectedRowIndices.isNotEmpty) {
-                                    _toggleRowSelection(index);
-                                  }
-                                },
-                          onLongPress: _isResizeMode
-                              ? null
-                              : () => _toggleRowSelection(index),
-                          borderRadius: BorderRadius.circular(4),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 4, vertical: 4),
-                            child: Text(
-                              row.endTime.isNotEmpty ? row.endTime : '--:--',
-                              textAlign:
-                                  _getTextAlign(_getDataColAlignment('selesai')),
-                              style: TextStyle(
-                                fontSize: 11.0,
-                                fontWeight: FontWeight.w600,
-                                color: row.endTime.isNotEmpty
-                                    ? const Color(0xFF0F172A)
-                                    : const Color(0xFF94A3B8),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // 4. DURASI (Klik untuk atur durasi)
-                    Container(
-                      width: _colDurasiWidth,
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          right: BorderSide(
-                            color: Color(0xFFE2E8F0),
-                            width: 1.0,
-                          ),
-                        ),
-                      ),
-                      child: Align(
-                        alignment: _getAlignment(_getDataColAlignment('durasi')),
-                        child: InkWell(
-                          onTap: _isResizeMode
-                              ? null
-                              : () {
-                                  if (_selectedRowIndices.isNotEmpty) {
-                                    _toggleRowSelection(index);
-                                  } else {
-                                    _editRowDuration(index);
-                                  }
-                                },
-                          onLongPress: _isResizeMode
-                              ? null
-                              : () => _toggleRowSelection(index),
-                          borderRadius: BorderRadius.circular(4),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 4, vertical: 4),
-                            child: Text(
-                              row.durationText,
-                              textAlign:
-                                  _getTextAlign(_getDataColAlignment('durasi')),
-                              style: TextStyle(
-                                fontSize: 11.0,
-                                fontWeight: FontWeight.w600,
-                                color: row.durationMinutes > 0
-                                    ? const Color(0xFF0F172A)
-                                    : const Color(0xFF94A3B8),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // 5. KEGIATAN (Inline Text Input)
-                    GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onLongPress: _isResizeMode
-                          ? null
-                          : () => _toggleRowSelection(index),
-                      child: Container(
-                        width: _colKegiatanWidth,
-                        decoration: BoxDecoration(
-                          border: activeDay.customColumns.isNotEmpty
-                              ? const Border(
-                                  right: BorderSide(
-                                    color: Color(0xFFE2E8F0),
-                                    width: 1.0,
-                                  ),
-                                )
-                              : null,
                         ),
                         child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: TextFormField(
-                              key: ValueKey('${row.id}_activity'),
-                              initialValue: row.activity,
-                              textAlign: _getTextAlign(_getDataColAlignment('kegiatan',
-                                  defaultAlign: 'left')),
-                              enabled: !_isResizeMode,
-                              textCapitalization: TextCapitalization.sentences,
-                              style: const TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF0F172A),
+                          alignment: _getAlignment(_getDataColAlignment('no')),
+                          child: InkWell(
+                            splashColor: primaryTeal.withValues(alpha: 0.28),
+                            highlightColor: primaryTeal.withValues(alpha: 0.16),
+                            onTap: _isResizeMode
+                                ? null
+                                : () {
+                                    if (_selectedRowIndices.isNotEmpty) {
+                                      _toggleRowSelection(index);
+                                    }
+                                  },
+                            onLongPress: _isResizeMode
+                                ? null
+                                : () => _toggleRowSelection(index),
+                            borderRadius: BorderRadius.circular(4),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 2, vertical: 2),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: _getMainAxisAlignment(
+                                    _getDataColAlignment('no')),
+                                children: [
+                                  if (_selectedRowIndices.isNotEmpty) ...[
+                                    Icon(
+                                      isSelected
+                                          ? Icons.check_box_rounded
+                                          : Icons
+                                              .check_box_outline_blank_rounded,
+                                      size: 13.5,
+                                      color: isSelected
+                                          ? primaryTeal
+                                          : const Color(0xFF94A3B8),
+                                    ),
+                                    const SizedBox(width: 2),
+                                  ],
+                                  Text(
+                                    '${index + 1}',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: isSelected
+                                          ? primaryTeal
+                                          : const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              decoration: const InputDecoration(
-                                hintText: 'Nama kegiatan...',
-                                hintStyle: TextStyle(
-                                  fontSize: 11.0,
-                                  color: Color(0xFFCBD5E1),
-                                  fontWeight: FontWeight.normal,
-                                ),
-                                isDense: true,
-                                contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 5, vertical: 3),
-                                border: InputBorder.none,
-                              ),
-                              onChanged: (val) {
-                                row.activity = val;
-                                _notifyChange();
-                              },
                             ),
                           ),
                         ),
                       ),
-                    ),
 
-                    // 6. CUSTOM COLUMNS
-                    ...activeDay.customColumns.asMap().entries.map((entry) {
-                      final colIndex = entry.key;
-                      final colName = entry.value;
-                      final isLast =
-                          colIndex == activeDay.customColumns.length - 1;
-                      final val = row.customValues[colName] ?? '';
-                      final colW = _getColCustomWidth(colName);
-                      final align = _getDataColAlignment(colName);
-                      return GestureDetector(
-                        behavior: HitTestBehavior.translucent,
+                      // 2. WAKTU MULAI
+                      Container(
+                        width: _colMulaiWidth,
+                        decoration: const BoxDecoration(
+                          border: Border(
+                            right: BorderSide(
+                              color: Color(0xFFE2E8F0),
+                              width: 1.0,
+                            ),
+                          ),
+                        ),
+                        child: Align(
+                          alignment:
+                              _getAlignment(_getDataColAlignment('mulai')),
+                          child: InkWell(
+                            splashColor: primaryTeal.withValues(alpha: 0.28),
+                            highlightColor: primaryTeal.withValues(alpha: 0.16),
+                            onTap: _isResizeMode
+                                ? null
+                                : () {
+                                    if (_selectedRowIndices.isNotEmpty) {
+                                      _toggleRowSelection(index);
+                                    } else {
+                                      _pickRowStartTime(index);
+                                    }
+                                  },
+                            onLongPress: _isResizeMode
+                                ? null
+                                : () => _toggleRowSelection(index),
+                            borderRadius: BorderRadius.circular(4),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 4, vertical: 4),
+                              child: Text(
+                                row.startTime.isNotEmpty
+                                    ? row.startTime
+                                    : '--:--',
+                                textAlign: _getTextAlign(
+                                    _getDataColAlignment('mulai')),
+                                style: TextStyle(
+                                  fontSize: 11.0,
+                                  fontWeight: FontWeight.w600,
+                                  color: row.startTime.isNotEmpty
+                                      ? const Color(0xFF0F172A)
+                                      : const Color(0xFF94A3B8),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // 3. WAKTU SELESAI (OTOMATIS)
+                      Container(
+                        width: _colSelesaiWidth,
+                        decoration: const BoxDecoration(
+                          border: Border(
+                            right: BorderSide(
+                              color: Color(0xFFE2E8F0),
+                              width: 1.0,
+                            ),
+                          ),
+                        ),
+                        child: Align(
+                          alignment:
+                              _getAlignment(_getDataColAlignment('selesai')),
+                          child: InkWell(
+                            splashColor: primaryTeal.withValues(alpha: 0.28),
+                            highlightColor: primaryTeal.withValues(alpha: 0.16),
+                            onTap: _isResizeMode
+                                ? null
+                                : () {
+                                    if (_selectedRowIndices.isNotEmpty) {
+                                      _toggleRowSelection(index);
+                                    }
+                                  },
+                            onLongPress: _isResizeMode
+                                ? null
+                                : () => _toggleRowSelection(index),
+                            borderRadius: BorderRadius.circular(4),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 4, vertical: 4),
+                              child: Text(
+                                row.endTime.isNotEmpty ? row.endTime : '--:--',
+                                textAlign: _getTextAlign(
+                                    _getDataColAlignment('selesai')),
+                                style: TextStyle(
+                                  fontSize: 11.0,
+                                  fontWeight: FontWeight.w600,
+                                  color: row.endTime.isNotEmpty
+                                      ? const Color(0xFF0F172A)
+                                      : const Color(0xFF94A3B8),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // 4. DURASI (Klik untuk atur durasi)
+                      Container(
+                        width: _colDurasiWidth,
+                        decoration: const BoxDecoration(
+                          border: Border(
+                            right: BorderSide(
+                              color: Color(0xFFE2E8F0),
+                              width: 1.0,
+                            ),
+                          ),
+                        ),
+                        child: Align(
+                          alignment:
+                              _getAlignment(_getDataColAlignment('durasi')),
+                          child: InkWell(
+                            splashColor: primaryTeal.withValues(alpha: 0.28),
+                            highlightColor: primaryTeal.withValues(alpha: 0.16),
+                            onTap: _isResizeMode
+                                ? null
+                                : () {
+                                    if (_selectedRowIndices.isNotEmpty) {
+                                      _toggleRowSelection(index);
+                                    } else {
+                                      _editRowDuration(index);
+                                    }
+                                  },
+                            onLongPress: _isResizeMode
+                                ? null
+                                : () => _toggleRowSelection(index),
+                            borderRadius: BorderRadius.circular(4),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 4, vertical: 4),
+                              child: Text(
+                                row.durationText,
+                                textAlign: _getTextAlign(
+                                    _getDataColAlignment('durasi')),
+                                style: TextStyle(
+                                  fontSize: 11.0,
+                                  fontWeight: FontWeight.w600,
+                                  color: row.durationMinutes > 0
+                                      ? const Color(0xFF0F172A)
+                                      : const Color(0xFF94A3B8),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // 5. KEGIATAN (Inline Text Input)
+                      InkWell(
+                        splashColor: primaryTeal.withValues(alpha: 0.22),
+                        highlightColor: primaryTeal.withValues(alpha: 0.12),
                         onLongPress: _isResizeMode
                             ? null
                             : () => _toggleRowSelection(index),
+                        onTap: _isResizeMode
+                            ? null
+                            : () {
+                                if (_selectedRowIndices.isNotEmpty) {
+                                  _toggleRowSelection(index);
+                                }
+                              },
                         child: Container(
-                          width: colW,
+                          width: _colKegiatanWidth,
                           decoration: BoxDecoration(
-                            border: !isLast
+                            border: activeDay.customColumns.isNotEmpty
                                 ? const Border(
                                     right: BorderSide(
                                       color: Color(0xFFE2E8F0),
@@ -3404,38 +3372,114 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                               padding:
                                   const EdgeInsets.symmetric(horizontal: 4),
                               child: TextFormField(
-                                key: ValueKey('${row.id}_custom_$colName'),
-                                initialValue: val,
-                                textAlign: _getTextAlign(align),
+                                key: ValueKey('${row.id}_activity'),
+                                initialValue: row.activity,
+                                textAlign: _getTextAlign(_getDataColAlignment(
+                                    'kegiatan',
+                                    defaultAlign: 'left')),
                                 enabled: !_isResizeMode,
                                 textCapitalization:
                                     TextCapitalization.sentences,
                                 style: const TextStyle(
                                   fontSize: 11.5,
-                                  color: Color(0xFF334155),
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF0F172A),
                                 ),
-                                decoration: InputDecoration(
-                                  hintText: '$colName...',
-                                  hintStyle: const TextStyle(
+                                decoration: const InputDecoration(
+                                  hintText: 'Nama kegiatan...',
+                                  hintStyle: TextStyle(
                                     fontSize: 11.0,
                                     color: Color(0xFFCBD5E1),
+                                    fontWeight: FontWeight.normal,
                                   ),
                                   isDense: true,
-                                  contentPadding: const EdgeInsets.symmetric(
+                                  contentPadding: EdgeInsets.symmetric(
                                       horizontal: 5, vertical: 3),
                                   border: InputBorder.none,
                                 ),
-                                onChanged: (newVal) {
-                                  row.customValues[colName] = newVal;
+                                onChanged: (val) {
+                                  row.activity = val;
                                   _notifyChange();
                                 },
                               ),
                             ),
                           ),
                         ),
-                      );
-                    }),
-                  ],
+                      ),
+
+                      // 6. CUSTOM COLUMNS
+                      ...activeDay.customColumns.asMap().entries.map((entry) {
+                        final colIndex = entry.key;
+                        final colName = entry.value;
+                        final isLast =
+                            colIndex == activeDay.customColumns.length - 1;
+                        final val = row.customValues[colName] ?? '';
+                        final colW = _getColCustomWidth(colName);
+                        final align = _getDataColAlignment(colName);
+                        return InkWell(
+                          splashColor: primaryTeal.withValues(alpha: 0.22),
+                          highlightColor: primaryTeal.withValues(alpha: 0.12),
+                          onLongPress: _isResizeMode
+                              ? null
+                              : () => _toggleRowSelection(index),
+                          onTap: _isResizeMode
+                              ? null
+                              : () {
+                                  if (_selectedRowIndices.isNotEmpty) {
+                                    _toggleRowSelection(index);
+                                  }
+                                },
+                          child: Container(
+                            width: colW,
+                            decoration: BoxDecoration(
+                              border: !isLast
+                                  ? const Border(
+                                      right: BorderSide(
+                                        color: Color(0xFFE2E8F0),
+                                        width: 1.0,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                child: TextFormField(
+                                  key: ValueKey('${row.id}_custom_$colName'),
+                                  initialValue: val,
+                                  textAlign: _getTextAlign(align),
+                                  enabled: !_isResizeMode,
+                                  textCapitalization:
+                                      TextCapitalization.sentences,
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    color: Color(0xFF334155),
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: '$colName...',
+                                    hintStyle: const TextStyle(
+                                      fontSize: 11.0,
+                                      color: Color(0xFFCBD5E1),
+                                    ),
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 5, vertical: 3),
+                                    border: InputBorder.none,
+                                  ),
+                                  onChanged: (newVal) {
+                                    row.customValues[colName] = newVal;
+                                    _notifyChange();
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
                 ),
               ),
             ),
