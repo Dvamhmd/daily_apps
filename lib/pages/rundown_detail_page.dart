@@ -55,6 +55,12 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
   double _colCustomWidth = 140.0;
   final Map<String, double> _customColWidths = {};
 
+  // Column Header Alignment Settings: 'left', 'center', 'right' (Default: 'center')
+  final Map<String, String> _headerColAlignments = {};
+
+  // Column Data Cell Alignment Settings: 'left', 'center', 'right' (Default: 'center', except kegiatan = 'left')
+  final Map<String, String> _dataColAlignments = {};
+
   // Touch pointer tracking for highly responsive and accurate pinch-to-zoom
   final Map<int, Offset> _activePointers = {};
   int? _pinchPointer1;
@@ -77,6 +83,50 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
   double _getColCustomWidth(String colName) {
     return _customColWidths[colName] ?? _colCustomWidth;
+  }
+
+  String _getHeaderColAlignment(String colKey, {String defaultAlign = 'center'}) {
+    return _headerColAlignments[colKey] ?? defaultAlign;
+  }
+
+  String _getDataColAlignment(String colKey, {String defaultAlign = 'center'}) {
+    return _dataColAlignments[colKey] ?? defaultAlign;
+  }
+
+  TextAlign _getTextAlign(String alignStr) {
+    switch (alignStr) {
+      case 'left':
+        return TextAlign.left;
+      case 'right':
+        return TextAlign.right;
+      case 'center':
+      default:
+        return TextAlign.center;
+    }
+  }
+
+  Alignment _getAlignment(String alignStr) {
+    switch (alignStr) {
+      case 'left':
+        return Alignment.centerLeft;
+      case 'right':
+        return Alignment.centerRight;
+      case 'center':
+      default:
+        return Alignment.center;
+    }
+  }
+
+  MainAxisAlignment _getMainAxisAlignment(String alignStr) {
+    switch (alignStr) {
+      case 'left':
+        return MainAxisAlignment.start;
+      case 'right':
+        return MainAxisAlignment.end;
+      case 'center':
+      default:
+        return MainAxisAlignment.center;
+    }
   }
 
   void _toggleResizeMode() {
@@ -104,6 +154,49 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
           });
         } catch (_) {}
       }
+      final headerAlignmentsJson =
+          prefs.getString('rundown_header_col_alignments');
+      if (headerAlignmentsJson != null) {
+        try {
+          final Map<String, dynamic> decoded = jsonDecode(headerAlignmentsJson);
+          _headerColAlignments.clear();
+          decoded.forEach((k, v) {
+            if (v is String) {
+              _headerColAlignments[k] = v;
+            }
+          });
+        } catch (_) {}
+      }
+      final dataAlignmentsJson =
+          prefs.getString('rundown_data_col_alignments');
+      if (dataAlignmentsJson != null) {
+        try {
+          final Map<String, dynamic> decoded = jsonDecode(dataAlignmentsJson);
+          _dataColAlignments.clear();
+          decoded.forEach((k, v) {
+            if (v is String) {
+              _dataColAlignments[k] = v;
+            }
+          });
+        } catch (_) {}
+      } else {
+        // Fallback to legacy single alignment map if exists
+        final legacyAlignmentsJson = prefs.getString('rundown_col_alignments');
+        if (legacyAlignmentsJson != null) {
+          try {
+            final Map<String, dynamic> decoded =
+                jsonDecode(legacyAlignmentsJson);
+            decoded.forEach((k, v) {
+              if (v is String) {
+                _dataColAlignments[k] = v;
+                if (!_headerColAlignments.containsKey(k)) {
+                  _headerColAlignments[k] = v;
+                }
+              }
+            });
+          } catch (_) {}
+        }
+      }
       setState(() {
         _rowHeight = prefs.getDouble('rundown_row_height') ?? 36.0;
         _colKegiatanWidth =
@@ -129,6 +222,13 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
       await prefs.setDouble('rundown_col_no_width', _colNoWidth);
       await prefs.setString(
           'rundown_custom_col_widths', jsonEncode(_customColWidths));
+      await prefs.setString(
+          'rundown_header_col_alignments', jsonEncode(_headerColAlignments));
+      await prefs.setString(
+          'rundown_data_col_alignments', jsonEncode(_dataColAlignments));
+      // Save legacy for backwards compatibility
+      await prefs.setString(
+          'rundown_col_alignments', jsonEncode(_dataColAlignments));
     } catch (_) {}
   }
 
@@ -905,6 +1005,9 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                               _colDurasiWidth = 72.0;
                               _colCustomWidth = 140.0;
                               _colNoWidth = 36.0;
+                              _headerColAlignments.clear();
+                              _dataColAlignments.clear();
+                              _dataColAlignments['kegiatan'] = 'left';
                             });
                             setModalState(() {});
                             _saveTableSettings();
@@ -928,7 +1031,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      'Sesuaikan tinggi baris dan lebar kolom agar pas dan nyaman di layar.',
+                      'Sesuaikan tinggi baris, lebar kolom, dan perataan teks (kiri, tengah, kanan) pada tabel.',
                       style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                     ),
                     const SizedBox(height: 12),
@@ -1087,6 +1190,78 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                               },
                             ),
 
+                            const SizedBox(height: 16),
+                            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                            const SizedBox(height: 16),
+
+                            // 7. PERATAAN KOLOM SECTION
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border:
+                                    Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Row(
+                                    children: [
+                                      Icon(Icons.format_align_left_rounded,
+                                          size: 18, color: primaryTeal),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Perataan Judul & Data Kolom',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF1E293B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'Atur alignment teks (kiri, tengah, kanan) secara terpisah untuk Judul Kolom dan Isi Data.',
+                                    style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: Color(0xFF64748B)),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: OutlinedButton.icon(
+                                      onPressed: () {
+                                        Navigator.of(ctx).pop();
+                                        _openColumnAlignmentModal();
+                                      },
+                                      icon: const Icon(Icons.tune_rounded,
+                                          size: 16, color: primaryTeal),
+                                      label: const Text(
+                                        'Buka Pengaturan Alignment',
+                                        style: TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: primaryTeal,
+                                        ),
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        side:
+                                            const BorderSide(color: primaryTeal),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 10),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
                             const SizedBox(height: 20),
                           ],
                         ),
@@ -1121,6 +1296,503 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
           },
         );
       },
+    );
+  }
+
+  Future<void> _openColumnAlignmentModal() async {
+    final activeDay = (_selectedDayIndex < _rundown.days.length)
+        ? _rundown.days[_selectedDayIndex]
+        : null;
+
+    int alignmentTargetTab = 0; // 0: Judul Kolom (Header), 1: Data Kolom (Data)
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final isHeaderTab = alignmentTargetTab == 0;
+
+            return SafeArea(
+              child: Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.85,
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Drag Handle
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Expanded(
+                          child: Row(
+                            children: [
+                              Icon(Icons.format_align_left_rounded,
+                                  color: primaryTeal, size: 22),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Perataan Kolom (Alignment)',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              if (isHeaderTab) {
+                                _headerColAlignments.clear();
+                              } else {
+                                _dataColAlignments.clear();
+                                _dataColAlignments['kegiatan'] = 'left';
+                              }
+                            });
+                            setModalState(() {});
+                            _saveTableSettings();
+                          },
+                          icon: const Icon(Icons.refresh_rounded,
+                              size: 15, color: primaryTeal),
+                          label: Text(
+                            isHeaderTab ? 'Reset Judul' : 'Reset Data',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: primaryTeal,
+                            ),
+                          ),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Tab Selector: Judul Kolom vs Data Kolom
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: () {
+                                setModalState(() {
+                                  alignmentTargetTab = 0;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(9),
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isHeaderTab
+                                      ? Colors.white
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(9),
+                                  boxShadow: isHeaderTab
+                                      ? [
+                                          BoxShadow(
+                                            color: Colors.black
+                                                .withValues(alpha: 0.06),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          )
+                                        ]
+                                      : null,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.title_rounded,
+                                      size: 16,
+                                      color: isHeaderTab
+                                          ? primaryTeal
+                                          : const Color(0xFF64748B),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Judul Kolom',
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: isHeaderTab
+                                            ? FontWeight.bold
+                                            : FontWeight.w500,
+                                        color: isHeaderTab
+                                            ? primaryTeal
+                                            : const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () {
+                                setModalState(() {
+                                  alignmentTargetTab = 1;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(9),
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: !isHeaderTab
+                                      ? Colors.white
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(9),
+                                  boxShadow: !isHeaderTab
+                                      ? [
+                                          BoxShadow(
+                                            color: Colors.black
+                                                .withValues(alpha: 0.06),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          )
+                                        ]
+                                      : null,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.table_rows_rounded,
+                                      size: 16,
+                                      color: !isHeaderTab
+                                          ? primaryTeal
+                                          : const Color(0xFF64748B),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Data Kolom',
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: !isHeaderTab
+                                            ? FontWeight.bold
+                                            : FontWeight.w500,
+                                        color: !isHeaderTab
+                                            ? primaryTeal
+                                            : const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      isHeaderTab
+                          ? 'Perataan teks khusus untuk baris Judul Kolom (Header Tabel):'
+                          : 'Perataan teks khusus untuk baris Isi Data (Cells Tabel):',
+                      style: const TextStyle(
+                          fontSize: 11.5, color: Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 10),
+                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                    const SizedBox(height: 10),
+
+                    // Column Alignment List
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: Column(
+                          children: [
+                            _buildAlignmentSegmentedControl(
+                              title: 'Kolom No',
+                              icon: Icons.format_list_numbered_rounded,
+                              currentValue: isHeaderTab
+                                  ? _getHeaderColAlignment('no')
+                                  : _getDataColAlignment('no'),
+                              onChanged: (val) {
+                                setState(() {
+                                  if (isHeaderTab) {
+                                    _headerColAlignments['no'] = val;
+                                  } else {
+                                    _dataColAlignments['no'] = val;
+                                  }
+                                });
+                                setModalState(() {});
+                                _saveTableSettings();
+                              },
+                            ),
+                            const SizedBox(height: 10),
+                            _buildAlignmentSegmentedControl(
+                              title: 'Waktu Mulai',
+                              icon: Icons.access_time_rounded,
+                              currentValue: isHeaderTab
+                                  ? _getHeaderColAlignment('mulai')
+                                  : _getDataColAlignment('mulai'),
+                              onChanged: (val) {
+                                setState(() {
+                                  if (isHeaderTab) {
+                                    _headerColAlignments['mulai'] = val;
+                                  } else {
+                                    _dataColAlignments['mulai'] = val;
+                                  }
+                                });
+                                setModalState(() {});
+                                _saveTableSettings();
+                              },
+                            ),
+                            const SizedBox(height: 10),
+                            _buildAlignmentSegmentedControl(
+                              title: 'Waktu Selesai',
+                              icon: Icons.check_circle_outline_rounded,
+                              currentValue: isHeaderTab
+                                  ? _getHeaderColAlignment('selesai')
+                                  : _getDataColAlignment('selesai'),
+                              onChanged: (val) {
+                                setState(() {
+                                  if (isHeaderTab) {
+                                    _headerColAlignments['selesai'] = val;
+                                  } else {
+                                    _dataColAlignments['selesai'] = val;
+                                  }
+                                });
+                                setModalState(() {});
+                                _saveTableSettings();
+                              },
+                            ),
+                            const SizedBox(height: 10),
+                            _buildAlignmentSegmentedControl(
+                              title: 'Durasi',
+                              icon: Icons.timer_outlined,
+                              currentValue: isHeaderTab
+                                  ? _getHeaderColAlignment('durasi')
+                                  : _getDataColAlignment('durasi'),
+                              onChanged: (val) {
+                                setState(() {
+                                  if (isHeaderTab) {
+                                    _headerColAlignments['durasi'] = val;
+                                  } else {
+                                    _dataColAlignments['durasi'] = val;
+                                  }
+                                });
+                                setModalState(() {});
+                                _saveTableSettings();
+                              },
+                            ),
+                            const SizedBox(height: 10),
+                            _buildAlignmentSegmentedControl(
+                              title: 'Kegiatan',
+                              icon: Icons.event_note_rounded,
+                              currentValue: isHeaderTab
+                                  ? _getHeaderColAlignment('kegiatan',
+                                      defaultAlign: 'center')
+                                  : _getDataColAlignment('kegiatan',
+                                      defaultAlign: 'left'),
+                              onChanged: (val) {
+                                setState(() {
+                                  if (isHeaderTab) {
+                                    _headerColAlignments['kegiatan'] = val;
+                                  } else {
+                                    _dataColAlignments['kegiatan'] = val;
+                                  }
+                                });
+                                setModalState(() {});
+                                _saveTableSettings();
+                              },
+                            ),
+                            if (activeDay != null)
+                              ...activeDay.customColumns.map((colName) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 10),
+                                  child: _buildAlignmentSegmentedControl(
+                                    title: colName,
+                                    icon: Icons.view_column_rounded,
+                                    currentValue: isHeaderTab
+                                        ? _getHeaderColAlignment(colName)
+                                        : _getDataColAlignment(colName),
+                                    onChanged: (val) {
+                                      setState(() {
+                                        if (isHeaderTab) {
+                                          _headerColAlignments[colName] = val;
+                                        } else {
+                                          _dataColAlignments[colName] = val;
+                                        }
+                                      });
+                                      setModalState(() {});
+                                      _saveTableSettings();
+                                    },
+                                  ),
+                                );
+                              }),
+                            const SizedBox(height: 16),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryTeal,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                        ),
+                        child: const Text(
+                          'Selesai',
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildAlignmentSegmentedControl({
+    required String title,
+    required IconData icon,
+    required String currentValue,
+    required void Function(String newAlign) onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Icon(icon, size: 17, color: primaryTeal),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1E293B),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFCBD5E1)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildAlignButton(
+                  icon: Icons.format_align_left_rounded,
+                  tooltip: 'Rata Kiri',
+                  isSelected: currentValue == 'left',
+                  onTap: () => onChanged('left'),
+                ),
+                Container(width: 1, height: 20, color: const Color(0xFFE2E8F0)),
+                _buildAlignButton(
+                  icon: Icons.format_align_center_rounded,
+                  tooltip: 'Rata Tengah',
+                  isSelected: currentValue == 'center',
+                  onTap: () => onChanged('center'),
+                ),
+                Container(width: 1, height: 20, color: const Color(0xFFE2E8F0)),
+                _buildAlignButton(
+                  icon: Icons.format_align_right_rounded,
+                  tooltip: 'Rata Kanan',
+                  isSelected: currentValue == 'right',
+                  onTap: () => onChanged('right'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlignButton({
+    required IconData icon,
+    required String tooltip,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(7),
+        child: Container(
+          width: 32,
+          height: 28,
+          decoration: BoxDecoration(
+            color: isSelected ? primaryTeal : Colors.transparent,
+            borderRadius: BorderRadius.circular(7),
+          ),
+          alignment: Alignment.center,
+          child: Icon(
+            icon,
+            size: 16,
+            color: isSelected ? Colors.white : const Color(0xFF64748B),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1810,7 +2482,39 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             ),
             const SizedBox(width: 8),
 
-            // 5. Kustom Ukuran Kolom & Baris (Mode Geser Spreadsheet)
+            // 5. Atur Perataan Kolom (Alignment: Kiri, Tengah, Kanan)
+            Tooltip(
+              message: 'Atur Perataan Kolom (Kiri / Tengah / Kanan)',
+              child: Material(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  onTap: _openColumnAlignmentModal,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: const Color(0xFFCBD5E1),
+                        width: 1.2,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.format_align_left_rounded,
+                      color: Color(0xFF334155),
+                      size: 19,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 8),
+
+            // 6. Kustom Ukuran Kolom & Baris (Mode Geser Spreadsheet)
             Tooltip(
               message: _isResizeMode
                   ? 'Selesai Ubah Ukuran'
@@ -2077,111 +2781,92 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     required Widget child,
     required void Function(double delta) onResize,
   }) {
-    final double handleHitWidth = _isResizeMode ? 46.0 : 24.0;
+    const borderDecoration = Border(
+      right: BorderSide(
+        color: Color(0xFFCBD5E1),
+        width: 1.0,
+      ),
+    );
+
+    if (!_isResizeMode) {
+      return Container(
+        width: width,
+        height: 36.0,
+        decoration: const BoxDecoration(
+          border: borderDecoration,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: child,
+      );
+    }
+
     return SizedBox(
       width: width,
       height: 36.0,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned.fill(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: child,
-            ),
-          ),
-          // Column divider resize handle (Google Sheets / Excel style)
-          Positioned(
-            right: -(handleHitWidth / 2),
-            top: 0,
-            bottom: 0,
-            width: handleHitWidth,
-            child: MouseRegion(
-              cursor: SystemMouseCursors.resizeColumn,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                dragStartBehavior: DragStartBehavior.down,
-                onHorizontalDragDown: (_) {
-                  setState(() {
-                    _isResizingColumn = true;
-                  });
-                },
-                onHorizontalDragStart: (_) {
-                  setState(() {
-                    _isResizingColumn = true;
-                  });
-                },
-                onHorizontalDragUpdate: (details) {
-                  onResize(details.delta.dx);
-                },
-                onHorizontalDragEnd: (_) {
-                  setState(() {
-                    _isResizingColumn = false;
-                  });
-                  _saveTableSettings();
-                },
-                onHorizontalDragCancel: () {
-                  setState(() {
-                    _isResizingColumn = false;
-                  });
-                },
-                child: Center(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    clipBehavior: Clip.none,
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        width: _isResizeMode ? 3.5 : 1.0,
-                        height: _isResizeMode ? 26.0 : 36.0,
-                        decoration: BoxDecoration(
-                          color: _isResizeMode
-                              ? primaryTeal
-                              : const Color(0xFFCBD5E1),
-                          borderRadius: BorderRadius.circular(2.5),
-                          boxShadow: _isResizeMode
-                              ? [
-                                  BoxShadow(
-                                    color: primaryTeal.withValues(alpha: 0.45),
-                                    blurRadius: 4,
-                                  ),
-                                ]
-                              : null,
-                        ),
-                      ),
-                      if (_isResizeMode)
-                        Positioned(
-                          top: 1,
-                          child: Container(
-                            width: 14,
-                            height: 14,
-                            decoration: BoxDecoration(
-                              color: primaryTeal,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: primaryTeal.withValues(alpha: 0.35),
-                                  blurRadius: 3,
-                                  offset: const Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.code_rounded,
-                                size: 9,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.resizeColumn,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          dragStartBehavior: DragStartBehavior.down,
+          onHorizontalDragDown: (_) {
+            setState(() {
+              _isResizingColumn = true;
+            });
+          },
+          onHorizontalDragStart: (_) {
+            setState(() {
+              _isResizingColumn = true;
+            });
+          },
+          onHorizontalDragUpdate: (details) {
+            onResize(details.delta.dx);
+          },
+          onHorizontalDragEnd: (_) {
+            setState(() {
+              _isResizingColumn = false;
+            });
+            _saveTableSettings();
+          },
+          onHorizontalDragCancel: () {
+            setState(() {
+              _isResizingColumn = false;
+            });
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: primaryTeal.withValues(alpha: 0.14),
+              border: Border(
+                top: BorderSide(
+                  color: primaryTeal.withValues(alpha: 0.4),
+                  width: 1.0,
+                ),
+                bottom: BorderSide(
+                  color: primaryTeal.withValues(alpha: 0.4),
+                  width: 1.0,
+                ),
+                right: const BorderSide(
+                  color: Color(0xFFCBD5E1),
+                  width: 1.0,
                 ),
               ),
             ),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                child,
+                Positioned(
+                  right: 2,
+                  child: Icon(
+                    Icons.unfold_more_rounded,
+                    size: 13,
+                    color: primaryTeal.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -2202,11 +2887,12 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 _colNoWidth = (_colNoWidth + delta).clamp(28.0, 100.0);
               });
             },
-            child: const Center(
+            child: Align(
+              alignment: _getAlignment(_getHeaderColAlignment('no')),
               child: Text(
                 'No',
-                textAlign: TextAlign.center,
-                style: TextStyle(
+                textAlign: _getTextAlign(_getHeaderColAlignment('no')),
+                style: const TextStyle(
                   fontSize: 11.0,
                   fontWeight: FontWeight.bold,
                   color: primaryTeal,
@@ -2223,11 +2909,12 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 _colMulaiWidth = (_colMulaiWidth + delta).clamp(50.0, 160.0);
               });
             },
-            child: const Center(
+            child: Align(
+              alignment: _getAlignment(_getHeaderColAlignment('mulai')),
               child: Text(
                 'Mulai',
-                textAlign: TextAlign.center,
-                style: TextStyle(
+                textAlign: _getTextAlign(_getHeaderColAlignment('mulai')),
+                style: const TextStyle(
                   fontSize: 11.0,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF1E293B),
@@ -2247,11 +2934,12 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                     (_colSelesaiWidth + delta).clamp(50.0, 160.0);
               });
             },
-            child: const Center(
+            child: Align(
+              alignment: _getAlignment(_getHeaderColAlignment('selesai')),
               child: Text(
                 'Selesai',
-                textAlign: TextAlign.center,
-                style: TextStyle(
+                textAlign: _getTextAlign(_getHeaderColAlignment('selesai')),
+                style: const TextStyle(
                   fontSize: 11.0,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF1E293B),
@@ -2270,11 +2958,12 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 _colDurasiWidth = (_colDurasiWidth + delta).clamp(45.0, 140.0);
               });
             },
-            child: const Center(
+            child: Align(
+              alignment: _getAlignment(_getHeaderColAlignment('durasi')),
               child: Text(
                 'Durasi',
-                textAlign: TextAlign.center,
-                style: TextStyle(
+                textAlign: _getTextAlign(_getHeaderColAlignment('durasi')),
+                style: const TextStyle(
                   fontSize: 11.0,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF1E293B),
@@ -2294,11 +2983,14 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                     (_colKegiatanWidth + delta).clamp(120.0, 600.0);
               });
             },
-            child: const Center(
+            child: Align(
+              alignment: _getAlignment(
+                  _getHeaderColAlignment('kegiatan', defaultAlign: 'center')),
               child: Text(
                 'Kegiatan',
-                textAlign: TextAlign.center,
-                style: TextStyle(
+                textAlign: _getTextAlign(
+                    _getHeaderColAlignment('kegiatan', defaultAlign: 'center')),
+                style: const TextStyle(
                   fontSize: 11.0,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF1E293B),
@@ -2312,6 +3004,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
           // 6. CUSTOM COLUMNS (e.g. Keterangan, etc.)
           ...activeDay.customColumns.map((colName) {
             final colW = _getColCustomWidth(colName);
+            final align = _getHeaderColAlignment(colName);
             return _buildHeaderCellWithResizeHandle(
               width: colW,
               onResize: (delta) {
@@ -2320,15 +3013,16 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                       (colW + delta).clamp(60.0, 400.0);
                 });
               },
-              child: Center(
+              child: Align(
+                alignment: _getAlignment(align),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: _getMainAxisAlignment(align),
                   children: [
-                    const SizedBox(width: 14),
-                    Expanded(
+                    Flexible(
                       child: Text(
                         colName,
-                        textAlign: TextAlign.center,
+                        textAlign: _getTextAlign(align),
                         style: const TextStyle(
                           fontSize: 11.0,
                           fontWeight: FontWeight.bold,
@@ -2338,6 +3032,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    const SizedBox(width: 4),
                     InkWell(
                       onTap: () => _deleteCustomColumn(colName),
                       borderRadius: BorderRadius.circular(10),
@@ -2392,7 +3087,8 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                   // 1. Select Checkbox & Number
                   SizedBox(
                     width: _colNoWidth,
-                    child: Center(
+                    child: Align(
+                      alignment: _getAlignment(_getDataColAlignment('no')),
                       child: InkWell(
                         onTap: _isResizeMode
                             ? null
@@ -2407,7 +3103,8 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                               },
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisAlignment:
+                              _getMainAxisAlignment(_getDataColAlignment('no')),
                           children: [
                             Icon(
                               isSelected
@@ -2439,7 +3136,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                   SizedBox(
                     width: _colMulaiWidth,
                     child: Align(
-                      alignment: Alignment.center,
+                      alignment: _getAlignment(_getDataColAlignment('mulai')),
                       child: InkWell(
                         onTap: _isResizeMode
                             ? null
@@ -2461,20 +3158,22 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisAlignment: _getMainAxisAlignment(
+                                _getDataColAlignment('mulai')),
                             children: [
                               Icon(Icons.access_time_rounded,
                                   size: 11,
                                   color: row.startTime.isNotEmpty
-                                      ? primaryTeal
-                                      : const Color(0xFF94A3B8)),
+                                  ? primaryTeal
+                                  : const Color(0xFF94A3B8)),
                               const SizedBox(width: 2),
                               Flexible(
                                 child: Text(
                                   row.startTime.isNotEmpty
                                       ? row.startTime
                                       : '--:--',
-                                  textAlign: TextAlign.center,
+                                  textAlign: _getTextAlign(
+                                      _getDataColAlignment('mulai')),
                                   style: TextStyle(
                                     fontSize: 10.5,
                                     fontWeight: FontWeight.bold,
@@ -2497,7 +3196,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                   SizedBox(
                     width: _colSelesaiWidth,
                     child: Align(
-                      alignment: Alignment.center,
+                      alignment: _getAlignment(_getDataColAlignment('selesai')),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 4, vertical: 2),
@@ -2514,7 +3213,8 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisAlignment: _getMainAxisAlignment(
+                              _getDataColAlignment('selesai')),
                           children: [
                             Icon(Icons.check_circle_outline_rounded,
                                 size: 10.5,
@@ -2525,7 +3225,8 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                             Flexible(
                               child: Text(
                                 row.endTime.isNotEmpty ? row.endTime : '--:--',
-                                textAlign: TextAlign.center,
+                                textAlign: _getTextAlign(
+                                    _getDataColAlignment('selesai')),
                                 style: TextStyle(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.bold,
@@ -2547,7 +3248,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                   SizedBox(
                     width: _colDurasiWidth,
                     child: Align(
-                      alignment: Alignment.center,
+                      alignment: _getAlignment(_getDataColAlignment('durasi')),
                       child: InkWell(
                         onTap: _isResizeMode
                             ? null
@@ -2565,12 +3266,14 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisAlignment: _getMainAxisAlignment(
+                                _getDataColAlignment('durasi')),
                             children: [
                               Flexible(
                                 child: Text(
                                   row.durationText,
-                                  textAlign: TextAlign.center,
+                                  textAlign: _getTextAlign(
+                                      _getDataColAlignment('durasi')),
                                   style: const TextStyle(
                                     fontSize: 10.5,
                                     fontWeight: FontWeight.bold,
@@ -2593,11 +3296,12 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                   SizedBox(
                     width: _colKegiatanWidth,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: TextFormField(
                         key: ValueKey('${row.id}_activity'),
                         initialValue: row.activity,
-                        textAlign: TextAlign.center,
+                        textAlign: _getTextAlign(_getDataColAlignment('kegiatan',
+                            defaultAlign: 'left')),
                         enabled: !_isResizeMode,
                         textCapitalization: TextCapitalization.sentences,
                         style: const TextStyle(
@@ -2629,14 +3333,15 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                   ...activeDay.customColumns.map((colName) {
                     final val = row.customValues[colName] ?? '';
                     final colW = _getColCustomWidth(colName);
+                    final align = _getDataColAlignment(colName);
                     return SizedBox(
                       width: colW,
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: TextFormField(
                           key: ValueKey('${row.id}_custom_$colName'),
                           initialValue: val,
-                          textAlign: TextAlign.center,
+                          textAlign: _getTextAlign(align),
                           enabled: !_isResizeMode,
                           textCapitalization: TextCapitalization.sentences,
                           style: const TextStyle(
@@ -2667,69 +3372,48 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             ),
           ),
 
-          // Horizontal Row Bottom Drag Handle (Spreadsheet / Excel style)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: _isResizeMode ? -16.0 : -7.0,
-            height: _isResizeMode ? 32.0 : 14.0,
-            child: MouseRegion(
-              cursor: SystemMouseCursors.resizeRow,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                dragStartBehavior: DragStartBehavior.down,
-                onVerticalDragDown: (_) {
-                  setState(() {
-                    _isResizingRow = true;
-                  });
-                },
-                onVerticalDragStart: (_) {
-                  setState(() {
-                    _isResizingRow = true;
-                  });
-                },
-                onVerticalDragUpdate: (details) {
-                  setState(() {
-                    _rowHeight =
-                        (_rowHeight + details.delta.dy).clamp(26.0, 90.0);
-                  });
-                },
-                onVerticalDragEnd: (_) {
-                  setState(() {
-                    _isResizingRow = false;
-                  });
-                  _saveTableSettings();
-                },
-                onVerticalDragCancel: () {
-                  setState(() {
-                    _isResizingRow = false;
-                  });
-                },
-                child: Center(
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    height: _isResizeMode ? 5.0 : 1.0,
-                    width: _isResizeMode ? 64.0 : 0.0,
-                    decoration: BoxDecoration(
-                      color: _isResizeMode
-                          ? primaryTeal
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(3),
-                      boxShadow: _isResizeMode
-                          ? [
-                              BoxShadow(
-                                color: primaryTeal.withValues(alpha: 0.45),
-                                blurRadius: 4,
-                                offset: const Offset(0, 1),
-                              ),
-                            ]
-                          : null,
-                    ),
-                  ),
+          // Horizontal Row Bottom Drag Handle (Spreadsheet / Excel style) - ONLY in resize mode
+          if (_isResizeMode)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: -6.0,
+              height: 14.0,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.resizeRow,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  dragStartBehavior: DragStartBehavior.down,
+                  onVerticalDragDown: (_) {
+                    setState(() {
+                      _isResizingRow = true;
+                    });
+                  },
+                  onVerticalDragStart: (_) {
+                    setState(() {
+                      _isResizingRow = true;
+                    });
+                  },
+                  onVerticalDragUpdate: (details) {
+                    setState(() {
+                      _rowHeight =
+                          (_rowHeight + details.delta.dy).clamp(26.0, 90.0);
+                    });
+                  },
+                  onVerticalDragEnd: (_) {
+                    setState(() {
+                      _isResizingRow = false;
+                    });
+                    _saveTableSettings();
+                  },
+                  onVerticalDragCancel: () {
+                    setState(() {
+                      _isResizingRow = false;
+                    });
+                  },
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

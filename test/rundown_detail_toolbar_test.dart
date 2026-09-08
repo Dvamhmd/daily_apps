@@ -100,7 +100,7 @@ void main() {
     expect(find.text('6'), findsOneWidget);
   });
 
-  testWidgets('Spreadsheet drag resize handles allow adjusting column width and row height by dragging',
+  testWidgets('Spreadsheet drag resize handles allow adjusting column width and row height by dragging only when toggle is active',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1200, 1600);
     tester.view.devicePixelRatio = 1.0;
@@ -118,17 +118,32 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Toggle Resize Mode
+    // Initially, table setting mode is OFF: no resize handles should exist
+    expect(
+        find.byWidgetPredicate((w) =>
+            w is MouseRegion && w.cursor == SystemMouseCursors.resizeColumn),
+        findsNothing);
+    expect(
+        find.byWidgetPredicate((w) =>
+            w is MouseRegion && w.cursor == SystemMouseCursors.resizeRow),
+        findsNothing);
+
+    // Toggle Resize Mode ON via table settings icon
     final tuneButton = find.byIcon(Icons.tune_rounded).first;
     await tester.tap(tuneButton);
     await tester.pumpAndSettle();
 
-    // Find column resize handles by SystemMouseCursors.resizeColumn
+    // Find column resize handles on header title areas by SystemMouseCursors.resizeColumn
     final columnHandles = find.byWidgetPredicate((w) =>
         w is MouseRegion && w.cursor == SystemMouseCursors.resizeColumn);
     expect(columnHandles, findsWidgets);
 
-    // Drag 1st handle (No column right border) horizontally to expand column
+    // Drag column header title area (e.g. Kegiatan or No) horizontally to expand column
+    await tester.drag(find.text('Kegiatan'), const Offset(30, 0),
+        warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    // Drag 1st handle (No column header area) horizontally to expand column
     await tester.drag(columnHandles.first, const Offset(20, 0),
         warnIfMissed: false);
     await tester.pumpAndSettle();
@@ -136,6 +151,7 @@ void main() {
     // Verify SharedPreferences updated with new column width
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getDouble('rundown_col_no_width'), isNotNull);
+    expect(prefs.getDouble('rundown_col_kegiatan_width'), isNotNull);
 
     // Find row resize handles by SystemMouseCursors.resizeRow
     final rowHandles = find.byWidgetPredicate(
@@ -149,6 +165,21 @@ void main() {
 
     // Verify SharedPreferences updated with new row height
     expect(prefs.getDouble('rundown_row_height'), isNotNull);
+
+    // Toggle Resize Mode OFF via check icon
+    final checkButton = find.byIcon(Icons.check_rounded).first;
+    await tester.tap(checkButton);
+    await tester.pumpAndSettle();
+
+    // Now resize handles should be disabled again
+    expect(
+        find.byWidgetPredicate((w) =>
+            w is MouseRegion && w.cursor == SystemMouseCursors.resizeColumn),
+        findsNothing);
+    expect(
+        find.byWidgetPredicate((w) =>
+            w is MouseRegion && w.cursor == SystemMouseCursors.resizeRow),
+        findsNothing);
   });
 
   testWidgets('Rundown table uses ClampingScrollPhysics without rubber-band bounce at edges',
@@ -197,5 +228,65 @@ void main() {
     await tester.tap(find.text('110%'));
     await tester.pumpAndSettle();
     expect(find.text('100%'), findsOneWidget);
+  });
+
+  testWidgets('Column alignment (left, center, right) can be set separately for Header and Data',
+      (WidgetTester tester) async {
+    final sampleRundown = createSampleRundown();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RundownDetailPage(rundown: sampleRundown),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Find alignment button in toolbar
+    final alignButton =
+        find.byTooltip('Atur Perataan Kolom (Kiri / Tengah / Kanan)');
+    expect(alignButton, findsOneWidget);
+
+    // Tap alignment button to open alignment modal
+    await tester.tap(alignButton);
+    await tester.pumpAndSettle();
+
+    // Verify modal header and tabs are visible
+    expect(find.text('Perataan Kolom (Alignment)'), findsOneWidget);
+    expect(find.text('Judul Kolom'), findsOneWidget);
+    expect(find.text('Data Kolom'), findsOneWidget);
+    expect(find.text('Kolom No'), findsOneWidget);
+
+    // In Judul Kolom tab (default), set Kolom No to Right alignment
+    final rataKananButtons = find.byTooltip('Rata Kanan');
+    expect(rataKananButtons, findsWidgets);
+    await tester.tap(rataKananButtons.first);
+    await tester.pumpAndSettle();
+
+    // Switch to Data Kolom tab
+    await tester.tap(find.text('Data Kolom'));
+    await tester.pumpAndSettle();
+
+    // In Data Kolom tab, set Waktu Mulai to Left alignment
+    final rataKiriButtons = find.byTooltip('Rata Kiri');
+    expect(rataKiriButtons, findsWidgets);
+    // tap the second rata kiri button (which corresponds to Waktu Mulai)
+    await tester.tap(rataKiriButtons.at(1));
+    await tester.pumpAndSettle();
+
+    // Tap Selesai button to close modal
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Selesai'));
+    await tester.pumpAndSettle();
+
+    // Verify separate persistence in SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    final headerAlignmentsStr =
+        prefs.getString('rundown_header_col_alignments');
+    final dataAlignmentsStr = prefs.getString('rundown_data_col_alignments');
+
+    expect(headerAlignmentsStr, isNotNull);
+    expect(headerAlignmentsStr, contains('"no":"right"'));
+
+    expect(dataAlignmentsStr, isNotNull);
+    expect(dataAlignmentsStr, contains('"mulai":"left"'));
   });
 }
