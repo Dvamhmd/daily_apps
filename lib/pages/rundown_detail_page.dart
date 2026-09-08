@@ -3073,26 +3073,48 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 border: Border(
                   bottom: BorderSide(
                     color: _isResizeMode
-                        ? primaryTeal.withValues(alpha: 0.35)
+                        ? const Color(0xFFCBD5E1)
                         : const Color(0xFFF1F5F9),
-                    width: _isResizeMode ? 1.5 : 1.0,
+                    width: 1.0,
                   ),
                 ),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+              padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // 1. Select Checkbox & Number
-                  SizedBox(
+                  // 1. Select Checkbox & Number (Tekan lama tahan untuk mulai memilih baris)
+                  Container(
                     width: _colNoWidth,
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        right: BorderSide(
+                          color: Color(0xFFE2E8F0),
+                          width: 1.0,
+                        ),
+                      ),
+                    ),
                     child: Align(
                       alignment: _getAlignment(_getDataColAlignment('no')),
                       child: InkWell(
                         onTap: _isResizeMode
                             ? null
                             : () {
+                                if (_selectedRowIndices.isNotEmpty) {
+                                  setState(() {
+                                    if (isSelected) {
+                                      _selectedRowIndices.remove(index);
+                                    } else {
+                                      _selectedRowIndices.add(index);
+                                    }
+                                  });
+                                }
+                              },
+                        onLongPress: _isResizeMode
+                            ? null
+                            : () {
+                                HapticFeedback.mediumImpact();
                                 setState(() {
                                   if (isSelected) {
                                     _selectedRowIndices.remove(index);
@@ -3101,91 +3123,78 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                                   }
                                 });
                               },
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment:
-                              _getMainAxisAlignment(_getDataColAlignment('no')),
-                          children: [
-                            Icon(
-                              isSelected
-                                  ? Icons.check_box_rounded
-                                  : Icons.check_box_outline_blank_rounded,
-                              size: 15,
-                              color: isSelected
-                                  ? primaryTeal
-                                  : const Color(0xFFCBD5E1),
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              '${index + 1}',
-                              style: TextStyle(
-                                fontSize: 10.0,
-                                fontWeight: FontWeight.bold,
-                                color: isSelected
-                                    ? primaryTeal
-                                    : const Color(0xFF64748B),
+                        borderRadius: BorderRadius.circular(4),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 2, vertical: 2),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment:
+                                _getMainAxisAlignment(_getDataColAlignment('no')),
+                            children: [
+                              if (_selectedRowIndices.isNotEmpty) ...[
+                                Icon(
+                                  isSelected
+                                      ? Icons.check_box_rounded
+                                      : Icons.check_box_outline_blank_rounded,
+                                  size: 13.5,
+                                  color: isSelected
+                                      ? primaryTeal
+                                      : const Color(0xFF94A3B8),
+                                ),
+                                const SizedBox(width: 2),
+                              ],
+                              Text(
+                                '${index + 1}',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected
+                                      ? primaryTeal
+                                      : const Color(0xFF64748B),
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
 
                   // 2. WAKTU MULAI
-                  SizedBox(
+                  Container(
                     width: _colMulaiWidth,
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        right: BorderSide(
+                          color: Color(0xFFE2E8F0),
+                          width: 1.0,
+                        ),
+                      ),
+                    ),
                     child: Align(
                       alignment: _getAlignment(_getDataColAlignment('mulai')),
                       child: InkWell(
                         onTap: _isResizeMode
                             ? null
                             : () => _pickRowStartTime(index),
-                        borderRadius: BorderRadius.circular(6),
-                        child: Container(
+                        borderRadius: BorderRadius.circular(4),
+                        child: Padding(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 4, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: row.startTime.isNotEmpty
-                                ? primaryTeal.withValues(alpha: 0.1)
-                                : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(5),
-                            border: Border.all(
+                              horizontal: 4, vertical: 4),
+                          child: Text(
+                            row.startTime.isNotEmpty ? row.startTime : '--:--',
+                            textAlign:
+                                _getTextAlign(_getDataColAlignment('mulai')),
+                            style: TextStyle(
+                              fontSize: 11.0,
+                              fontWeight: FontWeight.w600,
                               color: row.startTime.isNotEmpty
-                                  ? primaryTeal.withValues(alpha: 0.3)
-                                  : const Color(0xFFE2E8F0),
+                                  ? const Color(0xFF0F172A)
+                                  : const Color(0xFF94A3B8),
                             ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: _getMainAxisAlignment(
-                                _getDataColAlignment('mulai')),
-                            children: [
-                              Icon(Icons.access_time_rounded,
-                                  size: 11,
-                                  color: row.startTime.isNotEmpty
-                                  ? primaryTeal
-                                  : const Color(0xFF94A3B8)),
-                              const SizedBox(width: 2),
-                              Flexible(
-                                child: Text(
-                                  row.startTime.isNotEmpty
-                                      ? row.startTime
-                                      : '--:--',
-                                  textAlign: _getTextAlign(
-                                      _getDataColAlignment('mulai')),
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: row.startTime.isNotEmpty
-                                        ? primaryTeal
-                                        : const Color(0xFF94A3B8),
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ),
@@ -3193,99 +3202,73 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                   ),
 
                   // 3. WAKTU SELESAI (OTOMATIS)
-                  SizedBox(
+                  Container(
                     width: _colSelesaiWidth,
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        right: BorderSide(
+                          color: Color(0xFFE2E8F0),
+                          width: 1.0,
+                        ),
+                      ),
+                    ),
                     child: Align(
                       alignment: _getAlignment(_getDataColAlignment('selesai')),
-                      child: Container(
+                      child: Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: row.endTime.isNotEmpty
-                              ? const Color(0xFFF0FDF4)
-                              : const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(5),
-                          border: Border.all(
+                            horizontal: 4, vertical: 4),
+                        child: Text(
+                          row.endTime.isNotEmpty ? row.endTime : '--:--',
+                          textAlign:
+                              _getTextAlign(_getDataColAlignment('selesai')),
+                          style: TextStyle(
+                            fontSize: 11.0,
+                            fontWeight: FontWeight.w600,
                             color: row.endTime.isNotEmpty
-                                ? primaryTeal.withValues(alpha: 0.25)
-                                : const Color(0xFFE2E8F0),
+                                ? const Color(0xFF0F172A)
+                                : const Color(0xFF94A3B8),
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: _getMainAxisAlignment(
-                              _getDataColAlignment('selesai')),
-                          children: [
-                            Icon(Icons.check_circle_outline_rounded,
-                                size: 10.5,
-                                color: row.endTime.isNotEmpty
-                                    ? primaryTeal
-                                    : const Color(0xFF94A3B8)),
-                            const SizedBox(width: 2),
-                            Flexible(
-                              child: Text(
-                                row.endTime.isNotEmpty ? row.endTime : '--:--',
-                                textAlign: _getTextAlign(
-                                    _getDataColAlignment('selesai')),
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: row.endTime.isNotEmpty
-                                      ? const Color(0xFF004D40)
-                                      : const Color(0xFF94A3B8),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ),
                   ),
 
                   // 4. DURASI (Klik untuk atur durasi)
-                  SizedBox(
+                  Container(
                     width: _colDurasiWidth,
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        right: BorderSide(
+                          color: Color(0xFFE2E8F0),
+                          width: 1.0,
+                        ),
+                      ),
+                    ),
                     child: Align(
                       alignment: _getAlignment(_getDataColAlignment('durasi')),
                       child: InkWell(
                         onTap: _isResizeMode
                             ? null
                             : () => _editRowDuration(index),
-                        borderRadius: BorderRadius.circular(6),
-                        child: Container(
+                        borderRadius: BorderRadius.circular(4),
+                        child: Padding(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 4, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(5),
-                            border: Border.all(
-                              color: const Color(0xFFE2E8F0),
+                              horizontal: 4, vertical: 4),
+                          child: Text(
+                            row.durationText,
+                            textAlign:
+                                _getTextAlign(_getDataColAlignment('durasi')),
+                            style: TextStyle(
+                              fontSize: 11.0,
+                              fontWeight: FontWeight.w600,
+                              color: row.durationMinutes > 0
+                                  ? const Color(0xFF0F172A)
+                                  : const Color(0xFF94A3B8),
                             ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: _getMainAxisAlignment(
-                                _getDataColAlignment('durasi')),
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  row.durationText,
-                                  textAlign: _getTextAlign(
-                                      _getDataColAlignment('durasi')),
-                                  style: const TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF0F172A),
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const Icon(Icons.arrow_drop_down_rounded,
-                                  size: 13, color: primaryTeal),
-                            ],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ),
@@ -3293,38 +3276,49 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                   ),
 
                   // 5. KEGIATAN (Inline Text Input)
-                  SizedBox(
+                  Container(
                     width: _colKegiatanWidth,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: TextFormField(
-                        key: ValueKey('${row.id}_activity'),
-                        initialValue: row.activity,
-                        textAlign: _getTextAlign(_getDataColAlignment('kegiatan',
-                            defaultAlign: 'left')),
-                        enabled: !_isResizeMode,
-                        textCapitalization: TextCapitalization.sentences,
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF0F172A),
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        right: BorderSide(
+                          color: Color(0xFFE2E8F0),
+                          width: 1.0,
                         ),
-                        decoration: const InputDecoration(
-                          hintText: 'Nama kegiatan...',
-                          hintStyle: TextStyle(
-                            fontSize: 11.0,
-                            color: Color(0xFFCBD5E1),
-                            fontWeight: FontWeight.normal,
+                      ),
+                    ),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: TextFormField(
+                          key: ValueKey('${row.id}_activity'),
+                          initialValue: row.activity,
+                          textAlign: _getTextAlign(_getDataColAlignment('kegiatan',
+                              defaultAlign: 'left')),
+                          enabled: !_isResizeMode,
+                          textCapitalization: TextCapitalization.sentences,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0F172A),
                           ),
-                          isDense: true,
-                          contentPadding:
-                              EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-                          border: InputBorder.none,
+                          decoration: const InputDecoration(
+                            hintText: 'Nama kegiatan...',
+                            hintStyle: TextStyle(
+                              fontSize: 11.0,
+                              color: Color(0xFFCBD5E1),
+                              fontWeight: FontWeight.normal,
+                            ),
+                            isDense: true,
+                            contentPadding:
+                                EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                            border: InputBorder.none,
+                          ),
+                          onChanged: (val) {
+                            row.activity = val;
+                            _notifyChange();
+                          },
                         ),
-                        onChanged: (val) {
-                          row.activity = val;
-                          _notifyChange();
-                        },
                       ),
                     ),
                   ),
@@ -3334,35 +3328,46 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                     final val = row.customValues[colName] ?? '';
                     final colW = _getColCustomWidth(colName);
                     final align = _getDataColAlignment(colName);
-                    return SizedBox(
+                    return Container(
                       width: colW,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: TextFormField(
-                          key: ValueKey('${row.id}_custom_$colName'),
-                          initialValue: val,
-                          textAlign: _getTextAlign(align),
-                          enabled: !_isResizeMode,
-                          textCapitalization: TextCapitalization.sentences,
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            color: Color(0xFF334155),
+                      decoration: const BoxDecoration(
+                        border: Border(
+                          right: BorderSide(
+                            color: Color(0xFFE2E8F0),
+                            width: 1.0,
                           ),
-                          decoration: InputDecoration(
-                            hintText: '$colName...',
-                            hintStyle: const TextStyle(
-                              fontSize: 11.0,
-                              color: Color(0xFFCBD5E1),
+                        ),
+                      ),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: TextFormField(
+                            key: ValueKey('${row.id}_custom_$colName'),
+                            initialValue: val,
+                            textAlign: _getTextAlign(align),
+                            enabled: !_isResizeMode,
+                            textCapitalization: TextCapitalization.sentences,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              color: Color(0xFF334155),
                             ),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 3),
-                            border: InputBorder.none,
+                            decoration: InputDecoration(
+                              hintText: '$colName...',
+                              hintStyle: const TextStyle(
+                                fontSize: 11.0,
+                                color: Color(0xFFCBD5E1),
+                              ),
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 3),
+                              border: InputBorder.none,
+                            ),
+                            onChanged: (newVal) {
+                              row.customValues[colName] = newVal;
+                              _notifyChange();
+                            },
                           ),
-                          onChanged: (newVal) {
-                            row.customValues[colName] = newVal;
-                            _notifyChange();
-                          },
                         ),
                       ),
                     );
@@ -3372,13 +3377,9 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             ),
           ),
 
-          // Horizontal Row Bottom Drag Handle (Spreadsheet / Excel style) - ONLY in resize mode
+          // Area-based Row Height Drag Gesture (Seluruh area baris) - ONLY in resize mode
           if (_isResizeMode)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: -6.0,
-              height: 14.0,
+            Positioned.fill(
               child: MouseRegion(
                 cursor: SystemMouseCursors.resizeRow,
                 child: GestureDetector(
