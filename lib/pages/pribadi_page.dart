@@ -3048,10 +3048,11 @@ class _PribadiPageState extends State<PribadiPage> {
     );
   }
 
-  // --- DIALOG KONFIRMASI HAPUS & ROLLBACK SEMUA TRANSAKSI BULAN INI ---
+  // --- DIALOG KONFIRMASI HAPUS & ROLLBACK SEMUA TRANSAKSI & POS DANA BULAN INI ---
   void _confirmDeleteAllTransactions([VoidCallback? onDeleted]) {
-    final txList = _data.transactions;
-    if (txList.isEmpty) return;
+    if (_data.transactions.isEmpty && _data.posDanaList.isEmpty) return;
+    final txCount = _data.transactions.length;
+    final posCount = _data.posDanaList.length;
 
     showDialog(
       context: context,
@@ -3073,12 +3074,14 @@ class _PribadiPageState extends State<PribadiPage> {
                   color: primaryRose, size: 20),
             ),
             const SizedBox(width: 8),
-            const Text(
-              'Hapus Semua Transaksi?',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: textDark,
+            const Expanded(
+              child: Text(
+                'Hapus Semua Data & Pos?',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: textDark,
+                ),
               ),
             ),
           ],
@@ -3088,28 +3091,45 @@ class _PribadiPageState extends State<PribadiPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Apakah Anda yakin ingin menghapus seluruh (${txList.length}) transaksi pada bulan ${_namaBulan[_selectedMonth.month - 1]} ${_selectedMonth.year}?',
+              'Apakah Anda yakin ingin menghapus seluruh ($txCount) transaksi dan ($posCount) pos dana pada bulan ${_namaBulan[_selectedMonth.month - 1]} ${_selectedMonth.year}?',
               style: const TextStyle(fontSize: 13, color: textDark),
             ),
             const SizedBox(height: 12),
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: const Color(0xFFFEF2F2),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: const Color(0xFFFECACA)),
               ),
-              child: const Row(
+              child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.warning_amber_rounded,
-                      size: 18, color: Color(0xFFDC2626)),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Seluruh saldo akun dan pos dana akan dipulihkan (rollback) secara aman dan tidak akan menghasilkan saldo negatif.',
-                      style: TextStyle(
-                          fontSize: 11, color: Color(0xFF991B1B)),
+                  Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded,
+                          size: 18, color: Color(0xFFDC2626)),
+                      SizedBox(width: 8),
+                      Text(
+                        'Peringatan Konfirmasi Hapus!',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFDC2626),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    '1. Seluruh riwayat transaksi bulan ini akan dihapus permanen.\n'
+                    '2. Seluruh Pos Dana di Keuangan Pribadi dan Uangku pada bulan ini juga akan ikut terhapus.\n'
+                    '3. Seluruh saldo akan di-reset menjadi Rp 0.\n\n'
+                    'Tindakan ini tidak dapat dibatalkan.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF991B1B),
+                      height: 1.4,
                     ),
                   ),
                 ],
@@ -3125,47 +3145,36 @@ class _PribadiPageState extends State<PribadiPage> {
           ElevatedButton.icon(
             onPressed: () async {
               Navigator.pop(ctx);
-              final deletedCount = _data.transactions.length;
 
-              final uList = await PribadiSyncService.loadUangkuList(_monthKey);
-
-              // 1. Bersihkan seluruh transaksi
+              // 1. Bersihkan seluruh transaksi & pos dana
               _data.transactions.clear();
+              _data.posDanaList.clear();
 
-              // 2. Reset saldo Pos Dana sesuai daftar Uangku (atau 0 jika tidak ada / Uangku kosong)
-              for (final pos in _data.posDanaList) {
-                final uIdx = uList.indexWhere((u) =>
-                    u.nama.trim().toLowerCase() == pos.nama.trim().toLowerCase());
-                if (uIdx != -1) {
-                  pos.balance = uList[uIdx].jumlah;
-                } else {
-                  pos.balance = 0;
-                }
-              }
-
-              // 3. Pastikan saldo akun penampung bersih 0
+              // 2. Pastikan saldo akun penampung bersih 0
               _data.rekeningPribadi.balance = 0;
               _data.onHandDebit.balance = 0;
               _data.onHandCash.balance = 0;
 
-              // 4. Sanitasi & proteksi anti-minus seluruh wadah dana
-              _sanitizeAllBalances();
+              // 3. Bersihkan data Uangku untuk bulan ini
+              await PribadiSyncService.saveUangkuList(_monthKey, []);
 
+              // 4. Simpan perubahan ke SharedPreferences
               await _saveData();
+
               if (mounted) {
                 setState(() {});
                 onDeleted?.call();
                 CustomToast.showSuccess(
                   context,
-                  title: 'Semua Transaksi Dihapus',
+                  title: 'Semua Data & Pos Dihapus',
                   subtitle:
-                      '$deletedCount transaksi berhasil dihapus & saldo dipulihkan dengan aman.',
+                      '$txCount transaksi dan $posCount pos dana di Uangku berhasil dihapus.',
                   icon: Icons.delete_sweep_rounded,
                 );
               }
             },
             icon: const Icon(Icons.delete_forever_rounded, size: 16),
-            label: const Text('Hapus Semua'),
+            label: const Text('Hapus Semua Data & Pos'),
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryRose,
               foregroundColor: Colors.white,
