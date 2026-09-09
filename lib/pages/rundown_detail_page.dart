@@ -45,6 +45,9 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
   // Mode Kustom Ukuran (Spreadsheet / Excel style interactive drag-to-resize)
   bool _isResizeMode = false;
 
+  // Mode Edit Data Rundown (Jika false, rundown terkunci hanya untuk geser/zoom)
+  bool _isEditMode = false;
+
   // Customizable Column Widths and Row Height
   double _rowHeight = 36.0;
   double _colNoWidth = 36.0;
@@ -2755,39 +2758,111 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
   Widget _buildZoomControlBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Expanded(
-            child: Row(
-              children: [
-                Icon(Icons.pinch_rounded, size: 18, color: primaryTeal),
-                SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    'Zoom',
-                    style: TextStyle(
-                      fontSize: 12.0,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF475569),
+          // 1. Toggle Mode Edit (Tombol Icon Pensil)
+          Tooltip(
+            message: _isEditMode
+                ? 'Mode Edit Aktif: Ketuk sel tabel untuk mengubah data\n(Ketuk untuk mengunci tabel)'
+                : 'Mode Kunci: Hanya untuk menggeser & zoom tabel\n(Ketuk untuk mengaktifkan edit)',
+            child: Material(
+              color: _isEditMode ? primaryTeal : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                onTap: () {
+                  setState(() {
+                    _isEditMode = !_isEditMode;
+                  });
+                  CustomToast.show(
+                    context,
+                    title: _isEditMode
+                        ? 'Mode Edit Aktif'
+                        : 'Mode Kunci Aktif',
+                    subtitle: _isEditMode
+                        ? 'Ketuk sel tabel untuk mengubah data rundown'
+                        : 'Tabel terkunci (hanya untuk geser & zoom)',
+                    type: _isEditMode ? ToastType.success : ToastType.info,
+                  );
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: _isEditMode
+                          ? const Color(0xFF004D40)
+                          : const Color(0xFFCBD5E1),
+                      width: 1,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    boxShadow: _isEditMode
+                        ? [
+                            BoxShadow(
+                              color: primaryTeal.withValues(alpha: 0.25),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _isEditMode ? Icons.edit_rounded : Icons.edit_outlined,
+                        size: 15,
+                        color: _isEditMode
+                            ? Colors.white
+                            : const Color(0xFF475569),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        _isEditMode ? 'Edit Aktif' : 'Kunci Edit',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: _isEditMode
+                              ? Colors.white
+                              : const Color(0xFF475569),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
-          const SizedBox(width: 8),
+
+          // 2. Zoom Controls
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              const Icon(Icons.pinch_rounded, size: 16, color: primaryTeal),
+              const SizedBox(width: 4),
+              const Text(
+                'Zoom',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(width: 4),
               // Zoom Out Button
               IconButton(
                 icon: const Icon(Icons.remove_circle_outline_rounded, size: 18),
@@ -3369,8 +3444,11 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                           child: InkWell(
                             splashColor: primaryTeal.withValues(alpha: 0.28),
                             highlightColor: primaryTeal.withValues(alpha: 0.16),
-                            onTap: _isResizeMode
-                                ? null
+                            onTap: (_isResizeMode || !_isEditMode)
+                                ? (_selectedRowIndices.isNotEmpty &&
+                                        !_isResizeMode
+                                    ? () => _toggleRowSelection(index)
+                                    : null)
                                 : () {
                                     if (_selectedRowIndices.isNotEmpty) {
                                       _toggleRowSelection(index);
@@ -3473,8 +3551,11 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                           child: InkWell(
                             splashColor: primaryTeal.withValues(alpha: 0.28),
                             highlightColor: primaryTeal.withValues(alpha: 0.16),
-                            onTap: _isResizeMode
-                                ? null
+                            onTap: (_isResizeMode || !_isEditMode)
+                                ? (_selectedRowIndices.isNotEmpty &&
+                                        !_isResizeMode
+                                    ? () => _toggleRowSelection(index)
+                                    : null)
                                 : () {
                                     if (_selectedRowIndices.isNotEmpty) {
                                       _toggleRowSelection(index);
@@ -3540,12 +3621,13 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                               padding:
                                   const EdgeInsets.symmetric(horizontal: 4),
                               child: TextFormField(
-                                key: ValueKey('${row.id}_activity'),
+                                key: ValueKey(
+                                    '${row.id}_activity_$_isEditMode'),
                                 initialValue: row.activity,
                                 textAlign: _getTextAlign(_getDataColAlignment(
                                     'kegiatan',
                                     defaultAlign: 'left')),
-                                enabled: !_isResizeMode,
+                                enabled: _isEditMode && !_isResizeMode,
                                 textCapitalization:
                                     TextCapitalization.sentences,
                                 style: const TextStyle(
@@ -3615,10 +3697,11 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                                 padding:
                                     const EdgeInsets.symmetric(horizontal: 4),
                                 child: TextFormField(
-                                  key: ValueKey('${row.id}_custom_$colName'),
+                                  key: ValueKey(
+                                      '${row.id}_custom_${colName}_$_isEditMode'),
                                   initialValue: val,
                                   textAlign: _getTextAlign(align),
-                                  enabled: !_isResizeMode,
+                                  enabled: _isEditMode && !_isResizeMode,
                                   textCapitalization:
                                       TextCapitalization.sentences,
                                   style: const TextStyle(
@@ -3632,8 +3715,9 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                                       color: Color(0xFFCBD5E1),
                                     ),
                                     isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 5, vertical: 3),
+                                    contentPadding:
+                                        const EdgeInsets.symmetric(
+                                            horizontal: 5, vertical: 3),
                                     border: InputBorder.none,
                                   ),
                                   onChanged: (newVal) {
