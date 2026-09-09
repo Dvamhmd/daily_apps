@@ -3862,202 +3862,262 @@ class _PribadiPageState extends State<PribadiPage> {
                                   },
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.delete_outline_rounded,
-                                      size: 18, color: primaryRose),
-                                  onPressed: () async {
-                                    final cleanPosName =
-                                        pos.nama.trim().toLowerCase();
-                                    final matchingTx =
-                                        _data.transactions.where((tx) {
-                                      final target = tx.targetAccount
-                                              ?.trim()
-                                              .toLowerCase() ??
-                                          '';
-                                      final source = tx.sourceAccount
-                                              ?.trim()
-                                              .toLowerCase() ??
-                                          '';
-                                      final manual = tx.manualSource
-                                              ?.trim()
-                                              .toLowerCase() ??
-                                          '';
-                                      final title =
-                                          tx.title.trim().toLowerCase();
-                                      final note =
-                                          tx.note?.trim().toLowerCase() ?? '';
-
-                                      return target == cleanPosName ||
-                                          source == cleanPosName ||
-                                          manual == cleanPosName ||
-                                          title == cleanPosName ||
-                                          note ==
-                                              'pemasukan uangku: $cleanPosName' ||
-                                          note ==
-                                              'pengeluaran uangku: $cleanPosName' ||
-                                          note.contains(cleanPosName);
-                                    }).toList();
-
-                                    final uList = await PribadiSyncService
-                                        .loadUangkuList(_monthKey);
-                                    final isInUangku = uList.any((u) =>
-                                        u.nama.trim().toLowerCase() ==
-                                        cleanPosName);
-
-                                    final hasWarning = matchingTx.isNotEmpty ||
-                                        isInUangku;
-
-                                    if (!context.mounted) return;
-
-                                    final confirm = await showDialog<bool>(
-                                      context: context,
-                                      builder: (c) => AlertDialog(
-                                        backgroundColor: lightCard,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(16),
-                                        ),
-                                        title: Row(
-                                          children: [
-                                            if (hasWarning)
-                                              const Padding(
-                                                padding: EdgeInsets.only(
-                                                    right: 8),
-                                                child: Icon(
-                                                  Icons.warning_amber_rounded,
-                                                  color: Color(0xFFDC2626),
-                                                  size: 22,
-                                                ),
-                                              ),
-                                            Text(
-                                              hasWarning
-                                                  ? 'Peringatan Hapus Pos'
-                                                  : 'Hapus Pos Dana?',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 16,
-                                                color: hasWarning
-                                                    ? const Color(0xFF991B1B)
-                                                    : textDark,
-                                              ),
+                                    icon: const Icon(Icons.delete_outline_rounded,
+                                        size: 18, color: primaryRose),
+                                    onPressed: () async {
+                                      // 1. Validasi saldo: Pos dana hanya dapat dihapus jika saldonya Rp 0
+                                      if (pos.balance > 0) {
+                                        showDialog(
+                                          context: context,
+                                          builder: (ctx) => AlertDialog(
+                                            backgroundColor: lightCard,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                              side: const BorderSide(
+                                                  color: lightBorder),
                                             ),
-                                          ],
-                                        ),
-                                        content: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              'Yakin ingin menghapus pos "${pos.nama}"?',
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                                color: textDark,
-                                              ),
-                                            ),
-                                            if (hasWarning) ...[
-                                              const SizedBox(height: 10),
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.all(10),
-                                                decoration: BoxDecoration(
-                                                  color:
-                                                      const Color(0xFFFEF2F2),
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                  border: Border.all(
-                                                    color: const Color(
-                                                        0xFFFCA5A5),
+                                            title: Row(
+                                              children: [
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.all(6),
+                                                  decoration: BoxDecoration(
+                                                    color:
+                                                        const Color(0xFFDC2626)
+                                                            .withValues(alpha: 0.1),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.warning_amber_rounded,
+                                                    color: Color(0xFFDC2626),
+                                                    size: 20,
                                                   ),
                                                 ),
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    if (matchingTx
-                                                        .isNotEmpty)
-                                                      Text(
-                                                        '⚠️ Terdapat ${matchingTx.length} transaksi tercatat pada pos dana ini.',
-                                                        style: const TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          color: Color(
-                                                              0xFF991B1B),
-                                                        ),
-                                                      ),
-                                                    if (isInUangku)
-                                                      const Text(
-                                                        '🔗 Pos ini juga terhubung dengan daftar Uangku.',
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          color: Color(
-                                                              0xFF991B1B),
-                                                        ),
-                                                      ),
-                                                    const SizedBox(height: 4),
-                                                    const Text(
-                                                      'Menghapus pos ini dapat memengaruhi pencatatan saldo dan riwayat.',
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        color: Color(
-                                                            0xFF7F1D1D),
-                                                      ),
+                                                const SizedBox(width: 8),
+                                                const Expanded(
+                                                  child: Text(
+                                                    'Pos Dana Tidak Dapat Dihapus',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 16,
+                                                      color: textDark,
                                                     ),
-                                                  ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            content: Text(
+                                              'Pos dana "${pos.nama}" masih memiliki saldo tersisa sebesar Rp ${RupiahFormatter.format(pos.balance)}.\n\nPos dana hanya dapat dihapus jika saldonya Rp 0 (tidak tersisa saldo).',
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                color: textDark,
+                                                height: 1.4,
+                                              ),
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(ctx),
+                                                child: const Text(
+                                                  'Mengerti',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                                 ),
                                               ),
                                             ],
+                                          ),
+                                        );
+                                        return;
+                                      }
+
+                                      final cleanPosName =
+                                          pos.nama.trim().toLowerCase();
+                                      final matchingTx =
+                                          _data.transactions.where((tx) {
+                                        final target = tx.targetAccount
+                                                ?.trim()
+                                                .toLowerCase() ??
+                                            '';
+                                        final source = tx.sourceAccount
+                                                ?.trim()
+                                                .toLowerCase() ??
+                                            '';
+                                        final manual = tx.manualSource
+                                                ?.trim()
+                                                .toLowerCase() ??
+                                            '';
+                                        final title =
+                                            tx.title.trim().toLowerCase();
+                                        final note =
+                                            tx.note?.trim().toLowerCase() ?? '';
+
+                                        return target == cleanPosName ||
+                                            source == cleanPosName ||
+                                            manual == cleanPosName ||
+                                            title == cleanPosName ||
+                                            note ==
+                                                'pemasukan uangku: $cleanPosName' ||
+                                            note ==
+                                                'pengeluaran uangku: $cleanPosName' ||
+                                            note.contains(cleanPosName);
+                                      }).toList();
+
+                                      final uList = await PribadiSyncService
+                                          .loadUangkuList(_monthKey);
+                                      final isInUangku = uList.any((u) =>
+                                          u.nama.trim().toLowerCase() ==
+                                          cleanPosName);
+
+                                      if (!context.mounted) return;
+
+                                      final confirm = await showDialog<bool>(
+                                        context: context,
+                                        builder: (c) => AlertDialog(
+                                          backgroundColor: lightCard,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(16),
+                                          ),
+                                          title: const Row(
+                                            children: [
+                                              Icon(
+                                                Icons.delete_outline_rounded,
+                                                color: primaryRose,
+                                                size: 22,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                'Hapus Pos Dana?',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 16,
+                                                  color: textDark,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          content: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Yakin ingin menghapus pos "${pos.nama}"?',
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  color: textDark,
+                                                ),
+                                              ),
+                                              if (matchingTx.isNotEmpty ||
+                                                  isInUangku) ...[
+                                                const SizedBox(height: 10),
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.all(10),
+                                                  decoration: BoxDecoration(
+                                                    color:
+                                                        const Color(0xFFF0FDF4),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
+                                                    border: Border.all(
+                                                      color: const Color(
+                                                          0xFFBBF7D0),
+                                                    ),
+                                                  ),
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      if (matchingTx
+                                                          .isNotEmpty)
+                                                        Text(
+                                                          'ℹ️ Pos ini memiliki ${matchingTx.length} transaksi tercatat. Riwayat transaksi di Keuangan Pribadi akan tetap tersimpan aman.',
+                                                          style:
+                                                              const TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                            color: Color(
+                                                                0xFF166534),
+                                                          ),
+                                                        ),
+                                                      if (isInUangku) ...[
+                                                        if (matchingTx
+                                                            .isNotEmpty)
+                                                          const SizedBox(
+                                                              height: 4),
+                                                        const Text(
+                                                          '🔗 Pos ini juga akan dihapus dari daftar Uangku.',
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                            color: Color(
+                                                                0xFF166534),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(c, false),
+                                              child: const Text('Batal'),
+                                            ),
+                                            ElevatedButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(c, true),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: primaryRose,
+                                                foregroundColor: Colors.white,
+                                                elevation: 0,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                              ),
+                                              child: const Text(
+                                                'Hapus',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
                                           ],
                                         ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(c, false),
-                                            child: const Text('Batal'),
-                                          ),
-                                          ElevatedButton(
-                                            onPressed: () =>
-                                                Navigator.pop(c, true),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: primaryRose,
-                                              foregroundColor: Colors.white,
-                                              elevation: 0,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                            ),
-                                            child: const Text(
-                                              'Tetap Hapus',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                    if (confirm == true) {
-                                      final deletedName = pos.nama;
-                                      _data.posDanaList.removeWhere(
-                                          (p) => p.id == pos.id);
-                                      if (_data.posDanaList.isEmpty) {
-                                        _data.rekeningPribadi.balance = 0;
-                                        _data.onHandDebit.balance = 0;
-                                        _data.onHandCash.balance = 0;
-                                      }
-                                      await _saveData();
-                                      await PribadiSyncService.syncHapusPosDanaToUangku(
-                                        monthKey: _monthKey,
-                                        nama: deletedName,
                                       );
-                                      setModalState(() {});
-                                      setState(() {});
-                                    }
-                                  },
-                                ),
+                                      if (confirm == true) {
+                                        final deletedName = pos.nama;
+                                        _data.posDanaList.removeWhere(
+                                            (p) => p.id == pos.id);
+                                        if (_data.posDanaList.isEmpty &&
+                                            _data.transactions.isEmpty) {
+                                          _data.rekeningPribadi.balance = 0;
+                                          _data.onHandDebit.balance = 0;
+                                          _data.onHandCash.balance = 0;
+                                        }
+                                        await _saveData();
+                                        await PribadiSyncService.syncHapusPosDanaToUangku(
+                                          monthKey: _monthKey,
+                                          nama: deletedName,
+                                        );
+                                        setModalState(() {});
+                                        setState(() {});
+                                      }
+                                    },
+                                  ),
                               ],
                             ),
                           );

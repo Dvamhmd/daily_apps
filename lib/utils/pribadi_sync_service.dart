@@ -581,7 +581,7 @@ class PribadiSyncService {
   }
 
   /// Sinkronisasi saat pos Uangku dihapus.
-  /// Menghapus Pos Dana & transaksi pemasukan terkait dari Keuangan Pribadi.
+  /// Menghapus Pos Dana dari Keuangan Pribadi tanpa menghapus riwayat transaksi yang sudah tercatat.
   static Future<void> syncHapusUangku({
     required String nama,
     required int jumlah,
@@ -596,29 +596,9 @@ class PribadiSyncService {
       (p) => p.nama.trim().toLowerCase() == nama.trim().toLowerCase(),
     );
 
-    // Cari seluruh transaksi pemasukan yang berasal dari pos Uangku ini
-    final matchingIndices = <int>[];
-    for (int i = 0; i < data.transactions.length; i++) {
-      final tx = data.transactions[i];
-      if (tx.isPemasukan &&
-          (tx.manualSource?.trim().toLowerCase() ==
-                  nama.trim().toLowerCase() ||
-              tx.title.trim().toLowerCase() == nama.trim().toLowerCase() ||
-              tx.targetAccount?.trim().toLowerCase() ==
-                  nama.trim().toLowerCase() ||
-              tx.note?.trim().toLowerCase() ==
-                  'pemasukan uangku: ${nama.trim().toLowerCase()}')) {
-        matchingIndices.add(i);
-      }
-    }
+    // Transaksi di data.transactions TIDAK dihapus agar rekaman riwayat transaksi tetap tersimpan utuh.
 
-    if (matchingIndices.isNotEmpty) {
-      for (final idx in matchingIndices.reversed) {
-        data.transactions.removeAt(idx);
-      }
-    }
-
-    if (data.posDanaList.isEmpty) {
+    if (data.posDanaList.isEmpty && data.transactions.isEmpty) {
       data.rekeningPribadi.balance = 0;
       data.onHandDebit.balance = 0;
       data.onHandCash.balance = 0;

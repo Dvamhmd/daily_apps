@@ -1201,8 +1201,108 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                         .map((e) => e.value)
                         .toList();
 
+                    // 1. Validasi saldo: Pos dana hanya bisa dihapus jika saldo sudah Rp 0
+                    final itemsWithSaldo =
+                        itemsToDelete.where((e) => e.jumlah > 0).toList();
+                    if (itemsWithSaldo.isNotEmpty && dialogCtx.mounted) {
+                      await showDialog(
+                        context: dialogCtx,
+                        builder: (ctx) => AlertDialog(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          title: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF2F2),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: const Color(0xFFFCA5A5),
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.warning_amber_rounded,
+                                  color: Color(0xFFDC2626),
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              const Expanded(
+                                child: Text(
+                                  'Pos Dana Tidak Dapat Dihapus',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: Color(0xFF991B1B),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Pos dana hanya dapat dihapus jika saldonya Rp 0 (tidak tersisa saldo). Pos dana berikut masih memiliki sisa saldo:',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF374151),
+                                  height: 1.4,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              ...itemsWithSaldo.map(
+                                (item) => Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 3),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        '• ${item.nama}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Rp ${RupiahFormatter.format(item.jumlah)}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                          color: Color(0xFFDC2626),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text(
+                                'Mengerti',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF63B967),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                      return;
+                    }
+
                     // Periksa apakah ada pos dana uangku yang terhubung ke Keuangan Pribadi & memiliki transaksi
-                    final checkInfos = await PribadiSyncService.checkUangkuConnections(
+                    final checkInfos =
+                        await PribadiSyncService.checkUangkuConnections(
                       names: itemsToDelete.map((e) => e.nama).toList(),
                       selectedMonth: widget.selectedMonth,
                     );
@@ -1266,7 +1366,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                                   children: [
                                     const SizedBox(height: 6),
                                     const Text(
-                                      'Pos dana Uangku berikut sudah masuk ke Keuangan Pribadi dan memiliki riwayat transaksi tercatat:',
+                                      'Pos dana Uangku berikut memiliki riwayat transaksi di Keuangan Pribadi:',
                                       style: TextStyle(
                                         fontSize: 13,
                                         color: Color(0xFF374151),
@@ -1347,10 +1447,10 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                                     Container(
                                       padding: const EdgeInsets.all(10),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFFEF2F2),
+                                        color: const Color(0xFFF0FDF4),
                                         borderRadius: BorderRadius.circular(8),
                                         border: Border.all(
-                                          color: const Color(0xFFFCA5A5),
+                                          color: const Color(0xFFBBF7D0),
                                         ),
                                       ),
                                       child: const Row(
@@ -1358,18 +1458,18 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                                             CrossAxisAlignment.start,
                                         children: [
                                           Icon(
-                                            Icons.error_outline_rounded,
+                                            Icons.check_circle_outline_rounded,
                                             size: 16,
-                                            color: Color(0xFFDC2626),
+                                            color: Color(0xFF16A34A),
                                           ),
                                           SizedBox(width: 8),
                                           Expanded(
                                             child: Text(
-                                              'Menghapus pos dana ini dapat memengaruhi saldo & riwayat transaksi terkait di Keuangan Pribadi. Yakin ingin tetap menghapus?',
+                                              'Riwayat transaksi pada pos ini akan tetap tersimpan aman di Keuangan Pribadi dan tidak akan terhapus.',
                                               style: TextStyle(
                                                 fontSize: 11.5,
                                                 fontWeight: FontWeight.w500,
-                                                color: Color(0xFF991B1B),
+                                                color: Color(0xFF166534),
                                                 height: 1.35,
                                               ),
                                             ),

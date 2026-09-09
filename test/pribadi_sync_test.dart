@@ -144,7 +144,7 @@ void main() {
       expect(loaded.transactions.first.amount, 1500000);
     });
 
-    test('Hapus pos Uangku otomatis menghapus Pos Dana dan data pemasukan terkait dari Keuangan Pribadi', () async {
+    test('Hapus pos Uangku otomatis menghapus Pos Dana namun mempertahankan riwayat transaksi di Keuangan Pribadi', () async {
       final testMonth = DateTime(2026, 9, 1);
       final monthKey = PribadiSyncService.getMonthKey(null, testMonth);
 
@@ -179,10 +179,11 @@ void main() {
       expect(loaded.posDanaList.length, 1);
       expect(loaded.posDanaList.first.nama, 'Freelance');
       expect(loaded.posDanaList.first.balance, 1000000);
-      expect(loaded.transactions.length, 1);
-      expect(loaded.transactions.first.title, 'Freelance');
-      expect(loaded.transactions.first.amount, 1000000);
-      expect(loaded.totalDanaPribadi, 1000000);
+      // Transaksi tetap utuh (2 transaksi)
+      expect(loaded.transactions.length, 2);
+      expect(loaded.transactions.any((tx) => tx.title == 'Gaji'), true);
+      expect(loaded.transactions.any((tx) => tx.title == 'Freelance'), true);
+      expect(loaded.totalPosDana, 1000000);
     });
 
     test('Dua arah: Tambah, edit, dan hapus Pos Dana di Keuangan Pribadi tersimpan ke Uangku', () async {
