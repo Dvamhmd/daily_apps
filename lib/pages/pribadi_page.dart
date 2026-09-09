@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math' as math;
 import 'package:daily_apps/models/model_pribadi.dart';
 import 'package:daily_apps/utils/custom_rule_import_helper.dart';
@@ -10,7 +9,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class PribadiPage extends StatefulWidget {
   const PribadiPage({super.key});
@@ -302,11 +300,7 @@ class _PribadiPageState extends State<PribadiPage> {
   }
 
   Future<void> _saveData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final monthlyKey = 'pribadi_keuangan_data_$_monthKey';
-    final jsonStr = jsonEncode(_data.toJson());
-    await prefs.setString(monthlyKey, jsonStr);
-    await prefs.setString('pribadi_keuangan_data', jsonStr);
+    await PribadiSyncService.savePribadiData(_monthKey, _data);
   }
 
   // ==========================================
@@ -2807,12 +2801,15 @@ class _PribadiPageState extends State<PribadiPage> {
   // --- LOGIKA ROLLBACK SALDO TRANSAKSI (MANAJEMEN RISIKO) ---
   void _rollbackTransactionBalance(PribadiTransaction tx) {
     final total = tx.amount + tx.adminFee;
+    final targetStr = tx.targetAccount?.trim().toLowerCase() ?? '';
+    final sourceStr = tx.sourceAccount?.trim().toLowerCase() ?? '';
+
     if (tx.isPemasukan) {
       // Pemasukan menambah saldo target, jadi saat rollback kita kurangi dari target
       bool handled = false;
       if (_data.posDanaList.isNotEmpty) {
         final posIdx = _data.posDanaList.indexWhere(
-            (p) => p.nama == tx.targetAccount || p.id == tx.targetAccount);
+            (p) => p.nama.trim().toLowerCase() == targetStr || p.id.trim().toLowerCase() == targetStr);
         if (posIdx != -1) {
           _data.posDanaList[posIdx].balance -= tx.amount;
           if (_data.posDanaList[posIdx].balance < 0) {
@@ -2822,17 +2819,17 @@ class _PribadiPageState extends State<PribadiPage> {
         }
       }
       if (!handled) {
-        if (tx.targetAccount == 'rekening') {
+        if (targetStr == 'rekening') {
           _data.rekeningPribadi.balance -= tx.amount;
           if (_data.rekeningPribadi.balance < 0) {
             _data.rekeningPribadi.balance = 0;
           }
-        } else if (tx.targetAccount == 'debit') {
+        } else if (targetStr == 'debit') {
           _data.onHandDebit.balance -= tx.amount;
           if (_data.onHandDebit.balance < 0) {
             _data.onHandDebit.balance = 0;
           }
-        } else if (tx.targetAccount == 'cash') {
+        } else if (targetStr == 'cash') {
           _data.onHandCash.balance -= tx.amount;
           if (_data.onHandCash.balance < 0) {
             _data.onHandCash.balance = 0;
@@ -2844,18 +2841,18 @@ class _PribadiPageState extends State<PribadiPage> {
       bool handled = false;
       if (_data.posDanaList.isNotEmpty) {
         final posIdx = _data.posDanaList.indexWhere(
-            (p) => p.nama == tx.sourceAccount || p.id == tx.sourceAccount);
+            (p) => p.nama.trim().toLowerCase() == sourceStr || p.id.trim().toLowerCase() == sourceStr);
         if (posIdx != -1) {
           _data.posDanaList[posIdx].balance += total;
           handled = true;
         }
       }
       if (!handled) {
-        if (tx.sourceAccount == 'rekening') {
+        if (sourceStr == 'rekening') {
           _data.rekeningPribadi.balance += total;
-        } else if (tx.sourceAccount == 'debit') {
+        } else if (sourceStr == 'debit') {
           _data.onHandDebit.balance += total;
-        } else if (tx.sourceAccount == 'cash') {
+        } else if (sourceStr == 'cash') {
           _data.onHandCash.balance += total;
         }
       }
@@ -2865,18 +2862,18 @@ class _PribadiPageState extends State<PribadiPage> {
       bool srcHandled = false;
       if (_data.posDanaList.isNotEmpty) {
         final srcIdx = _data.posDanaList.indexWhere(
-            (p) => p.nama == tx.sourceAccount || p.id == tx.sourceAccount);
+            (p) => p.nama.trim().toLowerCase() == sourceStr || p.id.trim().toLowerCase() == sourceStr);
         if (srcIdx != -1) {
           _data.posDanaList[srcIdx].balance += total;
           srcHandled = true;
         }
       }
       if (!srcHandled) {
-        if (tx.sourceAccount == 'rekening') {
+        if (sourceStr == 'rekening') {
           _data.rekeningPribadi.balance += total;
-        } else if (tx.sourceAccount == 'debit') {
+        } else if (sourceStr == 'debit') {
           _data.onHandDebit.balance += total;
-        } else if (tx.sourceAccount == 'cash') {
+        } else if (sourceStr == 'cash') {
           _data.onHandCash.balance += total;
         }
       }
@@ -2885,7 +2882,7 @@ class _PribadiPageState extends State<PribadiPage> {
       bool tgtHandled = false;
       if (_data.posDanaList.isNotEmpty) {
         final tgtIdx = _data.posDanaList.indexWhere(
-            (p) => p.nama == tx.targetAccount || p.id == tx.targetAccount);
+            (p) => p.nama.trim().toLowerCase() == targetStr || p.id.trim().toLowerCase() == targetStr);
         if (tgtIdx != -1) {
           _data.posDanaList[tgtIdx].balance -= tx.amount;
           if (_data.posDanaList[tgtIdx].balance < 0) {
@@ -2895,17 +2892,17 @@ class _PribadiPageState extends State<PribadiPage> {
         }
       }
       if (!tgtHandled) {
-        if (tx.targetAccount == 'rekening') {
+        if (targetStr == 'rekening') {
           _data.rekeningPribadi.balance -= tx.amount;
           if (_data.rekeningPribadi.balance < 0) {
             _data.rekeningPribadi.balance = 0;
           }
-        } else if (tx.targetAccount == 'debit') {
+        } else if (targetStr == 'debit') {
           _data.onHandDebit.balance -= tx.amount;
           if (_data.onHandDebit.balance < 0) {
             _data.onHandDebit.balance = 0;
           }
-        } else if (tx.targetAccount == 'cash') {
+        } else if (targetStr == 'cash') {
           _data.onHandCash.balance -= tx.amount;
           if (_data.onHandCash.balance < 0) {
             _data.onHandCash.balance = 0;
@@ -2918,22 +2915,25 @@ class _PribadiPageState extends State<PribadiPage> {
   // --- LOGIKA MENERAPKAN SALDO TRANSAKSI BARU ---
   void _applyTransactionBalance(PribadiTransaction tx) {
     final total = tx.amount + tx.adminFee;
+    final targetStr = tx.targetAccount?.trim().toLowerCase() ?? '';
+    final sourceStr = tx.sourceAccount?.trim().toLowerCase() ?? '';
+
     if (tx.isPemasukan) {
       bool handled = false;
       if (_data.posDanaList.isNotEmpty) {
         final posIdx = _data.posDanaList.indexWhere(
-            (p) => p.nama == tx.targetAccount || p.id == tx.targetAccount);
+            (p) => p.nama.trim().toLowerCase() == targetStr || p.id.trim().toLowerCase() == targetStr);
         if (posIdx != -1) {
           _data.posDanaList[posIdx].balance += tx.amount;
           handled = true;
         }
       }
       if (!handled) {
-        if (tx.targetAccount == 'rekening') {
+        if (targetStr == 'rekening') {
           _data.rekeningPribadi.balance += tx.amount;
-        } else if (tx.targetAccount == 'debit') {
+        } else if (targetStr == 'debit') {
           _data.onHandDebit.balance += tx.amount;
-        } else if (tx.targetAccount == 'cash') {
+        } else if (targetStr == 'cash') {
           _data.onHandCash.balance += tx.amount;
         } else if (_data.posDanaList.isNotEmpty) {
           _data.posDanaList.first.balance += tx.amount;
@@ -2943,7 +2943,7 @@ class _PribadiPageState extends State<PribadiPage> {
       bool handled = false;
       if (_data.posDanaList.isNotEmpty) {
         final posIdx = _data.posDanaList.indexWhere(
-            (p) => p.nama == tx.sourceAccount || p.id == tx.sourceAccount);
+            (p) => p.nama.trim().toLowerCase() == sourceStr || p.id.trim().toLowerCase() == sourceStr);
         if (posIdx != -1) {
           _data.posDanaList[posIdx].balance -= total;
           if (_data.posDanaList[posIdx].balance < 0) {
@@ -2953,17 +2953,17 @@ class _PribadiPageState extends State<PribadiPage> {
         }
       }
       if (!handled) {
-        if (tx.sourceAccount == 'rekening') {
+        if (sourceStr == 'rekening') {
           _data.rekeningPribadi.balance -= total;
           if (_data.rekeningPribadi.balance < 0) {
             _data.rekeningPribadi.balance = 0;
           }
-        } else if (tx.sourceAccount == 'debit') {
+        } else if (sourceStr == 'debit') {
           _data.onHandDebit.balance -= total;
           if (_data.onHandDebit.balance < 0) {
             _data.onHandDebit.balance = 0;
           }
-        } else if (tx.sourceAccount == 'cash') {
+        } else if (sourceStr == 'cash') {
           _data.onHandCash.balance -= total;
           if (_data.onHandCash.balance < 0) {
             _data.onHandCash.balance = 0;

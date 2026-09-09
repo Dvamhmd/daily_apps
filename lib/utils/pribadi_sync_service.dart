@@ -223,7 +223,7 @@ class PribadiSyncService {
     return loaded;
   }
 
-  /// Simpan PribadiData ke SharedPreferences
+  /// Simpan PribadiData ke SharedPreferences dan sinkronkan saldo Pos Dana ke Uangku
   static Future<void> savePribadiData(
       String monthKey, PribadiData data) async {
     final prefs = await SharedPreferences.getInstance();
@@ -231,6 +231,42 @@ class PribadiSyncService {
     final jsonStr = jsonEncode(data.toJson());
     await prefs.setString(monthlyKey, jsonStr);
     await prefs.setString('pribadi_keuangan_data', jsonStr);
+    await syncAllPosDanaBalancesToUangku(
+      monthKey: monthKey,
+      posDanaList: data.posDanaList,
+    );
+  }
+
+  /// Sinkronisasi dua arah: Menyelaraskan seluruh saldo Pos Dana di Keuangan Pribadi ke daftar Uangku
+  static Future<void> syncAllPosDanaBalancesToUangku({
+    required String monthKey,
+    required List<PosDana> posDanaList,
+  }) async {
+    final uList = await loadUangkuList(monthKey);
+    if (uList.isEmpty && posDanaList.isEmpty) return;
+
+    bool isChanged = false;
+    for (int i = 0; i < uList.length; i++) {
+      final u = uList[i];
+      final matchIdx = posDanaList.indexWhere(
+        (p) =>
+            p.nama.trim().toLowerCase() == u.nama.trim().toLowerCase() ||
+            p.id.trim().toLowerCase() == u.nama.trim().toLowerCase(),
+      );
+      if (matchIdx != -1) {
+        final posBalance = posDanaList[matchIdx].balance < 0
+            ? 0
+            : posDanaList[matchIdx].balance;
+        if (u.jumlah != posBalance) {
+          uList[i] = u.copyWith(jumlah: posBalance);
+          isChanged = true;
+        }
+      }
+    }
+
+    if (isChanged) {
+      await saveUangkuList(monthKey, uList);
+    }
   }
 
   /// Catat Pemasukan dari Uangku ke Keuangan Pribadi (otomatis membuat/menyesuaikan Pos Dana)
