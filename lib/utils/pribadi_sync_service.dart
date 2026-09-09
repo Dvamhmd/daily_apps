@@ -726,6 +726,31 @@ class PribadiSyncService {
 
     return results;
   }
+
+  /// Memeriksa apakah suatu Pos Dana / Uangku sudah tercatat sebagai pembayaran pengeluaran / bayar tagihan di daftar transaksi
+  static Future<List<PribadiTransaction>> getPengeluaranTransactionsForPos({
+    required String posName,
+    DateTime? selectedMonth,
+  }) async {
+    final monthKey = getMonthKey(null, selectedMonth);
+    final data = await loadPribadiData(monthKey);
+    final cleanName = posName.trim().toLowerCase();
+
+    return data.transactions.where((tx) {
+      if (!tx.isPengeluaran && tx.type != 'transfer_pos') return false;
+
+      final source = tx.sourceAccount?.trim().toLowerCase() ?? '';
+      final manual = tx.manualSource?.trim().toLowerCase() ?? '';
+      final title = tx.title.trim().toLowerCase();
+      final note = tx.note?.trim().toLowerCase() ?? '';
+
+      final isSourceMatch = source == cleanName || manual == cleanName;
+      final isNoteOrTitleMatch =
+          note.contains(cleanName) || title.contains(cleanName);
+
+      return isSourceMatch || isNoteOrTitleMatch;
+    }).toList();
+  }
 }
 
 /// Informasi status keterhubungan Pos Dana dengan Keuangan Pribadi & riwayat transaksi

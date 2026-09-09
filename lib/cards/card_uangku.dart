@@ -431,8 +431,124 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
     );
   }
 
-  void showEditUangku(int index) {
+  Future<void> showEditUangku(int index) async {
     final item = uangkuList[index];
+
+    // Cek apakah pos dana sudah tercatat sebagai pembayaran pengeluaran/tagihan
+    final expenseTx = await PribadiSyncService.getPengeluaranTransactionsForPos(
+      posName: item.nama,
+      selectedMonth: widget.selectedMonth,
+    );
+
+    if (!mounted) return;
+
+    if (expenseTx.isNotEmpty) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFFE2E8F0)),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDC2626).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.warning_amber_rounded,
+                    color: Color(0xFFDC2626), size: 20),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Pos Dana Tidak Dapat Diedit',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Pos dana "${item.nama}" sudah tercatat dalam daftar transaksi sebagai pembayaran pengeluaran/tagihan, sehingga tidak dapat diedit.',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF334155),
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFFECACA)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Riwayat Pengeluaran Terkait:',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF991B1B),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    ...expenseTx.take(3).map((tx) => Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.circle,
+                                  size: 5, color: Color(0xFFDC2626)),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  '${tx.title} (${RupiahFormatter.format(tx.amount)})',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF7F1D1D),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF475569),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text('Tutup'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
 
     final namaCtrl = TextEditingController(text: item.nama);
     final jumlahCtrl = TextEditingController(
