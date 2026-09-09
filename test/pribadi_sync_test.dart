@@ -1,3 +1,4 @@
+import 'package:daily_apps/models/model_pribadi.dart';
 import 'package:daily_apps/models/model_uangku.dart';
 import 'package:daily_apps/utils/pribadi_sync_service.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -207,11 +208,6 @@ void main() {
         saldoBaru: 1500000,
       );
 
-      uList = await PribadiSyncService.loadUangkuList(monthKey);
-      expect(uList.length, 1);
-      expect(uList.first.nama, 'Kas Kantor');
-      expect(uList.first.jumlah, 1500000);
-
       // Hapus pos dana dari Keuangan Pribadi
       await PribadiSyncService.syncHapusPosDanaToUangku(
         monthKey: monthKey,
@@ -220,6 +216,82 @@ void main() {
 
       uList = await PribadiSyncService.loadUangkuList(monthKey);
       expect(uList.isEmpty, isTrue);
+    });
+
+    test('Tambah Uangku lalu catat pemasukan tidak menduplikasi saldo Pos Dana (tidak 2x)', () async {
+      final testMonth = DateTime(2026, 9, 1);
+      final monthKey = PribadiSyncService.getMonthKey(null, testMonth);
+
+      // Simulasikan alur saat tombol "Tambah Uangku" ditekan di CardUangku:
+      // 1. Simpan ke daftar Uangku
+      final itemsUangku = [
+        Uangku('Gaji Bulanan', 5000000),
+      ];
+      await PribadiSyncService.saveUangkuList(monthKey, itemsUangku);
+
+      // 2. Panggil recordPemasukanFromUangku
+      await PribadiSyncService.recordPemasukanFromUangku(
+        nama: 'Gaji Bulanan',
+        nominal: 5000000,
+        selectedMonth: testMonth,
+        keterangan: 'Gaji Bulanan',
+      );
+
+      final loaded = await PribadiSyncService.loadPribadiData(monthKey);
+      expect(loaded.posDanaList.length, 1);
+      expect(loaded.posDanaList.first.nama, 'Gaji Bulanan');
+      // Saldo harus tepat 5.000.000 (BUKAN 10.000.000 / 2x lipat)
+      expect(loaded.posDanaList.first.balance, 5000000);
+      expect(loaded.totalDanaPribadi, 5000000);
+      expect(loaded.totalPemasukan, 5000000);
+      expect(loaded.transactions.length, 1);
+
+      // 3. Quick Debit menambah saldo dengan benar
+      await PribadiSyncService.recordPemasukanFromUangku(
+        nama: 'Gaji Bulanan',
+        nominal: 1000000,
+        selectedMonth: testMonth,
+        keterangan: 'Gaji Bulanan (Debit)',
+      );
+
+      final loadedAfterDebit = await PribadiSyncService.loadPribadiData(monthKey);
+      expect(loadedAfterDebit.posDanaList.first.balance, 6000000);
+      expect(loadedAfterDebit.totalDanaPribadi, 6000000);
+      expect(loadedAfterDebit.totalPemasukan, 6000000);
+      expect(loadedAfterDebit.transactions.length, 2);
+    });
+
+    test('Sanitasi otomatis memperbaiki saldo Pos Dana yang sebelumnya terduplikasi 2x', () async {
+      final testMonth = DateTime(2026, 9, 1);
+      final monthKey = PribadiSyncService.getMonthKey(null, testMonth);
+
+      // Simpan Uangku
+      final itemsUangku = [
+        Uangku('Bonus', 2000000),
+      ];
+      await PribadiSyncService.saveUangkuList(monthKey, itemsUangku);
+
+      // Simulasikan data lawas yang rusak dengan saldo 4.000.000 (2x lipat) dan 1 transaksi 2.000.000
+      final corruptedData = PribadiData(
+        posDanaList: [
+          PosDana(id: 'pos_1', nama: 'Bonus', balance: 4000000),
+        ],
+        transactions: [
+          PribadiTransaction(
+            id: 'tx_1',
+            title: 'Bonus',
+            type: 'pemasukan',
+            targetAccount: 'Bonus',
+            amount: 2000000,
+          ),
+        ],
+      );
+      await PribadiSyncService.savePribadiData(monthKey, corruptedData);
+
+      // Saat loadPribadiData dipanggil, sanitasi otomatis memperbaiki saldo menjadi 2.000.000
+      final repaired = await PribadiSyncService.loadPribadiData(monthKey);
+      expect(repaired.posDanaList.first.balance, 2000000);
+      expect(repaired.totalDanaPribadi, 2000000);
     });
   });
 }

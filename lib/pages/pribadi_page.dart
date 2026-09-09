@@ -4038,7 +4038,9 @@ class _PribadiPageState extends State<PribadiPage> {
                   );
                 }
 
-                Navigator.pop(ctx);
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                }
                 if (mounted) {
                   onSaved?.call();
                 }

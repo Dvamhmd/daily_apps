@@ -87,6 +87,44 @@ class PribadiSyncService {
     return result;
   }
 
+  /// Membantu memperbaiki pos dana jika terdapat anomali saldo 2x lipat dari Uangku
+  static void sanitizePosDanaBalances(PribadiData data, List<Uangku> uList) {
+    if (uList.isEmpty || data.posDanaList.isEmpty) return;
+    for (final u in uList) {
+      final uName = u.nama.trim().toLowerCase();
+      final posIdx = data.posDanaList.indexWhere(
+        (p) => p.nama.trim().toLowerCase() == uName,
+      );
+      if (posIdx != -1 && u.jumlah > 0) {
+        final pos = data.posDanaList[posIdx];
+
+        int txIn = 0;
+        int txOut = 0;
+        for (final tx in data.transactions) {
+          if (tx.isPemasukan &&
+              (tx.targetAccount?.trim().toLowerCase() == uName ||
+                  tx.manualSource?.trim().toLowerCase() == uName ||
+                  tx.title.trim().toLowerCase() == uName)) {
+            txIn += tx.amount;
+          } else if (tx.isPengeluaran &&
+              tx.sourceAccount?.trim().toLowerCase() == uName) {
+            txOut += (tx.amount + tx.adminFee);
+          }
+        }
+        final expectedFromTx = txIn - txOut;
+
+        // Jika saldo pos tepat 2x lipat (pos.balance == expectedFromTx + u.jumlah)
+        if (pos.balance == expectedFromTx + u.jumlah && expectedFromTx > 0) {
+          pos.balance = expectedFromTx;
+        } else if (pos.balance == u.jumlah * 2 &&
+            txIn == u.jumlah &&
+            txOut == 0) {
+          pos.balance = u.jumlah;
+        }
+      }
+    }
+  }
+
   /// Memuat atau membuat PribadiData untuk bulan tertentu, otomatis sinkron dengan Uangku
   static Future<PribadiData> loadPribadiData(String monthKey) async {
     final prefs = await SharedPreferences.getInstance();
@@ -105,6 +143,7 @@ class PribadiSyncService {
               currentPosList: loaded.posDanaList,
               uangkuList: uList,
             );
+            sanitizePosDanaBalances(loaded, uList);
           } else if (loaded.posDanaList.any((p) =>
               p.id == 'pos_1' || p.id == 'pos_2' || p.id == 'pos_3')) {
             // Bersihkan pos dummy default jika Uangku kosong
@@ -130,7 +169,7 @@ class PribadiSyncService {
                 )
               : <PosDana>[];
 
-          return PribadiData(
+          final loaded = PribadiData(
             posDanaList: newPosList,
             rekeningPribadi: RekeningPribadi(
               bankName: template.rekeningPribadi.bankName,
@@ -148,6 +187,10 @@ class PribadiSyncService {
             transactions: [],
             customKodeRules: List.from(template.customKodeRules),
           );
+          if (uList.isNotEmpty) {
+            sanitizePosDanaBalances(loaded, uList);
+          }
+          return loaded;
         }
       } catch (_) {}
     }
@@ -160,7 +203,7 @@ class PribadiSyncService {
           )
         : <PosDana>[];
 
-    return PribadiData(
+    final loaded = PribadiData(
       posDanaList: newPosList,
       rekeningPribadi: RekeningPribadi(),
       onHandDebit: OnHandDebit(),
@@ -168,6 +211,10 @@ class PribadiSyncService {
       transactions: [],
       customKodeRules: PersonalDefaultRules.defaultRules(),
     );
+    if (uList.isNotEmpty) {
+      sanitizePosDanaBalances(loaded, uList);
+    }
+    return loaded;
   }
 
   /// Simpan PribadiData ke SharedPreferences
@@ -200,8 +247,23 @@ class PribadiSyncService {
           p.id.trim().toLowerCase() == targetName.toLowerCase(),
     );
 
+    // Periksa apakah sudah ada transaksi untuk pos ini
+    final hasPriorTx = data.transactions.any((tx) =>
+        (tx.targetAccount?.trim().toLowerCase() == targetName.toLowerCase() ||
+            tx.manualSource?.trim().toLowerCase() == targetName.toLowerCase() ||
+            tx.title.trim().toLowerCase() == targetName.toLowerCase() ||
+            tx.sourceAccount?.trim().toLowerCase() ==
+                targetName.toLowerCase()));
+
     if (idx != -1) {
-      data.posDanaList[idx].balance += nominal;
+      // Jika ini transaksi baru untuk pos yang sudah memiliki mutasi, tambahkan ke balance.
+      // Jika pos baru terbentuk dari sinkronisasi Uangku (dan belum ada transaksi),
+      // saldo pos sudah mencerminkan nominal Uangku sehingga tidak boleh ditambahkan dua kali.
+      if (hasPriorTx) {
+        data.posDanaList[idx].balance += nominal;
+      } else if (data.posDanaList[idx].balance == 0) {
+        data.posDanaList[idx].balance = nominal;
+      }
     } else {
       final newPos = PosDana(
         id: 'pos_${data.posDanaList.length + 1}_${targetName.hashCode}',
@@ -330,7 +392,9 @@ class PribadiSyncService {
 
       // Update Pos Dana
       final posIdx = data.posDanaList.indexWhere(
-        (p) => p.nama.trim().toLowerCase() == namaLama.trim().toLowerCase(),
+        (p) =>
+            p.nama.trim().toLowerCase() == namaLama.trim().toLowerCase() ||
+            p.nama.trim().toLowerCase() == namaBaru.trim().toLowerCase(),
       );
 
       final selisih = jumlahBaru - jumlahLama;

@@ -289,4 +289,86 @@ void main() {
     expect(dataAlignmentsStr, isNotNull);
     expect(dataAlignmentsStr, contains('"mulai":"left"'));
   });
+
+  testWidgets(
+      'Custom column header has no cross icon and can be renamed and deleted via long press options',
+      (WidgetTester tester) async {
+    final sampleRundown = Rundown(
+      id: 'test_rundown_custom_col',
+      title: 'Acara Custom',
+      startDate: DateTime(2026, 9, 10),
+      totalDays: 1,
+      days: [
+        RundownDay(
+          dayNumber: 1,
+          date: DateTime(2026, 9, 10),
+          theme: 'Day 1',
+          customColumns: ['PIC / Petugas'],
+          rows: [
+            RundownTableRow(
+              id: 'row_1',
+              startTime: '08:00',
+              durationMinutes: 30,
+              activity: 'Pembukaan',
+              location: 'Hall',
+              customValues: {'PIC / Petugas': 'Budi'},
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RundownDetailPage(rundown: sampleRundown),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify custom column header text exists
+    expect(find.text('PIC / Petugas'), findsWidgets);
+
+    // Verify cross icon is NOT in the header
+    expect(find.byIcon(Icons.close_rounded), findsNothing);
+
+    // Long press on custom column header
+    var customColHeader = find.text('PIC / Petugas').first;
+    await tester.longPress(customColHeader);
+    await tester.pumpAndSettle();
+
+    // Verify bottom sheet options appear
+    expect(find.text('Edit Nama Kolom'), findsOneWidget);
+    expect(find.text('Hapus Kolom'), findsOneWidget);
+
+    // Test 1: Edit Nama Kolom
+    await tester.tap(find.text('Edit Nama Kolom'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit Nama Kolom'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).last, 'Koordinator');
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Simpan'));
+    await tester.pumpAndSettle();
+
+    // Verify renamed column exists and old name does not
+    expect(find.text('Koordinator'), findsWidgets);
+    expect(find.text('PIC / Petugas'), findsNothing);
+
+    // Test 2: Hapus Kolom
+    customColHeader = find.text('Koordinator').first;
+    await tester.longPress(customColHeader);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hapus Kolom'), findsOneWidget);
+    await tester.tap(find.text('Hapus Kolom'));
+    await tester.pumpAndSettle();
+
+    // Confirm dialog appears
+    expect(find.text('Hapus Kolom "Koordinator"?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Hapus'));
+    await tester.pumpAndSettle();
+
+    // Verify custom column is deleted
+    expect(find.text('Koordinator'), findsNothing);
+  });
 }
+

@@ -864,10 +864,6 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: Text('Hapus Kolom "$colName"?',
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-        content: Text(
-          'Data pada kolom "$colName" di seluruh baris hari ini akan dihapus.',
-          style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
-        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -916,6 +912,218 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
       });
       _notifyChange();
     }
+  }
+
+  Future<void> _renameCustomColumn(String oldName) async {
+    final colNameCtrl = TextEditingController(text: oldName);
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Edit Nama Kolom',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: colNameCtrl,
+              autofocus: true,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+              decoration: InputDecoration(
+                hintText: 'Nama kolom...',
+                hintStyle:
+                    const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: primaryTeal, width: 1.8),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child:
+                const Text('Batal', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final name = colNameCtrl.text.trim();
+              if (name.isNotEmpty) {
+                Navigator.of(ctx).pop(name);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryTeal,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Simpan'),
+          ),
+        ],
+      ),
+    );
+
+    if (newName != null && newName.isNotEmpty && newName != oldName) {
+      final activeDay = _rundown.days[_selectedDayIndex];
+      if (activeDay.customColumns.contains(newName)) {
+        if (mounted) {
+          CustomToast.showWarning(
+            context,
+            title: 'Kolom Sudah Ada',
+            subtitle: 'Kolom "$newName" sudah ada di daftar.',
+          );
+        }
+        return;
+      }
+
+      final updatedCols = List<String>.from(activeDay.customColumns);
+      final idx = updatedCols.indexOf(oldName);
+      if (idx != -1) {
+        updatedCols[idx] = newName;
+      } else {
+        updatedCols.add(newName);
+      }
+
+      final updatedRows = activeDay.rows.map((r) {
+        final newMap = Map<String, String>.from(r.customValues);
+        if (newMap.containsKey(oldName)) {
+          final val = newMap.remove(oldName);
+          if (val != null) {
+            newMap[newName] = val;
+          }
+        }
+        return RundownTableRow(
+          id: r.id,
+          startTime: r.startTime,
+          durationMinutes: r.durationMinutes,
+          activity: r.activity,
+          location: r.location,
+          customValues: newMap,
+        );
+      }).toList();
+
+      if (_customColWidths.containsKey(oldName)) {
+        final w = _customColWidths.remove(oldName);
+        if (w != null) _customColWidths[newName] = w;
+      }
+      if (_headerColAlignments.containsKey(oldName)) {
+        final a = _headerColAlignments.remove(oldName);
+        if (a != null) _headerColAlignments[newName] = a;
+      }
+      if (_dataColAlignments.containsKey(oldName)) {
+        final a = _dataColAlignments.remove(oldName);
+        if (a != null) _dataColAlignments[newName] = a;
+      }
+
+      final updatedDay =
+          activeDay.copyWith(customColumns: updatedCols, rows: updatedRows);
+      final updatedDays = List<RundownDay>.from(_rundown.days);
+      updatedDays[_selectedDayIndex] = updatedDay;
+
+      setState(() {
+        _rundown = _rundown.copyWith(days: updatedDays);
+      });
+      _notifyChange();
+      _saveTableSettings();
+
+      if (mounted) {
+        CustomToast.showSuccess(
+          context,
+          title: 'Nama Kolom Diperbarui',
+          subtitle: 'Kolom berhasil diubah menjadi "$newName".',
+        );
+      }
+    }
+  }
+
+  void _showColumnHeaderOptions(String colName) {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  colName,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.edit_outlined,
+                    color: Color(0xFF0D9488)),
+                title: const Text(
+                  'Edit Nama Kolom',
+                  style: TextStyle(
+                    color: Color(0xFF1E293B),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _renameCustomColumn(colName);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded,
+                    color: Colors.redAccent),
+                title: const Text(
+                  'Hapus Kolom',
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _deleteCustomColumn(colName);
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _openEditRundownModal() async {
@@ -2780,6 +2988,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     required Widget child,
     required void Function(double delta) onResize,
     bool showRightBorder = true,
+    VoidCallback? onLongPress,
   }) {
     final borderDecoration = showRightBorder
         ? const Border(
@@ -2791,6 +3000,28 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
         : null;
 
     if (!_isResizeMode) {
+      if (onLongPress != null) {
+        return SizedBox(
+          width: width,
+          height: 36.0,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              splashColor: primaryTeal.withValues(alpha: 0.22),
+              highlightColor: primaryTeal.withValues(alpha: 0.12),
+              onLongPress: onLongPress,
+              child: Container(
+                decoration: BoxDecoration(
+                  border: borderDecoration,
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: child,
+              ),
+            ),
+          ),
+        );
+      }
+
       return Container(
         width: width,
         height: 36.0,
@@ -3016,6 +3247,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             return _buildHeaderCellWithResizeHandle(
               width: colW,
               showRightBorder: !isLast,
+              onLongPress: () => _showColumnHeaderOptions(colName),
               onResize: (delta) {
                 setState(() {
                   _customColWidths[colName] =
@@ -3024,34 +3256,16 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
               },
               child: Align(
                 alignment: _getAlignment(align),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: _getMainAxisAlignment(align),
-                  children: [
-                    Flexible(
-                      child: Text(
-                        colName,
-                        textAlign: _getTextAlign(align),
-                        style: const TextStyle(
-                          fontSize: 11.0,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    InkWell(
-                      onTap: () => _deleteCustomColumn(colName),
-                      borderRadius: BorderRadius.circular(10),
-                      child: const Padding(
-                        padding: EdgeInsets.all(2.0),
-                        child: Icon(Icons.close_rounded,
-                            size: 12, color: Colors.redAccent),
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  colName,
+                  textAlign: _getTextAlign(align),
+                  style: const TextStyle(
+                    fontSize: 11.0,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             );
