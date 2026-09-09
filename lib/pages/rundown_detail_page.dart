@@ -2197,17 +2197,12 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Day Selector Tabs
-              _buildDaySelectorSection(),
-
-              const SizedBox(height: 16),
-
-              // 2. Theme Header & Auto Cascade Switch
+              // 1. Theme Header & Day Navigation
               if (activeDay != null) ...[
                 _buildDayThemeHeader(activeDay),
                 const SizedBox(height: 12),
 
-                // 3. Table Toolbar (Select All, Add Row, Delete Row, Add Column, Toggle Resize Mode)
+                // 2. Table Toolbar (Select All, Add Row, Delete Row, Add Column, Toggle Resize Mode)
                 _buildTableToolbar(activeDay),
 
                 const SizedBox(height: 10),
@@ -2217,7 +2212,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
                 const SizedBox(height: 10),
 
-                // 4. Interactive Editable Table (Zoomable)
+                // 3. Interactive Editable Table (Zoomable)
                 _buildInteractiveTable(activeDay),
               ],
 
@@ -2229,114 +2224,127 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     );
   }
 
-  Widget _buildDaySelectorSection() {
-    return SizedBox(
-      height: 58,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: _rundown.days.length,
-        itemBuilder: (context, index) {
-          final day = _rundown.days[index];
-          final isSelected = index == _selectedDayIndex;
-          String dayDateStr;
-          try {
-            dayDateStr = DateFormat('d MMM').format(day.date);
-          } catch (_) {
-            dayDateStr = '${day.date.day}/${day.date.month}';
-          }
-
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: InkWell(
-              onTap: () {
-                setState(() {
-                  _selectedDayIndex = index;
-                  _selectedRowIndices.clear();
-                });
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected ? primaryTeal : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected ? primaryTeal : const Color(0xFFE2E8F0),
-                    width: isSelected ? 1.6 : 1,
-                  ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: primaryTeal.withValues(alpha: 0.25),
-                            blurRadius: 6,
-                            offset: const Offset(0, 3),
-                          ),
-                        ]
-                      : [],
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'DAY ${day.dayNumber}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: isSelected
-                            ? Colors.white
-                            : const Color(0xFF1E293B),
-                      ),
-                    ),
-                    Text(
-                      dayDateStr,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                        color: isSelected
-                            ? Colors.white.withValues(alpha: 0.9)
-                            : const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   Widget _buildDayThemeHeader(RundownDay activeDay) {
+    final hasPrevious = _selectedDayIndex > 0;
+    final hasNext = _selectedDayIndex < _rundown.days.length - 1;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: const Color(0xFF00897B).withValues(alpha: 0.15),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          const Icon(Icons.lightbulb_rounded, color: primaryTeal, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Tema: ${activeDay.theme.isNotEmpty ? activeDay.theme : "Hari Ke-${activeDay.dayNumber}"} • ${_formatDateFull(activeDay.date)}',
-              style: const TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A),
+          // Panah Kiri (Hari Sebelumnya)
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: hasPrevious
+                  ? () {
+                      setState(() {
+                        _selectedDayIndex--;
+                        _selectedRowIndices.clear();
+                      });
+                    }
+                  : null,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: hasPrevious
+                      ? primaryTeal.withValues(alpha: 0.1)
+                      : Colors.grey.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  size: 16,
+                  color: hasPrevious ? primaryTeal : const Color(0xFFCBD5E1),
+                ),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Konten Tema, Hari, & Tanggal
+          Expanded(
+            child: Row(
+              children: [
+                const Icon(Icons.lightbulb_rounded, color: primaryTeal, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Hari Ke-${activeDay.dayNumber}${activeDay.theme.isNotEmpty ? ": ${activeDay.theme}" : ""}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _formatDateFull(activeDay.date),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF64748B),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Panah Kanan (Hari Berikutnya)
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: hasNext
+                  ? () {
+                      setState(() {
+                        _selectedDayIndex++;
+                        _selectedRowIndices.clear();
+                      });
+                    }
+                  : null,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: hasNext
+                      ? primaryTeal.withValues(alpha: 0.1)
+                      : Colors.grey.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: hasNext ? primaryTeal : const Color(0xFFCBD5E1),
+                ),
+              ),
             ),
           ),
         ],
