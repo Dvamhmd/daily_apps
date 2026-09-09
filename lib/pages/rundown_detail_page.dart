@@ -353,6 +353,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
   void _ensureDefaultRows() {
     bool changed = false;
+    final seenRowIds = <String>{};
     final updatedDays = _rundown.days.map((day) {
       if (day.rows.isEmpty) {
         changed = true;
@@ -362,6 +363,15 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
           theme: day.theme,
           initialRowCount: 5,
         );
+      }
+      for (int i = 0; i < day.rows.length; i++) {
+        final row = day.rows[i];
+        if (seenRowIds.contains(row.id) || row.id.isEmpty) {
+          row.id =
+              '${DateTime.now().microsecondsSinceEpoch}_d${day.dayNumber}_r$i';
+          changed = true;
+        }
+        seenRowIds.add(row.id);
       }
       return day;
     }).toList();
@@ -446,7 +456,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
     for (int i = 0; i < countToAdd; i++) {
       final newRow = RundownTableRow(
-        id: '${DateTime.now().microsecondsSinceEpoch}_$i',
+        id: '${DateTime.now().microsecondsSinceEpoch}_d${activeDay.dayNumber}_$i',
         startTime: prevEnd,
         durationMinutes: 30,
       );
@@ -3622,7 +3632,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                                   const EdgeInsets.symmetric(horizontal: 4),
                               child: TextFormField(
                                 key: ValueKey(
-                                    '${row.id}_activity_$_isEditMode'),
+                                    'day_${activeDay.dayNumber}_${row.id}_activity_$_isEditMode'),
                                 initialValue: row.activity,
                                 textAlign: _getTextAlign(_getDataColAlignment(
                                     'kegiatan',
@@ -3698,7 +3708,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                                     const EdgeInsets.symmetric(horizontal: 4),
                                 child: TextFormField(
                                   key: ValueKey(
-                                      '${row.id}_custom_${colName}_$_isEditMode'),
+                                      'day_${activeDay.dayNumber}_${row.id}_custom_${colName}_$_isEditMode'),
                                   initialValue: val,
                                   textAlign: _getTextAlign(align),
                                   enabled: _isEditMode && !_isResizeMode,
@@ -3793,90 +3803,122 @@ class _RunningMarqueeText extends StatefulWidget {
   State<_RunningMarqueeText> createState() => _RunningMarqueeTextState();
 }
 
-class _RunningMarqueeTextState extends State<_RunningMarqueeText> {
-  static const double _velocity = 28.0;
-  static const Duration _pauseDuration = Duration(milliseconds: 1600);
-  static const Duration _backDuration = Duration(milliseconds: 900);
+class _RunningMarqueeTextState extends State<_RunningMarqueeText>
+    with SingleTickerProviderStateMixin {
+  static const double _blankSpace = 48.0;
+  static const double _velocity = 20.0;
 
-  final ScrollController _scrollController = ScrollController();
-  bool _isScrolling = false;
+  late final AnimationController _controller;
+  final GlobalKey _childKey = GlobalKey();
+  double _childWidth = 0.0;
+  double _containerWidth = 0.0;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _startAnimation());
+    _controller = AnimationController(vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureAndStart());
   }
 
   @override
   void didUpdateWidget(covariant _RunningMarqueeText oldWidget) {
     super.didUpdateWidget(oldWidget);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.jumpTo(0);
-      }
-      _startAnimation();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureAndStart());
   }
 
-  Future<void> _startAnimation() async {
-    if (_isScrolling || !mounted) return;
-    _isScrolling = true;
-
-    while (mounted && _scrollController.hasClients) {
-      final maxScroll = _scrollController.position.maxScrollExtent;
-      if (maxScroll <= 0) {
-        await Future.delayed(const Duration(milliseconds: 800));
-        continue;
-      }
-
-      await Future.delayed(_pauseDuration);
-      if (!mounted || !_scrollController.hasClients) break;
-
-      final currentMaxScroll = _scrollController.position.maxScrollExtent;
-      if (currentMaxScroll <= 0) continue;
-
-      final durationMs =
-          ((currentMaxScroll / _velocity) * 1000).round();
-      try {
-        await _scrollController.animateTo(
-          currentMaxScroll,
-          duration: Duration(milliseconds: durationMs.clamp(800, 30000)),
-          curve: Curves.linear,
-        );
-      } catch (_) {
-        break;
-      }
-
-      await Future.delayed(_pauseDuration);
-      if (!mounted || !_scrollController.hasClients) break;
-
-      try {
-        await _scrollController.animateTo(
-          0.0,
-          duration: _backDuration,
-          curve: Curves.easeInOut,
-        );
-      } catch (_) {
-        break;
+  void _measureAndStart() {
+    if (!mounted) return;
+    final renderBox =
+        _childKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox != null && renderBox.hasSize) {
+      final width = renderBox.size.width;
+      if (width != _childWidth) {
+        setState(() {
+          _childWidth = width;
+        });
       }
     }
-    _isScrolling = false;
+    _updateAnimation();
+  }
+
+  void _updateAnimation() {
+    if (!mounted || _childWidth <= 0 || _containerWidth <= 0) return;
+
+    if (_childWidth > _containerWidth) {
+      final totalDistance = _childWidth + _blankSpace;
+      final durationSeconds = totalDistance / _velocity;
+      _controller.duration =
+          Duration(milliseconds: (durationSeconds * 1000).round());
+      if (!_controller.isAnimating) {
+        _controller.repeat();
+      }
+    } else {
+      _controller.stop();
+      _controller.value = 0.0;
+    }
   }
 
   @override
   void dispose() {
-    _isScrolling = false;
-    _scrollController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      controller: _scrollController,
-      scrollDirection: Axis.horizontal,
-      physics: const NeverScrollableScrollPhysics(),
-      child: widget.child,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (_containerWidth != constraints.maxWidth) {
+          _containerWidth = constraints.maxWidth;
+          WidgetsBinding.instance
+              .addPostFrameCallback((_) => _updateAnimation());
+        }
+
+        return ClipRect(
+          child: Stack(
+            clipBehavior: Clip.hardEdge,
+            children: [
+              // Element offstage untuk mengukur lebar asli child tanpa wrapping
+              Offstage(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    KeyedSubtree(
+                      key: _childKey,
+                      child: widget.child,
+                    ),
+                  ],
+                ),
+              ),
+
+              // Running text looping terus-menerus seperti roda
+              if (_childWidth > _containerWidth && _childWidth > 0)
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, _) {
+                    final totalDistance = _childWidth + _blankSpace;
+                    final offset = -(_controller.value * totalDistance);
+                    return Transform.translate(
+                      offset: Offset(offset, 0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          widget.child,
+                          const SizedBox(width: _blankSpace),
+                          widget.child,
+                          const SizedBox(width: _blankSpace),
+                          widget.child,
+                        ],
+                      ),
+                    );
+                  },
+                )
+              else
+                widget.child,
+            ],
+          ),
+        );
+      },
     );
   }
 }

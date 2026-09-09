@@ -147,7 +147,7 @@ class RundownDay {
     for (int i = 0; i < initialRowCount; i++) {
       final dur = i < defaultDurations.length ? defaultDurations[i] : 60;
       final row = RundownTableRow(
-        id: '${DateTime.now().millisecondsSinceEpoch}_row_$i',
+        id: '${DateTime.now().microsecondsSinceEpoch}_d${dayNumber}_r$i',
         startTime: currentStart,
         durationMinutes: dur,
       );
@@ -173,6 +173,7 @@ class RundownDay {
       };
 
   factory RundownDay.fromJson(Map<String, dynamic> json) {
+    final dayNum = json['dayNumber'] as int? ?? 1;
     List<RundownTableRow> parsedRows = [];
     if (json['rows'] is List) {
       parsedRows = (json['rows'] as List)
@@ -187,7 +188,7 @@ class RundownDay {
     // If rows are empty upon loading, ensure at least 5 default rows
     if (parsedRows.isEmpty) {
       return RundownDay.createWithDefaultRows(
-        dayNumber: json['dayNumber'] as int? ?? 1,
+        dayNumber: dayNum,
         date: json['date'] != null
             ? DateTime.parse(json['date'] as String)
             : DateTime.now(),
@@ -203,7 +204,7 @@ class RundownDay {
     }
 
     return RundownDay(
-      dayNumber: json['dayNumber'] as int? ?? 1,
+      dayNumber: dayNum,
       date: json['date'] != null
           ? DateTime.parse(json['date'] as String)
           : DateTime.now(),
@@ -259,6 +260,24 @@ class Rundown {
       };
 
   factory Rundown.fromJson(Map<String, dynamic> json) {
+    final parsedDays = (json['days'] as List<dynamic>?)
+            ?.map((e) => RundownDay.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        [];
+
+    // Ensure all row IDs across days are distinct so legacy data doesn't share IDs
+    final seenIds = <String>{};
+    for (final day in parsedDays) {
+      for (int i = 0; i < day.rows.length; i++) {
+        final row = day.rows[i];
+        if (seenIds.contains(row.id) || row.id.isEmpty) {
+          row.id =
+              '${DateTime.now().microsecondsSinceEpoch}_d${day.dayNumber}_r$i';
+        }
+        seenIds.add(row.id);
+      }
+    }
+
     return Rundown(
       id: json['id'] as String? ??
           DateTime.now().millisecondsSinceEpoch.toString(),
@@ -267,10 +286,7 @@ class Rundown {
           ? DateTime.parse(json['startDate'] as String)
           : DateTime.now(),
       totalDays: json['totalDays'] as int? ?? 1,
-      days: (json['days'] as List<dynamic>?)
-              ?.map((e) => RundownDay.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
+      days: parsedDays,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
           : DateTime.now(),
