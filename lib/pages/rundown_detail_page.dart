@@ -369,13 +369,6 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     }
   }
 
-  String _formatDateShort(DateTime date) {
-    try {
-      return DateFormat('d MMM yyyy').format(date);
-    } catch (_) {
-      return '${date.day}/${date.month}/${date.year}';
-    }
-  }
 
   String _formatDateFull(DateTime date) {
     try {
@@ -2204,22 +2197,17 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Banner Info
-              _buildHeaderBanner(),
-
-              const SizedBox(height: 16),
-
-              // 2. Day Selector Tabs
+              // 1. Day Selector Tabs
               _buildDaySelectorSection(),
 
               const SizedBox(height: 16),
 
-              // 3. Theme Header & Auto Cascade Switch
+              // 2. Theme Header & Auto Cascade Switch
               if (activeDay != null) ...[
                 _buildDayThemeHeader(activeDay),
                 const SizedBox(height: 12),
 
-                // 4. Table Toolbar (Select All, Add Row, Delete Row, Add Column, Toggle Resize Mode)
+                // 3. Table Toolbar (Select All, Add Row, Delete Row, Add Column, Toggle Resize Mode)
                 _buildTableToolbar(activeDay),
 
                 const SizedBox(height: 10),
@@ -2229,7 +2217,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
                 const SizedBox(height: 10),
 
-                // 5. Interactive Editable Table (Zoomable)
+                // 4. Interactive Editable Table (Zoomable)
                 _buildInteractiveTable(activeDay),
               ],
 
@@ -2237,107 +2225,6 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeaderBanner() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF00897B), Color(0xFF004D40)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF00897B).withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              InkWell(
-                onTap: _openEditRundownModal,
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.3),
-                      width: 0.8,
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.edit_rounded,
-                          color: Colors.white, size: 12),
-                      SizedBox(width: 4),
-                      Text(
-                        'Edit',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '${_rundown.totalDays} Hari',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _rundown.title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _rundown.totalDays == 1
-                ? _formatDateShort(_rundown.startDate)
-                : '${_formatDateShort(_rundown.startDate)} s/d ${_formatDateShort(_rundown.endDate)}',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.9),
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
       ),
     );
   }
