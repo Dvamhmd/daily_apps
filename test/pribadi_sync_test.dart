@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:daily_apps/models/model_pribadi.dart';
 import 'package:daily_apps/models/model_uangku.dart';
 import 'package:daily_apps/utils/pribadi_sync_service.dart';
@@ -286,7 +287,8 @@ void main() {
           ),
         ],
       );
-      await PribadiSyncService.savePribadiData(monthKey, corruptedData);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('pribadi_keuangan_data_$monthKey', jsonEncode(corruptedData.toJson()));
 
       // Saat loadPribadiData dipanggil, sanitasi otomatis memperbaiki saldo menjadi 2.000.000
       final repaired = await PribadiSyncService.loadPribadiData(monthKey);
@@ -338,6 +340,21 @@ void main() {
       expect(finalData.rekeningPribadi.balance, 0);
       expect(finalData.onHandDebit.balance, 0);
       expect(finalData.onHandCash.balance, 0);
+    });
+
+    test('Transaksi bayar tagihan tidak menggunakan awalan Bayar Tagihan dan data lama dibersihkan', () async {
+      final jsonLegacy = {
+        'id': 'tx_legacy',
+        'title': 'Bayar Tagihan: Makan (BCA)',
+        'type': 'pengeluaran',
+        'sourceAccount': 'BCA',
+        'amount': 50000,
+        'note': 'Bayar Tagihan: Makan (BCA)',
+      };
+
+      final parsed = PribadiTransaction.fromJson(jsonLegacy);
+      expect(parsed.title, 'Makan (BCA)');
+      expect(parsed.note, 'Makan (BCA)');
     });
   });
 }

@@ -827,7 +827,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                     nama: chosenUangku.nama,
                     nominal: nominalBayar,
                     selectedMonth: widget.selectedMonth,
-                    keterangan: 'Bayar Tagihan: ${item.nama} (${chosenUangku.nama})',
+                    keterangan: '${item.nama} (${chosenUangku.nama})',
                   );
 
                   // Kasus 1: Bayar Sebagian (nominalBayar < item.jumlah)

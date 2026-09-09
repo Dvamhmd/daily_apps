@@ -260,11 +260,17 @@ class PribadiTransaction {
         'kode': kode,
       };
 
+  static String _cleanTitle(String raw) {
+    return raw.replaceFirst(RegExp(r'^Bayar\s+Tagihan:\s*', caseSensitive: false), '').trim();
+  }
+
   factory PribadiTransaction.fromJson(Map<String, dynamic> json) {
+    final rawTitle = json['title'] as String? ?? '';
+    final rawNote = json['note'] as String?;
     return PribadiTransaction(
       id: json['id'] as String? ??
           DateTime.now().microsecondsSinceEpoch.toString(),
-      title: json['title'] as String? ?? '',
+      title: _cleanTitle(rawTitle),
       type: json['type'] as String? ?? 'transfer_debit',
       sourceAccount: json['sourceAccount'] as String?,
       targetAccount: json['targetAccount'] as String?,
@@ -274,7 +280,7 @@ class PribadiTransaction {
       timestamp: json['timestamp'] != null
           ? DateTime.parse(json['timestamp'] as String)
           : DateTime.now(),
-      note: json['note'] as String?,
+      note: rawNote != null ? _cleanTitle(rawNote) : null,
       ku: json['ku'] as String?,
       kode: json['kode'] as String?,
     );
