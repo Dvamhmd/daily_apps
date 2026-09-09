@@ -629,4 +629,72 @@ class PribadiSyncService {
     );
     await saveUangkuList(monthKey, uList);
   }
+
+  /// Memeriksa apakah daftar pos Uangku terhubung dengan Pos Dana Keuangan Pribadi
+  /// dan memiliki riwayat transaksi tercatat di daftar transaksi.
+  static Future<List<PosDanaTransactionInfo>> checkUangkuConnections({
+    required List<String> names,
+    DateTime? selectedMonth,
+  }) async {
+    final monthKey = getMonthKey(null, selectedMonth);
+    final data = await loadPribadiData(monthKey);
+
+    final results = <PosDanaTransactionInfo>[];
+
+    for (final name in names) {
+      final cleanName = name.trim().toLowerCase();
+      final existsInPos = data.posDanaList.any(
+        (p) => p.nama.trim().toLowerCase() == cleanName,
+      );
+
+      final matchingTx = data.transactions.where((tx) {
+        final target = tx.targetAccount?.trim().toLowerCase() ?? '';
+        final source = tx.sourceAccount?.trim().toLowerCase() ?? '';
+        final manual = tx.manualSource?.trim().toLowerCase() ?? '';
+        final title = tx.title.trim().toLowerCase();
+        final note = tx.note?.trim().toLowerCase() ?? '';
+
+        return target == cleanName ||
+            source == cleanName ||
+            manual == cleanName ||
+            title == cleanName ||
+            note == 'pemasukan uangku: $cleanName' ||
+            note == 'pengeluaran uangku: $cleanName' ||
+            note.contains(cleanName);
+      }).toList();
+
+      final sampleTitles = matchingTx
+          .take(3)
+          .map((tx) => tx.title.isNotEmpty ? tx.title : tx.note ?? 'Transaksi')
+          .toList();
+
+      results.add(PosDanaTransactionInfo(
+        nama: name,
+        existsInPosDana: existsInPos,
+        transactionCount: matchingTx.length,
+        sampleTransactions: sampleTitles,
+      ));
+    }
+
+    return results;
+  }
 }
+
+/// Informasi status keterhubungan Pos Dana dengan Keuangan Pribadi & riwayat transaksi
+class PosDanaTransactionInfo {
+  final String nama;
+  final bool existsInPosDana;
+  final int transactionCount;
+  final List<String> sampleTransactions;
+
+  PosDanaTransactionInfo({
+    required this.nama,
+    required this.existsInPosDana,
+    required this.transactionCount,
+    this.sampleTransactions = const [],
+  });
+
+  bool get hasTransactions => transactionCount > 0;
+  bool get isConnected => existsInPosDana || hasTransactions;
+}
+

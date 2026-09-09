@@ -946,24 +946,37 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
     );
   }
 
-  void showHapusUangku() {
+  void showHapusUangku() async {
     final selected = <int>{};
+    Map<String, PosDanaTransactionInfo> connectionInfoMap = {};
+
+    try {
+      final infos = await PribadiSyncService.checkUangkuConnections(
+        names: uangkuList.map((e) => e.nama).toList(),
+        selectedMonth: widget.selectedMonth,
+      );
+      for (final info in infos) {
+        connectionInfoMap[info.nama.trim().toLowerCase()] = info;
+      }
+    } catch (_) {}
+
+    if (!mounted) return;
 
     showDialog(
       context: context,
       builder: (_) => StatefulBuilder(
-        builder: (context, setLocal) {
+        builder: (dialogCtx, setLocal) {
           return AlertDialog(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            title: Text(
+            title: const Text(
               'Hapus Uangku',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             content: ConstrainedBox(
               constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.5,
+                maxHeight: MediaQuery.of(dialogCtx).size.height * 0.5,
               ),
               child: SingleChildScrollView(
                 child: Column(
@@ -971,6 +984,9 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                   children: uangkuList.asMap().entries.map((e) {
                     final i = e.key;
                     final item = e.value;
+                    final info = connectionInfoMap[item.nama.trim().toLowerCase()];
+                    final hasTx = info != null && info.hasTransactions;
+
                     return CheckboxListTile(
                       value: selected.contains(i),
                       onChanged: (val) {
@@ -980,20 +996,65 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                       },
                       title: Text(
                         item.nama,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontWeight: FontWeight.w600,
-                          fontSize: 16,
+                          fontSize: 15,
                         ),
                       ),
+                      subtitle: hasTx
+                          ? Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFEF3C7),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: const Color(0xFFFCD34D),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.link_rounded,
+                                          size: 11,
+                                          color: Color(0xFFB45309),
+                                        ),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          '${info.transactionCount} Transaksi Pribadi',
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFFB45309),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : Text(
+                              RupiahFormatter.format(item.jumlah),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
                       controlAffinity: ListTileControlAffinity.trailing,
                       activeColor: Colors.green,
                       dense: true,
-                      visualDensity: const VisualDensity(
-                        vertical: -4,
-                      ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 0,
-                        vertical: 0,
+                        vertical: 2,
                       ),
                     );
                   }).toList(),
@@ -1009,14 +1070,281 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   onPressed: () async {
+                    if (selected.isEmpty) {
+                      Navigator.pop(dialogCtx);
+                      return;
+                    }
+
                     final itemsToDelete = uangkuList
                         .asMap()
                         .entries
                         .where((e) => selected.contains(e.key))
                         .map((e) => e.value)
                         .toList();
+
+                    // Periksa apakah ada pos dana uangku yang terhubung ke Keuangan Pribadi & memiliki transaksi
+                    final checkInfos = await PribadiSyncService.checkUangkuConnections(
+                      names: itemsToDelete.map((e) => e.nama).toList(),
+                      selectedMonth: widget.selectedMonth,
+                    );
+
+                    final connectedWithTx = checkInfos
+                        .where((info) => info.hasTransactions)
+                        .toList();
+
+                    if (connectedWithTx.isNotEmpty && dialogCtx.mounted) {
+                      final confirmDelete = await showDialog<bool>(
+                        context: dialogCtx,
+                        barrierDismissible: false,
+                        builder: (warnCtx) {
+                          return AlertDialog(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            titlePadding:
+                                const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                            contentPadding:
+                                const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                            title: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF2F2),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: const Color(0xFFFCA5A5),
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.warning_amber_rounded,
+                                    color: Color(0xFFDC2626),
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                  child: Text(
+                                    'Peringatan Hapus Pos',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: Color(0xFF991B1B),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            content: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxHeight:
+                                    MediaQuery.of(warnCtx).size.height * 0.5,
+                              ),
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const SizedBox(height: 6),
+                                    const Text(
+                                      'Pos dana Uangku berikut sudah masuk ke Keuangan Pribadi dan memiliki riwayat transaksi tercatat:',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF374151),
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    ...connectedWithTx.map(
+                                      (info) => Container(
+                                        margin:
+                                            const EdgeInsets.only(bottom: 8),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 8,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFFFBEB),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                          border: Border.all(
+                                            color: const Color(0xFFFCD34D),
+                                          ),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                const Icon(
+                                                  Icons
+                                                      .account_balance_wallet_outlined,
+                                                  size: 16,
+                                                  color: Color(0xFFB45309),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Expanded(
+                                                  child: Text(
+                                                    info.nama,
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 13,
+                                                      color: Color(0xFF92400E),
+                                                    ),
+                                                  ),
+                                                ),
+                                                Container(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 2,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color:
+                                                        const Color(0xFFFEF3C7),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            6),
+                                                  ),
+                                                  child: Text(
+                                                    '${info.transactionCount} Transaksi',
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: Color(0xFFB45309),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            if (info.sampleTransactions
+                                                .isNotEmpty) ...[
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                'Contoh: ${info.sampleTransactions.join(", ")}',
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: Color(0xFF78350F),
+                                                  fontStyle: FontStyle.italic,
+                                                ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFEF2F2),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: const Color(0xFFFCA5A5),
+                                        ),
+                                      ),
+                                      child: const Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Icon(
+                                            Icons.error_outline_rounded,
+                                            size: 16,
+                                            color: Color(0xFFDC2626),
+                                          ),
+                                          SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'Menghapus pos dana ini dapat memengaruhi saldo & riwayat transaksi terkait di Keuangan Pribadi. Yakin ingin tetap menghapus?',
+                                              style: TextStyle(
+                                                fontSize: 11.5,
+                                                fontWeight: FontWeight.w500,
+                                                color: Color(0xFF991B1B),
+                                                height: 1.35,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            actions: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: () =>
+                                          Navigator.pop(warnCtx, false),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor:
+                                            const Color(0xFF4B5563),
+                                        side: const BorderSide(
+                                          color: Color(0xFFD1D5DB),
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 10),
+                                      ),
+                                      child: const Text(
+                                        'Batal',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () =>
+                                          Navigator.pop(warnCtx, true),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            const Color(0xFFDC2626),
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 10),
+                                      ),
+                                      child: const Text(
+                                        'Tetap Hapus',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          );
+                        },
+                      );
+
+                      if (confirmDelete != true) {
+                        return;
+                      }
+                    }
 
                     setState(() {
                       uangkuList = uangkuList
@@ -1041,16 +1369,17 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                       );
                     }
                     widget.onChanged();
-                    if (context.mounted) {
-                      Navigator.pop(context);
+                    if (dialogCtx.mounted) {
+                      Navigator.pop(dialogCtx);
                     }
                   },
-                  child: Text(
+                  child: const Text(
                     'Konfirmasi Hapus',
                     style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        fontSize: 18),
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ),
