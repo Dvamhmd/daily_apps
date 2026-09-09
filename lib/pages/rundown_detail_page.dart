@@ -2325,26 +2325,32 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        'Hari Ke-${activeDay.dayNumber}${activeDay.theme.isNotEmpty ? ": ${activeDay.theme}" : ""}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF004D40),
+                      _RunningMarqueeText(
+                        key: ValueKey(
+                            'theme_${activeDay.dayNumber}_${activeDay.theme}'),
+                        child: Text(
+                          'Hari Ke-${activeDay.dayNumber}${activeDay.theme.isNotEmpty ? ": ${activeDay.theme}" : ""}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF004D40),
+                          ),
+                          maxLines: 1,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        _formatDateFull(activeDay.date),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF00695C),
+                      _RunningMarqueeText(
+                        key: ValueKey(
+                            'date_${activeDay.dayNumber}_${activeDay.date.millisecondsSinceEpoch}'),
+                        child: Text(
+                          _formatDateFull(activeDay.date),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF00695C),
+                          ),
+                          maxLines: 1,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -3687,6 +3693,106 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _RunningMarqueeText extends StatefulWidget {
+  final Widget child;
+
+  const _RunningMarqueeText({
+    super.key,
+    required this.child,
+  });
+
+  @override
+  State<_RunningMarqueeText> createState() => _RunningMarqueeTextState();
+}
+
+class _RunningMarqueeTextState extends State<_RunningMarqueeText> {
+  static const double _velocity = 28.0;
+  static const Duration _pauseDuration = Duration(milliseconds: 1600);
+  static const Duration _backDuration = Duration(milliseconds: 900);
+
+  final ScrollController _scrollController = ScrollController();
+  bool _isScrolling = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startAnimation());
+  }
+
+  @override
+  void didUpdateWidget(covariant _RunningMarqueeText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0);
+      }
+      _startAnimation();
+    });
+  }
+
+  Future<void> _startAnimation() async {
+    if (_isScrolling || !mounted) return;
+    _isScrolling = true;
+
+    while (mounted && _scrollController.hasClients) {
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      if (maxScroll <= 0) {
+        await Future.delayed(const Duration(milliseconds: 800));
+        continue;
+      }
+
+      await Future.delayed(_pauseDuration);
+      if (!mounted || !_scrollController.hasClients) break;
+
+      final currentMaxScroll = _scrollController.position.maxScrollExtent;
+      if (currentMaxScroll <= 0) continue;
+
+      final durationMs =
+          ((currentMaxScroll / _velocity) * 1000).round();
+      try {
+        await _scrollController.animateTo(
+          currentMaxScroll,
+          duration: Duration(milliseconds: durationMs.clamp(800, 30000)),
+          curve: Curves.linear,
+        );
+      } catch (_) {
+        break;
+      }
+
+      await Future.delayed(_pauseDuration);
+      if (!mounted || !_scrollController.hasClients) break;
+
+      try {
+        await _scrollController.animateTo(
+          0.0,
+          duration: _backDuration,
+          curve: Curves.easeInOut,
+        );
+      } catch (_) {
+        break;
+      }
+    }
+    _isScrolling = false;
+  }
+
+  @override
+  void dispose() {
+    _isScrolling = false;
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      controller: _scrollController,
+      scrollDirection: Axis.horizontal,
+      physics: const NeverScrollableScrollPhysics(),
+      child: widget.child,
     );
   }
 }
