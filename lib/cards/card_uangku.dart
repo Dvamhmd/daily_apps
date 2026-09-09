@@ -1223,20 +1223,6 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                                                 ),
                                               ],
                                             ),
-                                            if (info.sampleTransactions
-                                                .isNotEmpty) ...[
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                'Contoh: ${info.sampleTransactions.join(", ")}',
-                                                style: const TextStyle(
-                                                  fontSize: 11,
-                                                  color: Color(0xFF78350F),
-                                                  fontStyle: FontStyle.italic,
-                                                ),
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ],
                                           ],
                                         ),
                                       ),
