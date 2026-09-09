@@ -2837,11 +2837,6 @@ class _PribadiPageState extends State<PribadiPage> {
           if (_data.onHandCash.balance < 0) {
             _data.onHandCash.balance = 0;
           }
-        } else if (_data.posDanaList.isNotEmpty) {
-          _data.posDanaList.first.balance -= tx.amount;
-          if (_data.posDanaList.first.balance < 0) {
-            _data.posDanaList.first.balance = 0;
-          }
         }
       }
     } else if (tx.isPengeluaran) {
@@ -2862,8 +2857,6 @@ class _PribadiPageState extends State<PribadiPage> {
           _data.onHandDebit.balance += total;
         } else if (tx.sourceAccount == 'cash') {
           _data.onHandCash.balance += total;
-        } else if (_data.posDanaList.isNotEmpty) {
-          _data.posDanaList.first.balance += total;
         }
       }
     } else {
@@ -2885,8 +2878,6 @@ class _PribadiPageState extends State<PribadiPage> {
           _data.onHandDebit.balance += total;
         } else if (tx.sourceAccount == 'cash') {
           _data.onHandCash.balance += total;
-        } else if (_data.posDanaList.isNotEmpty) {
-          _data.posDanaList.first.balance += total;
         }
       }
 
@@ -2918,11 +2909,6 @@ class _PribadiPageState extends State<PribadiPage> {
           _data.onHandCash.balance -= tx.amount;
           if (_data.onHandCash.balance < 0) {
             _data.onHandCash.balance = 0;
-          }
-        } else if (_data.posDanaList.isNotEmpty) {
-          _data.posDanaList.first.balance -= tx.amount;
-          if (_data.posDanaList.first.balance < 0) {
-            _data.posDanaList.first.balance = 0;
           }
         }
       }
@@ -3141,16 +3127,30 @@ class _PribadiPageState extends State<PribadiPage> {
               Navigator.pop(ctx);
               final deletedCount = _data.transactions.length;
 
-              // 1. Rollback saldo seluruh transaksi secara aman dari transaksi terakhir
-              for (final tx in _data.transactions.reversed) {
-                _rollbackTransactionBalance(tx);
+              final uList = await PribadiSyncService.loadUangkuList(_monthKey);
+
+              // 1. Bersihkan seluruh transaksi
+              _data.transactions.clear();
+
+              // 2. Reset saldo Pos Dana sesuai daftar Uangku (atau 0 jika tidak ada / Uangku kosong)
+              for (final pos in _data.posDanaList) {
+                final uIdx = uList.indexWhere((u) =>
+                    u.nama.trim().toLowerCase() == pos.nama.trim().toLowerCase());
+                if (uIdx != -1) {
+                  pos.balance = uList[uIdx].jumlah;
+                } else {
+                  pos.balance = 0;
+                }
               }
 
-              // 2. Sanitasi & proteksi anti-minus seluruh wadah dana
+              // 3. Pastikan saldo akun penampung bersih 0
+              _data.rekeningPribadi.balance = 0;
+              _data.onHandDebit.balance = 0;
+              _data.onHandCash.balance = 0;
+
+              // 4. Sanitasi & proteksi anti-minus seluruh wadah dana
               _sanitizeAllBalances();
 
-              // 3. Bersihkan seluruh transaksi
-              _data.transactions.clear();
               await _saveData();
               if (mounted) {
                 setState(() {});
@@ -4023,6 +4023,11 @@ class _PribadiPageState extends State<PribadiPage> {
                                       final deletedName = pos.nama;
                                       _data.posDanaList.removeWhere(
                                           (p) => p.id == pos.id);
+                                      if (_data.posDanaList.isEmpty) {
+                                        _data.rekeningPribadi.balance = 0;
+                                        _data.onHandDebit.balance = 0;
+                                        _data.onHandCash.balance = 0;
+                                      }
                                       await _saveData();
                                       await PribadiSyncService.syncHapusPosDanaToUangku(
                                         monthKey: _monthKey,

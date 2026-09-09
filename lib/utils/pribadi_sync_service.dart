@@ -150,6 +150,12 @@ class PribadiSyncService {
             loaded.posDanaList = [];
           }
 
+          if (loaded.posDanaList.isEmpty && loaded.transactions.isEmpty) {
+            loaded.rekeningPribadi.balance = 0;
+            loaded.onHandDebit.balance = 0;
+            loaded.onHandCash.balance = 0;
+          }
+
           return loaded;
         }
       } catch (_) {}
@@ -574,6 +580,12 @@ class PribadiSyncService {
       for (final idx in matchingIndices.reversed) {
         data.transactions.removeAt(idx);
       }
+    }
+
+    if (data.posDanaList.isEmpty) {
+      data.rekeningPribadi.balance = 0;
+      data.onHandDebit.balance = 0;
+      data.onHandCash.balance = 0;
     }
 
     await savePribadiData(monthKey, data);

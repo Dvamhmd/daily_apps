@@ -293,5 +293,51 @@ void main() {
       expect(repaired.posDanaList.first.balance, 2000000);
       expect(repaired.totalDanaPribadi, 2000000);
     });
+
+    test('Hapus pos Uangku dan hapus seluruh transaksi di Keuangan Pribadi menghasilkan sisa dana tepat 0 (tidak ada residual)', () async {
+      final testMonth = DateTime(2026, 9, 1);
+      final monthKey = PribadiSyncService.getMonthKey(null, testMonth);
+
+      // 1. Tambah pos di Uangku & catat pengeluaran di Keuangan Pribadi
+      await PribadiSyncService.saveUangkuList(monthKey, [Uangku('Gaji', 5000000)]);
+      await PribadiSyncService.recordPemasukanFromUangku(
+        nama: 'Gaji',
+        nominal: 5000000,
+        selectedMonth: testMonth,
+      );
+      await PribadiSyncService.recordPengeluaranFromUangku(
+        nama: 'Gaji',
+        nominal: 500000,
+        selectedMonth: testMonth,
+        keterangan: 'Makan & Belanja',
+      );
+
+      // 2. Hapus Pos Dana di Uangku
+      await PribadiSyncService.saveUangkuList(monthKey, []);
+      await PribadiSyncService.syncHapusUangku(
+        nama: 'Gaji',
+        jumlah: 5000000,
+        selectedMonth: testMonth,
+      );
+
+      // 3. Muat Keuangan Pribadi dan hapus sisa transaksi (bersihkan semua)
+      final data = await PribadiSyncService.loadPribadiData(monthKey);
+      data.transactions.clear();
+      data.posDanaList.clear();
+      data.rekeningPribadi.balance = 0;
+      data.onHandDebit.balance = 0;
+      data.onHandCash.balance = 0;
+      await PribadiSyncService.savePribadiData(monthKey, data);
+
+      // 4. Muat ulang dan pastikan total dana pribadi tepat Rp 0
+      final finalData = await PribadiSyncService.loadPribadiData(monthKey);
+      expect(finalData.posDanaList.isEmpty, true);
+      expect(finalData.transactions.isEmpty, true);
+      expect(finalData.totalPosDana, 0);
+      expect(finalData.totalDanaPribadi, 0);
+      expect(finalData.rekeningPribadi.balance, 0);
+      expect(finalData.onHandDebit.balance, 0);
+      expect(finalData.onHandCash.balance, 0);
+    });
   });
 }
