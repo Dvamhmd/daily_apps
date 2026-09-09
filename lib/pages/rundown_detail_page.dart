@@ -2230,18 +2230,26 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFFB2DFDB), // Soft Mint / Light Teal
+            Color(0xFFCCEAE6), // Light Pastel Teal
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: const Color(0xFF00897B).withValues(alpha: 0.15),
+          color: const Color(0xFF00897B).withValues(alpha: 0.35),
+          width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+            color: const Color(0xFF00897B).withValues(alpha: 0.12),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -2259,31 +2267,59 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                       });
                     }
                   : null,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(9),
               child: Container(
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
                   color: hasPrevious
-                      ? primaryTeal.withValues(alpha: 0.1)
-                      : Colors.grey.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(8),
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(
+                    color: hasPrevious
+                        ? const Color(0xFF00897B).withValues(alpha: 0.3)
+                        : const Color(0xFFCBD5E1),
+                    width: 0.8,
+                  ),
+                  boxShadow: hasPrevious
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF00897B).withValues(alpha: 0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ]
+                      : [],
                 ),
                 child: Icon(
                   Icons.arrow_back_ios_new_rounded,
-                  size: 16,
-                  color: hasPrevious ? primaryTeal : const Color(0xFFCBD5E1),
+                  size: 15,
+                  color: hasPrevious
+                      ? const Color(0xFF00695C)
+                      : const Color(0xFF94A3B8),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
 
           // Konten Tema, Hari, & Tanggal
           Expanded(
             child: Row(
               children: [
-                const Icon(Icons.lightbulb_rounded, color: primaryTeal, size: 18),
-                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.lightbulb_rounded,
+                    color: Color(0xFF00695C),
+                    size: 17,
+                  ),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2294,7 +2330,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
+                          color: Color(0xFF004D40),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -2304,8 +2340,8 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                         _formatDateFull(activeDay.date),
                         style: const TextStyle(
                           fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF00695C),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -2316,7 +2352,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
 
           // Panah Kanan (Hari Berikutnya)
           Material(
@@ -2330,19 +2366,36 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                       });
                     }
                   : null,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(9),
               child: Container(
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
                   color: hasNext
-                      ? primaryTeal.withValues(alpha: 0.1)
-                      : Colors.grey.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(8),
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(
+                    color: hasNext
+                        ? const Color(0xFF00897B).withValues(alpha: 0.3)
+                        : const Color(0xFFCBD5E1),
+                    width: 0.8,
+                  ),
+                  boxShadow: hasNext
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF00897B).withValues(alpha: 0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ]
+                      : [],
                 ),
                 child: Icon(
                   Icons.arrow_forward_ios_rounded,
-                  size: 16,
-                  color: hasNext ? primaryTeal : const Color(0xFFCBD5E1),
+                  size: 15,
+                  color: hasNext
+                      ? const Color(0xFF00695C)
+                      : const Color(0xFF94A3B8),
                 ),
               ),
             ),
