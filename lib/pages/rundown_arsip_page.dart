@@ -215,11 +215,6 @@ class _RundownArsipPageState extends State<RundownArsipPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Header Banner
-                      _buildHeaderBanner(),
-
-                      const SizedBox(height: 18),
-
                       // Search Box (if there are archived items or searching)
                       if (_allRundowns.any((r) => r.isArchived) ||
                           _searchQuery.isNotEmpty) ...[
@@ -255,93 +250,6 @@ class _RundownArsipPageState extends State<RundownArsipPage> {
                   ),
                 ),
               ),
-      ),
-    );
-  }
-
-  Widget _buildHeaderBanner() {
-    final count = _allRundowns.where((r) => r.isArchived).length;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F766E), Color(0xFF115E59)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F766E).withValues(alpha: 0.35),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'RUANG ARSIP',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '$count Arsip',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Koleksi Arsip Rundown',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Rundown acara yang telah selesai disimpan di sini agar daftar utama tetap rapi. Kamu dapat memulihkannya kembali kapan pun.',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.88),
-              fontSize: 13,
-            ),
-          ),
-        ],
       ),
     );
   }
