@@ -2538,14 +2538,72 @@ class _KeuanganPageState extends State<KeuanganPage> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      RupiahFormatter.format(danaAman),
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: -0.5,
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              RupiahFormatter.format(danaAman),
+                              style: const TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (limitHarianEnabled &&
+                            limitHarianEndDate != null) ...[
+                          Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 10),
+                            child: Text(
+                              '|',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w300,
+                                color: Colors.white.withValues(alpha: 0.4),
+                              ),
+                            ),
+                          ),
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.baseline,
+                                textBaseline: TextBaseline.alphabetic,
+                                children: [
+                                  Text(
+                                    RupiahFormatter.format(
+                                        limitPengeluaranHarian),
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFFFFF59D), // Kuning soft
+                                      letterSpacing: -0.3,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 3),
+                                  const Text(
+                                    '/ hari',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFFFFF9C4), // Kuning soft
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 10),
                     Container(
@@ -2565,7 +2623,9 @@ class _KeuanganPageState extends State<KeuanganPage> {
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
-                              danaAmanFilterLabel,
+                              limitHarianEnabled && limitHarianEndDate != null
+                                  ? '$danaAmanFilterLabel • Limit s/d ${formatTanggalIndoSingkat(limitHarianEndDate!)} ($sisaHariLimit hr)'
+                                  : danaAmanFilterLabel,
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
@@ -2618,11 +2678,6 @@ class _KeuanganPageState extends State<KeuanganPage> {
                           ),
                         ],
                       ),
-                    ],
-
-                    if (limitHarianEnabled && limitHarianEndDate != null) ...[
-                      const SizedBox(height: 12),
-                      _buildLimitHarianSection(),
                     ],
                   ],
                 ),

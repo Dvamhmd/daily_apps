@@ -132,8 +132,8 @@ void main() {
       await tester.tap(find.text('Terapkan'));
       await tester.pumpAndSettle();
 
-      // Verifikasi tersimpan dan widget aktif tampil di card Dana Aman
-      expect(find.text('Limit Pengeluaran Harian'), findsOneWidget);
+      // Verifikasi tersimpan dan limit harian tampil berdampingan dengan Dana Aman (Dana Aman | Limit)
+      expect(find.text('|'), findsOneWidget);
       expect(find.text('/ hari'), findsOneWidget);
     });
   });
