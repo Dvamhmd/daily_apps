@@ -2083,51 +2083,6 @@ class _KeuanganPageState extends State<KeuanganPage> {
     );
   }
 
-  String _getUrgentTagihanMessage(List<Tagihan> urgentList) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    if (urgentList.isEmpty) return '';
-
-    if (urgentList.length == 1) {
-      final t = urgentList.first;
-      final target =
-          DateTime(t.deadline!.year, t.deadline!.month, t.deadline!.day);
-      final diff = target.difference(today).inDays;
-
-      if (diff == 0) {
-        return 'Tagihan "${t.nama}" jatuh tempo hari ini!';
-      } else if (diff == 1) {
-        return 'Tagihan "${t.nama}" kurang 1 hari lagi!';
-      } else if (diff > 1) {
-        return 'Tagihan "${t.nama}" kurang $diff hari lagi!';
-      } else {
-        return 'Tagihan "${t.nama}" sudah lewat ${-diff} hari!';
-      }
-    }
-
-    final sorted = List<Tagihan>.from(urgentList)
-      ..sort((a, b) => a.deadline!.compareTo(b.deadline!));
-
-    final nearest = sorted.first;
-    final target = DateTime(
-        nearest.deadline!.year, nearest.deadline!.month, nearest.deadline!.day);
-    final diff = target.difference(today).inDays;
-
-    String detail;
-    if (diff == 0) {
-      detail = '"${nearest.nama}" jatuh tempo hari ini';
-    } else if (diff == 1) {
-      detail = '"${nearest.nama}" kurang 1 hari lagi';
-    } else if (diff > 1) {
-      detail = '"${nearest.nama}" kurang $diff hari lagi';
-    } else {
-      detail = '"${nearest.nama}" lewat ${-diff} hari';
-    }
-
-    return 'Ada ${urgentList.length} tagihan mendesak ($detail)';
-  }
-
   Future<void> _refreshAll() async {
     await _loadInitialData();
     await _updateLastUpdated();
@@ -2137,16 +2092,6 @@ class _KeuanganPageState extends State<KeuanganPage> {
   Widget build(BuildContext context) {
     final status = FinancialHealthHelper.getStatus(totalUangku, totalTagihan);
     final statusColor = FinancialHealthHelper.getStatusColor(status);
-
-    final urgentTagihan = tagihanList.where((t) {
-      if (t.deadline == null) return false;
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final target =
-          DateTime(t.deadline!.year, t.deadline!.month, t.deadline!.day);
-      final diff = target.difference(today).inDays;
-      return diff <= 3;
-    }).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -2266,52 +2211,6 @@ class _KeuanganPageState extends State<KeuanganPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (urgentTagihan.isNotEmpty) ...[
-                Container(
-                  margin: const EdgeInsets.only(bottom: 14),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        const Color(0xFFFFFBEB),
-                        const Color(0xFFFEF3C7),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.notifications_active_rounded,
-                          color: Color(0xFFD97706),
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          _getUrgentTagihanMessage(urgentTagihan),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFFB45309),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
 
               // BULAN SELECTOR BAR
               Container(
