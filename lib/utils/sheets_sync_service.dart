@@ -87,6 +87,9 @@ class SheetsSyncComparison {
 }
 
 class SheetsSyncService {
+  /// Shared persistent HTTP client untuk efisiensi koneksi TCP/TLS Keep-Alive
+  static final http.Client _client = http.Client();
+
   /// Melakukan HTTP POST request ke Google Apps Script Web App dengan penanganan CORS Web & redirect 302 otomatis
   static Future<Map<String, dynamic>> _sendPostRequest(
     String url,
@@ -98,19 +101,19 @@ class SheetsSyncService {
 
     // 1. Coba POST dengan Content-Type text/plain (CORS Simple Request untuk mencegah browser mengirim OPTIONS preflight)
     try {
-      final response = await http.post(
+      final response = await _client.post(
         uri,
         headers: {
           'Content-Type': 'text/plain;charset=utf-8',
         },
         body: bodyJson,
-      );
+      ).timeout(const Duration(seconds: 20));
 
       // Tangani redirect 302/301/307/308
       if (response.statusCode >= 300 && response.statusCode < 400) {
         final redirectUrl = response.headers['location'];
         if (redirectUrl != null) {
-          final redirectedResponse = await http.get(Uri.parse(redirectUrl));
+          final redirectedResponse = await _client.get(Uri.parse(redirectUrl)).timeout(const Duration(seconds: 20));
           if (redirectedResponse.statusCode == 200) {
             return jsonDecode(redirectedResponse.body) as Map<String, dynamic>;
           }
@@ -143,7 +146,7 @@ class SheetsSyncService {
         },
       );
 
-      final getResponse = await http.get(getUri);
+      final getResponse = await _client.get(getUri).timeout(const Duration(seconds: 20));
       if (getResponse.statusCode == 200) {
         try {
           return jsonDecode(getResponse.body) as Map<String, dynamic>;
@@ -163,10 +166,10 @@ class SheetsSyncService {
       try {
         final httpClient = HttpClient();
         httpClient.connectionTimeout = const Duration(seconds: 15);
-        final request = await httpClient.postUrl(uri);
+        final request = await httpClient.postUrl(uri).timeout(const Duration(seconds: 15));
         request.headers.set('content-type', 'text/plain;charset=utf-8');
         request.add(utf8.encode(bodyJson));
-        final clientResponse = await request.close();
+        final clientResponse = await request.close().timeout(const Duration(seconds: 15));
 
         final responseBody =
             await clientResponse.transform(utf8.decoder).join();
@@ -396,43 +399,6 @@ class SheetsSyncService {
 
       final actualRekeningCount = rekeningRows.length;
       final actualOnHandCount = onHandRows.length;
-
-      // Kapasitas tabel dari config
-      final int maxRekCapacity = config.maxRekeningCapacity;
-      final int maxOnCapacity = config.maxOnHandCapacity;
-
-      // Selalu pastikan seluruh baris tabel (sampai endRow atau prevCount atau minimal 30 baris)
-      // tertimpa dengan sel kosong ("") agar Spreadsheet 100% bersih seketika
-      int targetRekRows = actualRekeningCount;
-      if (prevRekeningCount != null && prevRekeningCount > targetRekRows) {
-        targetRekRows = prevRekeningCount;
-      }
-      if (maxRekCapacity > 0 && maxRekCapacity > targetRekRows) {
-        targetRekRows = maxRekCapacity;
-      } else if (actualRekeningCount == 0 && targetRekRows < 30) {
-        targetRekRows = 30;
-      }
-
-      final padRek = targetRekRows - rekeningRows.length;
-      for (int p = 0; p < padRek; p++) {
-        rekeningRows.add(emptyTransactionRow());
-      }
-
-      int targetOnRows = actualOnHandCount;
-      if (prevOnHandCount != null && prevOnHandCount > targetOnRows) {
-        targetOnRows = prevOnHandCount;
-      }
-      if (maxOnCapacity > 0 && maxOnCapacity > targetOnRows) {
-        targetOnRows = maxOnCapacity;
-      } else if (actualOnHandCount == 0 && targetOnRows < 30) {
-        targetOnRows = 30;
-      }
-
-      final padOn = targetOnRows - onHandRows.length;
-      for (int p = 0; p < padOn; p++) {
-        onHandRows.add(emptyTransactionRow());
-      }
-
       final totalCount = actualRekeningCount + actualOnHandCount;
 
       // Pengecekan Batas Maksimal Baris (End Row) sebelum pengiriman
@@ -949,53 +915,58 @@ class SheetsSyncService {
             final p3 = int.tryParse(parts[2]) ?? fallbackDate.year;
             if (p3 > 1000) {
               parsedDate = DateTime(p3, p2, p1);
-            } else if (p1 > 1000) {
-              parsedDate = DateTime(p1, p2, p3);
             }
           }
         }
       }
     }
 
-    final kuStr = (row['ku'] ?? row['ku_onhand'] ?? '').toString().trim();
-    final kategoriStr = (row['kategori'] ?? row['kategori_onhand'] ?? '').toString().trim();
-    final keteranganStr = (row['keterangan'] ?? row['keterangan_onhand'] ?? '').toString().trim();
+    final rawKu = (row['ku'] ?? row['ku_onhand'] ?? '').toString().trim();
+    final rawKategori = (row['kategori'] ?? row['kategori_onhand'] ?? '').toString().trim();
+    final rawKeterangan = (row['keterangan'] ?? row['keterangan_onhand'] ?? '').toString().trim();
 
-    int parseAmount(dynamic val) {
+    num parseAmount(dynamic val) {
       if (val == null) return 0;
-      if (val is num) return val.toInt();
+      if (val is num) return val;
       final str = val.toString().trim();
       if (str.isEmpty || str == '-') return 0;
       final d = double.tryParse(str.replaceAll(',', ''));
-      if (d != null) return d.toInt();
+      if (d != null) return d;
       final clean = str.replaceAll(RegExp(r'[^0-9]'), '');
-      return int.tryParse(clean) ?? 0;
+      return num.tryParse(clean) ?? 0;
     }
 
     final debit = parseAmount(row['debit'] ?? row['debit_onhand']);
     final kredit = parseAmount(row['kredit'] ?? row['kredit_onhand']);
 
-    if (debit == 0 && kredit == 0 && keteranganStr.isEmpty && kategoriStr.isEmpty && kuStr.isEmpty) {
+    if (debit == 0 && kredit == 0 && rawKeterangan.isEmpty) {
       return null;
     }
 
-    final rawNo = (row['no'] ?? row['no_onhand'] ?? '').toString().trim();
-    final title = keteranganStr.isNotEmpty
-        ? keteranganStr
-        : (kategoriStr.isNotEmpty ? kategoriStr : (rawNo.isNotEmpty ? 'Transaksi #$rawNo' : 'Transaksi dari Spreadsheet'));
-    final targetAcc = isRekening ? 'rekening' : 'debit';
-    final sourceAcc = isRekening ? 'rekening' : 'debit';
+    final bool isPemasukan = debit > 0;
+    final num amount = isPemasukan ? debit : (kredit > 0 ? kredit : 0);
 
-    final isIncome = debit > 0;
-    final amount = isIncome ? debit : (kredit > 0 ? kredit : 0);
+    String note = rawKeterangan;
+    String title = rawKeterangan;
+
+    final regexSubtitle = RegExp(r'^(.*?)\s*\((.*?)\)$');
+    final match = regexSubtitle.firstMatch(rawKeterangan);
+    if (match != null) {
+      title = match.group(1)?.trim() ?? rawKeterangan;
+      note = match.group(2)?.trim() ?? '';
+    }
+
+    final kuStr = rawKu.isNotEmpty && rawKu != '-' ? rawKu : '';
+    final kategoriStr = rawKategori.isNotEmpty && rawKategori != '-' ? rawKategori : '';
+    final keteranganStr = rawKeterangan.isNotEmpty && rawKeterangan != '-' ? rawKeterangan : '';
 
     return StrukturTransaction(
-      id: '${parsedDate.millisecondsSinceEpoch}_${rawNo.isNotEmpty ? rawNo : DateTime.now().microsecondsSinceEpoch}',
-      title: title,
-      type: isIncome ? 'pemasukan' : 'pengeluaran',
+      id: 'sheet_${isRekening ? "rek" : "onhand"}_${parsedDate.millisecondsSinceEpoch}_${title.hashCode.abs()}',
+      title: title.isNotEmpty ? title : 'Transaksi',
+      type: isPemasukan ? 'pemasukan' : 'pengeluaran',
+      targetAccount: isPemasukan ? (isRekening ? 'rekening' : 'cash') : null,
+      sourceAccount: !isPemasukan ? (isRekening ? 'rekening' : 'cash') : null,
       amount: amount,
-      sourceAccount: isIncome ? null : sourceAcc,
-      targetAccount: isIncome ? targetAcc : null,
       ku: kuStr.isNotEmpty && kuStr != '-' ? kuStr : null,
       kode: kategoriStr.isNotEmpty && kategoriStr != '-' ? kategoriStr : null,
       note: keteranganStr,
@@ -1314,7 +1285,7 @@ function processRequest(data) {
       return incomingVal;
     }
 
-    // Helper penulisan sel SATU KOLOM KHUSUS yang cepat & aman terhadap aturan Validasi
+    // Helper penulisan sel SATU KOLOM KHUSUS yang aman jika terjadi fallback validasi
     function safeWriteSingleColumn(targetSheet, startRowIdx, colIdx, valuesArray) {
       if (!valuesArray || valuesArray.length === 0 || colIdx <= 0) return;
       var numRows = valuesArray.length;
@@ -1370,6 +1341,67 @@ function processRequest(data) {
               cell.clearContent();
             }
           }
+        }
+      }
+    }
+
+    // Helper penulisan SATU BLOK TABEL UTUH secara batch (1 Round-trip, Super Cepat)
+    function safeWriteTableBlock(targetSheet, startRowIdx, activeMappingObj, rowsArray, fieldsList) {
+      if (!rowsArray || rowsArray.length === 0) return;
+      var numRows = rowsArray.length;
+      
+      var colMap = {};
+      var minCol = 999999;
+      var maxCol = 0;
+      for (var i = 0; i < fieldsList.length; i++) {
+        var f = fieldsList[i];
+        var c = activeMappingObj[f];
+        if (c && c > 0) {
+          colMap[f] = c;
+          if (c < minCol) minCol = c;
+          if (c > maxCol) maxCol = c;
+        }
+      }
+      if (maxCol <= 0 || minCol > maxCol) return;
+      
+      var numCols = maxCol - minCol + 1;
+      var gridRange = targetSheet.getRange(startRowIdx, minCol, numRows, numCols);
+      var gridValues;
+      if (numCols > Object.keys(colMap).length) {
+        gridValues = gridRange.getValues();
+      } else {
+        gridValues = new Array(numRows);
+        for (var r = 0; r < numRows; r++) {
+          gridValues[r] = new Array(numCols);
+          for (var c = 0; c < numCols; c++) {
+            gridValues[r][c] = "";
+          }
+        }
+      }
+      
+      for (var r = 0; r < numRows; r++) {
+        var item = rowsArray[r];
+        for (var f in colMap) {
+          var cIdx = colMap[f];
+          var offset = cIdx - minCol;
+          var val = (item[f] !== undefined && item[f] !== null) ? item[f] : "";
+          gridValues[r][offset] = val;
+        }
+      }
+      
+      try {
+        gridRange.setValues(gridValues);
+        return;
+      } catch (err) {
+        // Fallback jika ada validasi ketat
+        for (var field in colMap) {
+          var colIdx = colMap[field];
+          var colArray = [];
+          for (var r = 0; r < numRows; r++) {
+            var val = (rowsArray[r][field] !== undefined && rowsArray[r][field] !== null) ? rowsArray[r][field] : "";
+            colArray.push([val]);
+          }
+          safeWriteSingleColumn(targetSheet, startRowIdx, colIdx, colArray);
         }
       }
     }
@@ -1467,13 +1499,17 @@ function processRequest(data) {
         rowsToClear++;
       }
 
-      // Hapus seluruh baris dalam rentang tabel yang aman
+      // Hapus seluruh baris dalam rentang tabel yang aman dalam 1 operasi batch
       if (rowsToClear > 0) {
-        for (var j = 0; j < colIndices.length; j++) {
-          var col = colIndices[j];
-          try {
-            targetSheet.getRange(checkStartRow, col, rowsToClear, 1).clearContent();
-          } catch (eC) {}
+        try {
+          targetSheet.getRange(checkStartRow, minCol, rowsToClear, numCols).clearContent();
+        } catch (eC) {
+          for (var j = 0; j < colIndices.length; j++) {
+            var col = colIndices[j];
+            try {
+              targetSheet.getRange(checkStartRow, col, rowsToClear, 1).clearContent();
+            } catch (e2) {}
+          }
         }
       }
     }
@@ -1502,7 +1538,7 @@ function processRequest(data) {
         }
       }
 
-      // 1. Bersihkan sisa baris lama untuk kedua tabel secara aman
+      // 1. Bersihkan sisa baris lama untuk kedua tabel secara aman dalam 1 operasi batch
       if (clearFirst) {
         var defaultEvRow = parseInt(data.targetRow) || 60;
         var evRowMap = data.rowMapping || {};
@@ -1510,32 +1546,14 @@ function processRequest(data) {
         clearOldTransactionData(sheet, targetStartRowOnHand, activeOnHandMapping, onHandRows.length, evRowMap, defaultEvRow, targetEndRowOnHand);
       }
       
-      // 2. Tulis data transaksi Rekening
+      // 2. Tulis data transaksi Rekening secara batch (1 Round-trip)
       if (rekeningRows.length > 0) {
-        for (var field in activeRekeningMapping) {
-          var colIdx = activeRekeningMapping[field];
-          var colArray = [];
-          for (var r = 0; r < rekeningRows.length; r++) {
-            var item = rekeningRows[r];
-            var val = (item[field] !== undefined && item[field] !== null) ? item[field] : "";
-            colArray.push([val]);
-          }
-          safeWriteSingleColumn(sheet, targetStartRowRekening, colIdx, colArray);
-        }
+        safeWriteTableBlock(sheet, targetStartRowRekening, activeRekeningMapping, rekeningRows, REKENING_FIELDS);
       }
       
-      // 3. Tulis data transaksi Cash On Hand
+      // 3. Tulis data transaksi Cash On Hand secara batch (1 Round-trip)
       if (onHandRows.length > 0) {
-        for (var field in activeOnHandMapping) {
-          var colIdx = activeOnHandMapping[field];
-          var colArray = [];
-          for (var r = 0; r < onHandRows.length; r++) {
-            var item = onHandRows[r];
-            var val = (item[field] !== undefined && item[field] !== null) ? item[field] : "";
-            colArray.push([val]);
-          }
-          safeWriteSingleColumn(sheet, targetStartRowOnHand, colIdx, colArray);
-        }
+        safeWriteTableBlock(sheet, targetStartRowOnHand, activeOnHandMapping, onHandRows, ONHAND_FIELDS);
       }
       
       var totalCount = rekeningRows.length + onHandRows.length;
@@ -1954,6 +1972,9 @@ function processRequest(data) {
 }
 
 function jsonResponse(obj) {
+  try {
+    SpreadsheetApp.flush();
+  } catch (eFlush) {}
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
