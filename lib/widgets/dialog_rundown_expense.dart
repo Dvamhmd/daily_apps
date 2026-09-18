@@ -1082,21 +1082,15 @@ class _DialogTambahEstimasiState extends State<DialogTambahEstimasi> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Masukkan nama dan nominal estimasi biaya. Kamu bisa menambah banyak item sekaligus:',
-              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-            ),
-            const SizedBox(height: 14),
-
             // Dynamic Rows
             ...List.generate(_rows.length, (index) {
               final row = _rows[index];
               return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(10),
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
                 child: Row(
@@ -1107,44 +1101,46 @@ class _DialogTambahEstimasiState extends State<DialogTambahEstimasi> {
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF64748B),
-                        fontSize: 13,
+                        fontSize: 12,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     // Nama
                     Expanded(
                       flex: 3,
                       child: TextField(
                         controller: row.namaCtrl,
                         textCapitalization: TextCapitalization.words,
+                        style: const TextStyle(fontSize: 12.5),
                         decoration: InputDecoration(
-                          hintText: 'Nama (misal: Bensin)',
+                          hintText: 'Nama',
                           hintStyle: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             color: Color(0xFF94A3B8),
                           ),
                           isDense: true,
                           contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 10,
+                            horizontal: 8,
+                            vertical: 7,
                           ),
                           filled: true,
                           fillColor: Colors.white,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(6),
                             borderSide:
                                 const BorderSide(color: Color(0xFFCBD5E1)),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     // Nominal
                     Expanded(
                       flex: 3,
                       child: TextField(
                         controller: row.nominalCtrl,
                         keyboardType: TextInputType.number,
+                        style: const TextStyle(fontSize: 12.5),
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
                           RupiahInputFormatter(),
@@ -1152,18 +1148,18 @@ class _DialogTambahEstimasiState extends State<DialogTambahEstimasi> {
                         decoration: InputDecoration(
                           hintText: 'Nominal',
                           hintStyle: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             color: Color(0xFF94A3B8),
                           ),
                           isDense: true,
                           contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 10,
+                            horizontal: 8,
+                            vertical: 7,
                           ),
                           filled: true,
                           fillColor: Colors.white,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(6),
                             borderSide:
                                 const BorderSide(color: Color(0xFFCBD5E1)),
                           ),
@@ -1177,10 +1173,10 @@ class _DialogTambahEstimasiState extends State<DialogTambahEstimasi> {
                         icon: const Icon(
                           Icons.remove_circle_outline_rounded,
                           color: Colors.redAccent,
-                          size: 20,
+                          size: 18,
                         ),
                         constraints: const BoxConstraints(),
-                        padding: const EdgeInsets.all(4),
+                        padding: const EdgeInsets.all(2),
                         tooltip: 'Hapus Baris',
                       ),
                     ],
@@ -1189,18 +1185,18 @@ class _DialogTambahEstimasiState extends State<DialogTambahEstimasi> {
               );
             }),
 
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             // Tombol Tambah Baris Lagi
             TextButton.icon(
               onPressed: _addRow,
               style: TextButton.styleFrom(
                 foregroundColor: primaryTeal,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               ),
-              icon: const Icon(Icons.add_rounded, size: 18),
+              icon: const Icon(Icons.add_rounded, size: 16),
               label: const Text(
                 '+ Tambah Baris Input Lainnya',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
               ),
             ),
           ],
