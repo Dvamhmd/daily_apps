@@ -277,7 +277,10 @@ class _RiwayatPageState extends State<RiwayatPage> {
           const SizedBox(width: 8),
         ],
       ),
-      body: ResponsiveContentWrapper(
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        child: ResponsiveContentWrapper(
         maxWidth: 720,
         child: Column(
           children: [
@@ -414,7 +417,8 @@ class _RiwayatPageState extends State<RiwayatPage> {
         ],
       ),
     ),
-  );
+  ),
+);
 }
 
   Widget _buildFilterChip(String title, int count) {

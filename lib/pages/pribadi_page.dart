@@ -3240,31 +3240,35 @@ class _PribadiPageState extends State<PribadiPage> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: primaryBlue))
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              color: primaryBlue,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildMonthSelectorBar(monthLabel),
-                    const SizedBox(height: 12),
-                    _buildTotalBanner(),
-                    const SizedBox(height: 12),
-                    _buildActionButtonsHub(),
-                    const SizedBox(height: 12),
-                    _buildCardPosDana(),
-                    const SizedBox(height: 18),
-                    _buildTabelKeuangan(),
-                  ],
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: primaryBlue))
+            : RefreshIndicator(
+                onRefresh: _loadData,
+                color: primaryBlue,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildMonthSelectorBar(monthLabel),
+                      const SizedBox(height: 12),
+                      _buildTotalBanner(),
+                      const SizedBox(height: 12),
+                      _buildActionButtonsHub(),
+                      const SizedBox(height: 12),
+                      _buildCardPosDana(),
+                      const SizedBox(height: 18),
+                      _buildTabelKeuangan(),
+                    ],
+                  ),
                 ),
               ),
-            ),
+      ),
     );
   }
 

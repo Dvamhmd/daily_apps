@@ -683,9 +683,12 @@ class _SeriousPunishmentConfigPageState
           const SizedBox(width: 8),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: accentGold))
-          : ListView(
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: accentGold))
+            : ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               children: [
                 // Top Info Banner
@@ -822,6 +825,7 @@ class _SeriousPunishmentConfigPageState
                 const SizedBox(height: 30),
               ],
             ),
+      ),
     );
   }
 

@@ -3024,7 +3024,10 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
         currentIndex: 2,
         onPageSelected: widget.onPageSelected,
       ),
-      body: AnimatedSwitcher(
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 320),
         switchInCurve: Curves.easeOutCubic,
         switchOutCurve: Curves.easeInCubic,
@@ -3210,6 +3213,7 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                   ),
               ],
             ),
+        ),
       ),
     );
   }

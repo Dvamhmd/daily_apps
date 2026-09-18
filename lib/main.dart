@@ -22,17 +22,31 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    await initializeDateFormatting('id_ID', null);
+  } catch (_) {}
 
   if (!kIsWeb) {
     try {
       SystemChrome.setEnabledSystemUIMode(
-        SystemUiMode.manual,
-        overlays: SystemUiOverlay.values,
+        SystemUiMode.edgeToEdge,
+      );
+      SystemChrome.setSystemUIOverlayStyle(
+        const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarDividerColor: Colors.transparent,
+          systemNavigationBarIconBrightness: Brightness.dark,
+        ),
       );
     } catch (_) {}
   }
@@ -514,6 +528,53 @@ class _KeuanganPageState extends State<KeuanganPage> {
     return (danaAman / sisa).floor();
   }
 
+  static String formatTanggalIndoLengkap(DateTime date) {
+    const hari = [
+      'Senin',
+      'Selasa',
+      'Rabu',
+      'Kamis',
+      'Jumat',
+      'Sabtu',
+      'Minggu',
+    ];
+    const bulan = [
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
+    ];
+    final namaHari = hari[date.weekday - 1];
+    final namaBulan = bulan[date.month - 1];
+    return '$namaHari, ${date.day} $namaBulan ${date.year}';
+  }
+
+  static String formatTanggalIndoSingkat(DateTime date) {
+    const bulan = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des',
+    ];
+    return '${date.day} ${bulan[date.month - 1]} ${date.year}';
+  }
+
   String formatTanggal(DateTime date) {
     const bulan = [
       'Januari',
@@ -762,75 +823,6 @@ class _KeuanganPageState extends State<KeuanganPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Quick Preset Chips
-                    const Text(
-                      'Pilihan Cepat Periode:',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF424242),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        _buildPresetChip(
-                          label: 'Bulan Ini',
-                          onTap: () {
-                            setDialogState(() {
-                              tempStart = DateTime(today.year, today.month, 1);
-                              tempEnd = DateTime(today.year, today.month + 1, 0);
-                            });
-                          },
-                        ),
-                        _buildPresetChip(
-                          label: 'Gajian 25-24',
-                          onTap: () {
-                            setDialogState(() {
-                              if (today.day >= 25) {
-                                tempStart = DateTime(today.year, today.month, 25);
-                                tempEnd = DateTime(today.year, today.month + 1, 24);
-                              } else {
-                                tempStart = DateTime(today.year, today.month - 1, 25);
-                                tempEnd = DateTime(today.year, today.month, 24);
-                              }
-                            });
-                          },
-                        ),
-                        _buildPresetChip(
-                          label: '7 Hari',
-                          onTap: () {
-                            setDialogState(() {
-                              tempStart = today;
-                              tempEnd = today.add(const Duration(days: 6));
-                            });
-                          },
-                        ),
-                        _buildPresetChip(
-                          label: '14 Hari',
-                          onTap: () {
-                            setDialogState(() {
-                              tempStart = today;
-                              tempEnd = today.add(const Duration(days: 13));
-                            });
-                          },
-                        ),
-                        _buildPresetChip(
-                          label: '30 Hari',
-                          onTap: () {
-                            setDialogState(() {
-                              tempStart = today;
-                              tempEnd = today.add(const Duration(days: 29));
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 16),
-
                     // Start Date Picker Card
                     const Text(
                       'Tanggal Mulai (Start):',
@@ -879,8 +871,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                DateFormat('EEEE, dd MMMM yyyy', 'id_ID')
-                                    .format(tempStart),
+                                formatTanggalIndoLengkap(tempStart),
                                 style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
@@ -947,8 +938,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                DateFormat('EEEE, dd MMMM yyyy', 'id_ID')
-                                    .format(tempEnd),
+                                formatTanggalIndoLengkap(tempEnd),
                                 style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
@@ -1062,15 +1052,6 @@ class _KeuanganPageState extends State<KeuanganPage> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Keterangan: Rumus = Dana Aman ÷ Sisa Hari. Saat hari berganti, limit harian akan otomatis menyesuaikan secara dinamis.',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey[600],
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -1150,34 +1131,6 @@ class _KeuanganPageState extends State<KeuanganPage> {
           },
         );
       },
-    );
-  }
-
-  Widget _buildPresetChip({
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: const Color(0xFF5E35B1).withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: const Color(0xFF5E35B1).withValues(alpha: 0.25),
-          ),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF5E35B1),
-          ),
-        ),
-      ),
     );
   }
 
@@ -1477,33 +1430,11 @@ class _KeuanganPageState extends State<KeuanganPage> {
                 ),
               ),
               Text(
-                's/d ${DateFormat('dd MMM yyyy').format(limitHarianEndDate!)}',
+                's/d ${formatTanggalIndoSingkat(limitHarianEndDate!)}',
                 style: const TextStyle(
                   fontSize: 10,
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              const Icon(
-                Icons.auto_awesome_rounded,
-                size: 11,
-                color: Color(0xFFA7F3D0),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  'Kalkulasi: ${RupiahFormatter.format(danaAman)} ÷ $sisa hari = ${RupiahFormatter.format(limit)}/hari',
-                  style: const TextStyle(
-                    fontSize: 9.5,
-                    color: Color(0xFFA7F3D0),
-                    fontWeight: FontWeight.w500,
-                  ),
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -2410,8 +2341,11 @@ class _KeuanganPageState extends State<KeuanganPage> {
           const SizedBox(width: 6),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
         child: ResponsiveContentWrapper(
           maxWidth: 680,
           child: Column(
@@ -2802,6 +2736,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }

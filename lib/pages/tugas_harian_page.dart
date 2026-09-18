@@ -427,7 +427,10 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
           ),
         ],
       ),
-      body: AnimatedSwitcher(
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
         switchInCurve: Curves.easeOutCubic,
         switchOutCurve: Curves.easeInCubic,
@@ -550,6 +553,7 @@ class _TugasHarianPageState extends State<TugasHarianPage> {
                 ),
               ),
             ),
+        ),
       ),
     );
   }

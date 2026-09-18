@@ -7990,57 +7990,61 @@ class _StrukturPageState extends State<StrukturPage> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: primaryPurple),
-            )
-          : SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 0. Geser Bulan Bar (Bulan & Tahun Selector)
-                  _buildMonthSelectorBar(),
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: primaryPurple),
+              )
+            : SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 0. Geser Bulan Bar (Bulan & Tahun Selector)
+                    _buildMonthSelectorBar(),
 
-                  const SizedBox(height: 10),
+                    const SizedBox(height: 10),
 
-                  // 1. Banner Total Dana Struktur & Cash Flow
-                  _buildTotalBanner(),
+                    // 1. Banner Total Dana Struktur & Cash Flow
+                    _buildTotalBanner(),
 
-                  const SizedBox(height: 10),
+                    const SizedBox(height: 10),
 
-                  // 2. Hub Tombol Aksi Distribusi & Alokasi Dana
-                  _buildActionButtonsHub(),
+                    // 2. Hub Tombol Aksi Distribusi & Alokasi Dana
+                    _buildActionButtonsHub(),
 
-                  const SizedBox(height: 10),
+                    const SizedBox(height: 10),
 
-                  // 3. Kartu Rekening Struktur & Dana On Hand (Bersampingan Kanan Kiri)
-                  IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: _buildRekeningStrukturCard(),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _buildOnHandCard(),
-                        ),
-                      ],
+                    // 3. Kartu Rekening Struktur & Dana On Hand (Bersampingan Kanan Kiri)
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: _buildRekeningStrukturCard(),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _buildOnHandCard(),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 10),
+                    const SizedBox(height: 10),
 
-                  // 4. Tabel Keuangan (Nama Bulan)
-                  _buildTabelKeuangan(),
+                    // 4. Tabel Keuangan (Nama Bulan)
+                    _buildTabelKeuangan(),
 
-                  const SizedBox(height: 24),
-                ],
+                    const SizedBox(height: 24),
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 

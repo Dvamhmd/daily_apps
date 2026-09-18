@@ -369,7 +369,10 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
           ],
         ),
       ),
-      body: AnimatedSwitcher(
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
         switchInCurve: Curves.easeOutCubic,
         switchOutCurve: Curves.easeInCubic,
@@ -418,6 +421,7 @@ class _DailyProductivityPageState extends State<DailyProductivityPage> {
                 ),
               ),
             ),
+        ),
       ),
     );
   }

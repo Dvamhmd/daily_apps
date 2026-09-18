@@ -2200,37 +2200,41 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        physics: (_isPinching || _isResizingColumn || _isResizingRow)
-            ? const NeverScrollableScrollPhysics()
-            : const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-        child: ResponsiveContentWrapper(
-          maxWidth: 850,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Theme Header & Day Navigation
-              if (activeDay != null) ...[
-                _buildDayThemeHeader(activeDay),
-                const SizedBox(height: 12),
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        child: SingleChildScrollView(
+          physics: (_isPinching || _isResizingColumn || _isResizingRow)
+              ? const NeverScrollableScrollPhysics()
+              : const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+          child: ResponsiveContentWrapper(
+            maxWidth: 850,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. Theme Header & Day Navigation
+                if (activeDay != null) ...[
+                  _buildDayThemeHeader(activeDay),
+                  const SizedBox(height: 12),
 
-                // 2. Table Toolbar (Select All, Add Row, Delete Row, Add Column, Toggle Resize Mode)
-                _buildTableToolbar(activeDay),
+                  // 2. Table Toolbar (Select All, Add Row, Delete Row, Add Column, Toggle Resize Mode)
+                  _buildTableToolbar(activeDay),
 
-                const SizedBox(height: 10),
+                  const SizedBox(height: 10),
 
-                // Zoom & Scale Control Bar
-                _buildZoomControlBar(),
+                  // Zoom & Scale Control Bar
+                  _buildZoomControlBar(),
 
-                const SizedBox(height: 10),
+                  const SizedBox(height: 10),
 
-                // 3. Interactive Editable Table (Zoomable)
-                _buildInteractiveTable(activeDay),
+                  // 3. Interactive Editable Table (Zoomable)
+                  _buildInteractiveTable(activeDay),
+                ],
+
+                const SizedBox(height: 80),
               ],
-
-              const SizedBox(height: 80),
-            ],
+            ),
           ),
         ),
       ),

@@ -203,11 +203,14 @@ class _RundownPageState extends State<RundownPage> {
         currentIndex: 1, // Rundown index
         onPageSelected: widget.onPageSelected,
       ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: primaryTeal),
-            )
-          : SingleChildScrollView(
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: primaryTeal),
+              )
+            : SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
               child: ResponsiveContentWrapper(
@@ -263,6 +266,7 @@ class _RundownPageState extends State<RundownPage> {
                 ),
               ),
             ),
+      ),
     );
   }
 
