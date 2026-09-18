@@ -741,10 +741,13 @@ class _KeuanganPageState extends State<KeuanganPage> {
     }
   }
 
-  void showDialogAturLimitHarian() {
+  void showPengaturanDanaAman() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
+    String tempMode = danaAmanFilterMode;
+    DateTime? tempCutoff = danaAmanCutoffDate;
+    bool tempLimitEnabled = limitHarianEnabled;
     DateTime tempStart = limitHarianStartDate ??
         DateTime(selectedMonth.year, selectedMonth.month, 1);
     DateTime tempEnd = limitHarianEndDate ??
@@ -755,8 +758,39 @@ class _KeuanganPageState extends State<KeuanganPage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            // Helper simulasi perhitungan live dalam dialog
-            final calcStart = DateTime(tempStart.year, tempStart.month, tempStart.day);
+            // Helper simulasi tagihan & dana aman live
+            int calcSimulatedTagihan(String mode, DateTime? cutoff) {
+              if (mode == 'has_deadline') {
+                int sum = 0;
+                for (final t in tagihanList) {
+                  if (t.deadline != null) sum += t.jumlah;
+                }
+                return sum;
+              } else if (mode == 'custom_date' && cutoff != null) {
+                final cutoffDt = DateTime(
+                    cutoff.year, cutoff.month, cutoff.day, 23, 59, 59);
+                final cutoffDateOnly =
+                    DateTime(cutoff.year, cutoff.month, cutoff.day);
+                int sum = 0;
+                for (final t in tagihanList) {
+                  if (t.deadline == null) continue;
+                  final d = DateTime(
+                      t.deadline!.year, t.deadline!.month, t.deadline!.day);
+                  if (d.isBefore(cutoffDt) ||
+                      d.isAtSameMomentAs(cutoffDateOnly)) {
+                    sum += t.jumlah;
+                  }
+                }
+                return sum;
+              }
+              return totalTagihan;
+            }
+
+            final simTagihan = calcSimulatedTagihan(tempMode, tempCutoff);
+            final simDanaAman = totalUangkuDihitung - simTagihan;
+
+            final calcStart =
+                DateTime(tempStart.year, tempStart.month, tempStart.day);
             final calcEnd = DateTime(tempEnd.year, tempEnd.month, tempEnd.day);
             final totalHari = calcEnd.difference(calcStart).inDays + 1;
 
@@ -769,16 +803,17 @@ class _KeuanganPageState extends State<KeuanganPage> {
               sisaHari = calcEnd.difference(today).inDays + 1;
             }
 
-            final int estimasiLimit = (sisaHari > 0 && danaAman > 0)
-                ? (danaAman / sisaHari).floor()
+            final int estimasiLimit = (sisaHari > 0 && simDanaAman > 0)
+                ? (simDanaAman / sisaHari).floor()
                 : 0;
 
             return AlertDialog(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
               ),
-              titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
               title: Row(
                 children: [
                   Container(
@@ -788,7 +823,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
-                      Icons.speed_rounded,
+                      Icons.tune_rounded,
                       color: Color(0xFF5E35B1),
                       size: 22,
                     ),
@@ -799,14 +834,14 @@ class _KeuanganPageState extends State<KeuanganPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Limit Pengeluaran Harian',
+                          'Pengaturan Dana Aman',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                           ),
                         ),
                         Text(
-                          'Bagi dana aman sesuai hari tersisa',
+                          'Deadline tagihan & limit pengeluaran',
                           style: TextStyle(
                             fontSize: 11,
                             color: Colors.grey,
@@ -818,306 +853,484 @@ class _KeuanganPageState extends State<KeuanganPage> {
                   ),
                 ],
               ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Start Date Picker Card
-                    const Text(
-                      'Tanggal Mulai (Start):',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF616161),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: tempStart,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2100),
-                        );
-                        if (picked != null) {
-                          setDialogState(() {
-                            tempStart = picked;
-                            if (tempEnd.isBefore(tempStart)) {
-                              tempEnd = tempStart;
-                            }
-                          });
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // SECTION 1: FILTER DEADLINE TAGIHAN
+                      Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 11),
+                            horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF3E5F5).withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: const Color(0xFF5E35B1).withValues(alpha: 0.25),
-                          ),
+                          color: const Color(0xFF5E35B1)
+                              .withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Row(
+                        child: const Row(
                           children: [
-                            const Icon(
-                              Icons.play_circle_outline_rounded,
-                              size: 18,
+                            Icon(
+                              Icons.filter_alt_outlined,
+                              size: 15,
                               color: Color(0xFF5E35B1),
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                formatTanggalIndoLengkap(tempStart),
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF311B92),
-                                ),
-                              ),
-                            ),
-                            const Icon(
-                              Icons.edit_calendar_rounded,
-                              size: 16,
-                              color: Color(0xFF5E35B1),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // End Date Picker Card
-                    const Text(
-                      'Tanggal Selesai (End):',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF616161),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: tempEnd.isBefore(tempStart)
-                              ? tempStart
-                              : tempEnd,
-                          firstDate: tempStart,
-                          lastDate: DateTime(2100),
-                        );
-                        if (picked != null) {
-                          setDialogState(() {
-                            tempEnd = picked;
-                          });
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 11),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEDE7F6),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: const Color(0xFF5E35B1).withValues(alpha: 0.4),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.flag_outlined,
-                              size: 18,
-                              color: Color(0xFF5E35B1),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                formatTanggalIndoLengkap(tempEnd),
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF311B92),
-                                ),
-                              ),
-                            ),
-                            const Icon(
-                              Icons.edit_calendar_rounded,
-                              size: 16,
-                              color: Color(0xFF5E35B1),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Live Simulation Card
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            const Color(0xFF5E35B1).withValues(alpha: 0.08),
-                            const Color(0xFF7E57C2).withValues(alpha: 0.12),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: const Color(0xFF5E35B1).withValues(alpha: 0.2),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.calculate_outlined,
-                                size: 16,
+                            SizedBox(width: 6),
+                            Text(
+                              'Opsi Deadline Tagihan',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
                                 color: Color(0xFF5E35B1),
                               ),
-                              const SizedBox(width: 6),
-                              const Text(
-                                'Simulasi Limit Harian',
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      RadioGroup<String>(
+                        groupValue: tempMode,
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() {
+                              tempMode = val;
+                              if (tempMode == 'custom_date') {
+                                tempCutoff ??= DateTime.now();
+                              }
+                            });
+                          }
+                        },
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            RadioListTile<String>(
+                              contentPadding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                              value: 'all',
+                              activeColor: const Color(0xFF5E35B1),
+                              title: const Text(
+                                'Semua Tagihan (Default)',
                                 style: TextStyle(
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              subtitle: const Text(
+                                'Semua tagihan akan mengurangi uangku',
+                                style: TextStyle(fontSize: 11),
+                              ),
+                            ),
+                            const Divider(height: 8),
+                            RadioListTile<String>(
+                              contentPadding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                              value: 'has_deadline',
+                              activeColor: const Color(0xFF5E35B1),
+                              title: const Text(
+                                'Hanya Tagihan Berdeadline',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              subtitle: const Text(
+                                'Hanya tagihan yang memiliki deadline yang mengurangi uangku',
+                                style: TextStyle(fontSize: 11),
+                              ),
+                            ),
+                            const Divider(height: 8),
+                            RadioListTile<String>(
+                              contentPadding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                              value: 'custom_date',
+                              activeColor: const Color(0xFF5E35B1),
+                              title: const Text(
+                                'Sesuaikan Batas Deadline',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              subtitle: const Text(
+                                'Hanya tagihan dengan deadline s/d tanggal batas',
+                                style: TextStyle(fontSize: 11),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (tempMode == 'custom_date') ...[
+                        const SizedBox(height: 4),
+                        InkWell(
+                          onTap: () async {
+                            final now = DateTime.now();
+                            final today =
+                                DateTime(now.year, now.month, now.day);
+                            final initial = (tempCutoff != null &&
+                                    !tempCutoff!.isBefore(today))
+                                ? tempCutoff!
+                                : today;
+
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: initial,
+                              firstDate: today,
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) {
+                              setDialogState(() {
+                                tempCutoff = picked;
+                              });
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 9,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3E5F5)
+                                  .withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: const Color(0xFF5E35B1)
+                                    .withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.calendar_month_rounded,
+                                  size: 16,
+                                  color: Color(0xFF5E35B1),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    tempCutoff == null
+                                        ? 'Pilih Tanggal Batas'
+                                        : 's/d ${DateFormat('dd MMMM yyyy').format(tempCutoff!)}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF5E35B1),
+                                    ),
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.edit_calendar_rounded,
+                                  size: 16,
+                                  color: Color(0xFF5E35B1),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Divider(),
+                      ),
+
+                      // SECTION 2: LIMIT PENGELUARAN HARIAN
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF5E35B1)
+                              .withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.speed_rounded,
+                              size: 15,
+                              color: Color(0xFF5E35B1),
+                            ),
+                            const SizedBox(width: 6),
+                            const Expanded(
+                              child: Text(
+                                'Limit Pengeluaran Harian',
+                                style: TextStyle(
                                   fontSize: 12,
+                                  fontWeight: FontWeight.bold,
                                   color: Color(0xFF5E35B1),
                                 ),
                               ),
-                              const Spacer(),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF5E35B1),
-                                  borderRadius: BorderRadius.circular(6),
+                            ),
+                            Transform.scale(
+                              scale: 0.8,
+                              child: Switch.adaptive(
+                                value: tempLimitEnabled,
+                                activeColor: const Color(0xFF5E35B1),
+                                onChanged: (val) {
+                                  setDialogState(() {
+                                    tempLimitEnabled = val;
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      if (tempLimitEnabled) ...[
+                        const SizedBox(height: 10),
+
+                        // Date Range Picker Card
+                        const Text(
+                          'Rentang Tanggal (Start — End):',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF616161),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        InkWell(
+                          onTap: () async {
+                            final picked = await showDateRangePicker(
+                              context: context,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2100),
+                              initialDateRange: DateTimeRange(
+                                start: tempStart,
+                                end: tempEnd.isBefore(tempStart)
+                                    ? tempStart
+                                    : tempEnd,
+                              ),
+                              saveText: 'Pilih',
+                              helpText: 'Pilih Rentang Tanggal Limit',
+                              builder: (context, child) {
+                                return Theme(
+                                  data: Theme.of(context).copyWith(
+                                    colorScheme: const ColorScheme.light(
+                                      primary: Color(0xFF5E35B1),
+                                      onPrimary: Colors.white,
+                                      surface: Colors.white,
+                                      onSurface: Colors.black87,
+                                    ),
+                                  ),
+                                  child: child!,
+                                );
+                              },
+                            );
+                            if (picked != null) {
+                              setDialogState(() {
+                                tempStart = picked.start;
+                                tempEnd = picked.end;
+                              });
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEDE7F6),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: const Color(0xFF5E35B1)
+                                    .withValues(alpha: 0.35),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.date_range_rounded,
+                                  size: 18,
+                                  color: Color(0xFF5E35B1),
                                 ),
-                                child: Text(
-                                  '$sisaHari Hari Tersisa',
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${formatTanggalIndoSingkat(tempStart)} — ${formatTanggalIndoSingkat(tempEnd)}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF311B92),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Total $totalHari hari periode (Ketuk untuk ganti rentang)',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: const Color(0xFF5E35B1)
+                                              .withValues(alpha: 0.8),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ),
-                            ],
+                                const Icon(
+                                  Icons.edit_calendar_rounded,
+                                  size: 16,
+                                  color: Color(0xFF5E35B1),
+                                ),
+                              ],
+                            ),
                           ),
-                          const Divider(height: 14),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Live Simulation Card
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                const Color(0xFF5E35B1)
+                                    .withValues(alpha: 0.08),
+                                const Color(0xFF7E57C2)
+                                    .withValues(alpha: 0.12),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFF5E35B1)
+                                  .withValues(alpha: 0.2),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'Dana Aman:',
-                                style: TextStyle(fontSize: 11, color: Colors.grey),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.calculate_outlined,
+                                    size: 16,
+                                    color: Color(0xFF5E35B1),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Text(
+                                    'Simulasi Limit Harian',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      color: Color(0xFF5E35B1),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF5E35B1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      '$sisaHari Hari Tersisa',
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              Text(
-                                RupiahFormatter.format(danaAman),
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                              const Divider(height: 14),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Dana Aman:',
+                                    style: TextStyle(
+                                        fontSize: 11, color: Colors.grey),
+                                  ),
+                                  Text(
+                                    RupiahFormatter.format(simDanaAman),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Limit / Hari:',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF424242),
+                                    ),
+                                  ),
+                                  Text(
+                                    '${RupiahFormatter.format(estimasiLimit)} / hari',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF2E7D32),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                          const SizedBox(height: 4),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Limit / Hari:',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF424242),
-                                ),
-                              ),
-                              Text(
-                                '${RupiahFormatter.format(estimasiLimit)} / hari',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF2E7D32),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
               actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               actions: [
                 Row(
                   children: [
-                    if (limitHarianEnabled) ...[
-                      TextButton.icon(
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFFD32F2F),
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            limitHarianEnabled = false;
-                          });
-                          _saveLimitHarian();
-                          Navigator.pop(context);
-                          CustomToast.showInfo(
-                            context,
-                            title: 'Limit Harian Dinonaktifkan',
-                          );
-                        },
-                        icon: const Icon(Icons.delete_outline_rounded, size: 16),
-                        label: const Text(
-                          'Nonaktifkan',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ),
-                      const Spacer(),
-                    ] else ...[
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Batal'),
-                      ),
-                      const Spacer(),
-                    ],
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Batal'),
+                    ),
+                    const Spacer(),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF5E35B1),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
+                            horizontal: 20, vertical: 10),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
                       onPressed: () {
                         setState(() {
-                          limitHarianEnabled = true;
-                          limitHarianStartDate = tempStart;
-                          limitHarianEndDate = tempEnd;
+                          danaAmanFilterMode = tempMode;
+                          danaAmanCutoffDate = tempCutoff;
+                          limitHarianEnabled = tempLimitEnabled;
+                          if (tempLimitEnabled) {
+                            limitHarianStartDate = tempStart;
+                            limitHarianEndDate = tempEnd;
+                          }
                         });
+                        _saveDanaAmanFilter();
                         _saveLimitHarian();
                         Navigator.pop(context);
                         CustomToast.showSuccess(
                           context,
-                          title: 'Limit Harian Disimpan',
-                          subtitle: 'Limit otomatis menyesuaikan tiap hari',
+                          title: 'Pengaturan Disimpan',
+                          subtitle: 'Filter & limit harian berhasil diperbarui',
                         );
                       },
                       child: const Text(
-                        'Simpan Limit',
+                        'Terapkan',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
@@ -1134,102 +1347,12 @@ class _KeuanganPageState extends State<KeuanganPage> {
     );
   }
 
+  void showDialogAturLimitHarian() => showPengaturanDanaAman();
+  void showOpsiDeadlineDanaAman() => showPengaturanDanaAman();
+
   Widget _buildLimitHarianSection() {
     if (!limitHarianEnabled || limitHarianEndDate == null) {
-      return Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.2),
-          ),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: showDialogAturLimitHarian,
-            borderRadius: BorderRadius.circular(14),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.speed_rounded,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Limit Pengeluaran Harian',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        SizedBox(height: 1),
-                        Text(
-                          'Bagi dana aman sesuai jumlah hari tersisa',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.add_rounded,
-                          size: 14,
-                          color: Color(0xFF5E35B1),
-                        ),
-                        SizedBox(width: 2),
-                        Text(
-                          'Atur',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF5E35B1),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
+      return const SizedBox.shrink();
     }
 
     final isExpired = isPeriodeLimitSelesai;
@@ -1279,7 +1402,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                 ],
               ),
               InkWell(
-                onTap: showDialogAturLimitHarian,
+                onTap: showPengaturanDanaAman,
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
                   padding:
@@ -1444,215 +1567,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
     );
   }
 
-  void showOpsiDeadlineDanaAman() {
-    String tempMode = danaAmanFilterMode;
-    DateTime? tempCutoff = danaAmanCutoffDate;
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: Row(
-                children: [
-                  const Icon(
-                    Icons.tune_rounded,
-                    color: Color(0xFF5E35B1),
-                    size: 22,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Opsi Deadline Dana Aman',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    RadioGroup<String>(
-                      groupValue: tempMode,
-                      onChanged: (val) {
-                        if (val != null) {
-                          setDialogState(() {
-                            tempMode = val;
-                            if (tempMode == 'custom_date') {
-                              tempCutoff ??= DateTime.now();
-                            }
-                          });
-                        }
-                      },
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          RadioListTile<String>(
-                            contentPadding: EdgeInsets.zero,
-                            value: 'all',
-                            activeColor: const Color(0xFF5E35B1),
-                            title: Text(
-                              'Semua Tagihan (Default)',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                              ),
-                            ),
-                            subtitle: Text(
-                              'Semua tagihan akan mengurangi uangku',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                          ),
-                          const Divider(),
-                          RadioListTile<String>(
-                            contentPadding: EdgeInsets.zero,
-                            value: 'has_deadline',
-                            activeColor: const Color(0xFF5E35B1),
-                            title: Text(
-                              'Hanya Tagihan Berdeadline',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                              ),
-                            ),
-                            subtitle: Text(
-                              'Hanya tagihan yang memiliki deadline yang mengurangi uangku',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                          ),
-                          const Divider(),
-                          RadioListTile<String>(
-                            contentPadding: EdgeInsets.zero,
-                            value: 'custom_date',
-                            activeColor: const Color(0xFF5E35B1),
-                            title: Text(
-                              'Sesuaikan Batas Deadline',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                              ),
-                            ),
-                            subtitle: Text(
-                              'Hanya tagihan dengan deadline s/d tanggal yang dipilih',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (tempMode == 'custom_date') ...[
-                      const SizedBox(height: 6),
-                      InkWell(
-                        onTap: () async {
-                          final now = DateTime.now();
-                          final today = DateTime(now.year, now.month, now.day);
-                          final initial = (tempCutoff != null &&
-                                  !tempCutoff!.isBefore(today))
-                              ? tempCutoff!
-                              : today;
-
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: initial,
-                            firstDate: today,
-                            lastDate: DateTime(2100),
-                          );
-                          if (picked != null) {
-                            setDialogState(() {
-                              tempCutoff = picked;
-                            });
-                          }
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: const Color(0xFF5E35B1)
-                                  .withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.calendar_month_rounded,
-                                size: 18,
-                                color: Color(0xFF5E35B1),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  tempCutoff == null
-                                      ? 'Pilih Tanggal Batas'
-                                      : 's/d ${DateFormat('dd/MM/yyyy').format(tempCutoff!)}',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF5E35B1),
-                                  ),
-                                ),
-                              ),
-                              const Icon(
-                                Icons.edit_calendar_rounded,
-                                size: 18,
-                                color: Color(0xFF5E35B1),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              actions: [
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF5E35B1),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        danaAmanFilterMode = tempMode;
-                        danaAmanCutoffDate = tempCutoff;
-                      });
-                      _saveDanaAmanFilter();
-                      Navigator.pop(context);
-                    },
-                    child: Text(
-                      'Terapkan',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
 
   Future<void> _loadUangku() async {
     final prefs = await SharedPreferences.getInstance();
@@ -2582,7 +2497,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                         ),
                         const SizedBox(width: 8),
                         InkWell(
-                          onTap: showOpsiDeadlineDanaAman,
+                          onTap: showPengaturanDanaAman,
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
@@ -2604,7 +2519,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
                                 ),
                                 SizedBox(width: 4),
                                 Text(
-                                  'Filter',
+                                  'Pengaturan',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
@@ -2705,10 +2620,10 @@ class _KeuanganPageState extends State<KeuanganPage> {
                       ),
                     ],
 
-                    const SizedBox(height: 12),
-
-                    // SECTION LIMIT PENGELUARAN HARIAN
-                    _buildLimitHarianSection(),
+                    if (limitHarianEnabled && limitHarianEndDate != null) ...[
+                      const SizedBox(height: 12),
+                      _buildLimitHarianSection(),
+                    ],
                   ],
                 ),
               ),

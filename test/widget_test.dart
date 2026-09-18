@@ -252,8 +252,8 @@ void main() {
       // Awalnya: semua tagihan masuk (500.000 - 120.000 = 380.000)
       expect(find.text('380.000'), findsOneWidget);
 
-      // Buka dialog penyesuaian deadline
-      await tester.tap(find.text('Filter'));
+      // Buka dialog penyesuaian deadline & limit
+      await tester.tap(find.text('Pengaturan'));
       await tester.pumpAndSettle();
 
       // Pilih hanya tagihan berdeadline
