@@ -155,16 +155,18 @@ class CustomKodeRule {
       ];
 
   static List<CustomKodeRule> k12Rules() => [
+        // 26 Aturan Kategori
         CustomKodeRule(keyword: 'DP KK', kode: 'Terima DP DTK', type: 'kategori'),
+        CustomKodeRule(keyword: 'Dana turun', kode: 'Kontribusi DP S4', type: 'kategori'),
         CustomKodeRule(keyword: 'Kirim DP ke S3', kode: 'Kirim DP DTK ke S3', type: 'kategori'),
-        CustomKodeRule(keyword: 'Dana kontribusi DP dari S3', kode: 'Kontribusi DP S4', type: 'kategori'),
-        CustomKodeRule(keyword: 'Motor', kode: 'Motor, Peralatan & Elektronik', type: 'kategori'),
-        CustomKodeRule(keyword: 'Sewa tempat', kode: 'Sewa Tempat', type: 'kategori'),
+        CustomKodeRule(keyword: 'Setor Dana Kontribusi ke S3', kode: 'Kirim DP DTK ke S3', type: 'kategori'),
+        CustomKodeRule(keyword: 'Kirim Dana Kontribusi ke S3', kode: 'Kirim DP DTK ke S3', type: 'kategori'),
         CustomKodeRule(keyword: 'Bensin', kode: 'Biaya Transportasi Lokal', type: 'kategori'),
-        CustomKodeRule(keyword: 'Konsumsi', kode: 'Biaya Konsumsi Acara', type: 'kategori'),
         CustomKodeRule(keyword: 'Internet', kode: 'Biaya Komunikasi dan Internet', type: 'kategori'),
         CustomKodeRule(keyword: 'Kuota', kode: 'Biaya Komunikasi dan Internet', type: 'kategori'),
         CustomKodeRule(keyword: 'Pulsa', kode: 'Biaya Komunikasi dan Internet', type: 'kategori'),
+        CustomKodeRule(keyword: 'Sewa', kode: 'Sewa Tempat', type: 'kategori'),
+        CustomKodeRule(keyword: 'Konsumsi', kode: 'Biaya Konsumsi Acara', type: 'kategori'),
         CustomKodeRule(keyword: 'Air', kode: 'Biaya Listrik dan Air', type: 'kategori'),
         CustomKodeRule(keyword: 'Listrik', kode: 'Biaya Listrik dan Air', type: 'kategori'),
         CustomKodeRule(keyword: 'Spidol', kode: 'Biaya ATK', type: 'kategori'),
@@ -180,6 +182,34 @@ class CustomKodeRule {
         CustomKodeRule(keyword: 'RTK', kode: 'Biaya RTK', type: 'kategori'),
         CustomKodeRule(keyword: 'Peralatan', kode: 'Pemeliharaan Bangunan, Peralatan', type: 'kategori'),
         CustomKodeRule(keyword: 'Bangunan', kode: 'Pemeliharaan Bangunan, Peralatan', type: 'kategori'),
+
+        // 26 Aturan KU
+        CustomKodeRule(keyword: 'rapat', kode: 'Sekretaris', type: 'ku'),
+        CustomKodeRule(keyword: 'rakor', kode: 'Sekretaris', type: 'ku'),
+        CustomKodeRule(keyword: 'rab', kode: 'Sekretaris', type: 'ku'),
+        CustomKodeRule(keyword: 'rkub', kode: 'Sekretaris', type: 'ku'),
+        CustomKodeRule(keyword: 'bensin', kode: 'Sekretaris', type: 'ku'),
+        CustomKodeRule(keyword: 'ATK', kode: 'Sekretaris', type: 'ku'),
+        CustomKodeRule(keyword: 'RTK', kode: 'Sekretaris', type: 'ku'),
+        CustomKodeRule(keyword: 'simulasi', kode: 'Sekretaris', type: 'ku'),
+        CustomKodeRule(keyword: 'admin', kode: 'KU SDK', type: 'ku'),
+        CustomKodeRule(keyword: 'bank', kode: 'KU SDK', type: 'ku'),
+        CustomKodeRule(keyword: 'pulsa', kode: 'KU SDK', type: 'ku'),
+        CustomKodeRule(keyword: 'pembinaan AP', kode: 'KU SDM', type: 'ku'),
+        CustomKodeRule(keyword: 'olahraga', kode: 'KU SDM', type: 'ku'),
+        CustomKodeRule(keyword: 'silah', kode: 'KU SDM', type: 'ku'),
+        CustomKodeRule(keyword: 'Pekabaran', kode: 'KU Publikasi', type: 'ku'),
+        CustomKodeRule(keyword: 'Talwiyah', kode: 'KU Publikasi', type: 'ku'),
+        CustomKodeRule(keyword: 'Pengabaran', kode: 'KU Publikasi', type: 'ku'),
+        CustomKodeRule(keyword: 'pembinaan AB', kode: 'KU Publikasi', type: 'ku'),
+        CustomKodeRule(keyword: 'Pratal', kode: 'KU Publikasi', type: 'ku'),
+        CustomKodeRule(keyword: 'Moral', kode: 'KU Hukum', type: 'ku'),
+        CustomKodeRule(keyword: 'Disiplin', kode: 'KU Hukum', type: 'ku'),
+        CustomKodeRule(keyword: 'MPMD', kode: 'KU Hukum', type: 'ku'),
+        CustomKodeRule(keyword: 'RPM', kode: 'KU Ekonomi', type: 'ku'),
+        CustomKodeRule(keyword: 'Pangan', kode: 'KU Ekonomi', type: 'ku'),
+        CustomKodeRule(keyword: 'Kedaulatan Pangan', kode: 'KU Ekonomi', type: 'ku'),
+        CustomKodeRule(keyword: 'Bibit', kode: 'KU Ekonomi', type: 'ku'),
       ];
 }
 

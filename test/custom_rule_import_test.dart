@@ -153,36 +153,32 @@ Kategori,Konsumsi,Konsumsi
       expect(generalResult.kategoriCount, 14);
     });
 
-    test('K12 Rules preset contains 25 rules and password is Yu5uf1253', () {
+    test('K12 Rules preset contains 52 rules (26 KU & 26 Kategori) and password is Yu5uf1253', () {
       expect(CustomRuleImportHelper.k12Password, equals('Yu5uf1253'));
       final k12Result = CustomRuleImportHelper.getK12ImportResult();
       expect(k12Result.isSuccess, isTrue);
-      expect(k12Result.rules.length, 25);
-      expect(k12Result.kuCount, 0);
-      expect(k12Result.kategoriCount, 25);
+      expect(k12Result.rules.length, 52);
+      expect(k12Result.kuCount, 26);
+      expect(k12Result.kategoriCount, 26);
 
-      // Verify specific K12 rules requested by user
-      final dpKk = k12Result.rules.firstWhere((r) => r.keyword == 'DP KK');
+      // Verify specific K12 Kategori rules requested by user
+      final dpKk = k12Result.rules.firstWhere((r) => r.keyword == 'DP KK' && r.type == 'kategori');
       expect(dpKk.kode, 'Terima DP DTK');
-      expect(dpKk.type, 'kategori');
+
+      final danaTurun = k12Result.rules.firstWhere((r) => r.keyword == 'Dana turun');
+      expect(danaTurun.kode, 'Kontribusi DP S4');
 
       final kirimDp = k12Result.rules.firstWhere((r) => r.keyword == 'Kirim DP ke S3');
       expect(kirimDp.kode, 'Kirim DP DTK ke S3');
 
-      final danaKontribusi = k12Result.rules.firstWhere((r) => r.keyword == 'Dana kontribusi DP dari S3');
-      expect(danaKontribusi.kode, 'Kontribusi DP S4');
+      final setorDana = k12Result.rules.firstWhere((r) => r.keyword == 'Setor Dana Kontribusi ke S3');
+      expect(setorDana.kode, 'Kirim DP DTK ke S3');
 
-      final motor = k12Result.rules.firstWhere((r) => r.keyword == 'Motor');
-      expect(motor.kode, 'Motor, Peralatan & Elektronik');
+      final kirimDana = k12Result.rules.firstWhere((r) => r.keyword == 'Kirim Dana Kontribusi ke S3');
+      expect(kirimDana.kode, 'Kirim DP DTK ke S3');
 
-      final sewa = k12Result.rules.firstWhere((r) => r.keyword == 'Sewa tempat');
-      expect(sewa.kode, 'Sewa Tempat');
-
-      final bensin = k12Result.rules.firstWhere((r) => r.keyword == 'Bensin');
+      final bensin = k12Result.rules.firstWhere((r) => r.keyword == 'Bensin' && r.type == 'kategori');
       expect(bensin.kode, 'Biaya Transportasi Lokal');
-
-      final konsumsi = k12Result.rules.firstWhere((r) => r.keyword == 'Konsumsi');
-      expect(konsumsi.kode, 'Biaya Konsumsi Acara');
 
       final internet = k12Result.rules.firstWhere((r) => r.keyword == 'Internet');
       expect(internet.kode, 'Biaya Komunikasi dan Internet');
@@ -190,8 +186,14 @@ Kategori,Konsumsi,Konsumsi
       final kuota = k12Result.rules.firstWhere((r) => r.keyword == 'Kuota');
       expect(kuota.kode, 'Biaya Komunikasi dan Internet');
 
-      final pulsa = k12Result.rules.firstWhere((r) => r.keyword == 'Pulsa');
+      final pulsa = k12Result.rules.firstWhere((r) => r.keyword == 'Pulsa' && r.type == 'kategori');
       expect(pulsa.kode, 'Biaya Komunikasi dan Internet');
+
+      final sewa = k12Result.rules.firstWhere((r) => r.keyword == 'Sewa');
+      expect(sewa.kode, 'Sewa Tempat');
+
+      final konsumsi = k12Result.rules.firstWhere((r) => r.keyword == 'Konsumsi');
+      expect(konsumsi.kode, 'Biaya Konsumsi Acara');
 
       final air = k12Result.rules.firstWhere((r) => r.keyword == 'Air');
       expect(air.kode, 'Biaya Listrik dan Air');
@@ -220,16 +222,16 @@ Kategori,Konsumsi,Konsumsi
       final pensil = k12Result.rules.firstWhere((r) => r.keyword == 'Pensil');
       expect(pensil.kode, 'Biaya ATK');
 
-      final atk = k12Result.rules.firstWhere((r) => r.keyword == 'ATK');
+      final atk = k12Result.rules.firstWhere((r) => r.keyword == 'ATK' && r.type == 'kategori');
       expect(atk.kode, 'Biaya ATK');
 
-      final admin = k12Result.rules.firstWhere((r) => r.keyword == 'Admin');
+      final admin = k12Result.rules.firstWhere((r) => r.keyword == 'Admin' && r.type == 'kategori');
       expect(admin.kode, 'Biaya RTK');
 
       final biFast = k12Result.rules.firstWhere((r) => r.keyword == 'Bi Fast');
       expect(biFast.kode, 'Biaya RTK');
 
-      final rtk = k12Result.rules.firstWhere((r) => r.keyword == 'RTK');
+      final rtk = k12Result.rules.firstWhere((r) => r.keyword == 'RTK' && r.type == 'kategori');
       expect(rtk.kode, 'Biaya RTK');
 
       final peralatan = k12Result.rules.firstWhere((r) => r.keyword == 'Peralatan');
@@ -237,6 +239,85 @@ Kategori,Konsumsi,Konsumsi
 
       final bangunan = k12Result.rules.firstWhere((r) => r.keyword == 'Bangunan');
       expect(bangunan.kode, 'Pemeliharaan Bangunan, Peralatan');
+
+      // Verify specific K12 KU rules
+      final rapat = k12Result.rules.firstWhere((r) => r.keyword == 'rapat' && r.type == 'ku');
+      expect(rapat.kode, 'Sekretaris');
+
+      final rakor = k12Result.rules.firstWhere((r) => r.keyword == 'rakor' && r.type == 'ku');
+      expect(rakor.kode, 'Sekretaris');
+
+      final rab = k12Result.rules.firstWhere((r) => r.keyword == 'rab' && r.type == 'ku');
+      expect(rab.kode, 'Sekretaris');
+
+      final rkub = k12Result.rules.firstWhere((r) => r.keyword == 'rkub' && r.type == 'ku');
+      expect(rkub.kode, 'Sekretaris');
+
+      final bensinKu = k12Result.rules.firstWhere((r) => r.keyword == 'bensin' && r.type == 'ku');
+      expect(bensinKu.kode, 'Sekretaris');
+
+      final atkKu = k12Result.rules.firstWhere((r) => r.keyword == 'ATK' && r.type == 'ku');
+      expect(atkKu.kode, 'Sekretaris');
+
+      final rtkKu = k12Result.rules.firstWhere((r) => r.keyword == 'RTK' && r.type == 'ku');
+      expect(rtkKu.kode, 'Sekretaris');
+
+      final simulasi = k12Result.rules.firstWhere((r) => r.keyword == 'simulasi' && r.type == 'ku');
+      expect(simulasi.kode, 'Sekretaris');
+
+      final adminKu = k12Result.rules.firstWhere((r) => r.keyword == 'admin' && r.type == 'ku');
+      expect(adminKu.kode, 'KU SDK');
+
+      final bankKu = k12Result.rules.firstWhere((r) => r.keyword == 'bank' && r.type == 'ku');
+      expect(bankKu.kode, 'KU SDK');
+
+      final pulsaKu = k12Result.rules.firstWhere((r) => r.keyword == 'pulsa' && r.type == 'ku');
+      expect(pulsaKu.kode, 'KU SDK');
+
+      final pembinaanAp = k12Result.rules.firstWhere((r) => r.keyword == 'pembinaan AP');
+      expect(pembinaanAp.kode, 'KU SDM');
+
+      final olahraga = k12Result.rules.firstWhere((r) => r.keyword == 'olahraga');
+      expect(olahraga.kode, 'KU SDM');
+
+      final silah = k12Result.rules.firstWhere((r) => r.keyword == 'silah');
+      expect(silah.kode, 'KU SDM');
+
+      final pekabaran = k12Result.rules.firstWhere((r) => r.keyword == 'Pekabaran');
+      expect(pekabaran.kode, 'KU Publikasi');
+
+      final talwiyah = k12Result.rules.firstWhere((r) => r.keyword == 'Talwiyah');
+      expect(talwiyah.kode, 'KU Publikasi');
+
+      final pengabaran = k12Result.rules.firstWhere((r) => r.keyword == 'Pengabaran');
+      expect(pengabaran.kode, 'KU Publikasi');
+
+      final pembinaanAb = k12Result.rules.firstWhere((r) => r.keyword == 'pembinaan AB');
+      expect(pembinaanAb.kode, 'KU Publikasi');
+
+      final pratal = k12Result.rules.firstWhere((r) => r.keyword == 'Pratal');
+      expect(pratal.kode, 'KU Publikasi');
+
+      final moral = k12Result.rules.firstWhere((r) => r.keyword == 'Moral');
+      expect(moral.kode, 'KU Hukum');
+
+      final disiplin = k12Result.rules.firstWhere((r) => r.keyword == 'Disiplin');
+      expect(disiplin.kode, 'KU Hukum');
+
+      final mpmd = k12Result.rules.firstWhere((r) => r.keyword == 'MPMD');
+      expect(mpmd.kode, 'KU Hukum');
+
+      final rpm = k12Result.rules.firstWhere((r) => r.keyword == 'RPM');
+      expect(rpm.kode, 'KU Ekonomi');
+
+      final pangan = k12Result.rules.firstWhere((r) => r.keyword == 'Pangan');
+      expect(pangan.kode, 'KU Ekonomi');
+
+      final kedaulatanPangan = k12Result.rules.firstWhere((r) => r.keyword == 'Kedaulatan Pangan');
+      expect(kedaulatanPangan.kode, 'KU Ekonomi');
+
+      final bibit = k12Result.rules.firstWhere((r) => r.keyword == 'Bibit');
+      expect(bibit.kode, 'KU Ekonomi');
     });
 
     test('StrukturData serialization with isSaldoRekeningUnlocked', () {

@@ -345,12 +345,14 @@ void main() {
   });
 
   group('7. Custom Rules & Preset Parsing Tests', () {
-    test('Parses General Rules (40 rules) and K12 Rules (25 rules) cleanly', () {
+    test('Parses General Rules (40 rules) and K12 Rules (52 rules) cleanly', () {
       final generalResult = CustomRuleImportHelper.getGeneralImportResult();
       expect(generalResult.rules.length, 40);
 
       final k12Result = CustomRuleImportHelper.getK12ImportResult();
-      expect(k12Result.rules.length, 25);
+      expect(k12Result.rules.length, 52);
+      expect(k12Result.kuCount, 26);
+      expect(k12Result.kategoriCount, 26);
     });
   });
 

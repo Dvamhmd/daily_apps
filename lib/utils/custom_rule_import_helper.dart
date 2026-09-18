@@ -370,7 +370,7 @@ class CustomRuleImportHelper {
   /// Mengembalikan list aturan General (26 KU + 14 Kategori)
   static List<CustomKodeRule> getGeneralRules() => CustomKodeRule.generalRules();
 
-  /// Mengembalikan list aturan K12 (25 Kategori)
+  /// Mengembalikan list aturan Admin / K12 (52 aturan: 26 Kategori + 26 KU)
   static List<CustomKodeRule> getK12Rules() => CustomKodeRule.k12Rules();
 
   /// Mengembalikan list aturan default bawaan sistem (alias ke General)
@@ -391,7 +391,7 @@ class CustomRuleImportHelper {
     );
   }
 
-  /// Mengembalikan ImportResult dari aturan K12 (25 aturan)
+  /// Mengembalikan ImportResult dari aturan Admin / K12 (52 aturan: 26 KU + 26 Kategori)
   static ImportResult getK12ImportResult() {
     final rules = getK12Rules();
     final kuCount = rules.where((r) => r.type == 'ku').length;
