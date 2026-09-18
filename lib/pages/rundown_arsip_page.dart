@@ -1,148 +1,100 @@
 import 'dart:convert';
 import 'package:daily_apps/models/model_rundown.dart';
-import 'package:daily_apps/pages/rundown_arsip_page.dart';
 import 'package:daily_apps/pages/rundown_detail_page.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/widgets/custom_toast.dart';
-import 'package:daily_apps/widgets/dialog_tambah_rundown.dart';
-import 'package:daily_apps/widgets/gta_switch_wheel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class RundownPage extends StatefulWidget {
-  final ValueChanged<int> onPageSelected;
+class RundownArsipPage extends StatefulWidget {
+  final VoidCallback? onRundownsChanged;
 
-  const RundownPage({
+  const RundownArsipPage({
     super.key,
-    required this.onPageSelected,
+    this.onRundownsChanged,
   });
 
   @override
-  State<RundownPage> createState() => _RundownPageState();
+  State<RundownArsipPage> createState() => _RundownArsipPageState();
 }
 
-class _RundownPageState extends State<RundownPage> {
+class _RundownArsipPageState extends State<RundownArsipPage> {
   static const Color primaryTeal = Color(0xFF00897B);
 
-  List<Rundown> _rundownList = [];
+  List<Rundown> _allRundowns = [];
   bool _isLoading = true;
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _loadRundowns();
+    _loadData();
   }
 
-  List<Rundown> get _activeRundowns =>
-      _rundownList.where((r) => !r.isArchived).toList();
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
-  List<Rundown> get _archivedRundowns =>
-      _rundownList.where((r) => r.isArchived).toList();
-
-  Future<void> _loadRundowns() async {
+  Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
     final rawData = prefs.getStringList('rundowns_data') ?? [];
     setState(() {
-      _rundownList = rawData
+      _allRundowns = rawData
           .map((e) => Rundown.fromJson(jsonDecode(e) as Map<String, dynamic>))
           .toList();
       _isLoading = false;
     });
   }
 
-  Future<void> _saveRundowns() async {
+  Future<void> _saveData() async {
     final prefs = await SharedPreferences.getInstance();
-    final rawData =
-        _rundownList.map((e) => jsonEncode(e.toJson())).toList();
+    final rawData = _allRundowns.map((e) => jsonEncode(e.toJson())).toList();
     await prefs.setStringList('rundowns_data', rawData);
+    widget.onRundownsChanged?.call();
   }
 
-  Future<void> _openTambahRundownModal() async {
-    final newRundown = await ModalTambahRundown.show(context);
-    if (newRundown != null) {
-      setState(() {
-        _rundownList.insert(0, newRundown);
-      });
-      await _saveRundowns();
-
-      if (mounted) {
-        CustomToast.showSuccess(
-          context,
-          title: 'Rundown Dibuat',
-          subtitle: 'Rundown "${newRundown.title}" berhasil dibuat!',
-        );
-
-        // Langsung arahkan ke rincian rundown yang baru dibuat
-        _navigateToDetail(newRundown);
-      }
-    }
+  List<Rundown> get _archivedRundowns {
+    final list = _allRundowns.where((r) => r.isArchived).toList();
+    if (_searchQuery.trim().isEmpty) return list;
+    final query = _searchQuery.toLowerCase().trim();
+    return list.where((r) => r.title.toLowerCase().contains(query)).toList();
   }
 
-  Future<void> _openArsipPage() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => RundownArsipPage(
-          onRundownsChanged: _loadRundowns,
-        ),
-      ),
-    );
-    // Reload when returning
-    _loadRundowns();
-  }
-
-  Future<void> _editRundown(Rundown target) async {
-    final updated = await ModalTambahRundown.show(context, rundown: target);
-    if (updated != null) {
-      final index = _rundownList.indexWhere((r) => r.id == target.id);
-      if (index != -1) {
-        setState(() {
-          _rundownList[index] = updated;
-        });
-        await _saveRundowns();
-
-        if (mounted) {
-          CustomToast.showSuccess(
-            context,
-            title: 'Rundown Diperbarui',
-            subtitle: 'Rundown "${updated.title}" berhasil diperbarui!',
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _archiveRundown(Rundown rundown) async {
+  Future<void> _restoreRundown(Rundown rundown) async {
     HapticFeedback.mediumImpact();
-    final index = _rundownList.indexWhere((r) => r.id == rundown.id);
+    final index = _allRundowns.indexWhere((r) => r.id == rundown.id);
     if (index != -1) {
       setState(() {
-        _rundownList[index] = _rundownList[index].copyWith(isArchived: true);
+        _allRundowns[index] = _allRundowns[index].copyWith(isArchived: false);
       });
-      await _saveRundowns();
+      await _saveData();
 
       if (mounted) {
         CustomToast.showSuccess(
           context,
-          title: 'Rundown Diarsipkan',
-          subtitle: 'Rundown "${rundown.title}" berhasil dipindahkan ke Arsip.',
+          title: 'Rundown Dipulihkan',
+          subtitle: 'Rundown "${rundown.title}" berhasil dikembalikan ke daftar aktif.',
         );
       }
     }
   }
 
-  Future<void> _deleteRundown(Rundown deleted) async {
+  Future<void> _deleteRundown(Rundown rundown) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Text(
-          'Hapus Rundown',
+          'Hapus Rundown Permanen',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         content: Text(
-          'Apakah kamu yakin ingin menghapus rundown "${deleted.title}"?',
+          'Apakah kamu yakin ingin menghapus rundown "${rundown.title}" secara permanen dari arsip?',
           style: const TextStyle(fontSize: 14, color: Color(0xFF475569)),
         ),
         actions: [
@@ -156,21 +108,22 @@ class _RundownPageState extends State<RundownPage> {
               backgroundColor: Colors.redAccent,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-            child: const Text('Hapus'),
+            child: const Text('Hapus Permanen'),
           ),
         ],
       ),
     );
 
     if (confirm == true) {
-      final index = _rundownList.indexWhere((r) => r.id == deleted.id);
+      final index = _allRundowns.indexWhere((r) => r.id == rundown.id);
       if (index != -1) {
         setState(() {
-          _rundownList.removeAt(index);
+          _allRundowns.removeAt(index);
         });
-        await _saveRundowns();
+        await _saveData();
       }
     }
   }
@@ -181,21 +134,21 @@ class _RundownPageState extends State<RundownPage> {
         builder: (_) => RundownDetailPage(
           rundown: rundown,
           onRundownChanged: (updated) {
-            final index = _rundownList.indexWhere((r) => r.id == updated.id);
+            final index = _allRundowns.indexWhere((r) => r.id == updated.id);
             if (index != -1) {
               setState(() {
-                _rundownList[index] = updated;
+                _allRundowns[index] = updated;
               });
-              _saveRundowns();
+              _saveData();
             }
           },
           onRundownDeleted: () {
-            final index = _rundownList.indexWhere((r) => r.id == rundown.id);
+            final index = _allRundowns.indexWhere((r) => r.id == rundown.id);
             if (index != -1) {
               setState(() {
-                _rundownList.removeAt(index);
+                _allRundowns.removeAt(index);
               });
-              _saveRundowns();
+              _saveData();
             }
           },
         ),
@@ -213,8 +166,7 @@ class _RundownPageState extends State<RundownPage> {
 
   @override
   Widget build(BuildContext context) {
-    final activeList = _activeRundowns;
-    final archivedCount = _archivedRundowns.length;
+    final archivedList = _archivedRundowns;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0FDF4),
@@ -227,13 +179,18 @@ class _RundownPageState extends State<RundownPage> {
           statusBarIconBrightness: Brightness.light,
           statusBarBrightness: Brightness.dark,
         ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: Colors.white, size: 20),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.event_note_rounded, color: Colors.white, size: 22),
+            Icon(Icons.inventory_2_outlined, color: Colors.white, size: 20),
             SizedBox(width: 8),
             Text(
-              'Rundown Acara',
+              'Arsip Rundown',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -242,47 +199,6 @@ class _RundownPageState extends State<RundownPage> {
             ),
           ],
         ),
-        actions: [
-          // Tombol + (Tambah Rundown Baru)
-          IconButton(
-            icon: const Icon(Icons.add_rounded, color: Colors.white, size: 26),
-            tooltip: 'Buat Rundown Baru',
-            onPressed: _openTambahRundownModal,
-          ),
-          // Tombol di samping kanan tombol + (Tombol Arsip)
-          IconButton(
-            icon: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const Icon(Icons.inventory_2_outlined,
-                    color: Colors.white, size: 22),
-                if (archivedCount > 0)
-                  Positioned(
-                    right: -2,
-                    top: -2,
-                    child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFF59E0B),
-                        shape: BoxShape.circle,
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 8,
-                        minHeight: 8,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            tooltip: 'Arsip Rundown ($archivedCount)',
-            onPressed: _openArsipPage,
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-      floatingActionButton: GtaSwitchWheel(
-        currentIndex: 1, // Rundown index
-        onPageSelected: widget.onPageSelected,
       ),
       body: SafeArea(
         top: false,
@@ -299,45 +215,42 @@ class _RundownPageState extends State<RundownPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Section Title & Action
+                      // Header Banner
+                      _buildHeaderBanner(),
+
+                      const SizedBox(height: 18),
+
+                      // Search Box (if there are archived items or searching)
+                      if (_allRundowns.any((r) => r.isArchived) ||
+                          _searchQuery.isNotEmpty) ...[
+                        _buildSearchBar(),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // Section Title
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Daftar Rundown (${activeList.length})',
+                            'Daftar Rundown Diarsipkan (${archivedList.length})',
                             style: const TextStyle(
-                              fontSize: 16,
+                              fontSize: 15,
                               fontWeight: FontWeight.bold,
                               color: Color(0xFF1E293B),
                             ),
                           ),
-                          if (activeList.isNotEmpty)
-                            TextButton.icon(
-                              onPressed: _openTambahRundownModal,
-                              icon: const Icon(Icons.add,
-                                  size: 16, color: primaryTeal),
-                              label: const Text(
-                                'Tambah',
-                                style: TextStyle(
-                                  color: primaryTeal,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
                         ],
                       ),
 
                       const SizedBox(height: 12),
 
-                      // List of Active Rundowns or Empty State
-                      if (activeList.isEmpty) ...[
-                        _buildEmptyState(archivedCount),
+                      if (archivedList.isEmpty) ...[
+                        _buildEmptyState(),
                       ] else ...[
-                        _buildRundownList(activeList),
+                        _buildArchivedList(archivedList),
                       ],
 
-                      const SizedBox(height: 100), // Spacing for FAB
+                      const SizedBox(height: 40),
                     ],
                   ),
                 ),
@@ -346,7 +259,147 @@ class _RundownPageState extends State<RundownPage> {
     );
   }
 
-  Widget _buildRundownList(List<Rundown> list) {
+  Widget _buildHeaderBanner() {
+    final count = _allRundowns.where((r) => r.isArchived).length;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F766E), Color(0xFF115E59)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F766E).withValues(alpha: 0.35),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'RUANG ARSIP',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$count Arsip',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Koleksi Arsip Rundown',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Rundown acara yang telah selesai disimpan di sini agar daftar utama tetap rapi. Kamu dapat memulihkannya kembali kapan pun.',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.88),
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFF00897B).withValues(alpha: 0.18),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (val) {
+          setState(() {
+            _searchQuery = val;
+          });
+        },
+        decoration: InputDecoration(
+          hintText: 'Cari rundown di arsip...',
+          hintStyle: const TextStyle(
+            fontSize: 13,
+            color: Color(0xFF94A3B8),
+          ),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: primaryTeal,
+            size: 20,
+          ),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear_rounded, size: 18),
+                  onPressed: () {
+                    setState(() {
+                      _searchController.clear();
+                      _searchQuery = '';
+                    });
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildArchivedList(List<Rundown> list) {
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -354,18 +407,18 @@ class _RundownPageState extends State<RundownPage> {
       separatorBuilder: (_, __) => const SizedBox(height: 14),
       itemBuilder: (context, index) {
         final rundown = list[index];
-        return _buildRundownCard(rundown);
+        return _buildArchivedCard(rundown);
       },
     );
   }
 
-  Widget _buildRundownCard(Rundown rundown) {
+  Widget _buildArchivedCard(Rundown rundown) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: const Color(0xFF00897B).withValues(alpha: 0.15),
+          color: const Color(0xFFCBD5E1),
         ),
         boxShadow: [
           BoxShadow(
@@ -392,12 +445,12 @@ class _RundownPageState extends State<RundownPage> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: primaryTeal.withValues(alpha: 0.1),
+                        color: const Color(0xFF64748B).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
-                        Icons.event_note_rounded,
-                        color: primaryTeal,
+                        Icons.inventory_2_outlined,
+                        color: Color(0xFF64748B),
                         size: 22,
                       ),
                     ),
@@ -406,13 +459,41 @@ class _RundownPageState extends State<RundownPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            rundown.title,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF0F172A),
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  rundown.title,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF334155),
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                margin: const EdgeInsets.only(left: 6),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF3C7),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: const Color(0xFFFDE68A),
+                                    width: 0.8,
+                                  ),
+                                ),
+                                child: const Text(
+                                  'ARSIP',
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFB45309),
+                                    letterSpacing: 0.4,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 4),
                           Row(
@@ -445,14 +526,12 @@ class _RundownPageState extends State<RundownPage> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                       onSelected: (val) {
-                        if (val == 'hapus') {
-                          _deleteRundown(rundown);
-                        } else if (val == 'edit') {
-                          _editRundown(rundown);
+                        if (val == 'restore') {
+                          _restoreRundown(rundown);
                         } else if (val == 'detail') {
                           _navigateToDetail(rundown);
-                        } else if (val == 'archive') {
-                          _archiveRundown(rundown);
+                        } else if (val == 'delete') {
+                          _deleteRundown(rundown);
                         }
                       },
                       itemBuilder: (context) => [
@@ -468,35 +547,24 @@ class _RundownPageState extends State<RundownPage> {
                           ),
                         ),
                         const PopupMenuItem(
-                          value: 'archive',
+                          value: 'restore',
                           child: Row(
                             children: [
-                              Icon(Icons.archive_outlined,
-                                  size: 18, color: Color(0xFFD97706)),
+                              Icon(Icons.unarchive_outlined,
+                                  size: 18, color: primaryTeal),
                               SizedBox(width: 8),
-                              Text('Arsipkan Rundown'),
+                              Text('Pulihkan ke Aktif'),
                             ],
                           ),
                         ),
                         const PopupMenuItem(
-                          value: 'edit',
-                          child: Row(
-                            children: [
-                              Icon(Icons.edit_rounded,
-                                  size: 18, color: Color(0xFF0284C7)),
-                              SizedBox(width: 8),
-                              Text('Edit Rundown'),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'hapus',
+                          value: 'delete',
                           child: Row(
                             children: [
                               Icon(Icons.delete_outline_rounded,
                                   size: 18, color: Colors.redAccent),
                               SizedBox(width: 8),
-                              Text('Hapus',
+                              Text('Hapus Permanen',
                                   style: TextStyle(color: Colors.redAccent)),
                             ],
                           ),
@@ -531,7 +599,7 @@ class _RundownPageState extends State<RundownPage> {
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: primaryTeal.withValues(alpha: 0.12),
+                              color: const Color(0xFF64748B).withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
@@ -539,7 +607,7 @@ class _RundownPageState extends State<RundownPage> {
                               style: const TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: primaryTeal,
+                                color: Color(0xFF64748B),
                                 letterSpacing: 0.5,
                               ),
                             ),
@@ -554,7 +622,6 @@ class _RundownPageState extends State<RundownPage> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      // List of themes (up to 3 previews)
                       ...rundown.days.take(3).map((day) {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 4),
@@ -564,7 +631,7 @@ class _RundownPageState extends State<RundownPage> {
                                 width: 6,
                                 height: 6,
                                 decoration: const BoxDecoration(
-                                  color: primaryTeal,
+                                  color: Color(0xFF94A3B8),
                                   shape: BoxShape.circle,
                                 ),
                               ),
@@ -602,7 +669,7 @@ class _RundownPageState extends State<RundownPage> {
                             style: const TextStyle(
                               fontSize: 11,
                               fontStyle: FontStyle.italic,
-                              color: primaryTeal,
+                              color: Color(0xFF64748B),
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -613,23 +680,49 @@ class _RundownPageState extends State<RundownPage> {
 
                 const SizedBox(height: 12),
 
-                // Bottom Tap Cue
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                // Bottom Buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Lihat Rincian Rundown',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: primaryTeal,
+                    ElevatedButton.icon(
+                      onPressed: () => _restoreRundown(rundown),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryTeal,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.unarchive_outlined, size: 15),
+                      label: const Text(
+                        'Pulihkan ke Aktif',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                    SizedBox(width: 4),
-                    Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 12,
-                      color: primaryTeal,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Lihat Rincian',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 12,
+                          color: Color(0xFF64748B),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -641,7 +734,7 @@ class _RundownPageState extends State<RundownPage> {
     );
   }
 
-  Widget _buildEmptyState(int archivedCount) {
+  Widget _buildEmptyState() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
@@ -649,7 +742,7 @@ class _RundownPageState extends State<RundownPage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(0xFF00897B).withValues(alpha: 0.15),
+          color: const Color(0xFFCBD5E1),
         ),
         boxShadow: [
           BoxShadow(
@@ -665,18 +758,18 @@ class _RundownPageState extends State<RundownPage> {
             width: 72,
             height: 72,
             decoration: BoxDecoration(
-              color: const Color(0xFF00897B).withValues(alpha: 0.1),
+              color: const Color(0xFF64748B).withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(
-              Icons.schedule_rounded,
+              Icons.inventory_2_outlined,
               size: 38,
-              color: primaryTeal,
+              color: Color(0xFF64748B),
             ),
           ),
           const SizedBox(height: 18),
           const Text(
-            'Belum Ada Rundown Kegiatan',
+            'Belum Ada Rundown Diarsipkan',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -685,9 +778,9 @@ class _RundownPageState extends State<RundownPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            archivedCount > 0
-                ? 'Semua rundown aktif telah diarsipkan. Kamu memiliki $archivedCount rundown di menu Arsip (ikon di kanan atas).'
-                : 'Semua susunan acara dan timeline yang kamu buat akan terkumpul di sini. Mulai buat rundown pertama kamu sekarang!',
+            _searchQuery.isNotEmpty
+                ? 'Tidak ditemukan rundown arsip yang cocok dengan "$_searchQuery".'
+                : 'Rundown acara yang telah selesai dapat diarsipkan dari menu pada daftar utama agar tidak memenuhi layar.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
@@ -695,45 +788,6 @@ class _RundownPageState extends State<RundownPage> {
               height: 1.4,
             ),
           ),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(
-            onPressed: _openTambahRundownModal,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryTeal,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 12,
-              ),
-              elevation: 0,
-            ),
-            icon: const Icon(Icons.add_task_rounded, size: 18),
-            label: const Text(
-              'Buat Rundown Pertama',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-              ),
-            ),
-          ),
-          if (archivedCount > 0) ...[
-            const SizedBox(height: 10),
-            TextButton.icon(
-              onPressed: _openArsipPage,
-              icon: const Icon(Icons.inventory_2_outlined, size: 16, color: primaryTeal),
-              label: Text(
-                'Buka Arsip Rundown ($archivedCount)',
-                style: const TextStyle(
-                  color: primaryTeal,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );

@@ -313,6 +313,7 @@ class Rundown {
   final List<RundownDay> days;
   final List<RundownExpenseItem> expenses;
   final DateTime createdAt;
+  bool isArchived;
 
   Rundown({
     required this.id,
@@ -322,6 +323,7 @@ class Rundown {
     required this.days,
     List<RundownExpenseItem>? expenses,
     DateTime? createdAt,
+    this.isArchived = false,
   })  : expenses = expenses ?? [],
         createdAt = createdAt ?? DateTime.now();
 
@@ -350,6 +352,7 @@ class Rundown {
         'days': days.map((e) => e.toJson()).toList(),
         'expenses': expenses.map((e) => e.toJson()).toList(),
         'createdAt': createdAt.toIso8601String(),
+        'isArchived': isArchived,
       };
 
   factory Rundown.fromJson(Map<String, dynamic> json) {
@@ -389,6 +392,7 @@ class Rundown {
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
           : DateTime.now(),
+      isArchived: json['isArchived'] as bool? ?? false,
     );
   }
 
@@ -400,6 +404,7 @@ class Rundown {
     List<RundownDay>? days,
     List<RundownExpenseItem>? expenses,
     DateTime? createdAt,
+    bool? isArchived,
   }) {
     return Rundown(
       id: id ?? this.id,
@@ -409,6 +414,7 @@ class Rundown {
       days: days ?? this.days,
       expenses: expenses ?? this.expenses,
       createdAt: createdAt ?? this.createdAt,
+      isArchived: isArchived ?? this.isArchived,
     );
   }
 }

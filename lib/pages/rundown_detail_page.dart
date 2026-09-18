@@ -2160,6 +2160,23 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     );
   }
 
+  void _toggleArchive() {
+    final newArchived = !_rundown.isArchived;
+    setState(() {
+      _rundown = _rundown.copyWith(isArchived: newArchived);
+    });
+    _notifyChange();
+    if (mounted) {
+      CustomToast.showSuccess(
+        context,
+        title: newArchived ? 'Rundown Diarsipkan' : 'Rundown Dipulihkan',
+        subtitle: newArchived
+            ? 'Rundown "${_rundown.title}" dipindahkan ke tab Arsip.'
+            : 'Rundown "${_rundown.title}" dikembalikan ke daftar aktif.',
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final activeDay = (_selectedDayIndex < _rundown.days.length)
@@ -2239,6 +2256,59 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Archived Notice Banner
+                if (_rundown.isArchived) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.inventory_2_outlined,
+                            size: 18, color: Color(0xFFB45309)),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text(
+                            'Rundown ini berada di dalam Arsip.',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF92400E),
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _toggleArchive,
+                          style: TextButton.styleFrom(
+                            backgroundColor: const Color(0xFFF59E0B),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text(
+                            'Pulihkan',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
                 // 1. Theme Header & Day Navigation
                 if (activeDay != null) ...[
                   _buildDayThemeHeader(activeDay),
