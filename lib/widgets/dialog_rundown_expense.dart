@@ -408,20 +408,20 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
                                 foregroundColor: Colors.white,
                                 elevation: 0,
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 6,
+                                  horizontal: 12,
+                                  vertical: 8,
                                 ),
-                                minimumSize: Size.zero,
+                                minimumSize: const Size(0, 36),
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(9),
                                 ),
                               ),
-                              icon: const Icon(Icons.add_rounded, size: 16),
+                              icon: const Icon(Icons.add_rounded, size: 17),
                               label: const Text(
                                 'Tambah Item',
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 12.5,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -446,26 +446,26 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
                                   ),
                                   elevation: 0,
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
+                                    horizontal: 12,
+                                    vertical: 8,
                                   ),
-                                  minimumSize: Size.zero,
+                                  minimumSize: const Size(0, 36),
                                   tapTargetSize:
                                       MaterialTapTargetSize.shrinkWrap,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(9),
                                   ),
                                 ),
                                 icon: Icon(
                                   _isEditMode
                                       ? Icons.check_rounded
                                       : Icons.edit_rounded,
-                                  size: 14,
+                                  size: 15,
                                 ),
                                 label: Text(
                                   _isEditMode ? 'Selesai' : 'Edit',
                                   style: const TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 12.5,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -474,7 +474,7 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
                           ],
                         ),
 
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 12),
 
                         // Expense List
                         if (_rundown.expenses.isEmpty)
@@ -485,7 +485,7 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: _rundown.expenses.length,
                             separatorBuilder: (_, __) =>
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 8),
                             itemBuilder: (context, index) {
                               final item = _rundown.expenses[index];
                               return _buildExpenseCard(item, index);
@@ -731,10 +731,10 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
     final int selisihItem = (realisasi != null) ? (estimasi - realisasi) : 0;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isRealized
               ? const Color(0xFF81C784).withValues(alpha: 0.6)
@@ -752,9 +752,9 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 1. Kolom Nama (Sejajar proporsional flex 11)
+          // 1. Kolom Nama (Sejajar proporsional flex 6)
           Expanded(
-            flex: 11,
+            flex: 6,
             child: Row(
               children: [
                 // Dot Status Indicator
@@ -804,9 +804,9 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
             ),
           ),
 
-          // 2. Pembatas '|' (Posisi sejajar vertikal di semua baris)
+          // 2. Pembatas '|' (Posisi sejajar vertikal dekat dengan nominal)
           const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4),
+            padding: EdgeInsets.symmetric(horizontal: 6),
             child: Text(
               '|',
               style: TextStyle(
@@ -817,11 +817,11 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
             ),
           ),
 
-          // 3. Kolom Nominal (Sejajar proporsional flex 9 rata kanan)
+          // 3. Kolom Nominal (Sejajar proporsional flex 5 langsung setelah '|')
           Expanded(
-            flex: 9,
+            flex: 5,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
@@ -857,9 +857,9 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
 
           const SizedBox(width: 8),
 
-          // 4. Kolom Tombol Aksi (Lebar tetap 64px sejajar rata kanan)
+          // 4. Kolom Tombol Aksi (Lebar tetap 66px sejajar rata kanan)
           SizedBox(
-            width: 64,
+            width: 66,
             child: Align(
               alignment: Alignment.centerRight,
               child: _isEditMode
@@ -894,30 +894,30 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
                             foregroundColor: Colors.white,
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 5),
-                            minimumSize: const Size(60, 26),
+                                horizontal: 11, vertical: 6.5),
+                            minimumSize: const Size(60, 29),
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(7),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                           ),
                           child: const Text(
                             'Bayar',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 11.5,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                         )
                       : InkWell(
                           onTap: () => _batalkanRealisasi(item, index),
-                          borderRadius: BorderRadius.circular(7),
+                          borderRadius: BorderRadius.circular(8),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 7, vertical: 3.5),
+                                horizontal: 8, vertical: 5),
                             decoration: BoxDecoration(
                               color: const Color(0xFFE8F5E9),
-                              borderRadius: BorderRadius.circular(7),
+                              borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                   color: const Color(0xFFA5D6A7), width: 0.8),
                             ),
@@ -926,7 +926,7 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
                               children: [
                                 Icon(Icons.check_rounded,
                                     size: 12, color: Color(0xFF2E7D32)),
-                                SizedBox(width: 2),
+                                SizedBox(width: 3),
                                 Text(
                                   'Lunas',
                                   style: TextStyle(
