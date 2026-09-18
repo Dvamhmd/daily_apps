@@ -731,7 +731,7 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
     final int selisihItem = (realisasi != null) ? (estimasi - realisasi) : 0;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
@@ -752,55 +752,61 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Dot Status Indicator
-          Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(
-              color: isRealized
-                  ? const Color(0xFF2E7D32)
-                  : const Color(0xFFFFA000),
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // Nama Pengeluaran
+          // 1. Kolom Nama (Sejajar proporsional flex 11)
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+            flex: 11,
+            child: Row(
               children: [
-                Text(
-                  item.nama,
-                  style: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
+                // Dot Status Indicator
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: isRealized
+                        ? const Color(0xFF2E7D32)
+                        : const Color(0xFFFFA000),
+                    shape: BoxShape.circle,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                if (isRealized && item.posDana != null) ...[
-                  const SizedBox(height: 1),
-                  Text(
-                    'Pos: ${item.posDana}',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Color(0xFF64748B),
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        item.nama,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (isRealized && item.posDana != null) ...[
+                        const SizedBox(height: 1),
+                        Text(
+                          'Pos: ${item.posDana}',
+                          style: const TextStyle(
+                            fontSize: 9.5,
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
                   ),
-                ],
+                ),
               ],
             ),
           ),
 
-          // Divider vertical pipe
+          // 2. Pembatas '|' (Posisi sejajar vertikal di semua baris)
           const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8),
+            padding: EdgeInsets.symmetric(horizontal: 4),
             child: Text(
               '|',
               style: TextStyle(
@@ -811,114 +817,130 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
             ),
           ),
 
-          // Nominal
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Rp ${RupiahFormatter.format(isRealized && realisasi != null ? realisasi : estimasi)}',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: isRealized
-                      ? const Color(0xFF00695C)
-                      : const Color(0xFF1E293B),
-                ),
-              ),
-              if (isRealized && selisihItem != 0)
+          // 3. Kolom Nominal (Sejajar proporsional flex 9 rata kanan)
+          Expanded(
+            flex: 9,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
                 Text(
-                  selisihItem > 0
-                      ? 'Hemat ${RupiahFormatter.format(selisihItem)}'
-                      : '+${RupiahFormatter.format(selisihItem.abs())}',
+                  'Rp ${RupiahFormatter.format(isRealized && realisasi != null ? realisasi : estimasi)}',
                   style: TextStyle(
-                    fontSize: 9.5,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.bold,
-                    color: selisihItem > 0
-                        ? const Color(0xFF2E7D32)
-                        : const Color(0xFFC62828),
+                    color: isRealized
+                        ? const Color(0xFF00695C)
+                        : const Color(0xFF1E293B),
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-            ],
+                if (isRealized && selisihItem != 0)
+                  Text(
+                    selisihItem > 0
+                        ? 'Hemat Rp ${RupiahFormatter.format(selisihItem)}'
+                        : '+Rp ${RupiahFormatter.format(selisihItem.abs())}',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      color: selisihItem > 0
+                          ? const Color(0xFF2E7D32)
+                          : const Color(0xFFC62828),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
           ),
 
           const SizedBox(width: 8),
 
-          // Actions: Bayar button or Edit mode icons
-          if (_isEditMode) ...[
-            IconButton(
-              icon: const Icon(Icons.edit_rounded,
-                  size: 18, color: Color(0xFF0284C7)),
-              onPressed: () => _openEditEstimasiDialog(item, index),
-              constraints: const BoxConstraints(),
-              padding: const EdgeInsets.all(4),
-              tooltip: 'Edit Item',
-            ),
-            const SizedBox(width: 4),
-            IconButton(
-              icon: const Icon(Icons.delete_outline_rounded,
-                  size: 18, color: Colors.redAccent),
-              onPressed: () => _deleteEstimasi(item, index),
-              constraints: const BoxConstraints(),
-              padding: const EdgeInsets.all(4),
-              tooltip: 'Hapus Item',
-            ),
-          ] else ...[
-            if (!isRealized)
-              ElevatedButton(
-                onPressed: () => _openIsiRealisasiDialog(item, index),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryTeal,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'Bayar',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              )
-            else
-              InkWell(
-                onTap: () => _batalkanRealisasi(item, index),
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
-                    borderRadius: BorderRadius.circular(8),
-                    border:
-                        Border.all(color: const Color(0xFFA5D6A7), width: 0.8),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.check_rounded,
-                          size: 13, color: Color(0xFF2E7D32)),
-                      SizedBox(width: 3),
-                      Text(
-                        'Lunas',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2E7D32),
+          // 4. Kolom Tombol Aksi (Lebar tetap 64px sejajar rata kanan)
+          SizedBox(
+            width: 64,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: _isEditMode
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit_rounded,
+                              size: 17, color: Color(0xFF0284C7)),
+                          onPressed: () => _openEditEstimasiDialog(item, index),
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(3),
+                          tooltip: 'Edit Item',
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
+                        const SizedBox(width: 2),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded,
+                              size: 17, color: Colors.redAccent),
+                          onPressed: () => _deleteEstimasi(item, index),
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(3),
+                          tooltip: 'Hapus Item',
+                        ),
+                      ],
+                    )
+                  : (!isRealized
+                      ? ElevatedButton(
+                          onPressed: () => _openIsiRealisasiDialog(item, index),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryTeal,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 5),
+                            minimumSize: const Size(60, 26),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(7),
+                            ),
+                          ),
+                          child: const Text(
+                            'Bayar',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        )
+                      : InkWell(
+                          onTap: () => _batalkanRealisasi(item, index),
+                          borderRadius: BorderRadius.circular(7),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 3.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8F5E9),
+                              borderRadius: BorderRadius.circular(7),
+                              border: Border.all(
+                                  color: const Color(0xFFA5D6A7), width: 0.8),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.check_rounded,
+                                    size: 12, color: Color(0xFF2E7D32)),
+                                SizedBox(width: 2),
+                                Text(
+                                  'Lunas',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF2E7D32),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )),
+            ),
+          ),
         ],
       ),
     );
