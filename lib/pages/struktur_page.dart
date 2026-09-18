@@ -1054,8 +1054,8 @@ class _StrukturPageState extends State<StrukturPage> {
 
       if (!mounted) return false;
 
-      // 4. Jika fetch berhasil dan spreadsheet berisi data, bandingkan keselarasan
-      if (fetchRes.isSuccess && !fetchRes.isEmpty) {
+      // 4. Jika fetch berhasil, bandingkan keselarasan data eksisting
+      if (fetchRes.isSuccess) {
         final comparison = SheetsSyncService.compareData(
           localTransactions: existingMutasi,
           remoteFetchResult: fetchRes,

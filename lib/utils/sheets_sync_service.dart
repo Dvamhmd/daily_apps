@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import '../models/model_sheets_config.dart';
 import '../models/model_struktur.dart';
+import 'rupiah_formatter.dart';
 
 class SheetsSyncResult {
   final bool isSuccess;
@@ -115,7 +116,14 @@ class SheetsSyncService {
         if (redirectUrl != null) {
           final redirectedResponse = await _client.get(Uri.parse(redirectUrl)).timeout(const Duration(seconds: 20));
           if (redirectedResponse.statusCode == 200) {
-            return jsonDecode(redirectedResponse.body) as Map<String, dynamic>;
+            try {
+              return jsonDecode(redirectedResponse.body) as Map<String, dynamic>;
+            } catch (_) {
+              return {
+                'status': 'error',
+                'message': 'Respon server Google Apps Script tidak dapat di-parse (Format bukan JSON).',
+              };
+            }
           }
         }
       }
@@ -125,8 +133,8 @@ class SheetsSyncService {
           return jsonDecode(response.body) as Map<String, dynamic>;
         } catch (_) {
           return {
-            'status': 'success',
-            'message': 'Data berhasil diproses oleh Google Apps Script.',
+            'status': 'error',
+            'message': 'Respon server Google Apps Script tidak valid (Format bukan JSON).',
           };
         }
       }
@@ -152,8 +160,8 @@ class SheetsSyncService {
           return jsonDecode(getResponse.body) as Map<String, dynamic>;
         } catch (_) {
           return {
-            'status': 'success',
-            'message': 'Berhasil terhubung ke Google Apps Script.',
+            'status': 'error',
+            'message': 'Respon GET Google Apps Script tidak valid.',
           };
         }
       }
@@ -179,8 +187,8 @@ class SheetsSyncService {
             return jsonDecode(responseBody) as Map<String, dynamic>;
           } catch (_) {
             return {
-              'status': 'success',
-              'message': 'Data berhasil diterima Google Apps Script',
+              'status': 'error',
+              'message': 'Respon HttpClient Google Apps Script tidak valid.',
             };
           }
         }
@@ -851,22 +859,31 @@ class SheetsSyncService {
     final int remoteRekCount = remoteFetchResult.rekeningRows.length;
     final int remoteOnHandCount = remoteFetchResult.onHandRows.length;
 
-    // 3. Deteksi apakah ada perbedaan JUMLAH TRANSAKSI (count) saja
+    // 3. Deteksi apakah ada perbedaan data (jumlah transaksi maupun nominal)
     final List<String> reasons = [];
 
     // Jika spreadsheet sama sekali kosong, tidak dianggap konflik
     final isRemoteEmpty = remoteRekCount == 0 && remoteOnHandCount == 0;
 
     if (!isRemoteEmpty) {
-      // Hanya perbedaan JUMLAH (count) transaksi yang memicu peringatan risiko
       if (localRekening.length != remoteRekCount) {
         reasons.add('Jumlah transaksi Rekening berbeda (Aplikasi: ${localRekening.length}, Sheets: $remoteRekCount)');
       }
       if (localOnHand.length != remoteOnHandCount) {
         reasons.add('Jumlah transaksi On Hand berbeda (Aplikasi: ${localOnHand.length}, Sheets: $remoteOnHandCount)');
       }
-      // Catatan: perbedaan nominal TIDAK memicu peringatan risiko,
-      // hanya perbedaan jumlah transaksi yang dianggap konflik kritis.
+      if (localRekDebit != remoteRekDebit) {
+        reasons.add('Total Masuk/Debit Rekening berbeda (Aplikasi: ${RupiahFormatter.format(localRekDebit)}, Sheets: ${RupiahFormatter.format(remoteRekDebit)})');
+      }
+      if (localRekKredit != remoteRekKredit) {
+        reasons.add('Total Keluar/Kredit Rekening berbeda (Aplikasi: ${RupiahFormatter.format(localRekKredit)}, Sheets: ${RupiahFormatter.format(remoteRekKredit)})');
+      }
+      if (localOnHandDebit != remoteOnHandDebit) {
+        reasons.add('Total Masuk/Debit On Hand berbeda (Aplikasi: ${RupiahFormatter.format(localOnHandDebit)}, Sheets: ${RupiahFormatter.format(remoteOnHandDebit)})');
+      }
+      if (localOnHandKredit != remoteOnHandKredit) {
+        reasons.add('Total Keluar/Kredit On Hand berbeda (Aplikasi: ${RupiahFormatter.format(localOnHandKredit)}, Sheets: ${RupiahFormatter.format(remoteOnHandKredit)})');
+      }
     }
 
     final hasDiscrepancy = reasons.isNotEmpty;

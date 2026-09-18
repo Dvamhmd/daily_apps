@@ -72,5 +72,77 @@ void main() {
       expect(script.contains('strVal.indexOf("CATATAN:") === 0'), isTrue);
       expect(script.contains('clearFirst'), isTrue);
     });
+
+    test('compareData detects discrepancy when local is empty and remote has data', () {
+      final remoteResult = SheetsFetchResult(
+        isSuccess: true,
+        message: 'Success',
+        rekeningRows: [
+          {'no': 1, 'debit': '100000', 'kredit': '', 'keterangan': 'Pemasukan remote'}
+        ],
+        onHandRows: [],
+      );
+
+      final comp = SheetsSyncService.compareData(
+        localTransactions: [],
+        remoteFetchResult: remoteResult,
+      );
+
+      expect(comp.hasDiscrepancy, isTrue);
+      expect(comp.discrepancyReasons.isNotEmpty, isTrue);
+    });
+
+    test('compareData detects discrepancy when amounts differ even if counts match', () {
+      final tx = StrukturTransaction(
+        id: '1',
+        title: 'Kas Masuk',
+        type: 'pemasukan',
+        amount: 50000,
+        timestamp: DateTime(2026, 9, 7),
+        targetAccount: 'rekening',
+      );
+
+      final remoteResult = SheetsFetchResult(
+        isSuccess: true,
+        message: 'Success',
+        rekeningRows: [
+          {'no': 1, 'debit': '100000', 'kredit': '', 'keterangan': 'Pemasukan remote'}
+        ],
+        onHandRows: [],
+      );
+
+      final comp = SheetsSyncService.compareData(
+        localTransactions: [tx],
+        remoteFetchResult: remoteResult,
+      );
+
+      expect(comp.hasDiscrepancy, isTrue);
+      expect(comp.discrepancyReasons.any((r) => r.contains('Total Masuk/Debit Rekening berbeda')), isTrue);
+    });
+
+    test('compareData does not report discrepancy when remote spreadsheet is completely empty', () {
+      final tx = StrukturTransaction(
+        id: '1',
+        title: 'Kas Masuk',
+        type: 'pemasukan',
+        amount: 50000,
+        timestamp: DateTime(2026, 9, 7),
+        targetAccount: 'rekening',
+      );
+
+      final remoteResult = SheetsFetchResult(
+        isSuccess: true,
+        message: 'Empty sheet',
+        rekeningRows: [],
+        onHandRows: [],
+      );
+
+      final comp = SheetsSyncService.compareData(
+        localTransactions: [tx],
+        remoteFetchResult: remoteResult,
+      );
+
+      expect(comp.hasDiscrepancy, isFalse);
+    });
   });
 }

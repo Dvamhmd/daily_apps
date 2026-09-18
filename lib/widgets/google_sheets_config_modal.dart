@@ -1312,50 +1312,67 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
       customRules: widget.customRules,
     );
 
-    if (fetchRes.isSuccess && !fetchRes.isEmpty) {
-      final comparison = SheetsSyncService.compareData(
-        localTransactions: widget.transactions,
-        remoteFetchResult: fetchRes,
-      );
-
-      if (comparison.hasDiscrepancy) {
+    if (!fetchRes.isSuccess) {
+      if (mounted) {
         setState(() {
           _isSyncing = false;
         });
-
-        if (!mounted) return;
-        final choice = await SheetsRiskManagementDialog.show(
+        CustomToast.showError(
           context,
-          comparison: comparison,
-          sheetName: _config.sheetName,
+          title: 'Gagal Memeriksa Spreadsheet',
+          subtitle: fetchRes.message,
         );
+      }
+      return;
+    }
 
-        if (choice == null || choice == SheetsConflictChoice.cancel) {
-          return;
-        }
+    final comparison = SheetsSyncService.compareData(
+      localTransactions: widget.transactions,
+      remoteFetchResult: fetchRes,
+    );
 
-        if (choice == SheetsConflictChoice.useSheetData) {
-          // Sesuaikan data dari Spreadsheet ke Aplikasi
-          bool applied = true;
-          if (widget.onImportFromSheets != null) {
-            final res =
-                await widget.onImportFromSheets!(comparison.remoteTransactions);
-            if (res == false) {
-              applied = false;
-            }
+    if (comparison.hasDiscrepancy) {
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+        });
+      }
+
+      if (!mounted) return;
+      final choice = await SheetsRiskManagementDialog.show(
+        context,
+        comparison: comparison,
+        sheetName: _config.sheetName,
+        useRootNavigator: true,
+      );
+
+      if (choice == null || choice == SheetsConflictChoice.cancel) {
+        return;
+      }
+
+      if (choice == SheetsConflictChoice.useSheetData) {
+        // Sesuaikan data dari Spreadsheet ke Aplikasi
+        bool applied = true;
+        if (widget.onImportFromSheets != null) {
+          final res =
+              await widget.onImportFromSheets!(comparison.remoteTransactions);
+          if (res == false) {
+            applied = false;
           }
-          if (applied && mounted) {
-            CustomToast.showSuccess(
-              context,
-              title: 'Data Disesuaikan',
-              subtitle:
-                  'Berhasil menyesuaikan ${comparison.remoteTotalCount} transaksi dari Spreadsheet ke aplikasi!',
-            );
-          }
-          return;
         }
+        if (applied && mounted) {
+          CustomToast.showSuccess(
+            context,
+            title: 'Data Disesuaikan',
+            subtitle:
+                'Berhasil menyesuaikan ${comparison.remoteTotalCount} transaksi dari Spreadsheet ke aplikasi!',
+          );
+        }
+        return;
+      }
 
-        // Jika choice == useAppData, lanjutkan mengirim data lokal ke Spreadsheet
+      // Jika choice == useAppData, lanjutkan mengirim data lokal ke Spreadsheet
+      if (mounted) {
         setState(() {
           _isSyncing = true;
         });
