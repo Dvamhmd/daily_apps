@@ -414,13 +414,17 @@ class _StrukturPageState extends State<StrukturPage> {
     await prefs.setString('struktur_keuangan_data', jsonEncode(_data.toJson()));
   }
 
-  /// Menghitung ulang saldo ketiga akun (Rekening, Debit, Cash) dari nol
+  /// Menghitung ulang saldo ketiga akun (Rekening, Debit, Cash) dari Saldo Awal
   /// berdasarkan seluruh transaksi yang ada di _data.transactions.
   /// Digunakan setelah data transaksi diganti dari sumber eksternal (Spreadsheet).
-  void _recalculateBalancesFromTransactions() {
-    num rekeningBalance = 0;
-    num debitBalance = 0;
-    num cashBalance = 0;
+  void _recalculateBalancesFromTransactions({
+    num saldoAwalRekening = 0,
+    num saldoAwalDebit = 0,
+    num saldoAwalCash = 0,
+  }) {
+    num rekeningBalance = saldoAwalRekening;
+    num debitBalance = saldoAwalDebit;
+    num cashBalance = saldoAwalCash;
 
     for (final tx in _data.transactions) {
       if (tx.isPemasukan) {
@@ -447,6 +451,555 @@ class _StrukturPageState extends State<StrukturPage> {
     _data.rekeningStruktur.balance = rekeningBalance < 0 ? 0 : rekeningBalance;
     _data.onHandDebit.balance = debitBalance < 0 ? 0 : debitBalance;
     _data.onHandCash.balance = cashBalance < 0 ? 0 : cashBalance;
+  }
+
+  /// Menampilkan dialog form input Saldo Awal (Rekening, On Hand Debit, On Hand Tunai)
+  /// khusus ketika Mode Admin aktif saat mengambil / menyesuaikan data dari Spreadsheet.
+  /// Saldo Akhir akan dihitung dari Saldo Awal + Total Pemasukan - Total Pengeluaran.
+  Future<({num saldoRekening, num saldoDebit, num saldoCash})?>
+      _showAdminInputSaldoDialog({
+    required BuildContext context,
+    required List<StrukturTransaction> importedTransactions,
+    bool useRootNavigator = true,
+  }) async {
+    // 1. Hitung mutasi per akun dari transaksi remote yang ditarik dari Spreadsheet
+    num masukRek = 0;
+    num keluarRek = 0;
+    num masukDeb = 0;
+    num keluarDeb = 0;
+    num masukCsh = 0;
+    num keluarCsh = 0;
+
+    for (final tx in importedTransactions) {
+      if (tx.isPemasukan) {
+        final target = tx.targetAccount ?? 'rekening';
+        if (target == 'rekening') {
+          masukRek += tx.amount;
+        } else if (target == 'debit') {
+          masukDeb += tx.amount;
+        } else if (target == 'cash') {
+          masukCsh += tx.amount;
+        }
+      } else if (tx.isPengeluaran) {
+        final source = tx.sourceAccount ?? 'rekening';
+        if (source == 'rekening') {
+          keluarRek += tx.totalDeduction;
+        } else if (source == 'debit') {
+          keluarDeb += tx.totalDeduction;
+        } else if (source == 'cash') {
+          keluarCsh += tx.totalDeduction;
+        }
+      }
+    }
+
+    final netMutasiRek = masukRek - keluarRek;
+    final netMutasiDeb = masukDeb - keluarDeb;
+    final netMutasiCsh = masukCsh - keluarCsh;
+
+    final saldoAwalRekeningCtrl = TextEditingController(text: '0');
+    final saldoAwalDebitCtrl = TextEditingController(text: '0');
+    final saldoAwalCashCtrl = TextEditingController(text: '0');
+
+    return showDialog<({num saldoRekening, num saldoDebit, num saldoCash})?>(
+      context: context,
+      useRootNavigator: useRootNavigator,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final awalRek =
+                RupiahFormatter.parseToNum(saldoAwalRekeningCtrl.text);
+            final awalDeb =
+                RupiahFormatter.parseToNum(saldoAwalDebitCtrl.text);
+            final awalCsh =
+                RupiahFormatter.parseToNum(saldoAwalCashCtrl.text);
+
+            final akhirRek = awalRek + netMutasiRek;
+            final akhirDeb = awalDeb + netMutasiDeb;
+            final akhirCsh = awalCsh + netMutasiCsh;
+
+            final totalAwal = awalRek + awalDeb + awalCsh;
+            final totalMutasi = netMutasiRek + netMutasiDeb + netMutasiCsh;
+            final totalAkhir = (akhirRek < 0 ? 0 : akhirRek) +
+                (akhirDeb < 0 ? 0 : akhirDeb) +
+                (akhirCsh < 0 ? 0 : akhirCsh);
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+              contentPadding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+              titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFDF2F8),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFBCFE8)),
+                    ),
+                    child: const Icon(
+                      Icons.admin_panel_settings_rounded,
+                      color: Color(0xFFDB2777),
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Text(
+                              'Input Saldo Awal',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 1.5),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFFCE7F3),
+                                borderRadius:
+                                    BorderRadius.all(Radius.circular(4)),
+                              ),
+                              child: const Text(
+                                'Mode Admin',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFBE185D),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Saldo awal sebelum transaksi diterapkan',
+                          style:
+                              TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Banner Info Penjelasan
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 14),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.info_outline_rounded,
+                                color: Color(0xFF64748B), size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Masukkan saldo awal sebelum transaksi. Saldo akhir akan otomatis dihitung dari: Saldo Awal + Mutasi Spreadsheet (${importedTransactions.length} transaksi).',
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  color: Color(0xFF475569),
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // 1. Input Saldo Awal Rekening
+                      _buildAdminSaldoInputField(
+                        label: 'Saldo Awal Rekening',
+                        accountInfo: _data.rekeningStruktur.bankName.isNotEmpty
+                            ? _data.rekeningStruktur.bankName
+                            : 'Rekening Bank',
+                        icon: Icons.account_balance_rounded,
+                        iconColor: primaryPurple,
+                        controller: saldoAwalRekeningCtrl,
+                        masuk: masukRek,
+                        keluar: keluarRek,
+                        netMutasi: netMutasiRek,
+                        saldoAkhir: akhirRek,
+                        onChanged: () => setDialogState(() {}),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 2. Input Saldo Awal Dana On Hand Debit
+                      _buildAdminSaldoInputField(
+                        label: 'Saldo Awal On Hand Debit',
+                        accountInfo: _data.onHandDebit.bankName.isNotEmpty
+                            ? _data.onHandDebit.bankName
+                            : 'Kartu Debit',
+                        icon: Icons.credit_card_rounded,
+                        iconColor: primaryTeal,
+                        controller: saldoAwalDebitCtrl,
+                        masuk: masukDeb,
+                        keluar: keluarDeb,
+                        netMutasi: netMutasiDeb,
+                        saldoAkhir: akhirDeb,
+                        onChanged: () => setDialogState(() {}),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 3. Input Saldo Awal Dana On Hand Tunai (Cash)
+                      _buildAdminSaldoInputField(
+                        label: 'Saldo Awal On Hand Tunai',
+                        accountInfo: 'Uang Kas Tunai (Cash)',
+                        icon: Icons.payments_outlined,
+                        iconColor: const Color(0xFFD97706),
+                        controller: saldoAwalCashCtrl,
+                        masuk: masukCsh,
+                        keluar: keluarCsh,
+                        netMutasi: netMutasiCsh,
+                        saldoAkhir: akhirCsh,
+                        onChanged: () => setDialogState(() {}),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Ringkasan Total Saldo
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFBBF7D0)),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Total Saldo Awal:',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: Color(0xFF475569),
+                                  ),
+                                ),
+                                Text(
+                                  'Rp ${RupiahFormatter.format(totalAwal, decimalDigits: _data.decimalDigits)}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF334155),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Total Mutasi Transaksi:',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: Color(0xFF475569),
+                                  ),
+                                ),
+                                Text(
+                                  '${totalMutasi >= 0 ? '+' : ''}Rp ${RupiahFormatter.format(totalMutasi, decimalDigits: _data.decimalDigits)}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: totalMutasi >= 0
+                                        ? const Color(0xFF15803D)
+                                        : const Color(0xFFDC2626),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Divider(height: 10),
+                            Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Total Saldo Akhir:',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF166534),
+                                  ),
+                                ),
+                                Text(
+                                  'Rp ${RupiahFormatter.format(totalAkhir, decimalDigits: _data.decimalDigits)}',
+                                  style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF15803D),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              actions: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(dialogCtx, null),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                        ),
+                        child: const Text(
+                          'Batal',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          final awalRekVal = RupiahFormatter.parseToNum(
+                              saldoAwalRekeningCtrl.text);
+                          final awalDebVal = RupiahFormatter.parseToNum(
+                              saldoAwalDebitCtrl.text);
+                          final awalCshVal = RupiahFormatter.parseToNum(
+                              saldoAwalCashCtrl.text);
+
+                          final finRek = awalRekVal + netMutasiRek;
+                          final finDeb = awalDebVal + netMutasiDeb;
+                          final finCsh = awalCshVal + netMutasiCsh;
+
+                          Navigator.pop(
+                            dialogCtx,
+                            (
+                              saldoRekening: finRek < 0 ? 0 : finRek,
+                              saldoDebit: finDeb < 0 ? 0 : finDeb,
+                              saldoCash: finCsh < 0 ? 0 : finCsh,
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.check_circle_outline_rounded,
+                            size: 16),
+                        label: const Text(
+                          'Terapkan & Simpan',
+                          style: TextStyle(
+                              fontSize: 12.5, fontWeight: FontWeight.bold),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF059669),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildAdminSaldoInputField({
+    required String label,
+    required String accountInfo,
+    required IconData icon,
+    required Color iconColor,
+    required TextEditingController controller,
+    required num masuk,
+    required num keluar,
+    required num netMutasi,
+    required num saldoAkhir,
+    required VoidCallback onChanged,
+  }) {
+    final isNegative = saldoAkhir < 0;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: iconColor),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  accountInfo,
+                  style: const TextStyle(
+                    fontSize: 9.5,
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFCBD5E1)),
+            ),
+            child: TextField(
+              controller: controller,
+              keyboardType: _data.decimalDigits > 0
+                  ? const TextInputType.numberWithOptions(decimal: true)
+                  : TextInputType.number,
+              inputFormatters: [
+                RupiahInputFormatter(
+                  allowDecimal: _data.decimalDigits > 0,
+                  maxDecimalDigits:
+                      _data.decimalDigits > 0 ? _data.decimalDigits : 2,
+                ),
+              ],
+              onChanged: (_) => onChanged(),
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A),
+              ),
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                border: InputBorder.none,
+                prefixText: 'Rp ',
+                prefixStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF64748B),
+                ),
+                suffixIcon: controller.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 16),
+                        splashRadius: 14,
+                        onPressed: () {
+                          controller.text = '0';
+                          onChanged();
+                        },
+                      )
+                    : null,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Rincian Mutasi & Saldo Akhir
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Mutasi: +${RupiahFormatter.format(masuk, decimalDigits: _data.decimalDigits)}  -${RupiahFormatter.format(keluar, decimalDigits: _data.decimalDigits)}',
+                      style: const TextStyle(
+                          fontSize: 10, color: Color(0xFF64748B)),
+                    ),
+                    Text(
+                      'Net: ${netMutasi >= 0 ? '+' : ''}Rp ${RupiahFormatter.format(netMutasi, decimalDigits: _data.decimalDigits)}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: netMutasi >= 0
+                            ? const Color(0xFF15803D)
+                            : const Color(0xFFB91C1C),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Saldo Akhir Akun:',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF334155),
+                      ),
+                    ),
+                    Text(
+                      'Rp ${RupiahFormatter.format(saldoAkhir < 0 ? 0 : saldoAkhir, decimalDigits: _data.decimalDigits)}',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        color: isNegative
+                            ? const Color(0xFFDC2626)
+                            : const Color(0xFF0D9488),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
 
@@ -523,6 +1076,36 @@ class _StrukturPageState extends State<StrukturPage> {
           }
 
           if (choice == SheetsConflictChoice.useSheetData) {
+            if (_data.isSaldoRekeningUnlocked) {
+              final balances = await _showAdminInputSaldoDialog(
+                context: context,
+                importedTransactions: comparison.remoteTransactions,
+                useRootNavigator: true,
+              );
+              if (balances == null) {
+                return false; // Pengguna membatalkan input saldo mode admin
+              }
+
+              setState(() {
+                _data.transactions = List<StrukturTransaction>.from(
+                    comparison.remoteTransactions)
+                  ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+                _data.rekeningStruktur.balance = balances.saldoRekening;
+                _data.onHandDebit.balance = balances.saldoDebit;
+                _data.onHandCash.balance = balances.saldoCash;
+              });
+              await _saveData();
+              if (mounted) {
+                CustomToast.showSuccess(
+                  context,
+                  title: 'Data Disesuaikan',
+                  subtitle:
+                      'Berhasil menyesuaikan ${comparison.remoteTotalCount} transaksi dan saldo akun!',
+                );
+              }
+              return false;
+            }
+
             // Sesuaikan data aplikasi mengikuti Spreadsheet
             setState(() {
               _data.transactions =
@@ -552,25 +1135,29 @@ class _StrukturPageState extends State<StrukturPage> {
       });
       await _saveData();
 
-      // 6. Kirim seluruh mutasi yang sudah ter-update ke Google Spreadsheet
-      final updatedMutasi = _data.transactions
-          .where((tx) => tx.isPemasukan || tx.isPengeluaran)
-          .toList()
-        ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      // 6. Kirim seluruh mutasi yang sudah ter-update ke Google Spreadsheet di background
+      final updatedMutasi = List<StrukturTransaction>.from(
+        _data.transactions.where((tx) => tx.isPemasukan || tx.isPengeluaran),
+      )..sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
-      final res = await SheetsSyncService.syncAllTransactions(
-        updatedMutasi,
-        cfg,
-        customRules: _data.customKodeRules,
-        prevRekeningCount: prevRekening,
-        prevOnHandCount: prevOnHand,
+      // Trigger sync secara asynchronous agar UI/tombol modal langsung responsif & tertutup
+      unawaited(
+        SheetsSyncService.syncAllTransactions(
+          updatedMutasi,
+          cfg,
+          customRules: _data.customKodeRules,
+          prevRekeningCount: prevRekening,
+          prevOnHandCount: prevOnHand,
+        ).then((res) {
+          debugPrint(
+              'Direct sync Sheets result: ${res.isSuccess} - ${res.message}');
+          if (mounted) {
+            setState(() {});
+          }
+        }).catchError((err) {
+          debugPrint('Background sync error: $err');
+        }),
       );
-
-      if (mounted) {
-        debugPrint(
-            'Direct sync Sheets result: ${res.isSuccess} - ${res.message}');
-        setState(() {});
-      }
 
       return true;
     } catch (e) {
@@ -657,13 +1244,35 @@ class _StrukturPageState extends State<StrukturPage> {
       onSyncCompleted: () {
         setState(() {});
       },
-      onImportFromSheets: (importedTx) {
+      onImportFromSheets: (importedTx) async {
+        if (_data.isSaldoRekeningUnlocked) {
+          final balances = await _showAdminInputSaldoDialog(
+            context: effectiveContext,
+            importedTransactions: importedTx,
+            useRootNavigator: true,
+          );
+          if (balances == null) {
+            return false; // Pengguna membatalkan input saldo mode admin
+          }
+
+          setState(() {
+            _data.transactions = List<StrukturTransaction>.from(importedTx)
+              ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+            _data.rekeningStruktur.balance = balances.saldoRekening;
+            _data.onHandDebit.balance = balances.saldoDebit;
+            _data.onHandCash.balance = balances.saldoCash;
+          });
+          await _saveData();
+          return true;
+        }
+
         setState(() {
           _data.transactions = List<StrukturTransaction>.from(importedTx)
             ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
           _recalculateBalancesFromTransactions();
         });
-        _saveData();
+        await _saveData();
+        return true;
       },
     );
   }

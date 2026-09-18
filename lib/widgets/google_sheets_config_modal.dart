@@ -18,7 +18,7 @@ class GoogleSheetsConfigModal extends StatefulWidget {
   final int initialTab;
   final Function(SheetsConfig) onConfigSaved;
   final VoidCallback? onSyncCompleted;
-  final Function(List<StrukturTransaction>)? onImportFromSheets;
+  final dynamic Function(List<StrukturTransaction>)? onImportFromSheets;
 
   const GoogleSheetsConfigModal({
     super.key,
@@ -39,7 +39,7 @@ class GoogleSheetsConfigModal extends StatefulWidget {
     int initialTab = 0,
     required Function(SheetsConfig) onConfigSaved,
     VoidCallback? onSyncCompleted,
-    Function(List<StrukturTransaction>)? onImportFromSheets,
+    dynamic Function(List<StrukturTransaction>)? onImportFromSheets,
     bool useRootNavigator = true,
   }) {
     return showModalBottomSheet(
@@ -1336,10 +1336,15 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
 
         if (choice == SheetsConflictChoice.useSheetData) {
           // Sesuaikan data dari Spreadsheet ke Aplikasi
+          bool applied = true;
           if (widget.onImportFromSheets != null) {
-            widget.onImportFromSheets!(comparison.remoteTransactions);
+            final res =
+                await widget.onImportFromSheets!(comparison.remoteTransactions);
+            if (res == false) {
+              applied = false;
+            }
           }
-          if (mounted) {
+          if (applied && mounted) {
             CustomToast.showSuccess(
               context,
               title: 'Data Disesuaikan',

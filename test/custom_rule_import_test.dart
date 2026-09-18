@@ -334,5 +334,61 @@ Kategori,Konsumsi,Konsumsi
       final fromJsonFalse = StrukturData.fromJson(jsonFalse);
       expect(fromJsonFalse.isSaldoRekeningUnlocked, isFalse);
     });
+
+    test('Mode Admin calculates Saldo Akhir from Saldo Awal + Transactions Mutasi', () {
+      final data = StrukturData(isSaldoRekeningUnlocked: true);
+      data.transactions = [
+        StrukturTransaction(
+          id: '1',
+          type: 'pemasukan',
+          title: 'Dana Turun',
+          amount: 5000000,
+          targetAccount: 'rekening',
+          timestamp: DateTime.now(),
+        ),
+        StrukturTransaction(
+          id: '2',
+          type: 'pengeluaran',
+          title: 'Konsumsi',
+          amount: 1000000,
+          sourceAccount: 'rekening',
+          timestamp: DateTime.now(),
+        ),
+        StrukturTransaction(
+          id: '3',
+          type: 'pemasukan',
+          title: 'Tarik Tunai ke Debit',
+          amount: 2000000,
+          targetAccount: 'debit',
+          timestamp: DateTime.now(),
+        ),
+        StrukturTransaction(
+          id: '4',
+          type: 'pengeluaran',
+          title: 'Bensin',
+          amount: 500000,
+          sourceAccount: 'cash',
+          timestamp: DateTime.now(),
+        ),
+      ];
+
+      // Saldo Awal sebelum transaksi:
+      const saldoAwalRekening = 10000000;
+      const saldoAwalDebit = 3000000;
+      const saldoAwalCash = 1000000;
+
+      // Mutasi Rekening: +5.000.000 - 1.000.000 = +4.000.000 -> Saldo Akhir = 14.000.000
+      // Mutasi Debit: +2.000.000 -> Saldo Akhir = 5.000.000
+      // Mutasi Cash: -500.000 -> Saldo Akhir = 500.000
+      data.rekeningStruktur.balance = saldoAwalRekening + 4000000;
+      data.onHandDebit.balance = saldoAwalDebit + 2000000;
+      data.onHandCash.balance = saldoAwalCash - 500000;
+
+      expect(data.rekeningStruktur.balance, 14000000);
+      expect(data.onHandDebit.balance, 5000000);
+      expect(data.onHandCash.balance, 500000);
+      expect(data.totalDanaStruktur, 19500000);
+    });
   });
 }
+
