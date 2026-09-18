@@ -243,13 +243,7 @@ class _RundownPageState extends State<RundownPage> {
           ],
         ),
         actions: [
-          // Tombol + (Tambah Rundown Baru)
-          IconButton(
-            icon: const Icon(Icons.add_rounded, color: Colors.white, size: 26),
-            tooltip: 'Buat Rundown Baru',
-            onPressed: _openTambahRundownModal,
-          ),
-          // Tombol di samping kanan tombol + (Tombol Arsip)
+          // Tombol Arsip Rundown
           IconButton(
             icon: Stack(
               clipBehavior: Clip.none,
