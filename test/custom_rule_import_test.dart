@@ -64,6 +64,31 @@ Kategori,Konsumsi,Konsumsi
       expect(result.kategoriCount, 1);
     });
 
+    test('Parse mixed KU and Kategori rules when defaultType is ku (e.g. from KU tab)', () {
+      final buffer = StringBuffer();
+      buffer.writeln('Jenis Aturan\tKeterangan Pemicu\tHasil');
+      for (int i = 1; i <= 26; i++) {
+        buffer.writeln('KU\tkeyword_ku_$i\tHasil_KU_$i');
+      }
+      for (int i = 1; i <= 26; i++) {
+        buffer.writeln('Kategori\tkeyword_kat_$i\tHasil_KAT_$i');
+      }
+
+      // Simulate parsing when the user is on the 'ku' tab (defaultType = 'ku')
+      final resultKuTab = CustomRuleImportHelper.parseText(buffer.toString(), defaultType: 'ku');
+      expect(resultKuTab.isSuccess, isTrue);
+      expect(resultKuTab.rules.length, 52);
+      expect(resultKuTab.kuCount, 26);
+      expect(resultKuTab.kategoriCount, 26);
+
+      // Simulate parsing when the user is on the 'kategori' tab (defaultType = 'kategori')
+      final resultKatTab = CustomRuleImportHelper.parseText(buffer.toString(), defaultType: 'kategori');
+      expect(resultKatTab.isSuccess, isTrue);
+      expect(resultKatTab.rules.length, 52);
+      expect(resultKatTab.kuCount, 26);
+      expect(resultKatTab.kategoriCount, 26);
+    });
+
     test('Parse Excel Bytes generated from template', () {
       final bytes = CustomRuleImportHelper.generateTemplateExcelBytes();
       final result = CustomRuleImportHelper.parseExcelBytes(bytes);

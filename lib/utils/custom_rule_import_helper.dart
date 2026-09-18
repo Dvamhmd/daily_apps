@@ -212,12 +212,15 @@ class CustomRuleImportHelper {
         final second = row[1].trim();
         final firstLower = first.toLowerCase();
 
-        if (firstLower == 'ku' || firstLower == 'kategori') {
+        if (firstLower == 'ku' ||
+            firstLower == 'kategori' ||
+            firstLower == 'pemasukan' ||
+            firstLower == 'pengeluaran') {
           rawType = first;
           rawKeyword = second;
           rawResult = second;
         } else {
-          rawType = defaultType ?? 'kategori';
+          rawType = ''; // Kosongkan agar mengambil defaultType sesuai tab aktif
           rawKeyword = first;
           rawResult = second;
         }
@@ -238,19 +241,26 @@ class CustomRuleImportHelper {
         continue;
       }
 
-      // Tentukan tipe 'ku', 'pemasukan', atau 'pengeluaran'
-      String normalizedType = defaultType ?? 'pengeluaran';
-      final typeLower = rawType.toLowerCase();
-      if (typeLower.contains('ku') || typeLower == 'k') {
+      // Tentukan tipe: 'ku', 'kategori', 'pemasukan', atau 'pengeluaran'
+      String normalizedType;
+      final typeLower = rawType.toLowerCase().trim();
+
+      if (typeLower.contains('ku') || typeLower == 'k' || typeLower == 'unit') {
         normalizedType = 'ku';
-      } else if (typeLower.contains('masuk') || typeLower == 'pemasukan') {
-        normalizedType = 'pemasukan';
-      } else if (typeLower.contains('keluar') || typeLower == 'pengeluaran') {
-        normalizedType = 'pengeluaran';
       } else if (typeLower.contains('kat') || typeLower.contains('category')) {
-        normalizedType = defaultType ?? 'kategori';
+        normalizedType = 'kategori';
+      } else if (typeLower.contains('masuk') ||
+          typeLower == 'pemasukan' ||
+          typeLower == 'income') {
+        normalizedType = 'pemasukan';
+      } else if (typeLower.contains('keluar') ||
+          typeLower == 'pengeluaran' ||
+          typeLower == 'expense') {
+        normalizedType = 'pengeluaran';
       } else if (defaultType != null && defaultType.isNotEmpty) {
         normalizedType = defaultType;
+      } else {
+        normalizedType = 'kategori';
       }
 
       parsedRules.add(

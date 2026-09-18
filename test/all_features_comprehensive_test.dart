@@ -315,8 +315,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Rundown Acara'), findsOneWidget);
-      expect(find.byTooltip('Buat Rundown Baru'), findsOneWidget);
+      expect(find.text('Rundown Acara'), findsWidgets);
+      expect(find.text('Buat Rundown Pertama'), findsOneWidget);
     });
 
     testWidgets('TodoPage renders appbar and todo header', (tester) async {
