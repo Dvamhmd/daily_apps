@@ -4556,29 +4556,29 @@ class _PribadiPageState extends State<PribadiPage> {
                 Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: () => _confirmDeleteAllTransactions(),
+                    onTap: _showDetailTabelModal,
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: primaryRose.withValues(alpha: 0.08),
+                        color: primaryBlue.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                            color: primaryRose.withValues(alpha: 0.25)),
+                            color: primaryBlue.withValues(alpha: 0.25)),
                       ),
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.delete_sweep_rounded,
-                              size: 15, color: primaryRose),
+                          Icon(Icons.table_rows_rounded,
+                              size: 15, color: primaryBlue),
                           SizedBox(width: 4),
                           Text(
-                            'Hapus Semua',
+                            'Buka Detail',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: primaryRose,
+                              color: primaryBlue,
                             ),
                           ),
                         ],
@@ -4669,24 +4669,25 @@ class _PribadiPageState extends State<PribadiPage> {
 
             const SizedBox(height: 10),
 
-            // Tombol Menu Detail Tabel
+            // Tombol Hapus Semua Transaksi
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: _showDetailTabelModal,
-                icon: const Icon(Icons.table_rows_rounded, size: 16),
-                label: Text(
-                  'Buka Detail Tabel Transaksi (${allTransactions.length})',
-                  style: const TextStyle(
+                onPressed: () => _confirmDeleteAllTransactions(),
+                icon: const Icon(Icons.delete_sweep_rounded, size: 16),
+                label: const Text(
+                  'Hapus Semua',
+                  style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: lightCardElevated,
-                  foregroundColor: primaryBlue,
+                  backgroundColor: primaryRose.withValues(alpha: 0.08),
+                  foregroundColor: primaryRose,
                   elevation: 0,
-                  side: const BorderSide(color: lightBorder),
+                  side: BorderSide(
+                      color: primaryRose.withValues(alpha: 0.25)),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
