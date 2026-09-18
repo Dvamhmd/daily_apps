@@ -29,6 +29,7 @@ class ModalEstimasiPengeluaran extends StatefulWidget {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) => ModalEstimasiPengeluaran(
         rundown: rundown,
@@ -47,7 +48,6 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
   static const Color primaryTeal = Color(0xFF00897B);
   late Rundown _rundown;
   bool _isLoading = false;
-  bool _isEditMode = false;
 
   @override
   void initState() {
@@ -292,93 +292,105 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
     final totalItems = _rundown.expenses.length;
     final realizedCount = _rundown.totalItemTerealisasi;
 
+    final bottomNavPadding = mediaQuery.padding.bottom;
+    final bottomInset = mediaQuery.viewInsets.bottom;
+
     return Container(
       height: mediaQuery.size.height * 0.88,
       decoration: const BoxDecoration(
         color: Color(0xFFF8FAFC),
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: Column(
-        children: [
-          // Drag Handle
-          const SizedBox(height: 10),
-          Container(
-            width: 44,
-            height: 5,
-            decoration: BoxDecoration(
-              color: const Color(0xFFCBD5E1),
-              borderRadius: BorderRadius.circular(10),
+      child: SafeArea(
+        top: false,
+        bottom: true,
+        child: Column(
+          children: [
+            // Drag Handle
+            const SizedBox(height: 10),
+            Container(
+              width: 44,
+              height: 5,
+              decoration: BoxDecoration(
+                color: const Color(0xFFCBD5E1),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
 
-          // Header Bar
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: primaryTeal.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
+            // Header Bar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: primaryTeal.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.account_balance_wallet_rounded,
+                      color: primaryTeal,
+                      size: 22,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.account_balance_wallet_rounded,
-                    color: primaryTeal,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Estimasi & Realisasi Biaya',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      Text(
-                        _rundown.title,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF64748B),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
-                  tooltip: 'Tutup',
-                ),
-              ],
-            ),
-          ),
-
-          const Divider(height: 20, color: Color(0xFFE2E8F0)),
-
-          // Main Scrollable Area
-          Expanded(
-            child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: primaryTeal),
-                  )
-                : SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  const SizedBox(width: 12),
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Financial Summary Card
-                        _buildFinancialSummaryCard(
+                        const Text(
+                          'Estimasi & Realisasi Biaya',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        Text(
+                          _rundown.title,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded,
+                        color: Color(0xFF64748B)),
+                    tooltip: 'Tutup',
+                  ),
+                ],
+              ),
+            ),
+
+            const Divider(height: 20, color: Color(0xFFE2E8F0)),
+
+            // Main Scrollable Area
+            Expanded(
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: primaryTeal),
+                    )
+                  : SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        0,
+                        16,
+                        24 + bottomNavPadding + bottomInset,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Financial Summary Card
+                          _buildFinancialSummaryCard(
                           totalEstimasi: totalEstimasi,
                           totalRealisasi: totalRealisasi,
                           selisih: selisih,
@@ -388,7 +400,7 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
 
                         const SizedBox(height: 16),
 
-                        // Section Title + Add Button + Edit Button
+                        // Section Title + Add Button
                         Row(
                           children: [
                             Expanded(
@@ -426,51 +438,6 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
                                 ),
                               ),
                             ),
-                            if (_rundown.expenses.isNotEmpty) ...[
-                              const SizedBox(width: 6),
-                              OutlinedButton.icon(
-                                onPressed: () {
-                                  setState(() {
-                                    _isEditMode = !_isEditMode;
-                                  });
-                                },
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: _isEditMode
-                                      ? Colors.white
-                                      : const Color(0xFF0284C7),
-                                  backgroundColor: _isEditMode
-                                      ? const Color(0xFF0284C7)
-                                      : Colors.transparent,
-                                  side: const BorderSide(
-                                    color: Color(0xFF0284C7),
-                                  ),
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                  minimumSize: const Size(0, 36),
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(9),
-                                  ),
-                                ),
-                                icon: Icon(
-                                  _isEditMode
-                                      ? Icons.check_rounded
-                                      : Icons.edit_rounded,
-                                  size: 15,
-                                ),
-                                label: Text(
-                                  _isEditMode ? 'Selesai' : 'Edit',
-                                  style: const TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
                           ],
                         ),
 
@@ -492,12 +459,13 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
                             },
                           ),
 
-                        const SizedBox(height: 30),
-                      ],
+                          const SizedBox(height: 30),
+                        ],
+                      ),
                     ),
-                  ),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -549,12 +517,16 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      'Rp ${RupiahFormatter.format(totalEstimasi)}',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Rp ${RupiahFormatter.format(totalEstimasi)}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ],
@@ -580,12 +552,16 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      'Rp ${RupiahFormatter.format(totalRealisasi)}',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF80CBC4),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Rp ${RupiahFormatter.format(totalRealisasi)}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF80CBC4),
+                        ),
                       ),
                     ),
                   ],
@@ -603,34 +579,42 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
 
           // Row 2: Status Selisih & Progress
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    isHemat
-                        ? Icons.savings_outlined
-                        : Icons.warning_amber_rounded,
-                    color: isHemat
-                        ? const Color(0xFF81C784)
-                        : const Color(0xFFFFB74D),
-                    size: 18,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    isHemat
-                        ? 'Sisa/Hemat: Rp ${RupiahFormatter.format(selisih)}'
-                        : 'Lebih: Rp ${RupiahFormatter.format(selisih.abs())}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      isHemat
+                          ? Icons.savings_outlined
+                          : Icons.warning_amber_rounded,
                       color: isHemat
-                          ? const Color(0xFFA5D6A7)
-                          : const Color(0xFFFFCC80),
+                          ? const Color(0xFF81C784)
+                          : const Color(0xFFFFB74D),
+                      size: 18,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          isHemat
+                              ? 'Sisa/Hemat: Rp ${RupiahFormatter.format(selisih)}'
+                              : 'Lebih: Rp ${RupiahFormatter.format(selisih.abs())}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isHemat
+                                ? const Color(0xFFA5D6A7)
+                                : const Color(0xFFFFCC80),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -724,215 +708,373 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
     );
   }
 
+  void _showItemActionSheet(RundownExpenseItem item, int index) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Material(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        child: SafeArea(
+          top: false,
+          bottom: true,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              16,
+              20,
+              16 + MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle Bar
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              // Item Header Summary
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: item.isRealized
+                          ? const Color(0xFFE8F5E9)
+                          : const Color(0xFFE0F2F1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      item.isRealized
+                          ? Icons.check_circle_rounded
+                          : Icons.receipt_long_rounded,
+                      color: item.isRealized
+                          ? const Color(0xFF2E7D32)
+                          : primaryTeal,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.nama,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          item.isRealized
+                              ? 'Realisasi: Rp ${RupiahFormatter.format(item.nominalRealisasi ?? item.nominalEstimasi)}${item.posDana != null ? ' (${item.posDana})' : ''}'
+                              : 'Estimasi: Rp ${RupiahFormatter.format(item.nominalEstimasi)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: item.isRealized
+                                ? const Color(0xFF2E7D32)
+                                : const Color(0xFF64748B),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Divider(height: 1, color: Color(0xFFF1F5F9)),
+              const SizedBox(height: 8),
+
+              // Action 1: Edit Item
+              ListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0F2FE),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.edit_rounded,
+                      color: Color(0xFF0284C7), size: 20),
+                ),
+                title: const Text(
+                  'Edit Estimasi Item',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                subtitle: const Text(
+                  'Ubah nama atau nominal estimasi pengeluaran',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                ),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openEditEstimasiDialog(item, index);
+                },
+              ),
+
+              // Action 2: Hapus Item
+              ListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.delete_outline_rounded,
+                      color: Color(0xFFDC2626), size: 20),
+                ),
+                title: const Text(
+                  'Hapus Item',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFDC2626),
+                  ),
+                ),
+                subtitle: const Text(
+                  'Hapus pengeluaran ini dari daftar rundown',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                ),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _deleteEstimasi(item, index);
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
   Widget _buildExpenseCard(RundownExpenseItem item, int index) {
     final bool isRealized = item.isRealized;
     final int estimasi = item.nominalEstimasi;
     final int? realisasi = item.nominalRealisasi;
     final int selisihItem = (realisasi != null) ? (estimasi - realisasi) : 0;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () => _showItemActionSheet(item, index),
+        onLongPress: () {
+          HapticFeedback.mediumImpact();
+          _showItemActionSheet(item, index);
+        },
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isRealized
-              ? const Color(0xFF81C784).withValues(alpha: 0.6)
-              : const Color(0xFFE2E8F0),
-          width: isRealized ? 1.2 : 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
+        splashColor: primaryTeal.withValues(alpha: 0.12),
+        highlightColor: primaryTeal.withValues(alpha: 0.05),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7.5),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isRealized
+                  ? const Color(0xFF81C784).withValues(alpha: 0.6)
+                  : const Color(0xFFE2E8F0),
+              width: isRealized ? 1.2 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 3,
+                offset: const Offset(0, 1),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // 1. Kolom Nama (Sejajar proporsional flex 6)
-          Expanded(
-            flex: 6,
-            child: Row(
-              children: [
-                // Dot Status Indicator
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: BoxDecoration(
-                    color: isRealized
-                        ? const Color(0xFF2E7D32)
-                        : const Color(0xFFFFA000),
-                    shape: BoxShape.circle,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // 1. Kolom Nama (Sejajar proporsional flex 6)
+              Expanded(
+                flex: 6,
+                child: Row(
+                  children: [
+                    // Dot Status Indicator
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: isRealized
+                            ? const Color(0xFF2E7D32)
+                            : const Color(0xFFFFA000),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            item.nama,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (isRealized && item.posDana != null) ...[
+                            Text(
+                              'Pos: ${item.posDana}',
+                              style: const TextStyle(
+                                fontSize: 9.5,
+                                color: Color(0xFF64748B),
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // 2. Pembatas '|' (Posisi sejajar vertikal dekat dengan nominal)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  '|',
+                  style: TextStyle(
+                    color: Color(0xFFCBD5E1),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w300,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        item.nama,
-                        style: const TextStyle(
-                          fontSize: 13,
+              ),
+
+              // 3. Kolom Nominal (Sejajar proporsional flex 5 langsung setelah '|')
+              Expanded(
+                flex: 5,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Rp ${RupiahFormatter.format(isRealized && realisasi != null ? realisasi : estimasi)}',
+                        style: TextStyle(
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
+                          color: isRealized
+                              ? const Color(0xFF00695C)
+                              : const Color(0xFF1E293B),
                         ),
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                      if (isRealized && item.posDana != null) ...[
-                        const SizedBox(height: 1),
-                        Text(
-                          'Pos: ${item.posDana}',
-                          style: const TextStyle(
-                            fontSize: 9.5,
-                            color: Color(0xFF64748B),
-                            fontWeight: FontWeight.w500,
+                    ),
+                    if (isRealized && selisihItem != 0)
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          selisihItem > 0
+                              ? 'Hemat Rp ${RupiahFormatter.format(selisihItem)}'
+                              : '+Rp ${RupiahFormatter.format(selisihItem.abs())}',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: selisihItem > 0
+                                ? const Color(0xFF2E7D32)
+                                : const Color(0xFFC62828),
                           ),
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ],
-                    ],
-                  ),
+                      ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-
-          // 2. Pembatas '|' (Posisi sejajar vertikal dekat dengan nominal)
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 6),
-            child: Text(
-              '|',
-              style: TextStyle(
-                color: Color(0xFFCBD5E1),
-                fontSize: 13,
-                fontWeight: FontWeight.w300,
               ),
-            ),
-          ),
 
-          // 3. Kolom Nominal (Sejajar proporsional flex 5 langsung setelah '|')
-          Expanded(
-            flex: 5,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Rp ${RupiahFormatter.format(isRealized && realisasi != null ? realisasi : estimasi)}',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.bold,
-                    color: isRealized
-                        ? const Color(0xFF00695C)
-                        : const Color(0xFF1E293B),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (isRealized && selisihItem != 0)
-                  Text(
-                    selisihItem > 0
-                        ? 'Hemat Rp ${RupiahFormatter.format(selisihItem)}'
-                        : '+Rp ${RupiahFormatter.format(selisihItem.abs())}',
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                      color: selisihItem > 0
-                          ? const Color(0xFF2E7D32)
-                          : const Color(0xFFC62828),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-              ],
-            ),
-          ),
+              const SizedBox(width: 6),
 
-          const SizedBox(width: 8),
-
-          // 4. Kolom Tombol Aksi (Lebar tetap 72px sejajar rata kanan tanpa overflow)
-          SizedBox(
-            width: 72,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: _isEditMode
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit_rounded,
-                              size: 17, color: Color(0xFF0284C7)),
-                          onPressed: () => _openEditEstimasiDialog(item, index),
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.all(3),
-                          tooltip: 'Edit Item',
-                        ),
-                        const SizedBox(width: 3),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline_rounded,
-                              size: 17, color: Colors.redAccent),
-                          onPressed: () => _deleteEstimasi(item, index),
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.all(3),
-                          tooltip: 'Hapus Item',
-                        ),
-                      ],
-                    )
-                  : (!isRealized
-                      ? ElevatedButton(
-                          onPressed: () => _openIsiRealisasiDialog(item, index),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryTeal,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
-                            minimumSize: const Size(58, 28),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+              // 4. Kolom Tombol Aksi (Scalable di layar hp Android kecil)
+              SizedBox(
+                width: 58,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: !isRealized
+                        ? ElevatedButton(
+                            onPressed: () => _openIsiRealisasiDialog(item, index),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryTeal,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              minimumSize: const Size(54, 26),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(7),
+                              ),
                             ),
-                          ),
-                          child: const Text(
-                            'Bayar',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.bold,
+                            child: const Text(
+                              'Bayar',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                        )
-                      : InkWell(
-                          onTap: () => _batalkanRealisasi(item, index),
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 4.5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE8F5E9),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                  color: const Color(0xFFA5D6A7), width: 0.8),
-                            ),
-                            child: const FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Row(
+                          )
+                        : InkWell(
+                            onTap: () => _batalkanRealisasi(item, index),
+                            borderRadius: BorderRadius.circular(7),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 3.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8F5E9),
+                                borderRadius: BorderRadius.circular(7),
+                                border: Border.all(
+                                    color: const Color(0xFFA5D6A7),
+                                    width: 0.8),
+                              ),
+                              child: const Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(Icons.check_circle_rounded,
-                                      size: 13, color: Color(0xFF2E7D32)),
+                                      size: 12, color: Color(0xFF2E7D32)),
                                   SizedBox(width: 3),
                                   Text(
                                     'Lunas',
                                     style: TextStyle(
-                                      fontSize: 10.5,
+                                      fontSize: 10,
                                       fontWeight: FontWeight.bold,
                                       color: Color(0xFF2E7D32),
                                     ),
@@ -941,10 +1083,12 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
                               ),
                             ),
                           ),
-                        )),
-            ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1065,12 +1209,14 @@ class _DialogTambahEstimasiState extends State<DialogTambahEstimasi> {
           ),
         ],
       ),
-      content: SizedBox(
-        width: 480,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             // Dynamic Rows
             ...List.generate(_rows.length, (index) {
               final row = _rows[index];
@@ -1191,6 +1337,7 @@ class _DialogTambahEstimasiState extends State<DialogTambahEstimasi> {
           ],
         ),
       ),
+      ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
@@ -1276,14 +1423,19 @@ class _DialogEditEstimasiState extends State<DialogEditEstimasi> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      scrollable: true,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       title: const Text(
         'Edit Estimasi Pengeluaran',
         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
       ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
           TextField(
             controller: _namaCtrl,
             textCapitalization: TextCapitalization.words,
@@ -1309,7 +1461,9 @@ class _DialogEditEstimasiState extends State<DialogEditEstimasi> {
               ),
             ),
           ),
-        ],
+            ],
+          ),
+        ),
       ),
       actions: [
         TextButton(
@@ -1502,12 +1656,14 @@ class _DialogIsiRealisasiState extends State<DialogIsiRealisasi> {
                 child: CircularProgressIndicator(color: primaryTeal),
               ),
             )
-          : SizedBox(
-              width: 440,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+          : ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                   // Info Item
                   Container(
                     width: double.infinity,
@@ -1740,6 +1896,7 @@ class _DialogIsiRealisasiState extends State<DialogIsiRealisasi> {
                 ],
               ),
             ),
+          ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),

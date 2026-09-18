@@ -234,9 +234,92 @@ void main() {
       expect(find.text('TOTAL ESTIMASI'), findsOneWidget);
       expect(find.text('TOTAL REALISASI'), findsOneWidget);
       expect(find.text('Tambah Item'), findsOneWidget);
-      expect(find.text('Edit'), findsOneWidget);
+      expect(find.text('Edit'), findsNothing); // Tombol Edit di header sudah dihilangkan
       expect(find.text('Bensin'), findsOneWidget);
       expect(find.text('Bayar'), findsOneWidget);
+
+      // Long press / tap pada item Bensin untuk memunculkan action sheet
+      final bensinCard = find.text('Bensin');
+      await tester.longPress(bensinCard);
+      await tester.pumpAndSettle();
+
+      // Verifikasi Action Sheet muncul dengan opsi Edit & Hapus
+      expect(find.text('Edit Estimasi Item'), findsOneWidget);
+      expect(find.text('Hapus Item'), findsOneWidget);
+    });
+
+    testWidgets(
+        'ModalEstimasiPengeluaran renders properly without overflow across small, standard, and large Android screen sizes with system nav bar insets',
+        (WidgetTester tester) async {
+      final sampleRundown = Rundown(
+        id: 'rd_android_test',
+        title: 'Gathering Akbar 2026',
+        startDate: DateTime(2026, 9, 18),
+        totalDays: 1,
+        days: [],
+        expenses: [
+          RundownExpenseItem(
+            id: 'exp_1',
+            nama: 'Sewa Gedung Pertemuan & Lapangan Utama',
+            nominalEstimasi: 15000000,
+            nominalRealisasi: 14500000,
+            posDana: 'Dana Operasional',
+            isRealized: true,
+          ),
+          RundownExpenseItem(
+            id: 'exp_2',
+            nama: 'Snack & Coffee Break Box',
+            nominalEstimasi: 2500000,
+            isRealized: false,
+          ),
+        ],
+      );
+
+      final screenSizes = [
+        const Size(320, 568), // Small Android phone
+        const Size(360, 800), // Standard Android phone (e.g. Galaxy A series)
+        const Size(412, 915), // Large Android phone (e.g. Pixel)
+      ];
+
+      for (final size in screenSizes) {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1.0;
+        tester.view.padding = const FakeViewPadding(bottom: 48.0); // Simulate 3-button nav bar
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Builder(
+                builder: (ctx) => ElevatedButton(
+                  onPressed: () => ModalEstimasiPengeluaran.show(
+                    ctx,
+                    rundown: sampleRundown,
+                    onRundownUpdated: (_) {},
+                  ),
+                  child: const Text('Open'),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+
+        // Verify elements rendered properly without any overflow exception
+        expect(find.text('Estimasi & Realisasi Biaya'), findsOneWidget);
+        expect(find.text('Tambah Item'), findsOneWidget);
+        expect(find.text('Lunas'), findsOneWidget);
+        expect(find.text('Bayar'), findsOneWidget);
+
+        // Close modal for next iteration
+        await tester.tap(find.byIcon(Icons.close_rounded));
+        await tester.pumpAndSettle();
+      }
+
+      // Reset view size
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetPadding);
     });
   });
 }
