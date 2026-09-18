@@ -11862,7 +11862,7 @@ class _StrukturPageState extends State<StrukturPage> {
                           final Map<String, int> pengeluaranKategoriCountMap =
                               {};
 
-                          // Tambahkan kategori yang sudah dikonfigurasi (kecuali mengandung "DP", "Saldo Awal", atau "Dana dari S3")
+                          // Tambahkan kategori yang sudah dikonfigurasi (kecuali mengandung "DP KK", "Saldo Awal", atau "Dana dari S3")
                           for (final r in _data.customKodeRules
                               .where((r) => r.type != 'ku')) {
                             final name = r.kode.trim();
@@ -11875,7 +11875,7 @@ class _StrukturPageState extends State<StrukturPage> {
                                     nameLower == 's3');
 
                             if (name.isNotEmpty &&
-                                !name.toUpperCase().contains('DP') &&
+                                !name.toUpperCase().contains('DP KK') &&
                                 !isSaldoAwal &&
                                 !isDanaS3 &&
                                 !pengeluaranKategoriMap.containsKey(name)) {
@@ -11884,7 +11884,7 @@ class _StrukturPageState extends State<StrukturPage> {
                             }
                           }
 
-                          // Agregasi dari transaksi pengeluaran (kecuali kategori yang mengandung "DP", "Saldo Awal", atau "Dana dari S3")
+                          // Agregasi dari transaksi pengeluaran (kecuali kategori yang mengandung "DP KK", "Saldo Awal", atau "Dana dari S3")
                           for (final tx in pengeluaranList) {
                             final rawKategori = tx
                                 .getDisplayKode(
@@ -11905,8 +11905,8 @@ class _StrukturPageState extends State<StrukturPage> {
                                     noteOrTitle.contains('dana dari s3') ||
                                     noteOrTitle.contains('dana s3'));
 
-                            // Lewati jika kategori mengandung "DP", "Saldo Awal", "Dana dari S3", atau merupakan transaksi DP
-                            if (kategori.toUpperCase().contains('DP') ||
+                            // Lewati jika kategori mengandung "DP KK", "Saldo Awal", "Dana dari S3", atau merupakan transaksi DP
+                            if (kategori.toUpperCase().contains('DP KK') ||
                                 isSaldoAwal ||
                                 isDanaS3 ||
                                 tx.isDPTransaction(

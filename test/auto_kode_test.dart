@@ -125,9 +125,69 @@ void main() {
       expect(fromJsonData.customKodeRules.first.kode, equals('Penerimaan Donasi'));
     });
 
-    test('Dana Operasional excludes pemasukan with DP in code', () {
+    test('isDPTransaction matches only when description/title/note/source/kode contains "DP KK"', () {
       final customRules = [
-        CustomKodeRule(keyword: 'dp', kode: 'DP Setoran'),
+        CustomKodeRule(keyword: 'dp kk', kode: 'DP KK Masuk'),
+        CustomKodeRule(keyword: 'dp biasa', kode: 'DP Lainnya'),
+      ];
+
+      final txDpKkInTitle = StrukturTransaction(
+        id: '1',
+        title: 'Pemasukan DP KK Angkatan 2021',
+        type: 'pemasukan',
+        amount: 100000,
+      );
+      expect(txDpKkInTitle.isDPTransaction(customRules: customRules), isTrue);
+
+      final txDpKkInNote = StrukturTransaction(
+        id: '2',
+        title: 'Pemasukan Peserta',
+        type: 'pemasukan',
+        amount: 100000,
+        note: 'Setoran DP KK Barqi',
+      );
+      expect(txDpKkInNote.isDPTransaction(customRules: customRules), isTrue);
+
+      final txDpKkInSource = StrukturTransaction(
+        id: '3',
+        title: 'Pemasukan Peserta',
+        type: 'pemasukan',
+        amount: 100000,
+        manualSource: 'DP KK Angkatan',
+      );
+      expect(txDpKkInSource.isDPTransaction(customRules: customRules), isTrue);
+
+      final txDpKkInKode = StrukturTransaction(
+        id: '4',
+        title: 'Pemasukan',
+        type: 'pemasukan',
+        amount: 100000,
+        kode: 'DP KK Angkatan',
+      );
+      expect(txDpKkInKode.isDPTransaction(customRules: customRules), isTrue);
+
+      // Only "DP" without "KK" should NOT be recognized as DP transaction
+      final txOnlyDpInTitle = StrukturTransaction(
+        id: '5',
+        title: 'Terima DP Peserta',
+        type: 'pemasukan',
+        amount: 100000,
+      );
+      expect(txOnlyDpInTitle.isDPTransaction(customRules: customRules), isFalse);
+
+      final txOnlyDpInKode = StrukturTransaction(
+        id: '6',
+        title: 'Pemasukan',
+        type: 'pemasukan',
+        amount: 100000,
+        kode: 'DP DTK',
+      );
+      expect(txOnlyDpInKode.isDPTransaction(customRules: customRules), isFalse);
+    });
+
+    test('Dana Operasional excludes pemasukan with DP KK', () {
+      final customRules = [
+        CustomKodeRule(keyword: 'dp kk', kode: 'DP KK Setoran'),
         CustomKodeRule(keyword: 'infaq', kode: 'Infaq Rutin'),
       ];
 
@@ -137,7 +197,7 @@ void main() {
         onHandCash: OnHandCash(balance: 200000),
         customKodeRules: customRules,
         transactions: [
-          // DP Pemasukan (should be excluded from operational funds)
+          // DP KK Pemasukan (should be excluded from operational funds)
           StrukturTransaction(
             id: '1',
             title: 'DP KK Barqi',
@@ -153,13 +213,13 @@ void main() {
             amount: 200000,
             note: 'infaq',
           ),
-          // Explicit kode DP
+          // Explicit kode DP KK
           StrukturTransaction(
             id: '3',
             title: 'Pemasukan Peserta',
             type: 'pemasukan',
             amount: 150000,
-            kode: 'DP Angkatan',
+            kode: 'DP KK Angkatan',
           ),
         ],
       );
@@ -192,11 +252,11 @@ void main() {
         ),
         StrukturTransaction(
           id: '3',
-          title: 'DP Peserta KK',
+          title: 'DP KK Peserta',
           type: 'pemasukan',
           amount: 750000,
-          kode: 'DP Angkatan',
-          note: 'DP Masuk',
+          kode: 'DP KK Angkatan',
+          note: 'DP KK Masuk',
         ),
         StrukturTransaction(
           id: '4',
@@ -282,11 +342,11 @@ void main() {
       expect(isDanaS3, isFalse);
     });
 
-    test('Tab Pengeluaran: Saldo Awal, Dana dari S3, and DP are excluded from Kategori Pengeluaran map and aggregation', () {
+    test('Tab Pengeluaran: Saldo Awal, Dana dari S3, and DP KK are excluded from Kategori Pengeluaran map and aggregation', () {
       final customRules = [
         CustomKodeRule(keyword: 'Saldo Awal', kode: 'Saldo Awal'),
         CustomKodeRule(keyword: 'Dana S3', kode: 'Dana dari S3'),
-        CustomKodeRule(keyword: 'DP', kode: 'DP Angkatan'),
+        CustomKodeRule(keyword: 'DP KK', kode: 'DP KK Angkatan'),
         CustomKodeRule(keyword: 'Konsumsi', kode: 'Konsumsi'),
         CustomKodeRule(keyword: 'ATK', kode: 'ATK'),
       ];
@@ -305,7 +365,7 @@ void main() {
                 nameLower == 's3');
 
         if (name.isNotEmpty &&
-            !name.toUpperCase().contains('DP') &&
+            !name.toUpperCase().contains('DP KK') &&
             !isSaldoAwal &&
             !isDanaS3 &&
             !pengeluaranKategoriMap.containsKey(name)) {
@@ -316,7 +376,7 @@ void main() {
 
       expect(pengeluaranKategoriMap.containsKey('Saldo Awal'), isFalse);
       expect(pengeluaranKategoriMap.containsKey('Dana dari S3'), isFalse);
-      expect(pengeluaranKategoriMap.containsKey('DP Angkatan'), isFalse);
+      expect(pengeluaranKategoriMap.containsKey('DP KK Angkatan'), isFalse);
       expect(pengeluaranKategoriMap.containsKey('Konsumsi'), isTrue);
       expect(pengeluaranKategoriMap.containsKey('ATK'), isTrue);
 
@@ -355,7 +415,7 @@ void main() {
           title: 'DP Pengeluaran',
           type: 'pengeluaran',
           amount: 30000,
-          kode: 'DP Angkatan',
+          kode: 'DP KK Angkatan',
         ),
       ];
 
@@ -369,7 +429,7 @@ void main() {
                 kategoriLower.contains('dana s3') ||
                 kategoriLower == 's3');
 
-        if (kategori.toUpperCase().contains('DP') ||
+        if (kategori.toUpperCase().contains('DP KK') ||
             isSaldoAwal ||
             isDanaS3 ||
             tx.isDPTransaction(customRules: customRules)) {
@@ -395,7 +455,7 @@ void main() {
       expect(pengeluaranKategoriCountMap['ATK'], equals(1));
       expect(pengeluaranKategoriMap.containsKey('Saldo Awal'), isFalse);
       expect(pengeluaranKategoriMap.containsKey('Dana dari S3'), isFalse);
-      expect(pengeluaranKategoriMap.containsKey('DP Angkatan'), isFalse);
+      expect(pengeluaranKategoriMap.containsKey('DP KK Angkatan'), isFalse);
     });
   });
 }

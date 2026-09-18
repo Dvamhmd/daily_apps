@@ -239,10 +239,10 @@ class PribadiTransaction {
   String get displayKategori => getDisplayKode();
 
   bool isDPTransaction({List<CustomKodeRule>? customRules}) {
-    final kd = getDisplayKode(customRules: customRules).toUpperCase();
-    if (kd.contains('DP')) return true;
-    if (kode != null && kode!.toUpperCase().contains('DP')) return true;
-    return false;
+    final combined =
+        '$title ${note ?? ''} ${manualSource ?? ''} ${kode ?? ''} ${getDisplayKode(customRules: customRules)}'
+            .toUpperCase();
+    return combined.contains('DP KK');
   }
 
   Map<String, dynamic> toJson() => {

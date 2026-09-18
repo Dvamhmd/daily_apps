@@ -365,12 +365,12 @@ class StrukturTransaction {
   String get displayKode => getDisplayKode();
   String get displayKategori => getDisplayKode();
 
-  /// Menandakan apakah transaksi ini merupakan transaksi DP (Kategori mengandung 'DP')
+  /// Menandakan apakah transaksi ini merupakan transaksi DP (keterangan/judul/asal dana/kategori mengandung 'DP KK')
   bool isDPTransaction({List<CustomKodeRule>? customRules}) {
-    final kd = getDisplayKode(customRules: customRules).toUpperCase();
-    if (kd.contains('DP')) return true;
-    if (kode != null && kode!.toUpperCase().contains('DP')) return true;
-    return false;
+    final combined =
+        '$title ${note ?? ''} ${manualSource ?? ''} ${kode ?? ''} ${getDisplayKode(customRules: customRules)}'
+            .toUpperCase();
+    return combined.contains('DP KK');
   }
 
   Map<String, dynamic> toJson() => {
