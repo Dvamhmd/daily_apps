@@ -233,8 +233,10 @@ void main() {
       expect(find.text('Estimasi & Realisasi Biaya'), findsOneWidget);
       expect(find.text('TOTAL ESTIMASI'), findsOneWidget);
       expect(find.text('TOTAL REALISASI'), findsOneWidget);
+      expect(find.text('Tambah Item'), findsOneWidget);
+      expect(find.text('Edit'), findsOneWidget);
       expect(find.text('Bensin'), findsOneWidget);
-      expect(find.text('Isi Realisasi'), findsOneWidget);
+      expect(find.text('Bayar'), findsOneWidget);
     });
   });
 }

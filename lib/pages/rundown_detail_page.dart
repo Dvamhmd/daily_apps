@@ -2219,25 +2219,10 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             onPressed: _openEstimasiPengeluaranModal,
           ),
           IconButton(
-            icon: Icon(
-              _isResizeMode ? Icons.check_rounded : Icons.tune_rounded,
-              color: Colors.white,
-            ),
-            tooltip: _isResizeMode
-                ? 'Selesai Ubah Ukuran'
-                : 'Mode Kustom Ukuran (Geser Kolom & Baris)',
-            onPressed: _toggleResizeMode,
-          ),
-          IconButton(
             icon: const Icon(Icons.edit_note_rounded,
                 color: Colors.white, size: 24),
             tooltip: 'Edit Informasi Rundown',
             onPressed: _openEditRundownModal,
-          ),
-          IconButton(
-            icon: const Icon(Icons.view_column_rounded, color: Colors.white),
-            tooltip: 'Tambah Kolom',
-            onPressed: _addNewColumn,
           ),
         ],
       ),
