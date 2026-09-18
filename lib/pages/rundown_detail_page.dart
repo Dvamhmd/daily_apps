@@ -7,6 +7,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:daily_apps/utils/rupiah_formatter.dart';
+import 'package:daily_apps/widgets/dialog_rundown_expense.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class RundownDetailPage extends StatefulWidget {
@@ -1153,6 +1155,19 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     }
   }
 
+  void _openEstimasiPengeluaranModal() {
+    ModalEstimasiPengeluaran.show(
+      context,
+      rundown: _rundown,
+      onRundownUpdated: (updated) {
+        setState(() {
+          _rundown = updated;
+        });
+        _notifyChange();
+      },
+    );
+  }
+
   // --- CUSTOM TABLE DIMENSIONS (ROW HEIGHT & COLUMN WIDTHS) ---
 
   Future<void> _openTableDimensionsModal() async {
@@ -2179,6 +2194,31 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
         ),
         actions: [
           IconButton(
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.account_balance_wallet_rounded,
+                    color: Colors.white, size: 22),
+                if (_rundown.hasExpenses)
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF59E0B),
+                        shape: BoxShape.circle,
+                      ),
+                      constraints:
+                          const BoxConstraints(minWidth: 8, minHeight: 8),
+                    ),
+                  ),
+              ],
+            ),
+            tooltip: 'Estimasi & Realisasi Pengeluaran',
+            onPressed: _openEstimasiPengeluaranModal,
+          ),
+          IconButton(
             icon: Icon(
               _isResizeMode ? Icons.check_rounded : Icons.tune_rounded,
               color: Colors.white,
@@ -2189,7 +2229,8 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             onPressed: _toggleResizeMode,
           ),
           IconButton(
-            icon: const Icon(Icons.edit_note_rounded, color: Colors.white, size: 24),
+            icon: const Icon(Icons.edit_note_rounded,
+                color: Colors.white, size: 24),
             tooltip: 'Edit Informasi Rundown',
             onPressed: _openEditRundownModal,
           ),
@@ -2213,6 +2254,9 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Quick Summary Card: Estimasi & Realisasi Pengeluaran
+                _buildExpenseQuickSummaryCard(),
+
                 // 1. Theme Header & Day Navigation
                 if (activeDay != null) ...[
                   _buildDayThemeHeader(activeDay),
@@ -2233,6 +2277,196 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                 ],
 
                 const SizedBox(height: 80),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpenseQuickSummaryCard() {
+    final hasExpenses = _rundown.hasExpenses;
+    final totalEstimasi = _rundown.totalEstimasiPengeluaran;
+    final totalRealisasi = _rundown.totalRealisasiPengeluaran;
+    final selisih = _rundown.selisihPengeluaran;
+    final count = _rundown.expenses.length;
+    final realized = _rundown.totalItemTerealisasi;
+    final bool isHemat = selisih >= 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF00897B).withValues(alpha: 0.25),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF00897B).withValues(alpha: 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _openEstimasiPengeluaranModal,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(9),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF00897B), Color(0xFF004D40)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.account_balance_wallet_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                            'Estimasi Biaya Acara',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          if (hasExpenses) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 1.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00897B)
+                                    .withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '$realized/$count Selesai',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF00695C),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      if (hasExpenses) ...[
+                        Row(
+                          children: [
+                            Text(
+                              'Est: Rp ${RupiahFormatter.format(totalEstimasi)}',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                color: Color(0xFF475569),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Text('•',
+                                style: TextStyle(
+                                    color: Color(0xFFCBD5E1), fontSize: 10)),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Real: Rp ${RupiahFormatter.format(totalRealisasi)}',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF00695C),
+                              ),
+                            ),
+                            if (realized > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 4, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: isHemat
+                                      ? const Color(0xFFE8F5E9)
+                                      : const Color(0xFFFFEBEE),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  isHemat
+                                      ? 'Hemat ${RupiahFormatter.format(selisih)}'
+                                      : '+${RupiahFormatter.format(selisih.abs())}',
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: isHemat
+                                        ? const Color(0xFF2E7D32)
+                                        : const Color(0xFFC62828),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ] else ...[
+                        const Text(
+                          'Ketuk untuk input estimasi & realisasi pos dana',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: primaryTeal.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Kelola',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: primaryTeal,
+                        ),
+                      ),
+                      SizedBox(width: 3),
+                      Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 10,
+                        color: primaryTeal,
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -2737,6 +2971,71 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
                           ? Colors.white
                           : const Color(0xFF334155),
                       size: 19,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 8),
+
+            // 7. Estimasi Biaya & Realisasi Pos Dana
+            Tooltip(
+              message: 'Estimasi & Realisasi Pengeluaran (Potong Pos Dana)',
+              child: Material(
+                color: _rundown.hasExpenses
+                    ? const Color(0xFF00897B).withValues(alpha: 0.12)
+                    : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  onTap: _openEstimasiPengeluaranModal,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _rundown.hasExpenses
+                            ? const Color(0xFF00897B)
+                            : const Color(0xFFCBD5E1),
+                        width: 1.2,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.center,
+                      children: [
+                        const Icon(
+                          Icons.account_balance_wallet_rounded,
+                          color: primaryTeal,
+                          size: 19,
+                        ),
+                        if (_rundown.hasExpenses)
+                          Positioned(
+                            top: -4,
+                            right: -4,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF004D40),
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(
+                                  minWidth: 14, minHeight: 14),
+                              child: Text(
+                                '${_rundown.expenses.length}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),

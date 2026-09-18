@@ -231,12 +231,87 @@ class RundownDay {
   }
 }
 
+class RundownExpenseItem {
+  String id;
+  String nama;
+  int nominalEstimasi;
+  int? nominalRealisasi;
+  String? posDana; // Nama pos dana terpilih (misal 'Operasional', 'BCA', dll.)
+  DateTime? tanggalRealisasi;
+  bool isRealized;
+  String? catatan;
+
+  RundownExpenseItem({
+    required this.id,
+    required this.nama,
+    required this.nominalEstimasi,
+    this.nominalRealisasi,
+    this.posDana,
+    this.tanggalRealisasi,
+    this.isRealized = false,
+    this.catatan,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'nama': nama,
+        'nominalEstimasi': nominalEstimasi,
+        'nominalRealisasi': nominalRealisasi,
+        'posDana': posDana,
+        'tanggalRealisasi': tanggalRealisasi?.toIso8601String(),
+        'isRealized': isRealized,
+        'catatan': catatan,
+      };
+
+  factory RundownExpenseItem.fromJson(Map<String, dynamic> json) {
+    return RundownExpenseItem(
+      id: json['id'] as String? ??
+          DateTime.now().microsecondsSinceEpoch.toString(),
+      nama: json['nama'] as String? ?? '',
+      nominalEstimasi: (json['nominalEstimasi'] as num?)?.toInt() ?? 0,
+      nominalRealisasi: (json['nominalRealisasi'] as num?)?.toInt(),
+      posDana: json['posDana'] as String?,
+      tanggalRealisasi: json['tanggalRealisasi'] != null
+          ? DateTime.tryParse(json['tanggalRealisasi'] as String)
+          : null,
+      isRealized: json['isRealized'] as bool? ?? false,
+      catatan: json['catatan'] as String?,
+    );
+  }
+
+  RundownExpenseItem copyWith({
+    String? id,
+    String? nama,
+    int? nominalEstimasi,
+    int? nominalRealisasi,
+    String? posDana,
+    DateTime? tanggalRealisasi,
+    bool? isRealized,
+    String? catatan,
+    bool clearRealisasi = false,
+  }) {
+    return RundownExpenseItem(
+      id: id ?? this.id,
+      nama: nama ?? this.nama,
+      nominalEstimasi: nominalEstimasi ?? this.nominalEstimasi,
+      nominalRealisasi:
+          clearRealisasi ? null : (nominalRealisasi ?? this.nominalRealisasi),
+      posDana: clearRealisasi ? null : (posDana ?? this.posDana),
+      tanggalRealisasi:
+          clearRealisasi ? null : (tanggalRealisasi ?? this.tanggalRealisasi),
+      isRealized: isRealized ?? (clearRealisasi ? false : this.isRealized),
+      catatan: catatan ?? this.catatan,
+    );
+  }
+}
+
 class Rundown {
   final String id;
   final String title;
   final DateTime startDate;
   final int totalDays;
   final List<RundownDay> days;
+  final List<RundownExpenseItem> expenses;
   final DateTime createdAt;
 
   Rundown({
@@ -245,10 +320,27 @@ class Rundown {
     required this.startDate,
     required this.totalDays,
     required this.days,
+    List<RundownExpenseItem>? expenses,
     DateTime? createdAt,
-  }) : createdAt = createdAt ?? DateTime.now();
+  })  : expenses = expenses ?? [],
+        createdAt = createdAt ?? DateTime.now();
 
   DateTime get endDate => startDate.add(Duration(days: totalDays - 1));
+
+  int get totalEstimasiPengeluaran =>
+      expenses.fold<int>(0, (sum, item) => sum + item.nominalEstimasi);
+
+  int get totalRealisasiPengeluaran => expenses
+      .where((item) => item.isRealized)
+      .fold<int>(0, (sum, item) => sum + (item.nominalRealisasi ?? item.nominalEstimasi));
+
+  int get selisihPengeluaran =>
+      totalEstimasiPengeluaran - totalRealisasiPengeluaran;
+
+  int get totalItemTerealisasi =>
+      expenses.where((item) => item.isRealized).length;
+
+  bool get hasExpenses => expenses.isNotEmpty;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -256,12 +348,18 @@ class Rundown {
         'startDate': startDate.toIso8601String(),
         'totalDays': totalDays,
         'days': days.map((e) => e.toJson()).toList(),
+        'expenses': expenses.map((e) => e.toJson()).toList(),
         'createdAt': createdAt.toIso8601String(),
       };
 
   factory Rundown.fromJson(Map<String, dynamic> json) {
     final parsedDays = (json['days'] as List<dynamic>?)
             ?.map((e) => RundownDay.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        [];
+
+    final parsedExpenses = (json['expenses'] as List<dynamic>?)
+            ?.map((e) => RundownExpenseItem.fromJson(e as Map<String, dynamic>))
             .toList() ??
         [];
 
@@ -287,6 +385,7 @@ class Rundown {
           : DateTime.now(),
       totalDays: json['totalDays'] as int? ?? 1,
       days: parsedDays,
+      expenses: parsedExpenses,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
           : DateTime.now(),
@@ -299,6 +398,7 @@ class Rundown {
     DateTime? startDate,
     int? totalDays,
     List<RundownDay>? days,
+    List<RundownExpenseItem>? expenses,
     DateTime? createdAt,
   }) {
     return Rundown(
@@ -307,6 +407,7 @@ class Rundown {
       startDate: startDate ?? this.startDate,
       totalDays: totalDays ?? this.totalDays,
       days: days ?? this.days,
+      expenses: expenses ?? this.expenses,
       createdAt: createdAt ?? this.createdAt,
     );
   }

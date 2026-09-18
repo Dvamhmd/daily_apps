@@ -47,7 +47,7 @@ void main() {
 
     // Verify title and day header
     expect(find.text('Family Gathering 2026'), findsWidgets);
-    expect(find.text('DAY 1'), findsOneWidget);
+    expect(find.textContaining('Hari Ke-1'), findsOneWidget);
 
     // Verify toolbar buttons are icon-only without redundant button text labels
     // The select all checkbox text is compact 'Semua'

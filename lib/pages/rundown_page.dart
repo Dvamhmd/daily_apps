@@ -7,6 +7,7 @@ import 'package:daily_apps/widgets/dialog_tambah_rundown.dart';
 import 'package:daily_apps/widgets/gta_switch_wheel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -607,6 +608,61 @@ class _RundownPageState extends State<RundownPage> {
                     ],
                   ),
                 ),
+
+                if (rundown.hasExpenses) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: const Color(0xFF00897B).withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.account_balance_wallet_outlined,
+                          size: 15,
+                          color: primaryTeal,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Est: ${RupiahFormatter.format(rundown.totalEstimasiPengeluaran)}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF334155),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Text('•',
+                            style: TextStyle(
+                                color: Color(0xFFCBD5E1), fontSize: 10)),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Real: ${RupiahFormatter.format(rundown.totalRealisasiPengeluaran)}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF00695C),
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${rundown.totalItemTerealisasi}/${rundown.expenses.length} Selesai',
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF00897B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
 
                 const SizedBox(height: 12),
 
