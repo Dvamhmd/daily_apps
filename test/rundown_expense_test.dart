@@ -220,13 +220,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Verify Quick Summary card
-      expect(find.text('Estimasi Biaya Acara'), findsOneWidget);
-      expect(find.textContaining('Est: Rp 20.000'), findsOneWidget);
-      expect(find.text('Kelola'), findsOneWidget);
+      // Verify Quick Summary card is removed
+      expect(find.text('Estimasi Biaya Acara'), findsNothing);
 
-      // Tap Kelola to open ModalEstimasiPengeluaran
-      await tester.tap(find.text('Kelola'));
+      // Tap AppBar wallet action button to open ModalEstimasiPengeluaran
+      final walletButton = find.byTooltip('Estimasi & Realisasi Pengeluaran');
+      expect(walletButton, findsOneWidget);
+      await tester.tap(walletButton);
       await tester.pumpAndSettle();
 
       // Verify Modal items
