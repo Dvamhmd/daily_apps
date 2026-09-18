@@ -857,9 +857,9 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
 
           const SizedBox(width: 8),
 
-          // 4. Kolom Tombol Aksi (Lebar tetap 66px sejajar rata kanan)
+          // 4. Kolom Tombol Aksi (Lebar tetap 72px sejajar rata kanan tanpa overflow)
           SizedBox(
-            width: 66,
+            width: 72,
             child: Align(
               alignment: Alignment.centerRight,
               child: _isEditMode
@@ -875,7 +875,7 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
                           padding: const EdgeInsets.all(3),
                           tooltip: 'Edit Item',
                         ),
-                        const SizedBox(width: 2),
+                        const SizedBox(width: 3),
                         IconButton(
                           icon: const Icon(Icons.delete_outline_rounded,
                               size: 17, color: Colors.redAccent),
@@ -894,8 +894,8 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
                             foregroundColor: Colors.white,
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 11, vertical: 6.5),
-                            minimumSize: const Size(60, 29),
+                                horizontal: 10, vertical: 6),
+                            minimumSize: const Size(58, 28),
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
@@ -914,28 +914,31 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
                           borderRadius: BorderRadius.circular(8),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 5),
+                                horizontal: 6, vertical: 4.5),
                             decoration: BoxDecoration(
                               color: const Color(0xFFE8F5E9),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                   color: const Color(0xFFA5D6A7), width: 0.8),
                             ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.check_rounded,
-                                    size: 12, color: Color(0xFF2E7D32)),
-                                SizedBox(width: 3),
-                                Text(
-                                  'Lunas',
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF2E7D32),
+                            child: const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check_circle_rounded,
+                                      size: 13, color: Color(0xFF2E7D32)),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    'Lunas',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF2E7D32),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         )),
