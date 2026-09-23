@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui';
 import 'package:daily_apps/models/model_serious_mode.dart';
 import 'package:daily_apps/models/model_todo.dart';
 import 'package:daily_apps/pages/todo_riwayat_page.dart';
@@ -105,6 +106,7 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
   String? _multiSelectGroupId;
   bool _isDraggingTasks = false;
   String? _draggingTaskId;
+  String? _activeReorderBatchDraggedId;
   final ValueNotifier<Set<String>> _activeDraggingTaskIdsNotifier =
       ValueNotifier<Set<String>>({});
 
@@ -2542,6 +2544,7 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
   }
 
   Widget _buildBatchDragFeedback(
+    TodoDateGroup group,
     List<TodoItem> tasks, {
     bool isProxy = false,
     TodoItem? singleFallback,
@@ -2555,74 +2558,53 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
     }
 
     return Material(
-      elevation: 8,
-      color: Colors.transparent,
-      shadowColor: primaryTerracotta.withValues(alpha: 0.35),
-      child: Container(
-        decoration: BoxDecoration(
-          color: _isSeriousMode ? seriousCardBg : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: primaryTerracotta.withValues(alpha: 0.35),
-              blurRadius: 14,
-              offset: const Offset(0, 6),
-            ),
-          ],
-          border: Border.all(color: primaryTerracotta, width: 1.8),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: IntrinsicWidth(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: effectiveTasks.asMap().entries.map((entry) {
-                final idx = entry.key;
-                final t = entry.value;
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: idx > 0
-                      ? BoxDecoration(
-                          border: Border(
-                            top: BorderSide(
-                              color: _isSeriousMode
-                                  ? const Color(0xFF334155)
-                                  : Colors.grey.withValues(alpha: 0.2),
-                              width: 1,
-                            ),
-                          ),
-                        )
-                      : null,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.drag_indicator_rounded,
-                        color: primaryTerracotta,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          t.title,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: _isSeriousMode
-                                ? Colors.white
-                                : const Color(0xFF1E293B),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ),
+      elevation: 6,
+      color: _isSeriousMode ? seriousCardBg : Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      shadowColor: primaryTerracotta.withValues(alpha: 0.3),
+      child: _buildBatchDragFeedbackContent(group, effectiveTasks),
+    );
+  }
+
+  Widget _buildBatchDragFeedbackContent(
+    TodoDateGroup group,
+    List<TodoItem> tasks,
+  ) {
+    final effectiveTasks = tasks.isNotEmpty ? tasks : <TodoItem>[];
+    if (effectiveTasks.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: effectiveTasks.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final t = entry.value;
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildTaskItemTile(
+                group,
+                t,
+                index: idx,
+                isSelected: _selectedTaskIds.contains(t.id) || tasks.length > 1,
+                isFeedback: true,
+              ),
+              if (idx < effectiveTasks.length - 1)
+                Divider(
+                  height: 1,
+                  thickness: 0.6,
+                  color: _isSeriousMode
+                      ? const Color(0xFF334155)
+                      : Colors.grey.withValues(alpha: 0.12),
+                  indent: 44,
+                ),
+            ],
+          );
+        }).toList(),
       ),
     );
   }
@@ -2723,29 +2705,20 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                   feedback: Material(
                     color: Colors.transparent,
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 340),
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width - 32,
+                      ),
                       child: _buildBatchDragFeedback(
+                        group,
                         tasksBeingDragged,
                         isProxy: false,
                         singleFallback: item,
                       ),
                     ),
                   ),
-                  childWhenDragging: Visibility(
-                    visible: false,
-                    maintainSize: true,
-                    maintainAnimation: true,
-                    maintainState: true,
-                    child: childTile,
-                  ),
+                  childWhenDragging: const SizedBox.shrink(),
                   child: isItemBeingDragged
-                      ? Visibility(
-                          visible: false,
-                          maintainSize: true,
-                          maintainAnimation: true,
-                          maintainState: true,
-                          child: childTile,
-                        )
+                      ? const SizedBox.shrink()
                       : childTile,
                 ),
               ],
@@ -4660,16 +4633,26 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                                 return AnimatedBuilder(
                                   animation: animation,
                                   builder: (context, _) {
+                                    final double animValue =
+                                        Curves.easeInOut.transform(animation.value);
+                                    final double elevation =
+                                        lerpDouble(0, 6, animValue) ?? 6;
+
                                     if (isBatch && selectedTasks.isNotEmpty) {
-                                      return _buildBatchDragFeedback(
-                                        selectedTasks,
-                                        isProxy: true,
-                                        singleFallback: draggedItem,
+                                      return Material(
+                                        elevation: elevation,
+                                        color: _isSeriousMode ? seriousCardBg : Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        shadowColor: primaryTerracotta.withValues(alpha: 0.3),
+                                        child: _buildBatchDragFeedbackContent(
+                                          group,
+                                          selectedTasks,
+                                        ),
                                       );
                                     }
 
                                     return Material(
-                                      elevation: 6,
+                                      elevation: elevation,
                                       color: _isSeriousMode ? seriousCardBg : Colors.white,
                                       borderRadius: BorderRadius.circular(12),
                                       shadowColor: primaryTerracotta.withValues(alpha: 0.3),
@@ -4678,8 +4661,30 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                                   },
                                 );
                               },
+                              onReorderStart: (index) {
+                                if (index < itemsToShow.length) {
+                                  final item = itemsToShow[index];
+                                  if (_selectedTaskIds.contains(item.id) &&
+                                      _selectedTaskIds.length > 1) {
+                                    setState(() {
+                                      _activeReorderBatchDraggedId = item.id;
+                                    });
+                                    _activeDraggingTaskIdsNotifier.value =
+                                        Set<String>.from(_selectedTaskIds);
+                                  }
+                                }
+                              },
+                              onReorderEnd: (index) {
+                                if (_activeReorderBatchDraggedId != null) {
+                                  setState(() {
+                                    _activeReorderBatchDraggedId = null;
+                                  });
+                                  _activeDraggingTaskIdsNotifier.value = {};
+                                }
+                              },
                               onReorderItem: (oldIndex, newIndex) {
                                 _activeDraggingTaskIdsNotifier.value = {};
+                                _activeReorderBatchDraggedId = null;
                                 if (_isSeriousMode) return;
                                 if (oldIndex == newIndex) return;
 
@@ -4733,6 +4738,17 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                               },
                               itemBuilder: (context, idx) {
                                 final item = itemsToShow[idx];
+                                final isHiddenBatchMember = _activeReorderBatchDraggedId != null &&
+                                    _selectedTaskIds.contains(item.id) &&
+                                    item.id != _activeReorderBatchDraggedId;
+
+                                if (isHiddenBatchMember) {
+                                  return KeyedSubtree(
+                                    key: ValueKey('task_${item.id}'),
+                                    child: const SizedBox.shrink(),
+                                  );
+                                }
+
                                 return KeyedSubtree(
                                   key: ValueKey('task_${item.id}'),
                                   child: Column(
@@ -5182,6 +5198,7 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
     int index = 0,
     bool isSelected = false,
     VoidCallback? onSelectionToggled,
+    bool isFeedback = false,
   }) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -5189,259 +5206,278 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
         DateTime(group.date.year, group.date.month, group.date.day);
     final isMissedLocked =
         _isSeriousMode && groupDate.isBefore(today) && !item.isCompleted;
-    final isMultiSelect = !_isSeriousMode && _selectedTaskIds.isNotEmpty;
+    final isMultiSelect = !_isSeriousMode && (_selectedTaskIds.isNotEmpty || isSelected);
     final isDisintegrating = _disintegratingTaskIds.contains(item.id);
+
+    final contentWidget = Container(
+      decoration: BoxDecoration(
+        color: isSelected
+            ? primaryTerracotta.withValues(alpha: 0.1)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        border: isSelected
+            ? Border.all(
+                color: primaryTerracotta.withValues(alpha: 0.45),
+                width: 1.2,
+              )
+            : null,
+      ),
+      padding: const EdgeInsets.only(
+        left: 12,
+        right: 4,
+        top: 3.5,
+        bottom: 3.5,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Checkbox (Seleksi jika mode pilih banyak aktif, atau Checkbox Status Selesai)
+          if (isMultiSelect)
+            GestureDetector(
+              onTap: isFeedback
+                  ? null
+                  : (onSelectionToggled ?? () => _toggleTaskSelection(group.id, item.id)),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: isSelected ? primaryTerracotta : Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected ? primaryTerracotta : const Color(0xFFCBD5E1),
+                    width: 1.8,
+                  ),
+                ),
+                child: isSelected
+                    ? const Center(
+                        child: Icon(Icons.check_rounded, color: Colors.white, size: 13),
+                      )
+                    : null,
+              ),
+            )
+          else
+            GestureDetector(
+              onTap: isFeedback ? null : () => _toggleTask(group, item),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: item.isCompleted
+                      ? (_isSeriousMode ? seriousGold : accentCompleted)
+                      : (isMissedLocked
+                          ? const Color(0xFF3B1212)
+                          : (_isSeriousMode
+                              ? const Color(0xFF0F172A)
+                              : Colors.white)),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: item.isCompleted
+                        ? (_isSeriousMode ? seriousGold : accentCompleted)
+                        : (isMissedLocked
+                            ? const Color(0xFFEF4444)
+                            : (_isSeriousMode
+                                ? const Color(0xFF475569)
+                                : const Color(0xFFCBD5E1))),
+                    width: 1.8,
+                  ),
+                  boxShadow: item.isCompleted
+                      ? [
+                          BoxShadow(
+                            color: (_isSeriousMode
+                                    ? seriousGold
+                                    : accentCompleted)
+                                .withValues(alpha: 0.25),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1.5),
+                          ),
+                        ]
+                      : [],
+                ),
+                child: Center(
+                  child: item.isCompleted
+                      ? Icon(
+                          Icons.check_rounded,
+                          color: _isSeriousMode ? Colors.black : Colors.white,
+                          size: 13,
+                        )
+                      : (isMissedLocked
+                          ? const Icon(
+                              Icons.lock_rounded,
+                              color: Color(0xFFEF4444),
+                              size: 11,
+                            )
+                          : null),
+                ),
+              ),
+            ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    item.title,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: item.isCompleted
+                          ? (_isSeriousMode
+                              ? const Color(0xFF64748B)
+                              : const Color(0xFF94A3B8))
+                          : (isMissedLocked
+                              ? const Color(0xFFFCA5A5)
+                              : (_isSeriousMode
+                                  ? Colors.white
+                                  : const Color(0xFF1E293B))),
+                      fontWeight: item.isCompleted
+                          ? FontWeight.w400
+                          : (isMissedLocked
+                              ? FontWeight.w600
+                              : FontWeight.w500),
+                      decoration: item.isCompleted
+                          ? TextDecoration.lineThrough
+                          : TextDecoration.none,
+                      decorationColor: _isSeriousMode
+                          ? const Color(0xFF64748B)
+                          : const Color(0xFF94A3B8),
+                    ),
+                  ),
+                ),
+                if (isMissedLocked) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color:
+                          const Color(0xFFEF4444).withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: const Color(0xFFEF4444)
+                            .withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: const Text(
+                      'TERLEWAT',
+                      style: TextStyle(
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFEF4444),
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            icon: Icon(
+              Icons.edit_outlined,
+              size: 15,
+              color: _isSeriousMode
+                  ? const Color(0xFF64748B)
+                  : const Color(0xFF94A3B8),
+            ),
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.all(2),
+            constraints: const BoxConstraints(),
+            tooltip: 'Edit Tugas',
+            onPressed: isFeedback ? null : () => _showEditTaskDialog(item),
+          ),
+          if (_isSeriousMode)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Tooltip(
+                message: 'Tugas terkunci (Anti-Hapus Mode Serius)',
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: seriousGold.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(
+                    Icons.lock_rounded,
+                    size: 13,
+                    color: seriousGold,
+                  ),
+                ),
+              ),
+            )
+          else ...[
+            if (isFeedback)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                color: Colors.transparent,
+                child: const Icon(
+                  Icons.drag_indicator_rounded,
+                  size: 19,
+                  color: Color(0xFF94A3B8),
+                ),
+              )
+            else
+              ReorderableDragStartListener(
+                index: index,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.grab,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                    color: Colors.transparent,
+                    child: const Icon(
+                      Icons.drag_indicator_rounded,
+                      size: 19,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+
+    if (isFeedback) {
+      return contentWidget;
+    }
 
     return AshDisintegrationWrapper(
       isDisintegrating: isDisintegrating,
       seed: item.id.hashCode,
       child: Dismissible(
-      key: Key(item.id),
-      direction:
-          (_isSeriousMode || isMultiSelect) ? DismissDirection.none : DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 16),
-        color: Colors.red[600],
-        child: const Icon(Icons.delete_rounded, color: Colors.white, size: 18),
-      ),
-      onDismissed: (_) => _deleteTask(group, item),
-      child: InkWell(
-        onTap: () {
-          if (isMultiSelect) {
-            if (onSelectionToggled != null) {
-              onSelectionToggled();
+        key: Key(item.id),
+        direction:
+            (_isSeriousMode || isMultiSelect) ? DismissDirection.none : DismissDirection.endToStart,
+        background: Container(
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 16),
+          color: Colors.red[600],
+          child: const Icon(Icons.delete_rounded, color: Colors.white, size: 18),
+        ),
+        onDismissed: (_) => _deleteTask(group, item),
+        child: InkWell(
+          onTap: () {
+            if (isMultiSelect) {
+              if (onSelectionToggled != null) {
+                onSelectionToggled();
+              } else {
+                _toggleTaskSelection(group.id, item.id);
+              }
             } else {
+              _toggleTask(group, item);
+            }
+          },
+          onLongPress: () {
+            if (!_isSeriousMode) {
+              HapticFeedback.mediumImpact();
               _toggleTaskSelection(group.id, item.id);
             }
-          } else {
-            _toggleTask(group, item);
-          }
-        },
-        onLongPress: () {
-          if (!_isSeriousMode) {
-            HapticFeedback.mediumImpact();
-            _toggleTaskSelection(group.id, item.id);
-          }
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            color: isSelected
-                ? primaryTerracotta.withValues(alpha: 0.1)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            border: isSelected
-                ? Border.all(
-                    color: primaryTerracotta.withValues(alpha: 0.45),
-                    width: 1.2,
-                  )
-                : null,
-          ),
-          padding: const EdgeInsets.only(
-            left: 12,
-            right: 4,
-            top: 3.5,
-            bottom: 3.5,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Checkbox (Seleksi jika mode pilih banyak aktif, atau Checkbox Status Selesai)
-              if (isMultiSelect)
-                GestureDetector(
-                  onTap: onSelectionToggled ?? () => _toggleTaskSelection(group.id, item.id),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      color: isSelected ? primaryTerracotta : Colors.white,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isSelected ? primaryTerracotta : const Color(0xFFCBD5E1),
-                        width: 1.8,
-                      ),
-                    ),
-                    child: isSelected
-                        ? const Center(
-                            child: Icon(Icons.check_rounded, color: Colors.white, size: 13),
-                          )
-                        : null,
-                  ),
-                )
-              else
-                GestureDetector(
-                  onTap: () => _toggleTask(group, item),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      color: item.isCompleted
-                          ? (_isSeriousMode ? seriousGold : accentCompleted)
-                          : (isMissedLocked
-                              ? const Color(0xFF3B1212)
-                              : (_isSeriousMode
-                                  ? const Color(0xFF0F172A)
-                                  : Colors.white)),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: item.isCompleted
-                            ? (_isSeriousMode ? seriousGold : accentCompleted)
-                            : (isMissedLocked
-                                ? const Color(0xFFEF4444)
-                                : (_isSeriousMode
-                                    ? const Color(0xFF475569)
-                                    : const Color(0xFFCBD5E1))),
-                        width: 1.8,
-                      ),
-                      boxShadow: item.isCompleted
-                          ? [
-                              BoxShadow(
-                                color: (_isSeriousMode
-                                        ? seriousGold
-                                        : accentCompleted)
-                                    .withValues(alpha: 0.25),
-                                blurRadius: 4,
-                                offset: const Offset(0, 1.5),
-                              ),
-                            ]
-                          : [],
-                    ),
-                    child: Center(
-                      child: item.isCompleted
-                          ? Icon(
-                              Icons.check_rounded,
-                              color: _isSeriousMode ? Colors.black : Colors.white,
-                              size: 13,
-                            )
-                          : (isMissedLocked
-                              ? const Icon(
-                                  Icons.lock_rounded,
-                                  color: Color(0xFFEF4444),
-                                  size: 11,
-                                )
-                              : null),
-                    ),
-                  ),
-                ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        item.title,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: item.isCompleted
-                              ? (_isSeriousMode
-                                  ? const Color(0xFF64748B)
-                                  : const Color(0xFF94A3B8))
-                              : (isMissedLocked
-                                  ? const Color(0xFFFCA5A5)
-                                  : (_isSeriousMode
-                                      ? Colors.white
-                                      : const Color(0xFF1E293B))),
-                          fontWeight: item.isCompleted
-                              ? FontWeight.w400
-                              : (isMissedLocked
-                                  ? FontWeight.w600
-                                  : FontWeight.w500),
-                          decoration: item.isCompleted
-                              ? TextDecoration.lineThrough
-                              : TextDecoration.none,
-                          decorationColor: _isSeriousMode
-                              ? const Color(0xFF64748B)
-                              : const Color(0xFF94A3B8),
-                        ),
-                      ),
-                    ),
-                    if (isMissedLocked) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color:
-                              const Color(0xFFEF4444).withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                            color: const Color(0xFFEF4444)
-                                .withValues(alpha: 0.35),
-                          ),
-                        ),
-                        child: const Text(
-                          'TERLEWAT',
-                          style: TextStyle(
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFFEF4444),
-                            letterSpacing: 0.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                icon: Icon(
-                  Icons.edit_outlined,
-                  size: 15,
-                  color: _isSeriousMode
-                      ? const Color(0xFF64748B)
-                      : const Color(0xFF94A3B8),
-                ),
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.all(2),
-                constraints: const BoxConstraints(),
-                tooltip: 'Edit Tugas',
-                onPressed: () => _showEditTaskDialog(item),
-              ),
-              if (_isSeriousMode)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Tooltip(
-                    message: 'Tugas terkunci (Anti-Hapus Mode Serius)',
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: seriousGold.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Icon(
-                        Icons.lock_rounded,
-                        size: 13,
-                        color: seriousGold,
-                      ),
-                    ),
-                  ),
-                )
-              else ...[
-                ReorderableDragStartListener(
-                  index: index,
-                  child: MouseRegion(
-                    cursor: SystemMouseCursors.grab,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                      color: Colors.transparent,
-                      child: const Icon(
-                        Icons.drag_indicator_rounded,
-                        size: 19,
-                        color: Color(0xFF94A3B8),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
+          },
+          child: contentWidget,
         ),
       ),
-    ),
-  );
+    );
   }
 
   // --- EMPTY STATE CARD ---
