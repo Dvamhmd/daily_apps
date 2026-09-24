@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:daily_apps/models/model_serious_mode.dart';
 import 'package:daily_apps/models/model_todo.dart';
 import 'package:daily_apps/pages/todo_riwayat_page.dart';
+import 'package:daily_apps/utils/backup_service.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/utils/serious_mode_service.dart';
 import 'package:daily_apps/utils/todo_alarm_service.dart';
@@ -113,12 +114,14 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    BackupService.dataRestoredNotifier.addListener(_loadTodoData);
     _initAlarmSystem();
     _loadTodoData();
   }
 
   @override
   void dispose() {
+    BackupService.dataRestoredNotifier.removeListener(_loadTodoData);
     TodoAlarmService.activeAlarmNotifier.removeListener(_onActiveAlarmChanged);
     _undoController?.dispose();
     _activeDraggingTaskIdsNotifier.dispose();

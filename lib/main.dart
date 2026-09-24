@@ -8,6 +8,7 @@ import 'package:daily_apps/models/model_uangku.dart';
 import 'package:daily_apps/pages/riwayat_page.dart';
 import 'package:daily_apps/pages/rundown_page.dart';
 import 'package:daily_apps/pages/todo_page.dart';
+import 'package:daily_apps/utils/backup_service.dart';
 import 'package:daily_apps/utils/notification_service.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
@@ -600,8 +601,15 @@ class _KeuanganPageState extends State<KeuanganPage> {
   @override
   void initState() {
     super.initState();
+    BackupService.dataRestoredNotifier.addListener(_loadInitialData);
     NotificationService.initialize();
     _loadInitialData();
+  }
+
+  @override
+  void dispose() {
+    BackupService.dataRestoredNotifier.removeListener(_loadInitialData);
+    super.dispose();
   }
 
   DateTime? _parseTargetDateFromPrefs(SharedPreferences prefs) {

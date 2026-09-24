@@ -136,6 +136,14 @@ class BackupDataModel {
 }
 
 class BackupService {
+  /// ValueNotifier yang dipicu setiap kali data aplikasi berhasil dipulihkan (restore/import)
+  static final ValueNotifier<int> dataRestoredNotifier = ValueNotifier<int>(0);
+
+  /// Pemicu manual atau internal pembaruan data
+  static void notifyDataRestored() {
+    dataRestoredNotifier.value++;
+  }
+
   /// Menghitung ringkasan data secara komprehensif dari Map key-value SharedPreferences
   static BackupSummary calculateSummaryFromRawMap(Map<String, dynamic> rawMap) {
     int countUangku = 0;
@@ -634,6 +642,9 @@ class BackupService {
         await prefs.setDouble(key, valObj);
       }
     }
+
+    // Beri tahu seluruh halaman/komponen yang aktif di memori untuk reload data
+    notifyDataRestored();
 
     return true;
   }

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:daily_apps/models/model_rundown.dart';
 import 'package:daily_apps/pages/rundown_arsip_page.dart';
 import 'package:daily_apps/pages/rundown_detail_page.dart';
+import 'package:daily_apps/utils/backup_service.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:daily_apps/widgets/dialog_tambah_rundown.dart';
@@ -32,7 +33,14 @@ class _RundownPageState extends State<RundownPage> {
   @override
   void initState() {
     super.initState();
+    BackupService.dataRestoredNotifier.addListener(_loadRundowns);
     _loadRundowns();
+  }
+
+  @override
+  void dispose() {
+    BackupService.dataRestoredNotifier.removeListener(_loadRundowns);
+    super.dispose();
   }
 
   List<Rundown> get _activeRundowns =>
