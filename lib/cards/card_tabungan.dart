@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:daily_apps/models/model_tabungan.dart';
+import 'package:daily_apps/utils/pos_validation_service.dart';
 import 'package:daily_apps/utils/riwayat_service.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
+import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -470,6 +472,21 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                 final nama = namaCtrl.text.trim();
                 if (nama.isEmpty) return;
 
+                final duplicateError =
+                    await PosValidationService.checkDuplicateName(
+                  newName: nama,
+                );
+                if (duplicateError != null) {
+                  if (dialogCtx.mounted) {
+                    CustomToast.showError(
+                      dialogCtx,
+                      title: 'Nama Pos Sudah Digunakan',
+                      subtitle: duplicateError,
+                    );
+                  }
+                  return;
+                }
+
                 final jumlah = RupiahFormatter.parse(jumlahCtrl.text);
 
                 final newTabungan = Tabungan(
@@ -615,6 +632,22 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
               onPressed: () async {
                 final nama = namaCtrl.text.trim();
                 if (nama.isEmpty) return;
+
+                final duplicateError =
+                    await PosValidationService.checkDuplicateName(
+                  newName: nama,
+                  currentName: item.nama,
+                );
+                if (duplicateError != null) {
+                  if (dialogCtx.mounted) {
+                    CustomToast.showError(
+                      dialogCtx,
+                      title: 'Nama Pos Sudah Digunakan',
+                      subtitle: duplicateError,
+                    );
+                  }
+                  return;
+                }
 
                 final jumlahBaru = RupiahFormatter.parse(jumlahCtrl.text);
 

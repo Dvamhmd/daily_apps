@@ -382,33 +382,17 @@ void main() {
       expect(find.text('Debit : 20.000'), findsOneWidget);
     });
 
-    testWidgets('Tagihanku & Uangku terpisah per bulan dan Tabunganku tetap statis',
+    testWidgets('Tagihanku & Uangku & Tabunganku tersimpan terpusat dan menampilkan Card Tanggal Hari Ini',
         (WidgetTester tester) async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
 
-      final now = DateTime.now();
-      final curKey = '${now.year}_${now.month.toString().padLeft(2, '0')}';
-      final nextMonth = DateTime(now.year, now.month + 1, 1);
-      final nextKey = '${nextMonth.year}_${nextMonth.month.toString().padLeft(2, '0')}';
-
-      // Data bulan ini
-      await prefs.setStringList('tagihan_$curKey', [
-        '{"nama":"Listrik Bulan Ini","jumlah":100000}',
+      await prefs.setStringList('tagihan', [
+        '{"nama":"Listrik","jumlah":100000}',
       ]);
-      await prefs.setStringList('uangku_$curKey', [
-        '{"nama":"Gaji Bulan Ini","jumlah":500000}',
+      await prefs.setStringList('uangku', [
+        '{"nama":"Gaji","jumlah":500000}',
       ]);
-
-      // Data bulan depan
-      await prefs.setStringList('tagihan_$nextKey', [
-        '{"nama":"Wifi Bulan Depan","jumlah":300000}',
-      ]);
-      await prefs.setStringList('uangku_$nextKey', [
-        '{"nama":"Bonus Bulan Depan","jumlah":1000000}',
-      ]);
-
-      // Tabungan (Global)
       await prefs.setStringList('tabungan', [
         '{"nama":"Beli Laptop","jumlah":5000000}',
       ]);
@@ -416,28 +400,14 @@ void main() {
       await tester.pumpWidget(const MyApp());
       await tester.pumpAndSettle();
 
-      // Bulan ini: periksa tagihan dan uangku
-      expect(find.text('100.000'), findsWidgets); // Total Tagihan bulan ini
-      expect(find.text('500.000'), findsWidgets); // Total Uangku bulan ini
-      expect(find.text('5.000.000'), findsWidgets); // Total Tabunganku (Global)
+      // Periksa tagihan, uangku, dan tabungan ditampilkan
+      expect(find.text('100.000'), findsWidgets); // Total Tagihan
+      expect(find.text('500.000'), findsWidgets); // Total Uangku
+      expect(find.text('5.000.000'), findsWidgets); // Total Tabunganku
 
-      // Pindah ke bulan berikutnya dengan menekan tombol panah kanan
-      await tester.tap(find.byTooltip('Bulan Berikutnya'));
-      await tester.pumpAndSettle();
-
-      // Bulan berikutnya: Tagihan dan Uangku berubah sesuai data bulan depan
-      expect(find.text('300.000'), findsWidgets); // Total Tagihan bulan depan
-      expect(find.text('1.000.000'), findsWidgets); // Total Uangku bulan depan
-      // Tabungan tetap sama persis (5.000.000)
-      expect(find.text('5.000.000'), findsWidgets);
-
-      // Kembali ke bulan ini dengan menekan tombol panah kiri
-      await tester.tap(find.byTooltip('Bulan Sebelumnya'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('100.000'), findsWidgets);
-      expect(find.text('500.000'), findsWidgets);
-      expect(find.text('5.000.000'), findsWidgets);
+      // Memastikan Card Tanggal Hari Ini muncul (bukan selector bulan lama)
+      expect(find.text('HARI INI'), findsOneWidget);
+      expect(find.byIcon(Icons.calendar_today_rounded), findsOneWidget);
     });
 
     test('Pesan Riwayat menyertakan nama bulan untuk Tagihan dan Uangku, tapi tidak untuk Tabungan', () async {

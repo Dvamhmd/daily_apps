@@ -1,8 +1,10 @@
 import 'package:daily_apps/models/model_tagihan.dart';
 import 'package:daily_apps/models/model_uangku.dart';
+import 'package:daily_apps/utils/pos_validation_service.dart';
 import 'package:daily_apps/utils/pribadi_sync_service.dart';
 import 'package:daily_apps/utils/riwayat_service.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
+import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -39,11 +41,6 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
   List<Uangku> uangkuList = [];
 
   bool get onlyCair => widget.onlyCair ?? _internalOnlyCair;
-
-  String get _monthKey {
-    final d = widget.selectedMonth ?? DateTime.now();
-    return '${d.year}_${d.month.toString().padLeft(2, '0')}';
-  }
 
   int get totalSudahCair =>
       uangkuList.where((e) => e.isCair).fold<int>(0, (sum, e) => sum + e.jumlah);
@@ -83,8 +80,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
   @override
   void didUpdateWidget(covariant InfoCardUangku oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.selectedMonth != widget.selectedMonth ||
-        oldWidget.onlyCair != widget.onlyCair ||
+    if (oldWidget.onlyCair != widget.onlyCair ||
         oldWidget.amount != widget.amount) {
       _loadUangku();
     }
@@ -95,23 +91,25 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
     final data = uangkuList
         .map((e) => jsonEncode(e.toJson()))
         .toList();
-    await prefs.setStringList('uangku_$_monthKey', data);
+    await prefs.setStringList('uangku', data);
   }
 
   Future<void> _loadUangku() async {
     final prefs = await SharedPreferences.getInstance();
-    final key = 'uangku_$_monthKey';
-    var data = prefs.getStringList(key);
+    var data = prefs.getStringList('uangku');
 
-    // Migrasi data legacy jika bulan ini belum punya data tapi ada data di 'uangku'
-    if (data == null) {
-      final now = DateTime.now();
-      final d = widget.selectedMonth ?? now;
-      if (d.year == now.year && d.month == now.month) {
-        final legacy = prefs.getStringList('uangku');
-        if (legacy != null) {
-          data = legacy;
-          await prefs.setStringList(key, legacy);
+    // Migrasi data jika 'uangku' belum ada tapi ada key 'uangku_YYYY_MM'
+    if (data == null || data.isEmpty) {
+      final allKeys = prefs
+          .getKeys()
+          .where((k) => k.startsWith('uangku_') && k != 'uangku_only_cair')
+          .toList();
+      allKeys.sort();
+      if (allKeys.isNotEmpty) {
+        final latestData = prefs.getStringList(allKeys.last);
+        if (latestData != null && latestData.isNotEmpty) {
+          data = latestData;
+          await prefs.setStringList('uangku', latestData);
         }
       }
     }
@@ -132,16 +130,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
     if (nominalDp <= 0) return;
 
     final prefs = await SharedPreferences.getInstance();
-    final tagihanKey = 'tagihan_$_monthKey';
-    var data = prefs.getStringList(tagihanKey);
-    if (data == null) {
-      final now = DateTime.now();
-      final d = widget.selectedMonth ?? now;
-      if (d.year == now.year && d.month == now.month) {
-        data = prefs.getStringList('tagihan');
-      }
-    }
-    data ??= [];
+    var data = prefs.getStringList('tagihan') ?? [];
 
     List<Tagihan> tagihanList =
         data.map((e) => Tagihan.fromJson(jsonDecode(e))).toList();
@@ -157,14 +146,12 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
 
       final prefsData =
           tagihanList.map((e) => jsonEncode(e.toJson())).toList();
-      await prefs.setStringList(tagihanKey, prefsData);
+      await prefs.setStringList('tagihan', prefsData);
 
-      final bSuffix = RiwayatService.formatBulanSuffix(
-          widget.selectedMonth ?? DateTime.now());
       await RiwayatService.catatRiwayat(
         kategori: 'Tagihan',
         perubahan:
-            '${itemLama.nama} ${RupiahFormatter.format(nominalDp)} Otomatis ditambah ke tagihan$bSuffix',
+            '${itemLama.nama} ${RupiahFormatter.format(nominalDp)} Otomatis ditambah ke tagihan',
         tipe: 'tambah',
         nominal: nominalDp,
       );
@@ -174,14 +161,12 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
 
       final prefsData =
           tagihanList.map((e) => jsonEncode(e.toJson())).toList();
-      await prefs.setStringList(tagihanKey, prefsData);
+      await prefs.setStringList('tagihan', prefsData);
 
-      final bSuffix = RiwayatService.formatBulanSuffix(
-          widget.selectedMonth ?? DateTime.now());
       await RiwayatService.catatRiwayat(
         kategori: 'Tagihan',
         perubahan:
-            'DP ${RupiahFormatter.format(nominalDp)} Otomatis ditambah ke tagihan$bSuffix',
+            'DP ${RupiahFormatter.format(nominalDp)} Otomatis ditambah ke tagihan',
         tipe: 'tambah',
         nominal: nominalDp,
       );
@@ -381,6 +366,21 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                         jumlahCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
 
                     if (nama.isEmpty || jumlahText.isEmpty) return;
+
+                    final duplicateError =
+                        await PosValidationService.checkDuplicateName(
+                      newName: nama,
+                    );
+                    if (duplicateError != null) {
+                      if (context.mounted) {
+                        CustomToast.showError(
+                          context,
+                          title: 'Nama Pos Sudah Digunakan',
+                          subtitle: duplicateError,
+                        );
+                      }
+                      return;
+                    }
 
                     final jumlah = int.parse(jumlahText);
 
@@ -736,6 +736,24 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     final nama = namaCtrl.text.trim();
                     final jumlahClean =
                         jumlahCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+                    if (nama.isEmpty || jumlahClean.isEmpty) return;
+
+                    final duplicateError =
+                        await PosValidationService.checkDuplicateName(
+                      newName: nama,
+                      currentName: item.nama,
+                    );
+                    if (duplicateError != null) {
+                      if (context.mounted) {
+                        CustomToast.showError(
+                          context,
+                          title: 'Nama Pos Sudah Digunakan',
+                          subtitle: duplicateError,
+                        );
+                      }
+                      return;
+                    }
 
                     final namaLama = item.nama;
                     final jumlahLama = item.jumlah;

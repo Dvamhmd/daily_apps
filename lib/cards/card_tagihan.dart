@@ -1,6 +1,7 @@
 import 'package:daily_apps/models/model_tagihan.dart';
 import 'package:daily_apps/models/model_uangku.dart';
 import 'package:daily_apps/utils/notification_service.dart';
+import 'package:daily_apps/utils/pos_validation_service.dart';
 import 'package:daily_apps/utils/pribadi_sync_service.dart';
 import 'package:daily_apps/utils/riwayat_service.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
@@ -35,11 +36,6 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
   bool isExpanded = false;
   List<Tagihan> tagihanList = [];
 
-  String get _monthKey {
-    final d = widget.selectedMonth ?? DateTime.now();
-    return '${d.year}_${d.month.toString().padLeft(2, '0')}';
-  }
-
   @override
   void initState() {
     super.initState();
@@ -49,8 +45,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
   @override
   void didUpdateWidget(covariant InfoCardTagihan oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.selectedMonth != widget.selectedMonth ||
-        oldWidget.amount != widget.amount) {
+    if (oldWidget.amount != widget.amount) {
       _loadTagihan();
     }
   }
@@ -60,23 +55,26 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
     final data = tagihanList
         .map((e) => jsonEncode(e.toJson()))
         .toList();
-    await prefs.setStringList('tagihan_$_monthKey', data);
+    await prefs.setStringList('tagihan', data);
   }
 
   Future<void> _loadTagihan() async {
     final prefs = await SharedPreferences.getInstance();
-    final key = 'tagihan_$_monthKey';
-    var data = prefs.getStringList(key);
+    var data = prefs.getStringList('tagihan');
 
-    // Migrasi data legacy jika bulan ini belum punya data tapi ada data di 'tagihan'
-    if (data == null) {
-      final now = DateTime.now();
-      final d = widget.selectedMonth ?? now;
-      if (d.year == now.year && d.month == now.month) {
-        final legacy = prefs.getStringList('tagihan');
-        if (legacy != null) {
-          data = legacy;
-          await prefs.setStringList(key, legacy);
+    // Migrasi data jika 'tagihan' belum ada tapi ada key 'tagihan_YYYY_MM'
+    if (data == null || data.isEmpty) {
+      final allKeys = prefs
+          .getKeys()
+          .where((k) =>
+              k.startsWith('tagihan_') && !k.startsWith('tagihan_lunas'))
+          .toList();
+      allKeys.sort();
+      if (allKeys.isNotEmpty) {
+        final latestData = prefs.getStringList(allKeys.last);
+        if (latestData != null && latestData.isNotEmpty) {
+          data = latestData;
+          await prefs.setStringList('tagihan', latestData);
         }
       }
     }
@@ -242,11 +240,26 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  onPressed: () {
+                  onPressed: () async {
                     final nama = namaCtrl.text.trim();
                     final jumlahText = jumlahCtrl.text.replaceAll('.', '');
 
                     if (nama.isEmpty || jumlahText.isEmpty) return;
+
+                    final duplicateError =
+                        await PosValidationService.checkDuplicateName(
+                      newName: nama,
+                    );
+                    if (duplicateError != null) {
+                      if (context.mounted) {
+                        CustomToast.showError(
+                          context,
+                          title: 'Nama Pos Sudah Digunakan',
+                          subtitle: duplicateError,
+                        );
+                      }
+                      return;
+                    }
 
                     final jumlah = int.parse(jumlahText);
 
@@ -434,12 +447,28 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  onPressed: () {
+                  onPressed: () async {
                     final nama = namaCtrl.text.trim();
                     final jumlahClean =
                         jumlahCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
 
                     if (nama.isEmpty || jumlahClean.isEmpty) return;
+
+                    final duplicateError =
+                        await PosValidationService.checkDuplicateName(
+                      newName: nama,
+                      currentName: item.nama,
+                    );
+                    if (duplicateError != null) {
+                      if (context.mounted) {
+                        CustomToast.showError(
+                          context,
+                          title: 'Nama Pos Sudah Digunakan',
+                          subtitle: duplicateError,
+                        );
+                      }
+                      return;
+                    }
 
                     final namaLama = item.nama;
                     final jumlahLama = item.jumlah;
@@ -488,19 +517,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
 
   Future<void> showBayarTagihan(Tagihan item, int index) async {
     final prefs = await SharedPreferences.getInstance();
-    final uKey = 'uangku_$_monthKey';
-    var rawUangku = prefs.getStringList(uKey);
-    if (rawUangku == null) {
-      final now = DateTime.now();
-      final d = widget.selectedMonth ?? now;
-      if (d.year == now.year && d.month == now.month) {
-        rawUangku = prefs.getStringList('uangku');
-        if (rawUangku != null) {
-          await prefs.setStringList(uKey, rawUangku);
-        }
-      }
-    }
-    rawUangku ??= [];
+    var rawUangku = prefs.getStringList('uangku') ?? [];
     List<Uangku> listUangku =
         rawUangku.map((e) => Uangku.fromJson(jsonDecode(e))).toList();
 
@@ -817,7 +834,7 @@ class _InfoCardExpandableState extends State<InfoCardTagihan> {
                   listUangku[selectedUangkuIndex] =
                       chosenUangku.copyWith(jumlah: sisaSaldo);
                   await prefs.setStringList(
-                    'uangku_$_monthKey',
+                    'uangku',
                     listUangku
                         .map((e) => jsonEncode(e.toJson()))
                         .toList(),

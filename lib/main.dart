@@ -260,27 +260,6 @@ class _KeuanganPageState extends State<KeuanganPage> {
   DateTime? targetDate;
   int targetTabungan = 0;
 
-  DateTime selectedMonth =
-      DateTime(DateTime.now().year, DateTime.now().month, 1);
-
-  static const List<String> namaBulan = [
-    'Januari',
-    'Februari',
-    'Maret',
-    'April',
-    'Mei',
-    'Juni',
-    'Juli',
-    'Agustus',
-    'September',
-    'Oktober',
-    'November',
-    'Desember',
-  ];
-
-  String get selectedMonthKey =>
-      '${selectedMonth.year}_${selectedMonth.month.toString().padLeft(2, '0')}';
-
   String danaAmanFilterMode = 'all'; // 'all', 'has_deadline', 'custom_date'
   DateTime? danaAmanCutoffDate;
   bool uangkuOnlyCair = false;
@@ -635,30 +614,37 @@ class _KeuanganPageState extends State<KeuanganPage> {
     final prefs = await SharedPreferences.getInstance();
 
     // Tagihan
-    final tagihanKey = 'tagihan_$selectedMonthKey';
-    var rawTagihan = prefs.getStringList(tagihanKey);
-    if (rawTagihan == null) {
-      final now = DateTime.now();
-      if (selectedMonth.year == now.year && selectedMonth.month == now.month) {
-        final legacy = prefs.getStringList('tagihan');
-        if (legacy != null) {
-          rawTagihan = legacy;
-          await prefs.setStringList(tagihanKey, legacy);
+    var rawTagihan = prefs.getStringList('tagihan');
+    if (rawTagihan == null || rawTagihan.isEmpty) {
+      final allKeys = prefs
+          .getKeys()
+          .where((k) =>
+              k.startsWith('tagihan_') && !k.startsWith('tagihan_lunas'))
+          .toList();
+      allKeys.sort();
+      if (allKeys.isNotEmpty) {
+        final latestData = prefs.getStringList(allKeys.last);
+        if (latestData != null && latestData.isNotEmpty) {
+          rawTagihan = latestData;
+          await prefs.setStringList('tagihan', latestData);
         }
       }
     }
     rawTagihan ??= [];
 
     // Uangku
-    final uangkuKey = 'uangku_$selectedMonthKey';
-    var rawUangku = prefs.getStringList(uangkuKey);
-    if (rawUangku == null) {
-      final now = DateTime.now();
-      if (selectedMonth.year == now.year && selectedMonth.month == now.month) {
-        final legacy = prefs.getStringList('uangku');
-        if (legacy != null) {
-          rawUangku = legacy;
-          await prefs.setStringList(uangkuKey, legacy);
+    var rawUangku = prefs.getStringList('uangku');
+    if (rawUangku == null || rawUangku.isEmpty) {
+      final allKeys = prefs
+          .getKeys()
+          .where((k) => k.startsWith('uangku_') && k != 'uangku_only_cair')
+          .toList();
+      allKeys.sort();
+      if (allKeys.isNotEmpty) {
+        final latestData = prefs.getStringList(allKeys.last);
+        if (latestData != null && latestData.isNotEmpty) {
+          rawUangku = latestData;
+          await prefs.setStringList('uangku', latestData);
         }
       }
     }
@@ -756,10 +742,9 @@ class _KeuanganPageState extends State<KeuanganPage> {
     String tempMode = danaAmanFilterMode;
     DateTime? tempCutoff = danaAmanCutoffDate;
     bool tempLimitEnabled = limitHarianEnabled;
-    DateTime tempStart = limitHarianStartDate ??
-        DateTime(selectedMonth.year, selectedMonth.month, 1);
+    DateTime tempStart = limitHarianStartDate ?? today;
     DateTime tempEnd = limitHarianEndDate ??
-        DateTime(selectedMonth.year, selectedMonth.month + 1, 0);
+        DateTime(now.year, now.month + 1, 0);
 
     showDialog(
       context: context,
@@ -1579,53 +1564,23 @@ class _KeuanganPageState extends State<KeuanganPage> {
 
   Future<void> _loadUangku() async {
     final prefs = await SharedPreferences.getInstance();
-    final key = 'uangku_$selectedMonthKey';
-    var data = prefs.getStringList(key);
-
-    // Migrasi data legacy jika bulan ini belum punya data tapi ada data legacy 'uangku'
-    if (data == null) {
-      final now = DateTime.now();
-      if (selectedMonth.year == now.year && selectedMonth.month == now.month) {
-        final legacy = prefs.getStringList('uangku');
-        if (legacy != null) {
-          data = legacy;
-          await prefs.setStringList(key, legacy);
-        }
-      }
-    }
-
-    data ??= [];
+    var data = prefs.getStringList('uangku') ?? [];
 
     if (!mounted) return;
     setState(() {
       uangkuList =
-          data!.map((e) => Uangku.fromJson(jsonDecode(e))).toList();
+          data.map((e) => Uangku.fromJson(jsonDecode(e))).toList();
     });
   }
 
   Future<void> _loadTagihan() async {
     final prefs = await SharedPreferences.getInstance();
-    final key = 'tagihan_$selectedMonthKey';
-    var data = prefs.getStringList(key);
-
-    // Migrasi data legacy jika bulan ini belum punya data tapi ada data legacy 'tagihan'
-    if (data == null) {
-      final now = DateTime.now();
-      if (selectedMonth.year == now.year && selectedMonth.month == now.month) {
-        final legacy = prefs.getStringList('tagihan');
-        if (legacy != null) {
-          data = legacy;
-          await prefs.setStringList(key, legacy);
-        }
-      }
-    }
-
-    data ??= [];
+    var data = prefs.getStringList('tagihan') ?? [];
 
     if (!mounted) return;
     setState(() {
       tagihanList =
-          data!.map((e) => Tagihan.fromJson(jsonDecode(e))).toList();
+          data.map((e) => Tagihan.fromJson(jsonDecode(e))).toList();
     });
   }
 
@@ -1679,238 +1634,6 @@ class _KeuanganPageState extends State<KeuanganPage> {
     setState(() {
       lastUpdated = now;
     });
-  }
-
-  void _prevMonth() {
-    setState(() {
-      selectedMonth =
-          DateTime(selectedMonth.year, selectedMonth.month - 1, 1);
-    });
-    _loadMonthData();
-  }
-
-  void _nextMonth() {
-    setState(() {
-      selectedMonth =
-          DateTime(selectedMonth.year, selectedMonth.month + 1, 1);
-    });
-    _loadMonthData();
-  }
-
-  Future<void> _loadMonthData() async {
-    await _loadTagihan();
-    await _loadUangku();
-    await _updateLastUpdated();
-  }
-
-  void _showMonthYearPicker() {
-    int tempYear = selectedMonth.year;
-    int tempMonth = selectedMonth.month;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              title: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Pilih Bulan & Tahun',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () {
-                      final now = DateTime.now();
-                      setDialogState(() {
-                        tempYear = now.year;
-                        tempMonth = now.month;
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color:
-                            const Color(0xFF5E35B1).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'Bulan Ini',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF5E35B1),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              content: SizedBox(
-                width: 320,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Year Selector
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.chevron_left_rounded),
-                            onPressed: () {
-                              setDialogState(() {
-                                tempYear--;
-                              });
-                            },
-                          ),
-                          Text(
-                            '$tempYear',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF5E35B1),
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.chevron_right_rounded),
-                            onPressed: () {
-                              setDialogState(() {
-                                tempYear++;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    // Month Grid (4 rows x 3 cols)
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        mainAxisSpacing: 8,
-                        crossAxisSpacing: 8,
-                        childAspectRatio: 2.2,
-                      ),
-                      itemCount: 12,
-                      itemBuilder: (context, idx) {
-                        final monthNum = idx + 1;
-                        final isSelected = tempMonth == monthNum;
-                        final isCurrentActual =
-                            (monthNum == DateTime.now().month &&
-                                tempYear == DateTime.now().year);
-
-                        return InkWell(
-                          onTap: () {
-                            setDialogState(() {
-                              tempMonth = monthNum;
-                            });
-                          },
-                          borderRadius: BorderRadius.circular(10),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 150),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? const Color(0xFF5E35B1)
-                                  : (isCurrentActual
-                                      ? const Color(0xFF5E35B1)
-                                          .withValues(alpha: 0.1)
-                                      : Colors.grey[100]),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: isSelected
-                                    ? const Color(0xFF5E35B1)
-                                    : (isCurrentActual
-                                        ? const Color(0xFF5E35B1)
-                                            .withValues(alpha: 0.4)
-                                        : Colors.transparent),
-                                width: 1.5,
-                              ),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              namaBulan[idx].substring(0, 3),
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : (isCurrentActual
-                                        ? FontWeight.w600
-                                        : FontWeight.normal),
-                                color: isSelected
-                                    ? Colors.white
-                                    : (isCurrentActual
-                                        ? const Color(0xFF5E35B1)
-                                        : const Color(0xFF1E293B)),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    'Batal',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF5E35B1),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      selectedMonth = DateTime(tempYear, tempMonth, 1);
-                    });
-                    _loadMonthData();
-                    Navigator.pop(context);
-                  },
-                  child: Text(
-                    'Pilih',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
   }
 
   void showEditTarget() {
@@ -2111,7 +1834,6 @@ class _KeuanganPageState extends State<KeuanganPage> {
         totalUangku: totalUangku,
         totalTagihan: totalTagihan,
         totalTabungan: totalTabungan,
-        selectedMonth: selectedMonth,
         onDataChanged: () async {
           await _loadTagihan();
           await _loadUangku();
@@ -2220,85 +1942,115 @@ class _KeuanganPageState extends State<KeuanganPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
 
-              // BULAN SELECTOR BAR
+              // CARD TANGGAL HARI INI
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.white,
+                      Color(0xFFFBF8FF),
+                    ],
+                  ),
                   borderRadius: BorderRadius.circular(18),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF5E35B1).withValues(alpha: 0.05),
-                      blurRadius: 12,
+                      color: const Color(0xFF5E35B1).withValues(alpha: 0.06),
+                      blurRadius: 14,
                       offset: const Offset(0, 4),
                     ),
                   ],
                   border: Border.all(
-                    color: const Color(0xFF5E35B1).withValues(alpha: 0.12),
+                    color: const Color(0xFF5E35B1).withValues(alpha: 0.15),
+                    width: 1.2,
                   ),
                 ),
                 child: Row(
                   children: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.chevron_left_rounded,
-                        size: 24,
-                        color: Color(0xFF5E35B1),
-                      ),
-                      tooltip: 'Bulan Sebelumnya',
-                      onPressed: _prevMonth,
-                    ),
-                    Expanded(
-                      child: InkWell(
-                        onTap: _showMonthYearPicker,
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFF5E35B1),
+                            Color(0xFF7E57C2),
+                          ],
+                        ),
                         borderRadius: BorderRadius.circular(14),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 9),
-                          decoration: BoxDecoration(
-                            color:
-                                const Color(0xFF5E35B1).withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF5E35B1).withValues(alpha: 0.25),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.calendar_today_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              const Icon(
-                                Icons.calendar_month_rounded,
-                                size: 18,
-                                color: Color(0xFF5E35B1),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF5E35B1)
+                                      .withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'HARI INI',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF5E35B1),
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
                               ),
                               const SizedBox(width: 6),
-                              Flexible(
+                              Expanded(
                                 child: Text(
-                                  '${namaBulan[selectedMonth.month - 1]} ${selectedMonth.year}',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF5E35B1),
+                                  lastUpdated != null
+                                      ? 'Diperbarui ${DateFormat('HH:mm').format(lastUpdated!)}'
+                                      : 'Keuangan Aktif',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey[600],
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const SizedBox(width: 2),
-                              const Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                size: 18,
-                                color: Color(0xFF5E35B1),
-                              ),
                             ],
                           ),
-                        ),
+                          const SizedBox(height: 4),
+                          Text(
+                            formatTanggalIndoLengkap(DateTime.now()),
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E1B4B),
+                              letterSpacing: -0.2,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.chevron_right_rounded,
-                        size: 24,
-                        color: Color(0xFF5E35B1),
-                      ),
-                      tooltip: 'Bulan Berikutnya',
-                      onPressed: _nextMonth,
                     ),
                   ],
                 ),
@@ -2310,7 +2062,6 @@ class _KeuanganPageState extends State<KeuanganPage> {
               InfoCardTagihan(
                 title: 'Tagihanku',
                 amount: totalTagihan.toString(),
-                selectedMonth: selectedMonth,
                 items: tagihanList
                     .map((e) => {
                           'name': e.nama,
@@ -2325,7 +2076,6 @@ class _KeuanganPageState extends State<KeuanganPage> {
               InfoCardUangku(
                 title: 'Uangku',
                 amount: totalUangku.toString(),
-                selectedMonth: selectedMonth,
                 onlyCair: uangkuOnlyCair,
                 onFilterChanged: (val) {
                   setState(() {
