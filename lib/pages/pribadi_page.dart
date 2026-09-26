@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:daily_apps/models/model_pribadi.dart';
 import 'package:daily_apps/utils/custom_rule_import_helper.dart';
+import 'package:daily_apps/utils/pribadi_saldo_awal_service.dart';
 import 'package:daily_apps/utils/pribadi_sync_service.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:daily_apps/widgets/custom_toast.dart';
@@ -265,6 +266,10 @@ class _PribadiPageState extends State<PribadiPage> {
   Future<void> _loadData() async {
     final loaded = await PribadiSyncService.loadPribadiData(_monthKey);
     _migrateKodeRules(loaded);
+    await PribadiSaldoAwalService.syncSaldoAwal(
+      currentMonthKey: _monthKey,
+      currentData: loaded,
+    );
     if (mounted) {
       setState(() {
         _data = loaded;
@@ -3335,15 +3340,20 @@ class _PribadiPageState extends State<PribadiPage> {
   Widget _buildTotalBanner() {
     final monthName = _namaBulan[_selectedMonth.month - 1];
     final year = _selectedMonth.year;
+    final hasSaldoAwal = _data.transactions.any((tx) =>
+        tx.id == 'saldo_awal_$_monthKey' ||
+        (tx.kode?.trim().toLowerCase() ==
+                PribadiSaldoAwalService.saldoAwalKode.toLowerCase() &&
+            tx.note?.trim().toLowerCase() ==
+                PribadiSaldoAwalService.saldoAwalKeterangan.toLowerCase()));
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [
-            Color(0xFF312E81), // Royal Indigo 900
-            Color(0xFF1E1B4B), // Midnight Indigo
+            Color(0xFF9D174D), // Deep Magenta 800
+            Color(0xFF701A75), // Rich Fuchsia / Purple 900
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -3351,169 +3361,226 @@ class _PribadiPageState extends State<PribadiPage> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF312E81).withValues(alpha: 0.35),
+            color: const Color(0xFF9D174D).withValues(alpha: 0.35),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.shield_rounded,
-                          size: 12, color: Colors.white70),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          'TOTAL DANA PRIBADI ($monthName $year)',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.8,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.account_balance_wallet_rounded,
-                  color: Colors.white70, size: 22),
-            ],
-          ),
-          const SizedBox(height: 14),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Rp ${RupiahFormatter.format(_data.totalDanaPribadi)}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-                height: 1.1,
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Monthly Inflow & Outflow Chips (Pemasukan & Pengeluaran Per Bulan)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.25),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: () {},
+          onLongPress: () {
+            HapticFeedback.mediumImpact();
+            _showSaldoAwalModal();
+          },
+          borderRadius: BorderRadius.circular(20),
+          splashColor: Colors.white.withValues(alpha: 0.20),
+          highlightColor: Colors.white.withValues(alpha: 0.08),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(5),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.25),
-                          shape: BoxShape.circle,
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.arrow_downward_rounded,
-                            size: 15, color: Color(0xFF34D399)),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text(
-                              'Pemasukan',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
+                            const Icon(Icons.shield_rounded,
+                                size: 12, color: Colors.white70),
+                            const SizedBox(width: 4),
+                            Flexible(
                               child: Text(
-                                '+Rp ${RupiahFormatter.format(_data.totalPemasukan)}',
+                                'TOTAL DANA PRIBADI ($monthName $year)',
                                 style: const TextStyle(
-                                  color: Color(0xFF34D399),
+                                  color: Colors.white,
+                                  fontSize: 10.5,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 12.5,
+                                  letterSpacing: 0.8,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ],
+                    ),
+                    const SizedBox(width: 8),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (hasSaldoAwal)
+                          Container(
+                            margin: const EdgeInsets.only(right: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981)
+                                  .withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFF34D399)
+                                    .withValues(alpha: 0.6),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.check_circle_rounded,
+                                    size: 10, color: Color(0xFFA7F3D0)),
+                                SizedBox(width: 3),
+                                Text(
+                                  'Saldo Awal',
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        const Icon(Icons.account_balance_wallet_rounded,
+                            color: Colors.white70, size: 22),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Rp ${RupiahFormatter.format(_data.totalDanaPribadi)}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      height: 1.1,
+                    ),
                   ),
                 ),
+                const SizedBox(height: 14),
+
+                // Monthly Inflow & Outflow Chips (Pemasukan & Pengeluaran Per Bulan)
                 Container(
-                  width: 1,
-                  height: 28,
-                  color: Colors.white24,
-                  margin: const EdgeInsets.symmetric(horizontal: 6),
-                ),
-                Expanded(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                   child: Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF43F5E).withValues(alpha: 0.25),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.arrow_upward_rounded,
-                            size: 15, color: Color(0xFFFB7185)),
-                      ),
-                      const SizedBox(width: 8),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Row(
                           children: [
-                            const Text(
-                              'Pengeluaran',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
+                            Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981)
+                                    .withValues(alpha: 0.25),
+                                shape: BoxShape.circle,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              child: const Icon(Icons.arrow_downward_rounded,
+                                  size: 15, color: Color(0xFF34D399)),
                             ),
-                            const SizedBox(height: 2),
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                '-Rp ${RupiahFormatter.format(_data.totalPengeluaran)}',
-                                style: const TextStyle(
-                                  color: Color(0xFFFB7185),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12.5,
-                                ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Pemasukan',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      '+Rp ${RupiahFormatter.format(_data.totalPemasukan)}',
+                                      style: const TextStyle(
+                                        color: Color(0xFF34D399),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 28,
+                        color: Colors.white24,
+                        margin: const EdgeInsets.symmetric(horizontal: 6),
+                      ),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF43F5E)
+                                    .withValues(alpha: 0.25),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.arrow_upward_rounded,
+                                  size: 15, color: Color(0xFFFB7185)),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Pengeluaran',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      '-Rp ${RupiahFormatter.format(_data.totalPengeluaran)}',
+                                      style: const TextStyle(
+                                        color: Color(0xFFFB7185),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -3525,8 +3592,457 @@ class _PribadiPageState extends State<PribadiPage> {
               ],
             ),
           ),
-        ],
+        ),
       ),
+    );
+  }
+
+  // ==========================================
+  // MODAL OPS SALDO AWAL DARI BULAN SEBELUMNYA
+  // ==========================================
+  void _showSaldoAwalModal() async {
+    final prevMonthDate =
+        DateTime(_selectedMonth.year, _selectedMonth.month - 1, 1);
+    final prevMonthName =
+        '${_namaBulan[prevMonthDate.month - 1]} ${prevMonthDate.year}';
+    final currentMonthName =
+        '${_namaBulan[_selectedMonth.month - 1]} ${_selectedMonth.year}';
+
+    final sisaDanaBulanLalu =
+        await PribadiSaldoAwalService.getSisaDanaBulanSebelumnya(_monthKey);
+    bool isEnabled =
+        await PribadiSaldoAwalService.isSaldoAwalEnabled(_monthKey);
+
+    String? selectedTargetPos;
+    if (_data.posDanaList.isNotEmpty) {
+      final existingTx = _data.transactions.firstWhere(
+        (tx) =>
+            tx.id == 'saldo_awal_$_monthKey' ||
+            (tx.kode?.trim().toLowerCase() ==
+                    PribadiSaldoAwalService.saldoAwalKode.toLowerCase() &&
+                tx.note?.trim().toLowerCase() ==
+                    PribadiSaldoAwalService.saldoAwalKeterangan.toLowerCase()),
+        orElse: () => PribadiTransaction(
+            id: '', title: '', type: 'pemasukan', amount: 0),
+      );
+      if (existingTx.id.isNotEmpty && existingTx.targetAccount != null) {
+        selectedTargetPos = existingTx.targetAccount;
+      } else {
+        selectedTargetPos = _data.posDanaList.first.nama;
+      }
+    }
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                top: 16,
+                left: 20,
+                right: 20,
+              ),
+              decoration: const BoxDecoration(
+                color: lightCard,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF9D174D)
+                                .withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.history_toggle_off_rounded,
+                            color: Color(0xFF9D174D),
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Saldo Awal Bulan Ini',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: textDark,
+                                ),
+                              ),
+                              Text(
+                                'Gunakan sisa dana bulan sebelumnya',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded,
+                              color: textMuted),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Card Info Sisa Dana Bulan Sebelumnya
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFFFDF2F8),
+                            Color(0xFFFAF5FF),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color:
+                              const Color(0xFFF472B6).withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.calendar_month_rounded,
+                                      size: 15, color: Color(0xFF9D174D)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Sisa Dana ($prevMonthName)',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF831843),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isEnabled
+                                      ? const Color(0xFF059669)
+                                          .withValues(alpha: 0.12)
+                                      : Colors.grey.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  isEnabled ? 'Aktif' : 'Nonaktif',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: isEnabled
+                                        ? const Color(0xFF059669)
+                                        : textMuted,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Rp ${RupiahFormatter.format(sisaDanaBulanLalu)}',
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF831843),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Jumlah ini akan otomatis menyesuaikan jika ada perubahan sisa dana di bulan kemarin.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF9D174D),
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Toggle Switch Card
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: lightCardElevated,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: lightBorder),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Gunakan Sebagai Saldo Awal',
+                                  style: TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: textDark,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Catat otomatis di bulan $currentMonthName',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch.adaptive(
+                            value: isEnabled,
+                            activeColor: const Color(0xFF9D174D),
+                            onChanged: (val) {
+                              setModalState(() {
+                                isEnabled = val;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // Detail Spesifikasi Transaksi (Tanggal 1, Saldo Awal, Keterangan, Tipe Debit)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: lightBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: lightBorder),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Format Transaksi Otomatis:',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: textDark,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          _buildSaldoAwalDetailRow(
+                            'Tanggal',
+                            'Tanggal 1 ${_namaBulan[_selectedMonth.month - 1]} ${_selectedMonth.year}',
+                            Icons.event_rounded,
+                          ),
+                          const SizedBox(height: 6),
+                          _buildSaldoAwalDetailRow(
+                            'Kategori',
+                            PribadiSaldoAwalService.saldoAwalKode,
+                            Icons.label_outline_rounded,
+                          ),
+                          const SizedBox(height: 6),
+                          _buildSaldoAwalDetailRow(
+                            'Keterangan',
+                            PribadiSaldoAwalService.saldoAwalKeterangan,
+                            Icons.description_outlined,
+                          ),
+                          const SizedBox(height: 6),
+                          _buildSaldoAwalDetailRow(
+                            'Tipe',
+                            'Debit (+ Masuk)',
+                            Icons.arrow_downward_rounded,
+                            valueColor: primaryGreen,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    if (isEnabled && _data.posDanaList.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Pilih Pos Dana Penerima Saldo Awal',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _data.posDanaList.map((pos) {
+                          final isSelected = selectedTargetPos == pos.nama;
+                          return InkWell(
+                            onTap: () {
+                              setModalState(() {
+                                selectedTargetPos = pos.nama;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? const Color(0xFF9D174D)
+                                        .withValues(alpha: 0.12)
+                                    : lightCardElevated,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? const Color(0xFF9D174D)
+                                      : lightBorder,
+                                  width: isSelected ? 1.5 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.account_balance_wallet_rounded,
+                                    size: 14,
+                                    color: isSelected
+                                        ? const Color(0xFF9D174D)
+                                        : textMuted,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    pos.nama,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.w500,
+                                      color: isSelected
+                                          ? const Color(0xFF9D174D)
+                                          : textDark,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+
+                    const SizedBox(height: 20),
+
+                    // Tombol Simpan / Terapkan
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          await PribadiSaldoAwalService.setSaldoAwalEnabled(
+                              _monthKey, isEnabled);
+                          await PribadiSaldoAwalService.syncSaldoAwal(
+                            currentMonthKey: _monthKey,
+                            currentData: _data,
+                            selectedTargetPos: selectedTargetPos,
+                          );
+                          await _saveData();
+                          if (mounted) {
+                            setState(() {});
+                            CustomToast.showSuccess(
+                              context,
+                              title: isEnabled
+                                  ? 'Saldo awal Rp ${RupiahFormatter.format(sisaDanaBulanLalu)} berhasil diterapkan!'
+                                  : 'Saldo awal dinonaktifkan.',
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF9D174D),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Terapkan & Simpan',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildSaldoAwalDetailRow(String label, String value, IconData icon,
+      {Color? valueColor}) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: textMuted),
+        const SizedBox(width: 6),
+        Text(
+          '$label: ',
+          style: const TextStyle(fontSize: 11.5, color: textMuted),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.bold,
+              color: valueColor ?? textDark,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 
