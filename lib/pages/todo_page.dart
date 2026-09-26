@@ -762,615 +762,624 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                 selectedDate.day == now.day;
             final isDark = _isSeriousMode;
 
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(sheetCtx).viewInsets.bottom,
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isDark ? seriousCardBg : Colors.white,
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(28)),
-                  border: isDark
-                      ? Border.all(
-                          color: seriousGold.withValues(alpha: 0.35),
-                          width: 1.5,
-                        )
-                      : null,
+            return SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(sheetCtx).viewInsets.bottom,
                 ),
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 44,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF475569)
-                              : Colors.grey[300],
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: (isDark ? seriousGold : primaryTerracotta)
-                                .withValues(alpha: isDark ? 0.15 : 0.12),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Icon(
-                            Icons.playlist_add_rounded,
-                            color: isDark ? seriousGold : primaryTerracotta,
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Buat To-Do List Baru',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark
-                                      ? Colors.white
-                                      : const Color(0xFF1E293B),
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Pilih tanggal untuk membuat list section baru',
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  color: isDark
-                                      ? const Color(0xFF94A3B8)
-                                      : const Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDate,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2035),
-                          builder: (context, child) {
-                            return Theme(
-                              data: Theme.of(context).copyWith(
-                                colorScheme: isDark
-                                    ? const ColorScheme.dark(
-                                        primary: seriousGold,
-                                        onPrimary: Colors.black,
-                                        surface: Color(0xFF1E293B),
-                                        onSurface: Colors.white,
-                                      )
-                                    : const ColorScheme.light(
-                                        primary: primaryTerracotta,
-                                        onPrimary: Colors.white,
-                                        surface: Colors.white,
-                                        onSurface: Color(0xFF1E293B),
-                                      ),
-                              ),
-                              child: child!,
-                            );
-                          },
-                        );
-                        if (picked != null) {
-                          setModalState(() {
-                            selectedDate = picked;
-                          });
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isDark ? seriousBg : const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: (isDark ? seriousGold : primaryTerracotta)
-                                .withValues(alpha: isDark ? 0.45 : 0.3),
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(sheetCtx).size.height * 0.88,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isDark ? seriousCardBg : Colors.white,
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(28)),
+                    border: isDark
+                        ? Border.all(
+                            color: seriousGold.withValues(alpha: 0.35),
                             width: 1.5,
+                          )
+                        : null,
+                  ),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 44,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? const Color(0xFF475569)
+                                  : Colors.grey[300],
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                         ),
-                        child: Row(
+                        const SizedBox(height: 18),
+                        Row(
                           children: [
-                            Icon(
-                              Icons.event_available_rounded,
-                              color: isDark ? seriousGold : primaryTerracotta,
-                              size: 22,
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: (isDark ? seriousGold : primaryTerracotta)
+                                    .withValues(alpha: isDark ? 0.15 : 0.12),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Icon(
+                                Icons.playlist_add_rounded,
+                                color: isDark ? seriousGold : primaryTerracotta,
+                                size: 24,
+                              ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 14),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Tanggal To-Do List',
+                                    'Buat To-Do List Baru',
                                     style: TextStyle(
-                                      fontSize: 11,
-                                      color: isDark
-                                          ? const Color(0xFF94A3B8)
-                                          : const Color(0xFF94A3B8),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    TodoDateGroup(
-                                      id: '',
-                                      date: selectedDate,
-                                    ).formattedFullDate,
-                                    style: TextStyle(
-                                      fontSize: 14.5,
+                                      fontSize: 18,
                                       fontWeight: FontWeight.bold,
                                       color: isDark
                                           ? Colors.white
                                           : const Color(0xFF1E293B),
                                     ),
                                   ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Pilih tanggal untuk membuat list section baru',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      color: isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : const Color(0xFF64748B),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
-                            if (isDateToday)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: (isDark
-                                          ? seriousGold
-                                          : primaryTerracotta)
-                                      .withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'Hari Ini',
-                                  style: TextStyle(
-                                    color: isDark
-                                        ? seriousGold
-                                        : primaryTerracotta,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            const SizedBox(width: 6),
-                            Icon(
-                              Icons.edit_calendar_rounded,
-                              color: isDark ? seriousGold : primaryTerracotta,
-                              size: 20,
-                            ),
                           ],
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Tugas Pertama (Opsional)',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFCBD5E1)
-                            : const Color(0xFF334155),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: taskController,
-                      autofocus: false,
-                      style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: InputDecoration(
-                        hintText: 'Contoh: Rapat koordinasi proyek...',
-                        hintStyle: TextStyle(
-                          color: isDark
-                              ? const Color(0xFF64748B)
-                              : Colors.grey[400],
-                          fontSize: 13.5,
-                        ),
-                        filled: true,
-                        fillColor:
-                            isDark ? seriousBg : const Color(0xFFF8FAFC),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(
-                            color: isDark
-                                ? seriousBorder
-                                : Colors.grey[300]!,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(
-                            color: isDark
-                                ? seriousBorder
-                                : Colors.grey.withValues(alpha: 0.25),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(
-                            color: isDark ? seriousGold : primaryTerracotta,
-                            width: 1.8,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Toggle Pengingat / Alarm
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: alarmConfig.enabled
-                            ? (isDark
-                                ? seriousGold.withValues(alpha: 0.12)
-                                : primaryTerracotta.withValues(alpha: 0.06))
-                            : (isDark ? seriousBg : const Color(0xFFF8FAFC)),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: alarmConfig.enabled
-                              ? (isDark
-                                  ? seriousGold.withValues(alpha: 0.5)
-                                  : primaryTerracotta.withValues(alpha: 0.4))
-                              : (isDark
-                                  ? seriousBorder
-                                  : Colors.grey.withValues(alpha: 0.25)),
-                          width: alarmConfig.enabled ? 1.5 : 1,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: alarmConfig.enabled
-                                      ? (isDark
-                                          ? seriousGold
-                                          : primaryTerracotta)
-                                      : (isDark
-                                          ? const Color(0xFF334155)
-                                          : const Color(0xFFE2E8F0)),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Icon(
-                                  Icons.alarm_rounded,
-                                  color: alarmConfig.enabled
-                                      ? (isDark ? Colors.black : Colors.white)
-                                      : const Color(0xFF64748B),
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Pengingat / Alarm Section',
-                                      style: TextStyle(
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: isDark
-                                            ? Colors.white
-                                            : const Color(0xFF1E293B),
-                                      ),
-                                    ),
-                                    Text(
-                                      alarmConfig.enabled
-                                          ? 'Alarm aktif berbunyi looping jika tugas belum selesai'
-                                          : 'Nyalakan alarm pengingat tugas',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: alarmConfig.enabled
-                                            ? (isDark
-                                                ? seriousGold
-                                                : darkTerracotta)
-                                            : const Color(0xFF64748B),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Switch(
-                                value: alarmConfig.enabled,
-                                activeThumbColor:
-                                    isDark ? seriousGold : primaryTerracotta,
-                                onChanged: (val) async {
-                                  if (val) {
-                                    await TodoAlarmService
-                                        .requestOverlayPermissionWithDialog(
-                                            sheetCtx);
-                                    if (!sheetCtx.mounted) return;
-                                    final res = await TodoAlarmSetupSheet.show(
-                                      sheetCtx,
-                                      initialConfig: alarmConfig,
-                                      dateTitle: TodoDateGroup(
-                                        id: '',
-                                        date: selectedDate,
-                                      ).formattedFullDate,
-                                      isSeriousMode: _isSeriousMode,
-                                    );
-                                    if (res != null) {
-                                      setModalState(() {
-                                        alarmConfig = res;
-                                        alarmConfig.enabled = true;
-                                      });
-                                      if (sheetCtx.mounted) {
-                                        _showToast(
-                                            sheetCtx, 'Berhasil atur pengingat');
-                                      }
-                                    }
-                                  } else {
-                                    setModalState(() {
-                                      alarmConfig.enabled = false;
-                                    });
-                                  }
-                                },
-                              ),
-                            ],
-                          ),
-                          if (alarmConfig.enabled) ...[
-                            const SizedBox(height: 8),
-                            Divider(
-                              height: 1,
-                              color: isDark
-                                  ? seriousBorder
-                                  : const Color(0xFFE2E8F0),
+                        const SizedBox(height: 20),
+                        InkWell(
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: selectedDate,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2035),
+                              builder: (context, child) {
+                                return Theme(
+                                  data: Theme.of(context).copyWith(
+                                    colorScheme: isDark
+                                        ? const ColorScheme.dark(
+                                            primary: seriousGold,
+                                            onPrimary: Colors.black,
+                                            surface: Color(0xFF1E293B),
+                                            onSurface: Colors.white,
+                                          )
+                                        : const ColorScheme.light(
+                                            primary: primaryTerracotta,
+                                            onPrimary: Colors.white,
+                                            surface: Colors.white,
+                                            onSurface: Color(0xFF1E293B),
+                                          ),
+                                  ),
+                                  child: child!,
+                                );
+                              },
+                            );
+                            if (picked != null) {
+                              setModalState(() {
+                                selectedDate = picked;
+                              });
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
                             ),
-                            const SizedBox(height: 8),
-                            Row(
+                            decoration: BoxDecoration(
+                              color: isDark ? seriousBg : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: (isDark ? seriousGold : primaryTerracotta)
+                                    .withValues(alpha: isDark ? 0.45 : 0.3),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Row(
                               children: [
+                                Icon(
+                                  Icons.event_available_rounded,
+                                  color: isDark ? seriousGold : primaryTerracotta,
+                                  size: 22,
+                                ),
+                                const SizedBox(width: 12),
                                 Expanded(
-                                  child: Text(
-                                    alarmConfig.type == 'interval'
-                                        ? '🔔 Tiap ${alarmConfig.intervalMinutes < 60 ? "${alarmConfig.intervalMinutes} Menit" : "${alarmConfig.intervalMinutes ~/ 60} Jam"} (${alarmConfig.intervalStartTime} - ${alarmConfig.intervalEndTime}) • ${_getSoundLabel(alarmConfig)}'
-                                        : '🔔 Jam: ${alarmConfig.specificTimes.join(', ')} • ${_getSoundLabel(alarmConfig)}',
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      color: isDark
-                                          ? seriousGold
-                                          : darkTerracotta,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Tanggal To-Do List',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: isDark
+                                              ? const Color(0xFF94A3B8)
+                                              : const Color(0xFF94A3B8),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        TodoDateGroup(
+                                          id: '',
+                                          date: selectedDate,
+                                        ).formattedFullDate,
+                                        style: TextStyle(
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: isDark
+                                              ? Colors.white
+                                              : const Color(0xFF1E293B),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                TextButton.icon(
-                                  onPressed: () async {
-                                    final res = await TodoAlarmSetupSheet.show(
-                                      sheetCtx,
-                                      initialConfig: alarmConfig,
-                                      dateTitle: TodoDateGroup(
-                                        id: '',
-                                        date: selectedDate,
-                                      ).formattedFullDate,
-                                      isSeriousMode: _isSeriousMode,
-                                    );
-                                    if (res != null) {
-                                      setModalState(() {
-                                        alarmConfig = res;
-                                        alarmConfig.enabled = true;
-                                      });
-                                      if (sheetCtx.mounted) {
-                                        _showToast(sheetCtx, 'Berhasil atur pengingat');
-                                      }
-                                    }
-                                  },
-                                  icon: Icon(
-                                    Icons.edit_rounded,
-                                    size: 14,
-                                    color: isDark
-                                        ? seriousGold
-                                        : primaryTerracotta,
-                                  ),
-                                  label: Text(
-                                    'Ubah',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: isDark
-                                          ? seriousGold
-                                          : primaryTerracotta,
+                                if (isDateToday)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: (isDark
+                                              ? seriousGold
+                                              : primaryTerracotta)
+                                          .withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      'Hari Ini',
+                                      style: TextStyle(
+                                        color: isDark
+                                            ? seriousGold
+                                            : primaryTerracotta,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
-                                  style: TextButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    minimumSize: Size.zero,
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  ),
+                                const SizedBox(width: 6),
+                                Icon(
+                                  Icons.edit_calendar_rounded,
+                                  color: isDark ? seriousGold : primaryTerracotta,
+                                  size: 20,
                                 ),
                               ],
                             ),
-                          ],
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              side: BorderSide(
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Tugas Pertama (Opsional)',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? const Color(0xFFCBD5E1)
+                                : const Color(0xFF334155),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: taskController,
+                          autofocus: false,
+                          style: TextStyle(
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                          textCapitalization: TextCapitalization.sentences,
+                          decoration: InputDecoration(
+                            hintText: 'Contoh: Rapat koordinasi proyek...',
+                            hintStyle: TextStyle(
+                              color: isDark
+                                  ? const Color(0xFF64748B)
+                                  : Colors.grey[400],
+                              fontSize: 13.5,
+                            ),
+                            filled: true,
+                            fillColor:
+                                isDark ? seriousBg : const Color(0xFFF8FAFC),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
                                 color: isDark
                                     ? seriousBorder
                                     : Colors.grey[300]!,
                               ),
                             ),
-                            child: Text(
-                              'Batal',
-                              style: TextStyle(
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
                                 color: isDark
-                                    ? const Color(0xFF94A3B8)
-                                    : const Color(0xFF64748B),
-                                fontWeight: FontWeight.bold,
+                                    ? seriousBorder
+                                    : Colors.grey.withValues(alpha: 0.25),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
+                                color: isDark ? seriousGold : primaryTerracotta,
+                                width: 1.8,
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 2,
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              final cleanDate = DateTime(
-                                selectedDate.year,
-                                selectedDate.month,
-                                selectedDate.day,
-                              );
-                              final taskTitle = taskController.text.trim();
 
-                              if (taskTitle.isNotEmpty && _isSeriousMode) {
-                                final confirmed =
-                                    await SeriousConfirmAddDialog.show(
-                                  context,
-                                  taskTitle: taskTitle,
-                                );
-                                if (!confirmed) return;
-                                if (!mounted) return;
-                              }
+                        const SizedBox(height: 16),
 
-                              final existingIndex = _dateGroups.indexWhere(
-                                (g) =>
-                                    g.date.year == cleanDate.year &&
-                                    g.date.month == cleanDate.month &&
-                                    g.date.day == cleanDate.day,
-                              );
+                        // Toggle Pengingat / Alarm
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: alarmConfig.enabled
+                                ? (isDark
+                                    ? seriousGold.withValues(alpha: 0.12)
+                                    : primaryTerracotta.withValues(alpha: 0.06))
+                                : (isDark ? seriousBg : const Color(0xFFF8FAFC)),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: alarmConfig.enabled
+                                  ? (isDark
+                                      ? seriousGold.withValues(alpha: 0.5)
+                                      : primaryTerracotta.withValues(alpha: 0.4))
+                                  : (isDark
+                                      ? seriousBorder
+                                      : Colors.grey.withValues(alpha: 0.25)),
+                              width: alarmConfig.enabled ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: alarmConfig.enabled
+                                          ? (isDark
+                                              ? seriousGold
+                                              : primaryTerracotta)
+                                          : (isDark
+                                              ? const Color(0xFF334155)
+                                              : const Color(0xFFE2E8F0)),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(
+                                      Icons.alarm_rounded,
+                                      color: alarmConfig.enabled
+                                          ? (isDark ? Colors.black : Colors.white)
+                                          : const Color(0xFF64748B),
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Pengingat / Alarm Section',
+                                          style: TextStyle(
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: isDark
+                                                ? Colors.white
+                                                : const Color(0xFF1E293B),
+                                          ),
+                                        ),
+                                        Text(
+                                          alarmConfig.enabled
+                                              ? 'Alarm aktif berbunyi looping jika tugas belum selesai'
+                                              : 'Nyalakan alarm pengingat tugas',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: alarmConfig.enabled
+                                                ? (isDark
+                                                    ? seriousGold
+                                                    : darkTerracotta)
+                                                : const Color(0xFF64748B),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Switch(
+                                    value: alarmConfig.enabled,
+                                    activeThumbColor:
+                                        isDark ? seriousGold : primaryTerracotta,
+                                    onChanged: (val) async {
+                                      if (val) {
+                                        await TodoAlarmService
+                                            .requestOverlayPermissionWithDialog(
+                                                sheetCtx);
+                                        if (!sheetCtx.mounted) return;
+                                        final res = await TodoAlarmSetupSheet.show(
+                                          sheetCtx,
+                                          initialConfig: alarmConfig,
+                                          dateTitle: TodoDateGroup(
+                                            id: '',
+                                            date: selectedDate,
+                                          ).formattedFullDate,
+                                          isSeriousMode: _isSeriousMode,
+                                        );
+                                        if (res != null) {
+                                          setModalState(() {
+                                            alarmConfig = res;
+                                            alarmConfig.enabled = true;
+                                          });
+                                          if (sheetCtx.mounted) {
+                                            _showToast(
+                                                sheetCtx, 'Berhasil atur pengingat');
+                                          }
+                                        }
+                                      } else {
+                                        setModalState(() {
+                                          alarmConfig.enabled = false;
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ],
+                              ),
+                              if (alarmConfig.enabled) ...[
+                                const SizedBox(height: 8),
+                                Divider(
+                                  height: 1,
+                                  color: isDark
+                                      ? seriousBorder
+                                      : const Color(0xFFE2E8F0),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        alarmConfig.type == 'interval'
+                                            ? '🔔 Tiap ${alarmConfig.intervalMinutes < 60 ? "${alarmConfig.intervalMinutes} Menit" : "${alarmConfig.intervalMinutes ~/ 60} Jam"} (${alarmConfig.intervalStartTime} - ${alarmConfig.intervalEndTime}) • ${_getSoundLabel(alarmConfig)}'
+                                            : '🔔 Jam: ${alarmConfig.specificTimes.join(', ')} • ${_getSoundLabel(alarmConfig)}',
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          color: isDark
+                                              ? seriousGold
+                                              : darkTerracotta,
+                                        fontWeight: FontWeight.w600,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    TextButton.icon(
+                                      onPressed: () async {
+                                        final res = await TodoAlarmSetupSheet.show(
+                                          sheetCtx,
+                                          initialConfig: alarmConfig,
+                                          dateTitle: TodoDateGroup(
+                                            id: '',
+                                            date: selectedDate,
+                                          ).formattedFullDate,
+                                          isSeriousMode: _isSeriousMode,
+                                        );
+                                        if (res != null) {
+                                          setModalState(() {
+                                            alarmConfig = res;
+                                            alarmConfig.enabled = true;
+                                          });
+                                          if (sheetCtx.mounted) {
+                                            _showToast(sheetCtx, 'Berhasil atur pengingat');
+                                          }
+                                        }
+                                      },
+                                      icon: Icon(
+                                        Icons.edit_rounded,
+                                        size: 14,
+                                        color: isDark
+                                            ? seriousGold
+                                            : primaryTerracotta,
+                                      ),
+                                      label: Text(
+                                        'Ubah',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: isDark
+                                              ? seriousGold
+                                              : primaryTerracotta,
+                                        ),
+                                      ),
+                                      style: TextButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        minimumSize: Size.zero,
+                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
 
-                              final TodoDateGroup targetGroup;
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  side: BorderSide(
+                                    color: isDark
+                                        ? seriousBorder
+                                        : Colors.grey[300]!,
+                                  ),
+                                ),
+                                child: Text(
+                                  'Batal',
+                                  style: TextStyle(
+                                    color: isDark
+                                        ? const Color(0xFF94A3B8)
+                                        : const Color(0xFF64748B),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: ElevatedButton.icon(
+                                onPressed: () async {
+                                  final cleanDate = DateTime(
+                                    selectedDate.year,
+                                    selectedDate.month,
+                                    selectedDate.day,
+                                  );
+                                  final taskTitle = taskController.text.trim();
 
-                              if (existingIndex != -1) {
-                                final existingGroup = _dateGroups[existingIndex];
-                                existingGroup.isArchived = false;
-                                _collapsedGroupIds.remove(existingGroup.id);
-                                alarmConfig.applyToGroup(existingGroup);
+                                  if (taskTitle.isNotEmpty && _isSeriousMode) {
+                                    final confirmed =
+                                        await SeriousConfirmAddDialog.show(
+                                      context,
+                                      taskTitle: taskTitle,
+                                    );
+                                    if (!confirmed) return;
+                                    if (!mounted) return;
+                                  }
 
-                                if (taskTitle.isNotEmpty) {
-                                  existingGroup.items.add(
-                                    TodoItem(
+                                  final existingIndex = _dateGroups.indexWhere(
+                                    (g) =>
+                                        g.date.year == cleanDate.year &&
+                                        g.date.month == cleanDate.month &&
+                                        g.date.day == cleanDate.day,
+                                  );
+
+                                  final TodoDateGroup targetGroup;
+
+                                  if (existingIndex != -1) {
+                                    final existingGroup = _dateGroups[existingIndex];
+                                    existingGroup.isArchived = false;
+                                    _collapsedGroupIds.remove(existingGroup.id);
+                                    alarmConfig.applyToGroup(existingGroup);
+
+                                    if (taskTitle.isNotEmpty) {
+                                      existingGroup.items.add(
+                                        TodoItem(
+                                          id: DateTime.now()
+                                              .microsecondsSinceEpoch
+                                              .toString(),
+                                          title: taskTitle,
+                                          isCompleted: false,
+                                        ),
+                                      );
+                                      existingGroup.items = [
+                                        ...existingGroup.items
+                                            .where((i) => !i.isCompleted),
+                                        ...existingGroup.items
+                                            .where((i) => i.isCompleted),
+                                      ];
+                                    }
+                                    targetGroup = existingGroup;
+                                  } else {
+                                    final newGroup = TodoDateGroup(
                                       id: DateTime.now()
                                           .microsecondsSinceEpoch
                                           .toString(),
-                                      title: taskTitle,
-                                      isCompleted: false,
-                                    ),
-                                  );
-                                  existingGroup.items = [
-                                    ...existingGroup.items
-                                        .where((i) => !i.isCompleted),
-                                    ...existingGroup.items
-                                        .where((i) => i.isCompleted),
-                                  ];
-                                }
-                                targetGroup = existingGroup;
-                              } else {
-                                final newGroup = TodoDateGroup(
-                                  id: DateTime.now()
-                                      .microsecondsSinceEpoch
-                                      .toString(),
-                                  date: cleanDate,
-                                  isArchived: false,
-                                  items: taskTitle.isNotEmpty
-                                      ? [
-                                          TodoItem(
-                                            id: DateTime.now()
-                                                .microsecondsSinceEpoch
-                                                .toString(),
-                                            title: taskTitle,
-                                            isCompleted: false,
-                                          ),
-                                        ]
-                                      : [],
-                                );
-                                alarmConfig.applyToGroup(newGroup);
-                                _collapsedGroupIds.remove(newGroup.id);
-                                _dateGroups.insert(0, newGroup);
-                                targetGroup = newGroup;
-                              }
+                                      date: cleanDate,
+                                      isArchived: false,
+                                      items: taskTitle.isNotEmpty
+                                          ? [
+                                              TodoItem(
+                                                id: DateTime.now()
+                                                    .microsecondsSinceEpoch
+                                                    .toString(),
+                                                title: taskTitle,
+                                                isCompleted: false,
+                                              ),
+                                            ]
+                                          : [],
+                                    );
+                                    alarmConfig.applyToGroup(newGroup);
+                                    _collapsedGroupIds.remove(newGroup.id);
+                                    _dateGroups.insert(0, newGroup);
+                                    targetGroup = newGroup;
+                                  }
 
-                              setState(() {
-                                _searchQuery = '';
-                                _selectedFilter = 'all';
-                              });
+                                  setState(() {
+                                    _searchQuery = '';
+                                    _selectedFilter = 'all';
+                                  });
 
-                              // Jadwalkan Alarm Service
-                              if (targetGroup.reminderEnabled) {
-                                TodoAlarmService.scheduleGroupAlarm(targetGroup);
-                              }
+                                  // Jadwalkan Alarm Service
+                                  if (targetGroup.reminderEnabled) {
+                                    TodoAlarmService.scheduleGroupAlarm(targetGroup);
+                                  }
 
-                              if (ctx.mounted) {
-                                Navigator.pop(ctx);
-                              }
-                              if (mounted) {
-                                _showToast(context, 'To-Do List berhasil dibuat!');
-                              }
-                              _saveTodoData();
-                              HapticFeedback.mediumImpact();
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isDark
-                                  ? seriousGold
-                                  : primaryTerracotta,
-                              foregroundColor:
-                                  isDark ? Colors.black : Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              elevation: 0,
-                            ),
-                            icon: const Icon(Icons.check_rounded, size: 20),
-                            label: const Text(
-                              'Buat List',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14.5,
+                                  if (ctx.mounted) {
+                                    Navigator.pop(ctx);
+                                  }
+                                  if (mounted) {
+                                    _showToast(context, 'To-Do List berhasil dibuat!');
+                                  }
+                                  _saveTodoData();
+                                  HapticFeedback.mediumImpact();
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: isDark
+                                      ? seriousGold
+                                      : primaryTerracotta,
+                                  foregroundColor:
+                                      isDark ? Colors.black : Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                icon: const Icon(Icons.check_rounded, size: 20),
+                                label: const Text(
+                                  'Buat List',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14.5,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             );
@@ -1407,249 +1416,258 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              color: isDark ? seriousCardBg : Colors.white,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(28)),
-              border: isDark
-                  ? Border.all(
-                      color: seriousGold.withValues(alpha: 0.35),
-                      width: 1.5,
-                    )
-                  : null,
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
             ),
-            padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF475569)
-                          : Colors.grey[300],
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Row(
+            child: Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.88,
+              ),
+              decoration: BoxDecoration(
+                color: isDark ? seriousCardBg : Colors.white,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(28)),
+                border: isDark
+                    ? Border.all(
+                        color: seriousGold.withValues(alpha: 0.35),
+                        width: 1.5,
+                      )
+                    : null,
+              ),
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: (isDark ? seriousGold : primaryTerracotta)
-                            .withValues(alpha: isDark ? 0.15 : 0.12),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(
-                        Icons.add_task_rounded,
-                        color: isDark ? seriousGold : primaryTerracotta,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Tambah Kerjaan Baru',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: isDark
-                                  ? Colors.white
-                                  : const Color(0xFF1E293B),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            group.formattedFullDate,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              color: isDark
-                                  ? seriousGold
-                                  : primaryTerracotta,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF475569)
+                              : Colors.grey[300],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Tugas / Pekerjaan yang Harus Dikerjakan',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: isDark
-                        ? const Color(0xFFCBD5E1)
-                        : const Color(0xFF334155),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: taskController,
-                  autofocus: true,
-                  style: TextStyle(
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                  textCapitalization: TextCapitalization.sentences,
-                  maxLines: 2,
-                  minLines: 1,
-                  decoration: InputDecoration(
-                    hintText: 'Ketik apa tugas kamu...',
-                    hintStyle: TextStyle(
-                      color: isDark
-                          ? const Color(0xFF64748B)
-                          : Colors.grey[400],
-                      fontSize: 14,
-                    ),
-                    filled: true,
-                    fillColor: isDark ? seriousBg : const Color(0xFFF8FAFC),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(
-                        color: isDark
-                            ? seriousBorder
-                            : Colors.grey[300]!,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(
-                        color: isDark
-                            ? seriousBorder
-                            : Colors.grey.withValues(alpha: 0.25),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(
-                        color: isDark ? seriousGold : primaryTerracotta,
-                        width: 1.8,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: (isDark ? seriousGold : primaryTerracotta)
+                                .withValues(alpha: isDark ? 0.15 : 0.12),
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          side: BorderSide(
+                          child: Icon(
+                            Icons.add_task_rounded,
+                            color: isDark ? seriousGold : primaryTerracotta,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Tambah Kerjaan Baru',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark
+                                      ? Colors.white
+                                      : const Color(0xFF1E293B),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                group.formattedFullDate,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: isDark
+                                      ? seriousGold
+                                      : primaryTerracotta,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Tugas / Pekerjaan yang Harus Dikerjakan',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? const Color(0xFFCBD5E1)
+                            : const Color(0xFF334155),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: taskController,
+                      autofocus: true,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                      textCapitalization: TextCapitalization.sentences,
+                      maxLines: 2,
+                      minLines: 1,
+                      decoration: InputDecoration(
+                        hintText: 'Ketik apa tugas kamu...',
+                        hintStyle: TextStyle(
+                          color: isDark
+                              ? const Color(0xFF64748B)
+                              : Colors.grey[400],
+                          fontSize: 14,
+                        ),
+                        filled: true,
+                        fillColor: isDark ? seriousBg : const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
                             color: isDark
                                 ? seriousBorder
                                 : Colors.grey[300]!,
                           ),
                         ),
-                        child: Text(
-                          'Batal',
-                          style: TextStyle(
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
                             color: isDark
-                                ? const Color(0xFF94A3B8)
-                                : const Color(0xFF64748B),
-                            fontWeight: FontWeight.bold,
+                                ? seriousBorder
+                                : Colors.grey.withValues(alpha: 0.25),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color: isDark ? seriousGold : primaryTerracotta,
+                            width: 1.8,
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          final text = taskController.text.trim();
-                          if (text.isEmpty) {
-                            CustomToast.showWarning(
-                              context,
-                              title: 'Nama Tugas Kosong',
-                              subtitle: 'Tolong isi nama tugas terlebih dahulu.',
-                            );
-                            return;
-                          }
-
-                          if (_isSeriousMode) {
-                            final confirmed =
-                                await SeriousConfirmAddDialog.show(
-                              context,
-                              taskTitle: text,
-                            );
-                            if (!confirmed) return;
-                            if (!mounted) return;
-                          }
-
-                          setState(() {
-                            group.items.add(
-                              TodoItem(
-                                id: DateTime.now()
-                                    .microsecondsSinceEpoch
-                                    .toString(),
-                                title: text,
-                                isCompleted: false,
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
                               ),
-                            );
-                            group.items = [
-                              ...group.items.where((i) => !i.isCompleted),
-                              ...group.items.where((i) => i.isCompleted),
-                            ];
-                          });
-
-                          if (group.reminderEnabled) {
-                            TodoAlarmService.scheduleGroupAlarm(group);
-                          }
-
-                          if (ctx.mounted) {
-                            Navigator.pop(ctx);
-                          }
-                          _saveTodoData();
-                          HapticFeedback.lightImpact();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              isDark ? seriousGold : primaryTerracotta,
-                          foregroundColor:
-                              isDark ? Colors.black : Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          elevation: 0,
-                        ),
-                        icon: const Icon(Icons.add_rounded, size: 20),
-                        label: const Text(
-                          'Simpan Tugas',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14.5,
+                              side: BorderSide(
+                                color: isDark
+                                    ? seriousBorder
+                                    : Colors.grey[300]!,
+                              ),
+                            ),
+                            child: Text(
+                              'Batal',
+                              style: TextStyle(
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : const Color(0xFF64748B),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              final text = taskController.text.trim();
+                              if (text.isEmpty) {
+                                CustomToast.showWarning(
+                                  context,
+                                  title: 'Nama Tugas Kosong',
+                                  subtitle: 'Tolong isi nama tugas terlebih dahulu.',
+                                );
+                                return;
+                              }
+
+                              if (_isSeriousMode) {
+                                final confirmed =
+                                    await SeriousConfirmAddDialog.show(
+                                  context,
+                                  taskTitle: text,
+                                );
+                                if (!confirmed) return;
+                                if (!mounted) return;
+                              }
+
+                              setState(() {
+                                group.items.add(
+                                  TodoItem(
+                                    id: DateTime.now()
+                                        .microsecondsSinceEpoch
+                                        .toString(),
+                                    title: text,
+                                    isCompleted: false,
+                                  ),
+                                );
+                                group.items = [
+                                  ...group.items.where((i) => !i.isCompleted),
+                                  ...group.items.where((i) => i.isCompleted),
+                                ];
+                              });
+
+                              if (group.reminderEnabled) {
+                                TodoAlarmService.scheduleGroupAlarm(group);
+                              }
+
+                              if (ctx.mounted) {
+                                Navigator.pop(ctx);
+                              }
+                              _saveTodoData();
+                              HapticFeedback.lightImpact();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor:
+                                  isDark ? seriousGold : primaryTerracotta,
+                              foregroundColor:
+                                  isDark ? Colors.black : Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              elevation: 0,
+                            ),
+                            icon: const Icon(Icons.add_rounded, size: 20),
+                            label: const Text(
+                              'Simpan Tugas',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
         );
