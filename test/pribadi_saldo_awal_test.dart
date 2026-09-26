@@ -53,32 +53,45 @@ void main() {
       expect(PribadiSaldoAwalService.calculateSisaDana(dataWithTx), 3000000);
     });
 
-    test('syncSaldoAwal creates Debit transaction with Tanggal 1 and Saldo Awal category', () async {
+    test('getBreakdownSisaDanaBulanSebelumnya returns list of pos with remaining balances', () async {
       final septKey = '2026_09';
       final octKey = '2026_10';
 
-      // Setup September data with 500.000 sisa dana
       final septData = PribadiData(
         posDanaList: [
-          PosDana(id: 'pos_1', nama: 'Cash', balance: 500000),
-        ],
-        transactions: [
-          PribadiTransaction(
-            id: 'tx_gaji',
-            title: 'Gaji',
-            type: 'pemasukan',
-            amount: 500000,
-            timestamp: DateTime(2026, 9, 5),
-          ),
+          PosDana(id: 'pos_1', nama: 'Cash', balance: 150000),
+          PosDana(id: 'pos_2', nama: 'BCA', balance: 350000),
+          PosDana(id: 'pos_3', nama: 'GoPay', balance: 50000),
         ],
       );
       await PribadiSyncService.savePribadiData(septKey, septData);
 
-      // October data initially empty
-      final octData = PribadiData(
+      final breakdown = await PribadiSaldoAwalService.getBreakdownSisaDanaBulanSebelumnya(octKey);
+      expect(breakdown.length, 3);
+      expect(breakdown[0].nama, 'Cash');
+      expect(breakdown[0].sisaSaldo, 150000);
+      expect(breakdown[1].nama, 'BCA');
+      expect(breakdown[1].sisaSaldo, 350000);
+      expect(breakdown[2].nama, 'GoPay');
+      expect(breakdown[2].sisaSaldo, 50000);
+    });
+
+    test('syncSaldoAwal creates Pos Dana and Debit transactions based on previous month Pos Dana', () async {
+      final septKey = '2026_09';
+      final octKey = '2026_10';
+
+      // Setup September data with multiple Pos Dana
+      final septData = PribadiData(
         posDanaList: [
-          PosDana(id: 'pos_1', nama: 'Cash', balance: 0),
+          PosDana(id: 'pos_1', nama: 'Cash', balance: 100000),
+          PosDana(id: 'pos_2', nama: 'BCA', balance: 400000),
         ],
+      );
+      await PribadiSyncService.savePribadiData(septKey, septData);
+
+      // October data initially empty (no pos dana yet)
+      final octData = PribadiData(
+        posDanaList: [],
         transactions: [],
       );
 
@@ -92,45 +105,45 @@ void main() {
       );
 
       expect(changed, isTrue);
-      expect(octData.transactions.length, 1);
+      // October now has the 2 Pos Dana from September
+      expect(octData.posDanaList.length, 2);
+      expect(octData.posDanaList.any((p) => p.nama == 'Cash' && p.balance == 100000), isTrue);
+      expect(octData.posDanaList.any((p) => p.nama == 'BCA' && p.balance == 400000), isTrue);
 
-      final saldoAwalTx = octData.transactions.first;
-      expect(saldoAwalTx.timestamp.day, 1);
-      expect(saldoAwalTx.timestamp.month, 10);
-      expect(saldoAwalTx.timestamp.year, 2026);
-      expect(saldoAwalTx.kode, 'Saldo Awal');
-      expect(saldoAwalTx.note, 'Sisa dana bulan kemarin');
-      expect(saldoAwalTx.title, 'Sisa dana bulan kemarin');
-      expect(saldoAwalTx.type, 'pemasukan'); // Debit
-      expect(saldoAwalTx.amount, 500000);
-      expect(octData.posDanaList.first.balance, 500000);
+      // And October has 2 Saldo Awal transactions matching each Pos Dana
+      expect(octData.transactions.length, 2);
+
+      final cashTx = octData.transactions.firstWhere((t) => t.targetAccount == 'Cash');
+      expect(cashTx.timestamp.day, 1);
+      expect(cashTx.timestamp.month, 10);
+      expect(cashTx.timestamp.year, 2026);
+      expect(cashTx.kode, 'Saldo Awal');
+      expect(cashTx.note, 'Sisa Dana (Cash)');
+      expect(cashTx.type, 'pemasukan'); // Debit
+      expect(cashTx.amount, 100000);
+
+      final bcaTx = octData.transactions.firstWhere((t) => t.targetAccount == 'BCA');
+      expect(bcaTx.timestamp.day, 1);
+      expect(bcaTx.kode, 'Saldo Awal');
+      expect(bcaTx.note, 'Sisa Dana (BCA)');
+      expect(bcaTx.type, 'pemasukan'); // Debit
+      expect(bcaTx.amount, 400000);
     });
 
-    test('syncSaldoAwal dynamically adjusts if previous month remaining balance changes', () async {
+    test('syncSaldoAwal dynamically adjusts Pos Dana and transaction if previous month balance changes', () async {
       final septKey = '2026_09';
       final octKey = '2026_10';
 
-      // Setup September data initially with 500.000 sisa dana
+      // Setup September data initially with Cash: 500.000
       final septData = PribadiData(
         posDanaList: [
           PosDana(id: 'pos_cash', nama: 'Cash', balance: 500000),
-        ],
-        transactions: [
-          PribadiTransaction(
-            id: 'tx_sept',
-            title: 'Gaji',
-            type: 'pemasukan',
-            amount: 500000,
-            timestamp: DateTime(2026, 9, 1),
-          ),
         ],
       );
       await PribadiSyncService.savePribadiData(septKey, septData);
 
       final octData = PribadiData(
-        posDanaList: [
-          PosDana(id: 'pos_cash', nama: 'Cash', balance: 0),
-        ],
+        posDanaList: [],
         transactions: [],
       );
       await PribadiSaldoAwalService.setSaldoAwalEnabled(octKey, true);
@@ -142,17 +155,8 @@ void main() {
       expect(octData.transactions.first.amount, 500000);
       expect(octData.posDanaList.first.balance, 500000);
 
-      // User spends 100.000 in September -> sisa becomes 400.000
+      // User spends 100.000 in September -> Cash becomes 400.000
       septData.posDanaList.first.balance = 400000;
-      septData.transactions.add(
-        PribadiTransaction(
-          id: 'tx_makan',
-          title: 'Makan',
-          type: 'pengeluaran',
-          amount: 100000,
-          timestamp: DateTime(2026, 9, 15),
-        ),
-      );
       await PribadiSyncService.savePribadiData(septKey, septData);
 
       // Now sync October again
@@ -168,8 +172,12 @@ void main() {
   });
 
   group('PribadiPage Saldo Awal UI Tests', () {
-    testWidgets('Long press on magenta banner opens Saldo Awal modal and can toggle',
+    testWidgets('Long press on banner opens Saldo Awal modal and shows Pos Dana breakdown',
         (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
 
@@ -178,19 +186,11 @@ void main() {
       final prevDate = DateTime(now.year, now.month - 1, 1);
       final prevKey = '${prevDate.year}_${prevDate.month.toString().padLeft(2, '0')}';
 
-      // Setup previous month with 350.000
+      // Setup previous month with Cash (150.000) and BCA (200.000)
       final prevData = PribadiData(
         posDanaList: [
-          PosDana(id: 'pos_cash', nama: 'Cash', balance: 350000),
-        ],
-        transactions: [
-          PribadiTransaction(
-            id: 'tx_1',
-            title: 'Gaji',
-            type: 'pemasukan',
-            amount: 350000,
-            timestamp: prevDate,
-          ),
+          PosDana(id: 'pos_cash', nama: 'Cash', balance: 150000),
+          PosDana(id: 'pos_bca', nama: 'BCA', balance: 200000),
         ],
       );
       await PribadiSyncService.savePribadiData(prevKey, prevData);
@@ -210,10 +210,14 @@ void main() {
       await tester.longPress(bannerFinder);
       await tester.pumpAndSettle();
 
-      // Verify modal opened
+      // Verify modal opened and displays previous month's Pos Dana breakdown
       expect(find.text('Saldo Awal Bulan Ini'), findsOneWidget);
       expect(find.text('Gunakan Sebagai Saldo Awal'), findsOneWidget);
       expect(find.textContaining('350.000'), findsWidgets);
+      expect(find.text('Cash'), findsWidgets);
+      expect(find.textContaining('150.000'), findsWidgets);
+      expect(find.text('BCA'), findsWidgets);
+      expect(find.textContaining('200.000'), findsWidgets);
 
       // Toggle switch to ON
       final switchFinder = find.byType(Switch);

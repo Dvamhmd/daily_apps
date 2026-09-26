@@ -145,7 +145,9 @@ class PribadiSyncService {
             );
             sanitizePosDanaBalances(loaded, uList);
           } else if (loaded.posDanaList.any((p) =>
-              p.id == 'pos_1' || p.id == 'pos_2' || p.id == 'pos_3')) {
+              (p.id == 'pos_1' || p.id == 'pos_2' || p.id == 'pos_3') &&
+              p.nama.startsWith('Pos Dana') &&
+              p.balance == 0)) {
             // Bersihkan pos dummy default jika Uangku kosong
             loaded.posDanaList = [];
           }

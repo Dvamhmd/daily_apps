@@ -3341,19 +3341,18 @@ class _PribadiPageState extends State<PribadiPage> {
     final monthName = _namaBulan[_selectedMonth.month - 1];
     final year = _selectedMonth.year;
     final hasSaldoAwal = _data.transactions.any((tx) =>
-        tx.id == 'saldo_awal_$_monthKey' ||
+        tx.id.startsWith('saldo_awal_$_monthKey') ||
         (tx.kode?.trim().toLowerCase() ==
                 PribadiSaldoAwalService.saldoAwalKode.toLowerCase() &&
-            tx.note?.trim().toLowerCase() ==
-                PribadiSaldoAwalService.saldoAwalKeterangan.toLowerCase()));
+            (tx.note?.trim().toLowerCase().startsWith('sisa dana') ?? false)));
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [
-            Color(0xFF9D174D), // Deep Magenta 800
-            Color(0xFF701A75), // Rich Fuchsia / Purple 900
+            Color(0xFF312E81), // Royal Indigo 900
+            Color(0xFF1E1B4B), // Midnight Indigo
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -3361,7 +3360,7 @@ class _PribadiPageState extends State<PribadiPage> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF9D174D).withValues(alpha: 0.35),
+            color: const Color(0xFF312E81).withValues(alpha: 0.35),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
@@ -3610,27 +3609,11 @@ class _PribadiPageState extends State<PribadiPage> {
 
     final sisaDanaBulanLalu =
         await PribadiSaldoAwalService.getSisaDanaBulanSebelumnya(_monthKey);
+    final breakdownBulanLalu =
+        await PribadiSaldoAwalService.getBreakdownSisaDanaBulanSebelumnya(
+            _monthKey);
     bool isEnabled =
         await PribadiSaldoAwalService.isSaldoAwalEnabled(_monthKey);
-
-    String? selectedTargetPos;
-    if (_data.posDanaList.isNotEmpty) {
-      final existingTx = _data.transactions.firstWhere(
-        (tx) =>
-            tx.id == 'saldo_awal_$_monthKey' ||
-            (tx.kode?.trim().toLowerCase() ==
-                    PribadiSaldoAwalService.saldoAwalKode.toLowerCase() &&
-                tx.note?.trim().toLowerCase() ==
-                    PribadiSaldoAwalService.saldoAwalKeterangan.toLowerCase()),
-        orElse: () => PribadiTransaction(
-            id: '', title: '', type: 'pemasukan', amount: 0),
-      );
-      if (existingTx.id.isNotEmpty && existingTx.targetAccount != null) {
-        selectedTargetPos = existingTx.targetAccount;
-      } else {
-        selectedTargetPos = _data.posDanaList.first.nama;
-      }
-    }
 
     if (!mounted) return;
 
@@ -3673,13 +3656,12 @@ class _PribadiPageState extends State<PribadiPage> {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF9D174D)
-                                .withValues(alpha: 0.1),
+                            color: primaryBlue.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Icon(
                             Icons.history_toggle_off_rounded,
-                            color: Color(0xFF9D174D),
+                            color: primaryBlue,
                             size: 22,
                           ),
                         ),
@@ -3697,7 +3679,7 @@ class _PribadiPageState extends State<PribadiPage> {
                                 ),
                               ),
                               Text(
-                                'Gunakan sisa dana bulan sebelumnya',
+                                'Gunakan sisa dana per pos dari bulan sebelumnya',
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: textMuted,
@@ -3721,16 +3703,15 @@ class _PribadiPageState extends State<PribadiPage> {
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [
-                            Color(0xFFFDF2F8),
-                            Color(0xFFFAF5FF),
+                            Color(0xFFEEF2FF), // Indigo 50
+                            Color(0xFFF8FAFC), // Slate 50
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color:
-                              const Color(0xFFF472B6).withValues(alpha: 0.3),
+                          color: const Color(0xFFC7D2FE),
                         ),
                       ),
                       child: Column(
@@ -3742,14 +3723,14 @@ class _PribadiPageState extends State<PribadiPage> {
                               Row(
                                 children: [
                                   const Icon(Icons.calendar_month_rounded,
-                                      size: 15, color: Color(0xFF9D174D)),
+                                      size: 15, color: primaryBlue),
                                   const SizedBox(width: 6),
                                   Text(
-                                    'Sisa Dana ($prevMonthName)',
+                                    'Total Sisa Dana ($prevMonthName)',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
-                                      color: Color(0xFF831843),
+                                      color: primaryDark,
                                     ),
                                   ),
                                 ],
@@ -3777,13 +3758,13 @@ class _PribadiPageState extends State<PribadiPage> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 8),
                           Text(
                             'Rp ${RupiahFormatter.format(sisaDanaBulanLalu)}',
                             style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF831843),
+                              color: primaryDark,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -3791,13 +3772,77 @@ class _PribadiPageState extends State<PribadiPage> {
                             'Jumlah ini akan otomatis menyesuaikan jika ada perubahan sisa dana di bulan kemarin.',
                             style: TextStyle(
                               fontSize: 11,
-                              color: Color(0xFF9D174D),
+                              color: textMuted,
                               height: 1.3,
                             ),
                           ),
                         ],
                       ),
                     ),
+
+                    // Rincian Pos Dana Asal dari Bulan Sebelumnya
+                    if (breakdownBulanLalu.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      Text(
+                        'Rincian Pos Dana Asal ($prevMonthName):',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: textDark,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: lightBg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: lightBorder),
+                        ),
+                        child: Column(
+                          children: breakdownBulanLalu.map((pos) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(5),
+                                    decoration: BoxDecoration(
+                                      color: primaryBlue.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Icon(
+                                      Icons.account_balance_wallet_rounded,
+                                      size: 13,
+                                      color: primaryBlue,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      pos.nama,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: textDark,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    'Rp ${RupiahFormatter.format(pos.sisaSaldo)}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: primaryDark,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
 
                     const SizedBox(height: 16),
 
@@ -3826,7 +3871,7 @@ class _PribadiPageState extends State<PribadiPage> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Catat otomatis di bulan $currentMonthName',
+                                  'Buat pos dana & catat saldo awal di bulan $currentMonthName',
                                   style: const TextStyle(
                                     fontSize: 11,
                                     color: textMuted,
@@ -3837,7 +3882,7 @@ class _PribadiPageState extends State<PribadiPage> {
                           ),
                           Switch.adaptive(
                             value: isEnabled,
-                            activeColor: const Color(0xFF9D174D),
+                            activeColor: primaryBlue,
                             onChanged: (val) {
                               setModalState(() {
                                 isEnabled = val;
@@ -3884,7 +3929,7 @@ class _PribadiPageState extends State<PribadiPage> {
                           const SizedBox(height: 6),
                           _buildSaldoAwalDetailRow(
                             'Keterangan',
-                            PribadiSaldoAwalService.saldoAwalKeterangan,
+                            '${PribadiSaldoAwalService.saldoAwalKeterangan} (<Nama Pos>)',
                             Icons.description_outlined,
                           ),
                           const SizedBox(height: 6),
@@ -3894,79 +3939,15 @@ class _PribadiPageState extends State<PribadiPage> {
                             Icons.arrow_downward_rounded,
                             valueColor: primaryGreen,
                           ),
+                          const SizedBox(height: 6),
+                          _buildSaldoAwalDetailRow(
+                            'Pos Dana',
+                            'Sesuai pos dana asal bulan sebelumnya',
+                            Icons.account_balance_wallet_outlined,
+                          ),
                         ],
                       ),
                     ),
-
-                    if (isEnabled && _data.posDanaList.isNotEmpty) ...[
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Pilih Pos Dana Penerima Saldo Awal',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: textMuted,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _data.posDanaList.map((pos) {
-                          final isSelected = selectedTargetPos == pos.nama;
-                          return InkWell(
-                            onTap: () {
-                              setModalState(() {
-                                selectedTargetPos = pos.nama;
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? const Color(0xFF9D174D)
-                                        .withValues(alpha: 0.12)
-                                    : lightCardElevated,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? const Color(0xFF9D174D)
-                                      : lightBorder,
-                                  width: isSelected ? 1.5 : 1,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.account_balance_wallet_rounded,
-                                    size: 14,
-                                    color: isSelected
-                                        ? const Color(0xFF9D174D)
-                                        : textMuted,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    pos.nama,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: isSelected
-                                          ? FontWeight.bold
-                                          : FontWeight.w500,
-                                      color: isSelected
-                                          ? const Color(0xFF9D174D)
-                                          : textDark,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
 
                     const SizedBox(height: 20),
 
@@ -3981,7 +3962,6 @@ class _PribadiPageState extends State<PribadiPage> {
                           await PribadiSaldoAwalService.syncSaldoAwal(
                             currentMonthKey: _monthKey,
                             currentData: _data,
-                            selectedTargetPos: selectedTargetPos,
                           );
                           await _saveData();
                           if (mounted) {
@@ -3989,13 +3969,13 @@ class _PribadiPageState extends State<PribadiPage> {
                             CustomToast.showSuccess(
                               context,
                               title: isEnabled
-                                  ? 'Saldo awal Rp ${RupiahFormatter.format(sisaDanaBulanLalu)} berhasil diterapkan!'
+                                  ? 'Saldo awal Rp ${RupiahFormatter.format(sisaDanaBulanLalu)} berhasil diterapkan per pos dana!'
                                   : 'Saldo awal dinonaktifkan.',
                             );
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF9D174D),
+                          backgroundColor: primaryBlue,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
