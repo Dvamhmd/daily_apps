@@ -253,28 +253,10 @@ class _RundownPageState extends State<RundownPage> {
         actions: [
           // Tombol Arsip Rundown
           IconButton(
-            icon: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const Icon(Icons.inventory_2_outlined,
-                    color: Colors.white, size: 22),
-                if (archivedCount > 0)
-                  Positioned(
-                    right: -2,
-                    top: -2,
-                    child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFF59E0B),
-                        shape: BoxShape.circle,
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 8,
-                        minHeight: 8,
-                      ),
-                    ),
-                  ),
-              ],
+            icon: const Icon(
+              Icons.inventory_2_outlined,
+              color: Colors.white,
+              size: 22,
             ),
             tooltip: 'Arsip Rundown ($archivedCount)',
             onPressed: _openArsipPage,

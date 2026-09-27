@@ -2234,26 +2234,10 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
         ),
         actions: [
           IconButton(
-            icon: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const Icon(Icons.account_balance_wallet_rounded,
-                    color: Colors.white, size: 22),
-                if (_rundown.hasExpenses)
-                  Positioned(
-                    top: -2,
-                    right: -2,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFF59E0B),
-                        shape: BoxShape.circle,
-                      ),
-                      constraints:
-                          const BoxConstraints(minWidth: 8, minHeight: 8),
-                    ),
-                  ),
-              ],
+            icon: const Icon(
+              Icons.account_balance_wallet_rounded,
+              color: Colors.white,
+              size: 22,
             ),
             tooltip: 'Estimasi & Realisasi Pengeluaran',
             onPressed: _openEstimasiPengeluaranModal,
