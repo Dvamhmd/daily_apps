@@ -163,19 +163,22 @@ void main() {
           updatedPData.posDanaList.firstWhere((p) => p.nama == 'Dana Operasional');
       expect(posOp.balance, 488000);
 
-      // 3. Verifikasi Transaksi Pengeluaran tercatat di Keuangan Pribadi dengan nama "Solar" dari catatan
+      // 3. Verifikasi Transaksi Pengeluaran tercatat di Keuangan Pribadi dengan format "(<nama rundown>) - <item>"
       expect(updatedPData.transactions.length, 1);
       final tx = updatedPData.transactions.first;
       expect(tx.isPengeluaran, isTrue);
       expect(tx.amount, 12000);
       expect(tx.sourceAccount, 'Dana Operasional');
-      expect(tx.title, 'Rundown: Gathering 2026 - Solar');
+      expect(tx.title, '(Gathering 2026) - Solar');
 
-      // 4. Verifikasi Riwayat Keuangan tercatat dengan nama "Solar"
+      // 4. Verifikasi Riwayat Keuangan tercatat dengan format "Realisasi <item> acara <nama rundown> : <pos dana> (<nominal>)"
       final riwayat = await RiwayatService.getRiwayat();
       expect(riwayat.isNotEmpty, isTrue);
       expect(riwayat.first.kategori, 'Rundown');
-      expect(riwayat.first.perubahan, contains('Realisasi Solar'));
+      expect(
+        riwayat.first.perubahan,
+        'Realisasi Solar acara Gathering 2026 : Dana Operasional (12.000)',
+      );
       expect(riwayat.first.nominal, 12000);
 
       // 5. Test Rollback / Revert Realisasi

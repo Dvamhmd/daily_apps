@@ -63,7 +63,7 @@ class RundownExpenseService {
     final effectiveNama = (catatan != null && catatan.trim().isNotEmpty)
         ? catatan.trim()
         : item.nama;
-    final keteranganTx = 'Rundown: ${rundown.title} - $effectiveNama';
+    final keteranganTx = '(${rundown.title}) - $effectiveNama';
     await PribadiSyncService.recordPengeluaranFromUangku(
       nama: posDanaNama,
       nominal: nominalRealisasi,
@@ -73,13 +73,11 @@ class RundownExpenseService {
     );
 
     // 3. Catat di Riwayat Keuangan Aplikasi
-    final bSuffix = RiwayatService.formatBulanSuffix(txDate);
-    final posFormat = RiwayatService.capitalize(posDanaNama);
-    final namaFormat = RiwayatService.capitalize(effectiveNama);
+    final nominalFormat = RupiahFormatter.format(nominalRealisasi);
     await RiwayatService.catatRiwayat(
       kategori: 'Rundown',
       perubahan:
-          'Realisasi $namaFormat ${RupiahFormatter.format(nominalRealisasi)} dari Pos $posFormat (Acara: ${rundown.title})$bSuffix',
+          'Realisasi $effectiveNama acara ${rundown.title} : $posDanaNama ($nominalFormat)',
       tipe: 'kurang',
       nominal: nominalRealisasi,
     );
@@ -141,17 +139,26 @@ class RundownExpenseService {
             ? item.catatan!.trim()
             : item.nama;
     final targetKetEffective =
-        'Rundown: ${rundown.title} - $effectiveNama'.toLowerCase();
+        '(${rundown.title}) - $effectiveNama'.toLowerCase();
     final targetKetOriginal =
-        'Rundown: ${rundown.title} - ${item.nama}'.toLowerCase();
+        '(${rundown.title}) - ${item.nama}'.toLowerCase();
+    final targetKetEffectiveLegacy =
+        'rundown: ${rundown.title} - $effectiveNama'.toLowerCase();
+    final targetKetOriginalLegacy =
+        'rundown: ${rundown.title} - ${item.nama}'.toLowerCase();
+
     final txIdx = data.transactions.lastIndexWhere((tx) =>
         tx.isPengeluaran &&
         tx.sourceAccount?.trim().toLowerCase() == posName.toLowerCase() &&
         (tx.title.toLowerCase().contains(targetKetEffective) ||
             tx.title.toLowerCase().contains(targetKetOriginal) ||
+            tx.title.toLowerCase().contains(targetKetEffectiveLegacy) ||
+            tx.title.toLowerCase().contains(targetKetOriginalLegacy) ||
             (tx.note != null &&
                 (tx.note!.toLowerCase().contains(targetKetEffective) ||
-                    tx.note!.toLowerCase().contains(targetKetOriginal)))));
+                    tx.note!.toLowerCase().contains(targetKetOriginal) ||
+                    tx.note!.toLowerCase().contains(targetKetEffectiveLegacy) ||
+                    tx.note!.toLowerCase().contains(targetKetOriginalLegacy)))));
 
     if (txIdx != -1) {
       data.transactions.removeAt(txIdx);
@@ -160,13 +167,11 @@ class RundownExpenseService {
     await PribadiSyncService.savePribadiData(monthKey, data);
 
     // 3. Catat di Riwayat Keuangan
-    final bSuffix = RiwayatService.formatBulanSuffix(txDate);
-    final posFormat = RiwayatService.capitalize(posName);
-    final namaFormat = RiwayatService.capitalize(effectiveNama);
+    final nominalFormat = RupiahFormatter.format(nominal);
     await RiwayatService.catatRiwayat(
       kategori: 'Rundown',
       perubahan:
-          'Batal Realisasi $namaFormat ${RupiahFormatter.format(nominal)} dikembalikan ke Pos $posFormat (Acara: ${rundown.title})$bSuffix',
+          'Batal Realisasi $effectiveNama acara ${rundown.title} : $posName ($nominalFormat)',
       tipe: 'tambah',
       nominal: nominal,
     );
