@@ -5589,109 +5589,37 @@ class _PribadiPageState extends State<PribadiPage> {
                 color: lightCard,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: Column(
-                children: [
-                  // Handle Bar
-                  Container(
-                    margin: const EdgeInsets.only(top: 12, bottom: 8),
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-
-                  // Header Modal
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 16, 12),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: primaryBlue.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            Icons.table_chart_rounded,
-                            color: primaryBlue,
-                            size: 22,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Detail Tabel Transaksi',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: textDark,
-                                ),
-                              ),
-                              Text(
-                                '${_namaBulan[_selectedMonth.month - 1]} ${_selectedMonth.year} • ${transactions.length} Transaksi',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: textMuted,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded,
-                              color: textMuted),
-                          onPressed: () => Navigator.pop(ctx),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(color: lightBorder, height: 1),
-
-                  // Ringkasan Debit / Kredit Banner
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  children: [
+                    // Handle Bar
+                    Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 8),
+                      width: 40,
+                      height: 4,
                       decoration: BoxDecoration(
-                        color: lightCardElevated,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: lightBorder),
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
                       ),
+                    ),
+
+                    // Header Modal
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 16, 12),
                       child: Row(
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Total Debit',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: textMuted,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '+ Rp ${RupiahFormatter.format(totalDebit)}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: primaryGreen,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                           Container(
-                            height: 28,
-                            width: 1,
-                            color: lightBorder,
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: primaryBlue.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.table_chart_rounded,
+                              color: primaryBlue,
+                              size: 22,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -5699,227 +5627,302 @@ class _PribadiPageState extends State<PribadiPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  'Total Kredit',
+                                  'Detail Tabel Transaksi',
                                   style: TextStyle(
-                                    fontSize: 10,
-                                    color: textMuted,
-                                    fontWeight: FontWeight.w500,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: textDark,
                                   ),
                                 ),
-                                const SizedBox(height: 2),
                                 Text(
-                                  '- Rp ${RupiahFormatter.format(totalKredit)}',
+                                  '${_namaBulan[_selectedMonth.month - 1]} ${_selectedMonth.year} • ${transactions.length} Transaksi',
                                   style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: primaryRose,
+                                    fontSize: 11,
+                                    color: textMuted,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          Container(
-                            height: 28,
-                            width: 1,
-                            color: lightBorder,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Selisih Bersih',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: textMuted,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Rp ${RupiahFormatter.format(saldoBersih)}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: saldoBersih >= 0
-                                        ? primaryGreen
-                                        : primaryRose,
-                                  ),
-                                ),
-                              ],
-                            ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded,
+                                color: textMuted),
+                            onPressed: () => Navigator.pop(ctx),
                           ),
                         ],
                       ),
                     ),
-                  ),
+                    const Divider(color: lightBorder, height: 1),
 
-                  // Filter & Search Controls
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      children: [
-                        // Filter Chips (Semua, Debit, Kredit, Kategori)
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              _buildModalFilterChip(
-                                  'Semua', 'semua', setModalState),
-                              _buildModalFilterChip(
-                                  'Debit', 'pemasukan', setModalState),
-                              _buildModalFilterChip(
-                                  'Kredit', 'pengeluaran', setModalState),
-                              _buildModalFilterChip(
-                                  'Kategori', 'kategori', setModalState),
-                            ],
-                          ),
-                        ),
-                        if (_selectedFilter != 'kategori') ...[
-                          const SizedBox(height: 8),
-                          // Search Bar & Tombol Sort
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  style: const TextStyle(
-                                      color: textDark, fontSize: 13),
-                                  decoration: InputDecoration(
-                                    hintText:
-                                        'Cari kategori, judul, atau catatan...',
-                                    hintStyle:
-                                        const TextStyle(color: Colors.grey),
-                                    prefixIcon: const Icon(
-                                        Icons.search_rounded,
-                                        size: 18,
-                                        color: textMuted),
-                                    filled: true,
-                                    fillColor: lightCardElevated,
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide:
-                                          const BorderSide(color: lightBorder),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide:
-                                          const BorderSide(color: lightBorder),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide: const BorderSide(
-                                          color: primaryBlue, width: 1.5),
-                                    ),
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 8),
-                                  ),
-                                  onChanged: (val) {
-                                    setModalState(() {
-                                      _searchQuery = val.trim().toLowerCase();
-                                    });
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              InkWell(
-                                onTap: () {
-                                  setModalState(() {
-                                    _isSortAscending = !_isSortAscending;
-                                  });
-                                  setState(() {});
-                                },
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: _isSortAscending
-                                        ? primaryBlue.withValues(alpha: 0.12)
-                                        : lightCardElevated,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: _isSortAscending
-                                          ? primaryBlue
-                                          : lightBorder,
-                                    ),
-                                  ),
-                                  child: Icon(
-                                    _isSortAscending
-                                        ? Icons.arrow_upward_rounded
-                                        : Icons.arrow_downward_rounded,
-                                    size: 18,
-                                    color: _isSortAscending
-                                        ? primaryBlue
-                                        : textDark,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  // Konten Berdasarkan Tab: Kategori (2 Tabel) atau Transaksi (Tabel 5 Kolom)
-                  if (_selectedFilter == 'kategori')
-                    Expanded(
-                      child: _buildCategorySummaryTables(
-                        totalDebit: totalDebit,
-                        totalKredit: totalKredit,
-                      ),
-                    )
-                  else ...[
-                    // Header Tabel Tetap
+                    // Ringkasan Debit / Kredit Banner
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: _buildTransactionTableHeader(),
-                    ),
-
-                    const SizedBox(height: 6),
-
-                    // Data Tabel Lengkap
-                    Expanded(
-                      child: transactions.isEmpty
-                          ? Center(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: lightCardElevated,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: lightBorder),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
                               child: Column(
-                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(Icons.receipt_long_rounded,
-                                      size: 48, color: Colors.grey[300]),
-                                  const SizedBox(height: 8),
                                   const Text(
-                                    'Tidak ada transaksi yang cocok',
+                                    'Total Debit',
                                     style: TextStyle(
+                                      fontSize: 10,
                                       color: textMuted,
-                                      fontSize: 13,
                                       fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '+ Rp ${RupiahFormatter.format(totalDebit)}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: primaryGreen,
                                     ),
                                   ),
                                 ],
                               ),
-                            )
-                          : ListView.separated(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-                              itemCount: transactions.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(height: 6),
-                              itemBuilder: (context, index) {
-                                final tx = transactions[index];
-                                return _buildTransactionTableRow(
-                                  tx,
-                                  onRefresh: () {
-                                    setModalState(() {});
+                            ),
+                            Container(
+                              height: 28,
+                              width: 1,
+                              color: lightBorder,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Total Kredit',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: textMuted,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '- Rp ${RupiahFormatter.format(totalKredit)}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: primaryRose,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              height: 28,
+                              width: 1,
+                              color: lightBorder,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Selisih Bersih',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: textMuted,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Rp ${RupiahFormatter.format(saldoBersih)}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: saldoBersih >= 0
+                                          ? primaryGreen
+                                          : primaryRose,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Filter & Search Controls
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        children: [
+                          // Filter Chips (Semua, Debit, Kredit, Kategori)
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                _buildModalFilterChip(
+                                    'Semua', 'semua', setModalState),
+                                _buildModalFilterChip(
+                                    'Debit', 'pemasukan', setModalState),
+                                _buildModalFilterChip(
+                                    'Kredit', 'pengeluaran', setModalState),
+                                _buildModalFilterChip(
+                                    'Kategori', 'kategori', setModalState),
+                              ],
+                            ),
+                          ),
+                          if (_selectedFilter != 'kategori') ...[
+                            const SizedBox(height: 8),
+                            // Search Bar & Tombol Sort
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    style: const TextStyle(
+                                        color: textDark, fontSize: 13),
+                                    decoration: InputDecoration(
+                                      hintText:
+                                          'Cari kategori, judul, atau catatan...',
+                                      hintStyle:
+                                          const TextStyle(color: Colors.grey),
+                                      prefixIcon: const Icon(
+                                          Icons.search_rounded,
+                                          size: 18,
+                                          color: textMuted),
+                                      filled: true,
+                                      fillColor: lightCardElevated,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide:
+                                            const BorderSide(color: lightBorder),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide:
+                                            const BorderSide(color: lightBorder),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide: const BorderSide(
+                                            color: primaryBlue, width: 1.5),
+                                      ),
+                                      contentPadding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 8),
+                                    ),
+                                    onChanged: (val) {
+                                      setModalState(() {
+                                        _searchQuery = val.trim().toLowerCase();
+                                      });
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                InkWell(
+                                  onTap: () {
+                                    setModalState(() {
+                                      _isSortAscending = !_isSortAscending;
+                                    });
                                     setState(() {});
                                   },
-                                );
-                              },
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: _isSortAscending
+                                          ? primaryBlue.withValues(alpha: 0.12)
+                                          : lightCardElevated,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: _isSortAscending
+                                            ? primaryBlue
+                                            : lightBorder,
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      _isSortAscending
+                                          ? Icons.arrow_upward_rounded
+                                          : Icons.arrow_downward_rounded,
+                                      size: 18,
+                                      color: _isSortAscending
+                                          ? primaryBlue
+                                          : textDark,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
+                          ],
+                        ],
+                      ),
                     ),
+
+                    const SizedBox(height: 10),
+
+                    // Konten Berdasarkan Tab: Kategori (2 Tabel) atau Transaksi (Tabel 5 Kolom)
+                    if (_selectedFilter == 'kategori')
+                      Expanded(
+                        child: _buildCategorySummaryTables(
+                          totalDebit: totalDebit,
+                          totalKredit: totalKredit,
+                        ),
+                      )
+                    else ...[
+                      // Header Tabel Tetap
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: _buildTransactionTableHeader(),
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      // Data Tabel Lengkap
+                      Expanded(
+                        child: transactions.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.receipt_long_rounded,
+                                        size: 48, color: Colors.grey[300]),
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      'Tidak ada transaksi yang cocok',
+                                      style: TextStyle(
+                                        color: textMuted,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.separated(
+                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+                                itemCount: transactions.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 6),
+                                itemBuilder: (context, index) {
+                                  final tx = transactions[index];
+                                  return _buildTransactionTableRow(
+                                    tx,
+                                    onRefresh: () {
+                                      setModalState(() {});
+                                      setState(() {});
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             );
           },
@@ -5966,7 +5969,7 @@ class _PribadiPageState extends State<PribadiPage> {
       ..sort((a, b) => b.value.compareTo(a.value));
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
       children: [
         // ==========================================
         // TABEL 1: PEMASUKAN (BERDASARKAN KATEGORI)

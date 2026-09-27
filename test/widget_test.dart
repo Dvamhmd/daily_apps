@@ -405,8 +405,8 @@ void main() {
       expect(find.text('500.000'), findsWidgets); // Total Uangku
       expect(find.text('5.000.000'), findsWidgets); // Total Tabunganku
 
-      // Memastikan info terakhir diperbarui compact muncul
-      expect(find.textContaining('Terakhir diperbarui:'), findsOneWidget);
+      // Memastikan info diperbarui compact muncul
+      expect(find.textContaining('Diperbarui:'), findsOneWidget);
       expect(find.byIcon(Icons.schedule_rounded), findsOneWidget);
     });
 

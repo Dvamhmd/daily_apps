@@ -1984,19 +1984,19 @@ class _KeuanganPageState extends State<KeuanganPage> {
                 padding: const EdgeInsets.only(left: 4, right: 4, top: 0, bottom: 12),
                 child: Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.schedule_rounded,
                       size: 14,
-                      color: Colors.grey[600],
+                      color: Colors.black87,
                     ),
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
-                        'Terakhir diperbarui: ${formatTanggalIndoLengkapWaktu(lastUpdated ?? DateTime.now())}',
-                        style: TextStyle(
+                        'Diperbarui: ${formatTanggalIndoLengkapWaktu(lastUpdated ?? DateTime.now())}',
+                        style: const TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[700],
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
