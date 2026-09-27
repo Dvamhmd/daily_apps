@@ -126,20 +126,21 @@ void main() {
         nominalEstimasi: 20000,
       );
 
-      // Realisasi diisi Rp 12.000 dari Pos Dana "Dana Operasional"
+      // Realisasi diisi Rp 12.000 dari Pos Dana "Dana Operasional" dengan catatan "Solar"
       final updatedItem = await RundownExpenseService.executeRealisasi(
         rundown: rundown,
         item: item,
         nominalRealisasi: 12000,
         posDanaNama: 'Dana Operasional',
         tanggalRealisasi: now,
-        catatan: 'Bensin Avanza',
+        catatan: 'Solar',
         selectedMonth: now,
       );
 
       expect(updatedItem.isRealized, isTrue);
       expect(updatedItem.nominalRealisasi, 12000);
       expect(updatedItem.posDana, 'Dana Operasional');
+      expect(updatedItem.catatan, 'Solar');
 
       // 1. Verifikasi saldo Uangku (Keuangan Utama) berkurang Rp 12.000 -> Rp 488.000
       final updatedUList = await PribadiSyncService.loadUangkuList(monthKey);
@@ -162,19 +163,19 @@ void main() {
           updatedPData.posDanaList.firstWhere((p) => p.nama == 'Dana Operasional');
       expect(posOp.balance, 488000);
 
-      // 3. Verifikasi Transaksi Pengeluaran tercatat di Keuangan Pribadi
+      // 3. Verifikasi Transaksi Pengeluaran tercatat di Keuangan Pribadi dengan nama "Solar" dari catatan
       expect(updatedPData.transactions.length, 1);
       final tx = updatedPData.transactions.first;
       expect(tx.isPengeluaran, isTrue);
       expect(tx.amount, 12000);
       expect(tx.sourceAccount, 'Dana Operasional');
-      expect(tx.title, contains('Rundown: Gathering 2026 - Bensin'));
+      expect(tx.title, 'Rundown: Gathering 2026 - Solar');
 
-      // 4. Verifikasi Riwayat Keuangan tercatat
+      // 4. Verifikasi Riwayat Keuangan tercatat dengan nama "Solar"
       final riwayat = await RiwayatService.getRiwayat();
       expect(riwayat.isNotEmpty, isTrue);
       expect(riwayat.first.kategori, 'Rundown');
-      expect(riwayat.first.perubahan, contains('Realisasi Bensin'));
+      expect(riwayat.first.perubahan, contains('Realisasi Solar'));
       expect(riwayat.first.nominal, 12000);
 
       // 5. Test Rollback / Revert Realisasi

@@ -395,6 +395,29 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
   void _notifyChange() {
     widget.onRundownChanged?.call(_rundown);
+    _persistRundownToStorage();
+  }
+
+  Future<void> _persistRundownToStorage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rawData = prefs.getStringList('rundowns_data') ?? [];
+      final list = rawData
+          .map((e) => Rundown.fromJson(jsonDecode(e) as Map<String, dynamic>))
+          .toList();
+      final index = list.indexWhere((r) => r.id == _rundown.id);
+      if (index != -1) {
+        list[index] = _rundown;
+      } else {
+        list.add(_rundown);
+      }
+      await prefs.setStringList(
+        'rundowns_data',
+        list.map((e) => jsonEncode(e.toJson())).toList(),
+      );
+    } catch (e) {
+      debugPrint('Error persisting rundown: $e');
+    }
   }
 
   // --- RECALCULATE CHAINED TIMES ---

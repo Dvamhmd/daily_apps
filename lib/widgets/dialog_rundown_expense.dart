@@ -203,12 +203,16 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
       final updatedRundown = _rundown.copyWith(expenses: updatedExpenses);
       _updateRundown(updatedRundown);
 
+      final effectiveName =
+          (result.catatan != null && result.catatan!.trim().isNotEmpty)
+              ? result.catatan!.trim()
+              : result.nama;
       if (mounted) {
         CustomToast.showSuccess(
           context,
           title: 'Realisasi Berhasil',
           subtitle:
-              'Pengeluaran "${result.nama}" sebesar ${RupiahFormatter.format(result.nominalRealisasi ?? 0)} telah dipotong dari Pos Dana "${result.posDana}".',
+              'Pengeluaran "$effectiveName" sebesar ${RupiahFormatter.format(result.nominalRealisasi ?? 0)} telah dipotong dari Pos Dana "${result.posDana}".',
         );
       }
     }
@@ -945,7 +949,12 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
                           ),
                           if (isRealized && item.posDana != null) ...[
                             Text(
-                              'Pos: ${item.posDana}',
+                              (item.catatan != null &&
+                                      item.catatan!.trim().isNotEmpty &&
+                                      item.catatan!.trim().toLowerCase() !=
+                                          item.nama.trim().toLowerCase())
+                                  ? 'Pos: ${item.posDana} • ${item.catatan}'
+                                  : 'Pos: ${item.posDana}',
                               style: const TextStyle(
                                 fontSize: 9.5,
                                 color: Color(0xFF64748B),
@@ -1885,9 +1894,23 @@ class _DialogIsiRealisasiState extends State<DialogIsiRealisasi> {
                   // Catatan Opsional
                   TextField(
                     controller: _catatanCtrl,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF0F172A),
+                    ),
                     decoration: InputDecoration(
-                      labelText: 'Catatan / Keterangan (Opsional)',
+                      hintText: 'realisasi item',
+                      hintStyle: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF94A3B8),
+                        fontWeight: FontWeight.w400,
+                      ),
                       isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),

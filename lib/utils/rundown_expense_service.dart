@@ -60,8 +60,10 @@ class RundownExpenseService {
     }
 
     // 2. Potong saldo Pos Dana di Keuangan Pribadi & catat transaksi
-    final keteranganTx =
-        'Rundown: ${rundown.title} - ${item.nama}${catatan != null && catatan.trim().isNotEmpty ? " ($catatan)" : ""}';
+    final effectiveNama = (catatan != null && catatan.trim().isNotEmpty)
+        ? catatan.trim()
+        : item.nama;
+    final keteranganTx = 'Rundown: ${rundown.title} - $effectiveNama';
     await PribadiSyncService.recordPengeluaranFromUangku(
       nama: posDanaNama,
       nominal: nominalRealisasi,
@@ -73,7 +75,7 @@ class RundownExpenseService {
     // 3. Catat di Riwayat Keuangan Aplikasi
     final bSuffix = RiwayatService.formatBulanSuffix(txDate);
     final posFormat = RiwayatService.capitalize(posDanaNama);
-    final namaFormat = RiwayatService.capitalize(item.nama);
+    final namaFormat = RiwayatService.capitalize(effectiveNama);
     await RiwayatService.catatRiwayat(
       kategori: 'Rundown',
       perubahan:
@@ -134,13 +136,22 @@ class RundownExpenseService {
     }
 
     // Hapus atau batalkan transaksi pengeluaran terkait dari list
-    final targetKet =
+    final effectiveNama =
+        (item.catatan != null && item.catatan!.trim().isNotEmpty)
+            ? item.catatan!.trim()
+            : item.nama;
+    final targetKetEffective =
+        'Rundown: ${rundown.title} - $effectiveNama'.toLowerCase();
+    final targetKetOriginal =
         'Rundown: ${rundown.title} - ${item.nama}'.toLowerCase();
     final txIdx = data.transactions.lastIndexWhere((tx) =>
         tx.isPengeluaran &&
         tx.sourceAccount?.trim().toLowerCase() == posName.toLowerCase() &&
-        (tx.title.toLowerCase().contains(targetKet) ||
-            (tx.note != null && tx.note!.toLowerCase().contains(targetKet))));
+        (tx.title.toLowerCase().contains(targetKetEffective) ||
+            tx.title.toLowerCase().contains(targetKetOriginal) ||
+            (tx.note != null &&
+                (tx.note!.toLowerCase().contains(targetKetEffective) ||
+                    tx.note!.toLowerCase().contains(targetKetOriginal)))));
 
     if (txIdx != -1) {
       data.transactions.removeAt(txIdx);
@@ -151,7 +162,7 @@ class RundownExpenseService {
     // 3. Catat di Riwayat Keuangan
     final bSuffix = RiwayatService.formatBulanSuffix(txDate);
     final posFormat = RiwayatService.capitalize(posName);
-    final namaFormat = RiwayatService.capitalize(item.nama);
+    final namaFormat = RiwayatService.capitalize(effectiveNama);
     await RiwayatService.catatRiwayat(
       kategori: 'Rundown',
       perubahan:

@@ -13,7 +13,6 @@ class PribadiSyncService {
   /// Memberitahukan seluruh listener bahwa data keuangan telah diperbarui
   static void notifyFinanceDataChanged() {
     financeDataUpdatedNotifier.value++;
-    BackupService.notifyDataRestored();
   }
 
   static String getMonthKey(DateTime? date, DateTime? selectedMonth) {
