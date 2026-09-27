@@ -541,6 +541,37 @@ class _KeuanganPageState extends State<KeuanganPage> {
     return '$namaHari, ${date.day} $namaBulan ${date.year}';
   }
 
+  static String formatTanggalIndoLengkapWaktu(DateTime date) {
+    const hari = [
+      'Senin',
+      'Selasa',
+      'Rabu',
+      'Kamis',
+      'Jumat',
+      'Sabtu',
+      'Minggu',
+    ];
+    const bulan = [
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
+    ];
+    final namaHari = hari[date.weekday - 1];
+    final namaBulan = bulan[date.month - 1];
+    final jam = date.hour.toString().padLeft(2, '0');
+    final menit = date.minute.toString().padLeft(2, '0');
+    return '$namaHari, ${date.day} $namaBulan ${date.year} • $jam:$menit';
+  }
+
   static String formatTanggalIndoSingkat(DateTime date) {
     const bulan = [
       'Jan',
@@ -1948,121 +1979,31 @@ class _KeuanganPageState extends State<KeuanganPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
 
-              // CARD TANGGAL HARI INI
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.white,
-                      Color(0xFFFBF8FF),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF5E35B1).withValues(alpha: 0.06),
-                      blurRadius: 14,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                  border: Border.all(
-                    color: const Color(0xFF5E35B1).withValues(alpha: 0.15),
-                    width: 1.2,
-                  ),
-                ),
+              // INFORMASI TERAKHIR DIPERBARUI (COMPACT / TANPA CARD)
+              Padding(
+                padding: const EdgeInsets.only(left: 4, right: 4, top: 0, bottom: 12),
                 child: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Color(0xFF5E35B1),
-                            Color(0xFF7E57C2),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF5E35B1).withValues(alpha: 0.25),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.calendar_today_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
+                    Icon(
+                      Icons.schedule_rounded,
+                      size: 14,
+                      color: Colors.grey[600],
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 7, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF5E35B1)
-                                      .withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  'HARI INI',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF5E35B1),
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  lastUpdated != null
-                                      ? 'Diperbarui ${DateFormat('HH:mm').format(lastUpdated!)}'
-                                      : 'Keuangan Aktif',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.grey[600],
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            formatTanggalIndoLengkap(DateTime.now()),
-                            style: const TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E1B4B),
-                              letterSpacing: -0.2,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'Terakhir diperbarui: ${formatTanggalIndoLengkapWaktu(lastUpdated ?? DateTime.now())}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[700],
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
               ),
-
-              const SizedBox(height: 14),
 
               // KEUANGAN HARIAN
               InfoCardTagihan(

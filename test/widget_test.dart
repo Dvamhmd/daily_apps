@@ -382,7 +382,7 @@ void main() {
       expect(find.text('Debit : 20.000'), findsOneWidget);
     });
 
-    testWidgets('Tagihanku & Uangku & Tabunganku tersimpan terpusat dan menampilkan Card Tanggal Hari Ini',
+    testWidgets('Tagihanku & Uangku & Tabunganku tersimpan terpusat dan menampilkan Informasi Terakhir Diperbarui',
         (WidgetTester tester) async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
@@ -405,9 +405,9 @@ void main() {
       expect(find.text('500.000'), findsWidgets); // Total Uangku
       expect(find.text('5.000.000'), findsWidgets); // Total Tabunganku
 
-      // Memastikan Card Tanggal Hari Ini muncul (bukan selector bulan lama)
-      expect(find.text('HARI INI'), findsOneWidget);
-      expect(find.byIcon(Icons.calendar_today_rounded), findsOneWidget);
+      // Memastikan info terakhir diperbarui compact muncul
+      expect(find.textContaining('Terakhir diperbarui:'), findsOneWidget);
+      expect(find.byIcon(Icons.schedule_rounded), findsOneWidget);
     });
 
     test('Pesan Riwayat menyertakan nama bulan untuk Tagihan dan Uangku, tapi tidak untuk Tabungan', () async {
