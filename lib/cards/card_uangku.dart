@@ -53,8 +53,21 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
   @override
   void initState() {
     super.initState();
+    PribadiSyncService.financeDataUpdatedNotifier.addListener(_onFinanceUpdated);
     _loadOnlyCair();
     _loadUangku();
+  }
+
+  @override
+  void dispose() {
+    PribadiSyncService.financeDataUpdatedNotifier.removeListener(_onFinanceUpdated);
+    super.dispose();
+  }
+
+  void _onFinanceUpdated() {
+    if (mounted) {
+      _loadUangku();
+    }
   }
 
   Future<void> _loadOnlyCair() async {
@@ -92,6 +105,9 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
         .map((e) => jsonEncode(e.toJson()))
         .toList();
     await prefs.setStringList('uangku', data);
+    final monthKey = PribadiSyncService.getMonthKey(null, widget.selectedMonth);
+    await prefs.setStringList('uangku_$monthKey', data);
+    PribadiSyncService.notifyFinanceDataChanged();
   }
 
   Future<void> _loadUangku() async {

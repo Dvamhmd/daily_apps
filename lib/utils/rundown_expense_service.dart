@@ -82,7 +82,10 @@ class RundownExpenseService {
       nominal: nominalRealisasi,
     );
 
-    // 4. Return updated item
+    // 4. Beritahu seluruh halaman keuangan untuk memperbarui tampilan
+    PribadiSyncService.notifyFinanceDataChanged();
+
+    // 5. Return updated item
     return item.copyWith(
       nominalRealisasi: nominalRealisasi,
       posDana: posDanaNama,
@@ -156,6 +159,9 @@ class RundownExpenseService {
       tipe: 'tambah',
       nominal: nominal,
     );
+
+    // 4. Beritahu seluruh halaman keuangan untuk memperbarui tampilan
+    PribadiSyncService.notifyFinanceDataChanged();
 
     return item.copyWith(
       clearRealisasi: true,

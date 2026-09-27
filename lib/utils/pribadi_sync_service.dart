@@ -1,9 +1,21 @@
 import 'dart:convert';
 import 'package:daily_apps/models/model_pribadi.dart';
 import 'package:daily_apps/models/model_uangku.dart';
+import 'package:daily_apps/utils/backup_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PribadiSyncService {
+  /// ValueNotifier yang dipicu setiap kali data keuangan (Uangku / Pos Dana / Transaksi) berubah
+  static final ValueNotifier<int> financeDataUpdatedNotifier =
+      ValueNotifier<int>(0);
+
+  /// Memberitahukan seluruh listener bahwa data keuangan telah diperbarui
+  static void notifyFinanceDataChanged() {
+    financeDataUpdatedNotifier.value++;
+    BackupService.notifyDataRestored();
+  }
+
   static String getMonthKey(DateTime? date, DateTime? selectedMonth) {
     final d = date ?? selectedMonth ?? DateTime.now();
     return '${d.year}_${d.month.toString().padLeft(2, '0')}';
@@ -15,16 +27,16 @@ class PribadiSyncService {
     final key = 'uangku_$monthKey';
     var data = prefs.getStringList(key);
 
-    // Migrasi/fallback legacy jika bulan ini belum punya data
-    if (data == null) {
-      final now = DateTime.now();
-      final currentMonthKey =
-          '${now.year}_${now.month.toString().padLeft(2, '0')}';
-      if (monthKey == currentMonthKey) {
-        final legacy = prefs.getStringList('uangku');
-        if (legacy != null) {
-          data = legacy;
-        }
+    final now = DateTime.now();
+    final currentMonthKey =
+        '${now.year}_${now.month.toString().padLeft(2, '0')}';
+
+    // Migrasi/fallback jika data bulanan kosong tapi ada data di 'uangku' utama
+    if (data == null || (monthKey == currentMonthKey && data.isEmpty)) {
+      final legacy = prefs.getStringList('uangku');
+      if (legacy != null && legacy.isNotEmpty) {
+        data = legacy;
+        await prefs.setStringList(key, legacy);
       }
     }
 
@@ -44,6 +56,15 @@ class PribadiSyncService {
     final prefs = await SharedPreferences.getInstance();
     final data = uangkuList.map((e) => jsonEncode(e.toJson())).toList();
     await prefs.setStringList('uangku_$monthKey', data);
+
+    final now = DateTime.now();
+    final currentMonthKey =
+        '${now.year}_${now.month.toString().padLeft(2, '0')}';
+    if (monthKey == currentMonthKey || prefs.containsKey('uangku')) {
+      await prefs.setStringList('uangku', data);
+    }
+
+    notifyFinanceDataChanged();
   }
 
   /// Menyelaraskan daftar Pos Dana dengan daftar Uangku (1-to-1)

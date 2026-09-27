@@ -10,6 +10,7 @@ import 'package:daily_apps/pages/rundown_page.dart';
 import 'package:daily_apps/pages/todo_page.dart';
 import 'package:daily_apps/utils/backup_service.dart';
 import 'package:daily_apps/utils/notification_service.dart';
+import 'package:daily_apps/utils/pribadi_sync_service.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:daily_apps/utils/serious_mode_service.dart';
@@ -203,6 +204,9 @@ class _MainScreenWrapperState extends State<MainScreenWrapper> {
 
   void _onPageSelected(int index) {
     if (_currentPageIndex != index) {
+      if (index == 0) {
+        PribadiSyncService.notifyFinanceDataChanged();
+      }
       if (_transitionKey.currentState != null) {
         _transitionKey.currentState!.triggerTransition(index, () {
           if (mounted) {
@@ -581,6 +585,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
   void initState() {
     super.initState();
     BackupService.dataRestoredNotifier.addListener(_loadInitialData);
+    PribadiSyncService.financeDataUpdatedNotifier.addListener(_loadInitialData);
     NotificationService.initialize();
     _loadInitialData();
   }
@@ -588,6 +593,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
   @override
   void dispose() {
     BackupService.dataRestoredNotifier.removeListener(_loadInitialData);
+    PribadiSyncService.financeDataUpdatedNotifier.removeListener(_loadInitialData);
     super.dispose();
   }
 

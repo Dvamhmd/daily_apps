@@ -146,6 +146,16 @@ void main() {
       final uOp = updatedUList.firstWhere((u) => u.nama == 'Dana Operasional');
       expect(uOp.jumlah, 488000);
 
+      // Verifikasi key 'uangku' (halaman utama) juga terpotong Rp 12.000 -> Rp 488.000
+      final prefs = await SharedPreferences.getInstance();
+      final mainRawUangku = prefs.getStringList('uangku');
+      expect(mainRawUangku, isNotNull);
+      final mainUList = mainRawUangku!
+          .map((e) => Uangku.fromJson(jsonDecode(e) as Map<String, dynamic>))
+          .toList();
+      final mainOp = mainUList.firstWhere((u) => u.nama == 'Dana Operasional');
+      expect(mainOp.jumlah, 488000);
+
       // 2. Verifikasi saldo Pos Dana di Keuangan Pribadi berkurang Rp 12.000 -> Rp 488.000
       final updatedPData = await PribadiSyncService.loadPribadiData(monthKey);
       final posOp =
@@ -181,6 +191,12 @@ void main() {
       // Verifikasi saldo kembali ke Rp 500.000
       final revertedUList = await PribadiSyncService.loadUangkuList(monthKey);
       expect(revertedUList.first.jumlah, 500000);
+
+      final revertedMainRaw = prefs.getStringList('uangku')!;
+      final revertedMainList = revertedMainRaw
+          .map((e) => Uangku.fromJson(jsonDecode(e) as Map<String, dynamic>))
+          .toList();
+      expect(revertedMainList.first.jumlah, 500000);
 
       final revertedPData = await PribadiSyncService.loadPribadiData(monthKey);
       expect(revertedPData.posDanaList.first.balance, 500000);
