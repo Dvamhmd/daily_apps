@@ -48,6 +48,9 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
   int get totalBelumCair =>
       uangkuList.where((e) => !e.isCair).fold<int>(0, (sum, e) => sum + e.jumlah);
 
+  int get totalSemua =>
+      uangkuList.fold<int>(0, (sum, e) => sum + e.jumlah);
+
   bool get hasBelumCair => uangkuList.any((e) => !e.isCair);
 
   @override
@@ -1723,7 +1726,7 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
               Expanded(
                 child: Text(
                   RupiahFormatter.format(
-                    onlyCair ? totalSudahCair : int.parse(widget.amount),
+                    onlyCair ? totalSudahCair : totalSemua,
                   ),
                   style: const TextStyle(
                     fontSize: 26,

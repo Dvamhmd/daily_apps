@@ -4,6 +4,7 @@ import 'package:daily_apps/models/model_pribadi.dart';
 import 'package:daily_apps/utils/custom_rule_import_helper.dart';
 import 'package:daily_apps/utils/pribadi_saldo_awal_service.dart';
 import 'package:daily_apps/utils/pribadi_sync_service.dart';
+import 'package:daily_apps/utils/riwayat_service.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:file_picker/file_picker.dart';
@@ -1197,9 +1198,12 @@ class _PribadiPageState extends State<PribadiPage> {
   void _showPemasukanDanaModal({String initialTarget = 'rekening'}) {
     final amountCtrl = TextEditingController();
     final keteranganCtrl = TextEditingController();
+    final newPosCtrl = TextEditingController();
+
+    // Default target: pos pertama jika ada, atau '__custom_pos__' jika belum ada pos
     String targetAccount = _data.posDanaList.isNotEmpty
         ? _data.posDanaList.first.id
-        : initialTarget;
+        : '__custom_pos__';
     DateTime selectedDate = DateTime.now();
 
     showModalBottomSheet(
@@ -1214,6 +1218,7 @@ class _PribadiPageState extends State<PribadiPage> {
               customRules: _data.customKodeRules,
               type: 'pemasukan',
             );
+            final isCreatingNewPos = targetAccount == '__custom_pos__';
 
             return Container(
               decoration: const BoxDecoration(
@@ -1235,436 +1240,527 @@ class _PribadiPageState extends State<PribadiPage> {
                       children: [
                         Center(
                           child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: primaryGreen.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            Icons.arrow_downward_rounded,
-                            color: primaryGreen,
-                            size: 22,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'Tambah Pemasukan Pribadi',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: textDark,
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(2),
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-
-                    // 1. Pos Dana Tujuan (Berjajar Rapi)
-                    const Text('Pos Dana Tujuan',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: textMuted)),
-                    const SizedBox(height: 8),
-                    if (_data.posDanaList.isNotEmpty)
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _data.posDanaList.length,
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
-                          childAspectRatio: 2.7,
-                        ),
-                        itemBuilder: (context, index) {
-                          final pos = _data.posDanaList[index];
-                          final isSelected = targetAccount == pos.id ||
-                              targetAccount == pos.nama;
-
-                          return InkWell(
-                            onTap: () =>
-                                setModalState(() => targetAccount = pos.id),
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 8),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: isSelected
-                                    ? primaryGreen.withValues(alpha: 0.12)
-                                    : lightCardElevated,
+                                color: primaryGreen.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? primaryGreen
-                                      : lightBorder,
-                                  width: isSelected ? 1.5 : 1,
+                              ),
+                              child: const Icon(
+                                Icons.arrow_downward_rounded,
+                                color: primaryGreen,
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text(
+                                'Tambah Pemasukan Pribadi',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: textDark,
                                 ),
                               ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(5),
-                                    decoration: BoxDecoration(
-                                      color: isSelected
-                                          ? primaryGreen.withValues(alpha: 0.2)
-                                          : Colors.grey.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Icon(
-                                      Icons.account_balance_wallet_rounded,
-                                      size: 14,
-                                      color: isSelected
-                                          ? primaryGreen
-                                          : textMuted,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+
+                        // 1. Pos Dana Tujuan (Dropdown & Buat Pos Dana Sendiri)
+                        const Text('Pos Dana Tujuan',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: textMuted)),
+                        const SizedBox(height: 8),
+
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: lightCardElevated,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: lightBorder),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: (_data.posDanaList.any((p) => p.id == targetAccount) || targetAccount == '__custom_pos__')
+                                  ? targetAccount
+                                  : (_data.posDanaList.isNotEmpty ? _data.posDanaList.first.id : '__custom_pos__'),
+                              isExpanded: true,
+                              icon: const Icon(Icons.arrow_drop_down_rounded, color: primaryGreen),
+                              dropdownColor: lightCard,
+                              borderRadius: BorderRadius.circular(12),
+                              items: [
+                                ..._data.posDanaList.map((pos) {
+                                  return DropdownMenuItem<String>(
+                                    value: pos.id,
+                                    child: Row(
                                       children: [
-                                        Text(
-                                          pos.nama,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: isSelected
-                                                ? FontWeight.bold
-                                                : FontWeight.w600,
-                                            color: isSelected
-                                                ? primaryGreen
-                                                : textDark,
+                                        Container(
+                                          padding: const EdgeInsets.all(5),
+                                          decoration: BoxDecoration(
+                                            color: primaryGreen.withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: const Icon(
+                                            Icons.account_balance_wallet_rounded,
+                                            size: 15,
+                                            color: primaryGreen,
                                           ),
                                         ),
-                                        Text(
-                                          'Rp ${RupiahFormatter.format(pos.balance)}',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: isSelected
-                                                ? primaryGreen
-                                                    .withValues(alpha: 0.85)
-                                                : textMuted,
-                                            fontWeight: isSelected
-                                                ? FontWeight.bold
-                                                : FontWeight.normal,
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                pos.nama,
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: textDark,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              Text(
+                                                'Saldo: Rp ${RupiahFormatter.format(pos.balance)}',
+                                                style: const TextStyle(
+                                                  fontSize: 10.5,
+                                                  color: textMuted,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                  if (isSelected)
-                                    const Icon(
-                                      Icons.check_circle_rounded,
-                                      size: 14,
-                                      color: primaryGreen,
-                                    ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      )
-                    else
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: lightCardElevated,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: lightBorder),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.info_outline_rounded,
-                                size: 16, color: primaryBlue),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Pemasukan akan dicatat ke Pos Dana Default.',
-                                style: TextStyle(
-                                    fontSize: 11, color: textMuted),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    const SizedBox(height: 14),
-
-                    // 2. Input Tanggal
-                    const Text('Tanggal',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: textMuted)),
-                    const SizedBox(height: 6),
-                    InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDate,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2035),
-                        );
-                        if (picked != null) {
-                          setModalState(() => selectedDate = picked);
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: lightCardElevated,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: lightBorder),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.calendar_today_rounded,
-                                    size: 15, color: primaryGreen),
-                                const SizedBox(width: 10),
-                                Text(
-                                  DateFormat('dd MMMM yyyy')
-                                      .format(selectedDate),
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: textDark,
+                                  );
+                                }),
+                                DropdownMenuItem<String>(
+                                  value: '__custom_pos__',
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(5),
+                                        decoration: BoxDecoration(
+                                          color: primaryGreen.withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: const Icon(
+                                          Icons.add_circle_outline_rounded,
+                                          size: 15,
+                                          color: primaryGreen,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      const Expanded(
+                                        child: Text(
+                                          '+ Buat Pos Dana Sendiri / Baru',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: primaryGreen,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setModalState(() => targetAccount = val);
+                                }
+                              },
                             ),
-                            const Icon(Icons.edit_calendar_rounded,
-                                size: 16, color: textMuted),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
 
-                    const SizedBox(height: 14),
-
-                    // 3. Input Jumlah
-                    const Text('Jumlah',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: textMuted)),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: amountCtrl,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        RupiahInputFormatter(),
-                      ],
-                      style: const TextStyle(
-                        color: textDark,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      decoration: InputDecoration(
-                        prefixText: 'Rp ',
-                        prefixStyle: const TextStyle(
-                          color: primaryGreen,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                        hintText: '0',
-                        hintStyle: const TextStyle(color: Colors.grey),
-                        filled: true,
-                        fillColor: lightCardElevated,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: lightBorder),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: lightBorder),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide:
-                              const BorderSide(color: primaryGreen, width: 1.5),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 11),
-                      ),
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // 4. Input Keterangan (setelah Jumlah)
-                    const Text('Keterangan',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: textMuted)),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: keteranganCtrl,
-                      onChanged: (_) => setModalState(() {}),
-                      style: const TextStyle(color: textDark, fontSize: 13),
-                      decoration: InputDecoration(
-                        hintText:
-                            'Contoh: Gaji Bulanan, Bonus Proyek, Freelance, dll',
-                        hintStyle: const TextStyle(color: Colors.grey),
-                        filled: true,
-                        fillColor: lightCardElevated,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: lightBorder),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: lightBorder),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide:
-                              const BorderSide(color: primaryGreen, width: 1.5),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 11),
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // Auto-resolved Category Preview
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: lightCardElevated,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: lightBorder),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.auto_awesome_rounded,
-                              size: 16, color: primaryGreen),
-                          const SizedBox(width: 8),
-                          const Text('Kategori Auto:',
+                        if (isCreatingNewPos) ...[
+                          const SizedBox(height: 12),
+                          const Text('Nama Pos Dana Baru',
                               style: TextStyle(
-                                  fontSize: 11, color: textMuted)),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: primaryGreen.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: textMuted)),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: newPosCtrl,
+                            style: const TextStyle(color: textDark, fontSize: 13, fontWeight: FontWeight.w600),
+                            decoration: InputDecoration(
+                              hintText: 'Contoh: Gaji, Pendapatan Usaha, Bonus, THR',
+                              hintStyle: const TextStyle(color: Colors.grey, fontSize: 12),
+                              prefixIcon: const Icon(Icons.create_new_folder_outlined, color: primaryGreen, size: 18),
+                              filled: true,
+                              fillColor: lightCardElevated,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: lightBorder),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: lightBorder),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: primaryGreen, width: 1.5),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
                             ),
-                            child: Text(
-                              autoKode != '-' ? autoKode : 'Umum',
-                              style: const TextStyle(
-                                fontSize: 11,
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(Icons.info_outline_rounded, size: 13, color: primaryGreen.withValues(alpha: 0.8)),
+                              const SizedBox(width: 4),
+                              const Expanded(
+                                child: Text(
+                                  'Pos dana baru akan otomatis terintegrasi ke Keuangan & Uangku.',
+                                  style: TextStyle(fontSize: 11, color: primaryGreen, fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+
+                        const SizedBox(height: 14),
+
+                        // 2. Input Tanggal
+                        const Text('Tanggal',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: textMuted)),
+                        const SizedBox(height: 6),
+                        InkWell(
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: selectedDate,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2035),
+                            );
+                            if (picked != null) {
+                              setModalState(() => selectedDate = picked);
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: lightCardElevated,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: lightBorder),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.calendar_today_rounded,
+                                        size: 15, color: primaryGreen),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      DateFormat('dd MMMM yyyy')
+                                          .format(selectedDate),
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: textDark,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Icon(Icons.edit_calendar_rounded,
+                                    size: 16, color: textMuted),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        // 3. Input Jumlah
+                        const Text('Jumlah',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: textMuted)),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: amountCtrl,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            RupiahInputFormatter(),
+                          ],
+                          style: const TextStyle(
+                            color: textDark,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          decoration: InputDecoration(
+                            prefixText: 'Rp ',
+                            prefixStyle: const TextStyle(
+                              color: primaryGreen,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                            hintText: '0',
+                            hintStyle: const TextStyle(color: Colors.grey),
+                            filled: true,
+                            fillColor: lightCardElevated,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: lightBorder),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: lightBorder),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide:
+                                  const BorderSide(color: primaryGreen, width: 1.5),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 11),
+                          ),
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        // 4. Input Keterangan
+                        const Text('Keterangan',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: textMuted)),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: keteranganCtrl,
+                          onChanged: (_) => setModalState(() {}),
+                          style: const TextStyle(color: textDark, fontSize: 13),
+                          decoration: InputDecoration(
+                            hintText:
+                                'Contoh: Gaji Bulanan, Bonus Proyek, Freelance, dll',
+                            hintStyle: const TextStyle(color: Colors.grey),
+                            filled: true,
+                            fillColor: lightCardElevated,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: lightBorder),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: lightBorder),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide:
+                                  const BorderSide(color: primaryGreen, width: 1.5),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 11),
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Auto-resolved Category Preview
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: lightCardElevated,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: lightBorder),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.auto_awesome_rounded,
+                                  size: 16, color: primaryGreen),
+                              const SizedBox(width: 8),
+                              const Text('Kategori Auto:',
+                                  style: TextStyle(
+                                      fontSize: 11, color: textMuted)),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: primaryGreen.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  autoKode != '-' ? autoKode : 'Umum',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: primaryGreen,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // Tombol Simpan
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              final desc = keteranganCtrl.text.trim();
+                              final amt = RupiahFormatter.parse(amountCtrl.text);
+
+                              if (amt <= 0) {
+                                CustomToast.showError(
+                                  context,
+                                  title: 'Nominal Tidak Valid',
+                                  subtitle: 'Masukkan nominal pemasukan lebih dari Rp 0.',
+                                );
+                                return;
+                              }
+
+                              if (desc.isEmpty) {
+                                CustomToast.showError(
+                                  context,
+                                  title: 'Keterangan Kosong',
+                                  subtitle: 'Masukkan keterangan pemasukan terlebih dahulu.',
+                                );
+                                return;
+                              }
+
+                              String targetName = '';
+
+                              if (targetAccount == '__custom_pos__') {
+                                final customName = newPosCtrl.text.trim();
+                                if (customName.isEmpty) {
+                                  CustomToast.showError(
+                                    context,
+                                    title: 'Nama Pos Dana Kosong',
+                                    subtitle: 'Masukkan nama pos dana baru yang ingin dibuat.',
+                                  );
+                                  return;
+                                }
+
+                                final existingIdx = _data.posDanaList.indexWhere(
+                                  (p) => p.nama.trim().toLowerCase() == customName.toLowerCase(),
+                                );
+
+                                if (existingIdx != -1) {
+                                  _data.posDanaList[existingIdx].balance += amt;
+                                  targetName = _data.posDanaList[existingIdx].nama;
+                                } else {
+                                  final newPos = PosDana(
+                                    id: 'pos_${_data.posDanaList.length + 1}_${customName.hashCode}',
+                                    nama: customName,
+                                    balance: amt,
+                                    deskripsi: 'Pos dana: $customName',
+                                  );
+                                  _data.posDanaList.add(newPos);
+                                  targetName = customName;
+                                }
+                              } else {
+                                final idx = _data.posDanaList.indexWhere(
+                                  (p) => p.id == targetAccount || p.nama.trim().toLowerCase() == targetAccount.trim().toLowerCase(),
+                                );
+                                if (idx != -1) {
+                                  _data.posDanaList[idx].balance += amt;
+                                  targetName = _data.posDanaList[idx].nama;
+                                } else {
+                                  final newPos = PosDana(
+                                    id: 'pos_${_data.posDanaList.length + 1}_${targetAccount.hashCode}',
+                                    nama: targetAccount,
+                                    balance: amt,
+                                    deskripsi: 'Pos dana: $targetAccount',
+                                  );
+                                  _data.posDanaList.add(newPos);
+                                  targetName = targetAccount;
+                                }
+                              }
+
+                              final tx = PribadiTransaction(
+                                id: DateTime.now()
+                                    .microsecondsSinceEpoch
+                                    .toString(),
+                                title: desc,
+                                type: 'pemasukan',
+                                targetAccount: targetName,
+                                amount: amt,
+                                note: desc,
+                                timestamp: selectedDate,
+                                ku: null,
+                                kode: autoKode != '-' ? autoKode : null,
+                              );
+
+                              _data.transactions.add(tx);
+                              Navigator.pop(ctx);
+                              await _saveData();
+                              await RiwayatService.catatRiwayat(
+                                kategori: 'Pemasukan Pribadi',
+                                perubahan:
+                                    'Pemasukan "$desc" ${RupiahFormatter.format(amt)} masuk ke pos dana $targetName',
+                                tipe: 'tambah',
+                                nominal: amt,
+                              );
+                              if (mounted) {
+                                setState(() {});
+                                CustomToast.showSuccess(
+                                  context,
+                                  title: 'Pemasukan Berhasil Ditambahkan',
+                                  subtitle:
+                                      'Rp ${RupiahFormatter.format(amt)} berhasil masuk ke pos dana $targetName.',
+                                );
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryGreen,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              'Simpan Pemasukan',
+                              style: TextStyle(
+                                fontSize: 14,
                                 fontWeight: FontWeight.bold,
-                                color: primaryGreen,
                               ),
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Tombol Simpan
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final desc = keteranganCtrl.text.trim();
-                          final amt = RupiahFormatter.parse(amountCtrl.text);
-                          if (desc.isEmpty || amt <= 0) return;
-
-                          String targetName = targetAccount;
-                          if (_data.posDanaList.isNotEmpty) {
-                            final idx = _data.posDanaList.indexWhere((p) =>
-                                p.id == targetAccount ||
-                                p.nama == targetAccount);
-                            if (idx != -1) {
-                              _data.posDanaList[idx].balance += amt;
-                              targetName = _data.posDanaList[idx].nama;
-                            } else {
-                              _data.posDanaList.first.balance += amt;
-                              targetName = _data.posDanaList.first.nama;
-                            }
-                          }
-
-                          final tx = PribadiTransaction(
-                            id: DateTime.now()
-                                .microsecondsSinceEpoch
-                                .toString(),
-                            title: desc,
-                            type: 'pemasukan',
-                            targetAccount: targetName,
-                            amount: amt,
-                            note: desc,
-                            timestamp: selectedDate,
-                            ku: null,
-                            kode: autoKode != '-' ? autoKode : null,
-                          );
-
-                          _data.transactions.add(tx);
-                          Navigator.pop(ctx);
-                          await _saveData();
-                          if (mounted) {
-                            setState(() {});
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryGreen,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
                         ),
-                        child: const Text(
-                          'Simpan Pemasukan',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
-  },
-);
   }
 
   // ==========================================

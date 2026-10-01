@@ -652,7 +652,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
 
     // Tagihan
     var rawTagihan = prefs.getStringList('tagihan');
-    if (rawTagihan == null || rawTagihan.isEmpty) {
+    if (rawTagihan == null) {
       final allKeys = prefs
           .getKeys()
           .where((k) =>
@@ -671,7 +671,7 @@ class _KeuanganPageState extends State<KeuanganPage> {
 
     // Uangku
     var rawUangku = prefs.getStringList('uangku');
-    if (rawUangku == null || rawUangku.isEmpty) {
+    if (rawUangku == null) {
       final allKeys = prefs
           .getKeys()
           .where((k) => k.startsWith('uangku_') && k != 'uangku_only_cair')
