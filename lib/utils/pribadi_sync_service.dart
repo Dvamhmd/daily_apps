@@ -30,10 +30,10 @@ class PribadiSyncService {
     final currentMonthKey =
         '${now.year}_${now.month.toString().padLeft(2, '0')}';
 
-    // Migrasi/fallback jika data bulanan kosong tapi ada data di 'uangku' utama
-    if (data == null || (monthKey == currentMonthKey && data.isEmpty)) {
+    // Migrasi/fallback jika data bulanan belum ada tapi ada data di 'uangku' utama
+    if (data == null) {
       final legacy = prefs.getStringList('uangku');
-      if (legacy != null && legacy.isNotEmpty) {
+      if (legacy != null && legacy.isNotEmpty && monthKey == currentMonthKey) {
         data = legacy;
         await prefs.setStringList(key, legacy);
       }
@@ -55,29 +55,35 @@ class PribadiSyncService {
     final prefs = await SharedPreferences.getInstance();
     final data = uangkuList.map((e) => jsonEncode(e.toJson())).toList();
     await prefs.setStringList('uangku_$monthKey', data);
-
-    final now = DateTime.now();
-    final currentMonthKey =
-        '${now.year}_${now.month.toString().padLeft(2, '0')}';
-    if (monthKey == currentMonthKey || prefs.containsKey('uangku')) {
-      await prefs.setStringList('uangku', data);
-    }
+    await prefs.setStringList('uangku', data);
 
     notifyFinanceDataChanged();
   }
 
   /// Menyelaraskan daftar Pos Dana dengan daftar Uangku (1-to-1)
+  /// HANYA menyelaraskan item Uangku yang statusnya SUDAH CAIR (isCair == true)
+  /// Item yang Belum Cair TIDAK BOLEH masuk ke Pos Dana Keuangan Pribadi karena Keuangan Pribadi hanya mencatat dana real.
   static List<PosDana> syncPosDanaWithUangkuList({
     required List<PosDana> currentPosList,
     required List<Uangku> uangkuList,
   }) {
-    if (uangkuList.isEmpty) {
-      return [];
+    // Filter HANYA uangku yang sudah cair
+    final cairUangkuList = uangkuList.where((u) => u.isCair).toList();
+    final belumCairNames = uangkuList
+        .where((u) => !u.isCair)
+        .map((u) => u.nama.trim().toLowerCase())
+        .toSet();
+
+    if (cairUangkuList.isEmpty) {
+      // Bersihkan pos yang namanya sama dengan uangku belum cair
+      return currentPosList
+          .where((p) => !belumCairNames.contains(p.nama.trim().toLowerCase()))
+          .toList();
     }
 
     final result = <PosDana>[];
-    for (int i = 0; i < uangkuList.length; i++) {
-      final u = uangkuList[i];
+    for (int i = 0; i < cairUangkuList.length; i++) {
+      final u = cairUangkuList[i];
       final uName = u.nama.trim();
       final matchIndex = currentPosList.indexWhere(
         (p) => p.nama.trim().toLowerCase() == uName.toLowerCase(),
@@ -104,13 +110,27 @@ class PribadiSyncService {
         ));
       }
     }
+
+    // Pertahankan Pos Dana kustom lain yang bukan dari item belum cair
+    for (final existing in currentPosList) {
+      final existsInResult = result.any(
+        (p) => p.nama.trim().toLowerCase() == existing.nama.trim().toLowerCase(),
+      );
+      final isBelumCair =
+          belumCairNames.contains(existing.nama.trim().toLowerCase());
+      if (!existsInResult && !isBelumCair) {
+        result.add(existing);
+      }
+    }
+
     return result;
   }
 
   /// Membantu memperbaiki pos dana jika terdapat anomali saldo 2x lipat dari Uangku
   static void sanitizePosDanaBalances(PribadiData data, List<Uangku> uList) {
-    if (uList.isEmpty || data.posDanaList.isEmpty) return;
-    for (final u in uList) {
+    final cairList = uList.where((u) => u.isCair).toList();
+    if (cairList.isEmpty || data.posDanaList.isEmpty) return;
+    for (final u in cairList) {
       final uName = u.nama.trim().toLowerCase();
       final posIdx = data.posDanaList.indexWhere(
         (p) => p.nama.trim().toLowerCase() == uName,
@@ -223,7 +243,7 @@ class PribadiSyncService {
       } catch (_) {}
     }
 
-    // Default data baru: jika ada data Uangku, buat Pos Dana sesuai Uangku
+    // Default data baru: jika ada data Uangku, buat Pos Dana sesuai Uangku yang sudah cair
     final newPosList = uList.isNotEmpty
         ? syncPosDanaWithUangkuList(
             currentPosList: [],
@@ -260,6 +280,7 @@ class PribadiSyncService {
   }
 
   /// Sinkronisasi dua arah: Menyelaraskan seluruh saldo Pos Dana di Keuangan Pribadi ke daftar Uangku
+  /// HANYA menyelaraskan item Uangku yang statusnya SUDAH CAIR
   static Future<void> syncAllPosDanaBalancesToUangku({
     required String monthKey,
     required List<PosDana> posDanaList,
@@ -270,6 +291,9 @@ class PribadiSyncService {
     bool isChanged = false;
     for (int i = 0; i < uList.length; i++) {
       final u = uList[i];
+      // Item belum cair tidak disinkronkan dengan saldo Pos Dana
+      if (!u.isCair) continue;
+
       final matchIdx = posDanaList.indexWhere(
         (p) =>
             p.nama.trim().toLowerCase() == u.nama.trim().toLowerCase() ||
@@ -292,16 +316,25 @@ class PribadiSyncService {
   }
 
   /// Catat Pemasukan dari Uangku ke Keuangan Pribadi (otomatis membuat/menyesuaikan Pos Dana)
+  /// HANYA dicatat jika item tersebut SUDAH CAIR (isCair == true)
   static Future<void> recordPemasukanFromUangku({
     required String nama,
     required int nominal,
     DateTime? date,
     DateTime? selectedMonth,
     String? keterangan,
+    bool isInitialCreation = false,
   }) async {
+    final checkUangku = Uangku(nama, nominal, tanggalCair: date);
+    if (!checkUangku.isCair) {
+      // Jika statusnya belum cair, jangan masuk ke pos dana keuangan pribadi
+      return;
+    }
+
     final txDate = date ?? DateTime.now();
     final monthKey = getMonthKey(date, selectedMonth);
     final data = await loadPribadiData(monthKey);
+    final uList = await loadUangkuList(monthKey);
 
     // Cari pos target yang sesuai atau buat baru
     final targetName = nama.trim();
@@ -320,13 +353,20 @@ class PribadiSyncService {
                 targetName.toLowerCase()));
 
     if (idx != -1) {
-      // Jika ini transaksi baru untuk pos yang sudah memiliki mutasi, tambahkan ke balance.
-      // Jika pos baru terbentuk dari sinkronisasi Uangku (dan belum ada transaksi),
-      // saldo pos sudah mencerminkan nominal Uangku sehingga tidak boleh ditambahkan dua kali.
-      if (hasPriorTx) {
+      final matchU = uList.cast<Uangku?>().firstWhere(
+            (u) => u?.nama.trim().toLowerCase() == targetName.toLowerCase(),
+            orElse: () => null,
+          );
+
+      if ((isInitialCreation || !hasPriorTx) &&
+          matchU != null &&
+          matchU.jumlah == data.posDanaList[idx].balance &&
+          data.posDanaList[idx].balance == nominal) {
+        // Pos baru saja dibuat dari syncPosDanaWithUangkuList dengan saldo awal yang sama
+        // Tidak perlu ditambahkan 2x lipat
+      } else {
+        // Mutasi debit / tambah dana / penyesuaian nominal: tambahkan ke saldo pos
         data.posDanaList[idx].balance += nominal;
-      } else if (data.posDanaList[idx].balance == 0) {
-        data.posDanaList[idx].balance = nominal;
       }
     } else {
       final newPos = PosDana(
@@ -448,9 +488,75 @@ class PribadiSyncService {
     DateTime? tanggalCairBaru,
     DateTime? selectedMonth,
   }) async {
+    final wasCair =
+        Uangku(namaLama, jumlahLama, tanggalCair: tanggalCairLama).isCair;
+    final isNowCair =
+        Uangku(namaBaru, jumlahBaru, tanggalCair: tanggalCairBaru).isCair;
+
     final oldMonthKey = getMonthKey(tanggalCairLama, selectedMonth);
     final newMonthKey = getMonthKey(tanggalCairBaru, selectedMonth);
 
+    // KASUS 1: Sebelumnya Belum Cair dan Sekarang Masih Belum Cair
+    if (!wasCair && !isNowCair) {
+      // Keuangan Pribadi hanya mencatat dana real.
+      // Bersihkan jika ada sisa pos dana atau transaksi lama dengan namaLama
+      final oldData = await loadPribadiData(oldMonthKey);
+      oldData.posDanaList.removeWhere(
+        (p) => p.nama.trim().toLowerCase() == namaLama.trim().toLowerCase(),
+      );
+      oldData.transactions.removeWhere((tx) =>
+          tx.isPemasukan &&
+          (tx.manualSource?.trim().toLowerCase() ==
+                  namaLama.trim().toLowerCase() ||
+              tx.title.trim().toLowerCase() ==
+                  namaLama.trim().toLowerCase() ||
+              tx.targetAccount?.trim().toLowerCase() ==
+                  namaLama.trim().toLowerCase() ||
+              tx.note?.trim().toLowerCase() ==
+                  'pemasukan uangku: ${namaLama.trim().toLowerCase()}'));
+      await savePribadiData(oldMonthKey, oldData);
+      return;
+    }
+
+    // KASUS 2: Sebelumnya Cair, Sekarang Menjadi Belum Cair
+    if (wasCair && !isNowCair) {
+      // Hapus Pos Dana dan transaksi pemasukan dari Keuangan Pribadi
+      final oldData = await loadPribadiData(oldMonthKey);
+      oldData.posDanaList.removeWhere(
+        (p) => p.nama.trim().toLowerCase() == namaLama.trim().toLowerCase(),
+      );
+      oldData.transactions.removeWhere((tx) =>
+          tx.isPemasukan &&
+          (tx.manualSource?.trim().toLowerCase() ==
+                  namaLama.trim().toLowerCase() ||
+              tx.title.trim().toLowerCase() ==
+                  namaLama.trim().toLowerCase() ||
+              tx.targetAccount?.trim().toLowerCase() ==
+                  namaLama.trim().toLowerCase() ||
+              tx.note?.trim().toLowerCase() ==
+                  'pemasukan uangku: ${namaLama.trim().toLowerCase()}'));
+      if (oldData.posDanaList.isEmpty && oldData.transactions.isEmpty) {
+        oldData.rekeningPribadi.balance = 0;
+        oldData.onHandDebit.balance = 0;
+        oldData.onHandCash.balance = 0;
+      }
+      await savePribadiData(oldMonthKey, oldData);
+      return;
+    }
+
+    // KASUS 3: Sebelumnya Belum Cair, Sekarang Menjadi Cair
+    if (!wasCair && isNowCair) {
+      await recordPemasukanFromUangku(
+        nama: namaBaru,
+        nominal: jumlahBaru,
+        date: tanggalCairBaru,
+        selectedMonth: selectedMonth,
+        keterangan: namaBaru,
+      );
+      return;
+    }
+
+    // KASUS 4: Keduanya Cair (wasCair && isNowCair)
     if (oldMonthKey == newMonthKey) {
       final data = await loadPribadiData(oldMonthKey);
 
@@ -560,12 +666,28 @@ class PribadiSyncService {
           kode: autoKode != '-' ? autoKode : existingTx.kode,
         );
       } else if (jumlahBaru > 0) {
-        await recordPemasukanFromUangku(
-          nama: namaBaru,
-          nominal: jumlahBaru,
-          date: tanggalCairBaru,
-          selectedMonth: selectedMonth,
-          keterangan: namaBaru,
+        final autoKode = PribadiTransaction.resolveKodeFromText(
+          namaBaru,
+          customRules: data.customKodeRules,
+          type: 'pemasukan',
+        );
+        final autoKu = PribadiTransaction.resolveKuFromText(
+          namaBaru,
+          customRules: data.customKodeRules,
+        );
+        data.transactions.add(
+          PribadiTransaction(
+            id: DateTime.now().microsecondsSinceEpoch.toString(),
+            title: namaBaru,
+            type: 'pemasukan',
+            targetAccount: namaBaru.trim(),
+            manualSource: namaBaru.trim(),
+            amount: jumlahBaru,
+            timestamp: tanggalCairBaru ?? DateTime.now(),
+            note: 'Pemasukan Uangku: $namaBaru',
+            ku: autoKu != '-' ? autoKu : null,
+            kode: autoKode != '-' ? autoKode : null,
+          ),
         );
       }
 
@@ -604,6 +726,7 @@ class PribadiSyncService {
 
   /// Sinkronisasi saat pos Uangku dihapus.
   /// Menghapus Pos Dana dari Keuangan Pribadi tanpa menghapus riwayat transaksi yang sudah tercatat.
+  /// Juga mengintegrasikan penghapusan Pos Dana antar bulan jika nominalnya sudah menyentuh 0.
   static Future<void> syncHapusUangku({
     required String nama,
     required int jumlah,
@@ -618,7 +741,19 @@ class PribadiSyncService {
       (p) => p.nama.trim().toLowerCase() == nama.trim().toLowerCase(),
     );
 
-    // Transaksi di data.transactions TIDAK dihapus agar rekaman riwayat transaksi tetap tersimpan utuh.
+    final isCair = Uangku(nama, jumlah, tanggalCair: tanggalCair).isCair;
+    if (!isCair) {
+      data.transactions.removeWhere((tx) =>
+          tx.isPemasukan &&
+          (tx.manualSource?.trim().toLowerCase() ==
+                  nama.trim().toLowerCase() ||
+              tx.title.trim().toLowerCase() ==
+                  nama.trim().toLowerCase() ||
+              tx.targetAccount?.trim().toLowerCase() ==
+                  nama.trim().toLowerCase() ||
+              tx.note?.trim().toLowerCase() ==
+                  'pemasukan uangku: ${nama.trim().toLowerCase()}'));
+    }
 
     if (data.posDanaList.isEmpty && data.transactions.isEmpty) {
       data.rekeningPribadi.balance = 0;
@@ -627,6 +762,7 @@ class PribadiSyncService {
     }
 
     await savePribadiData(monthKey, data);
+    await deletePosDanaAcrossAllMonths(nama);
   }
 
   /// Sinkronisasi dua arah: Simpan penambahan Pos Dana dari Keuangan Pribadi ke Uangku
@@ -669,6 +805,7 @@ class PribadiSyncService {
   }
 
   /// Sinkronisasi dua arah: Simpan penghapusan Pos Dana dari Keuangan Pribadi ke Uangku
+  /// dan hapus pos dana yang sama di seluruh bulan lain yang nominalnya sudah menyentuh 0.
   static Future<void> syncHapusPosDanaToUangku({
     required String monthKey,
     required String nama,
@@ -678,6 +815,122 @@ class PribadiSyncService {
       (u) => u.nama.trim().toLowerCase() == nama.trim().toLowerCase(),
     );
     await saveUangkuList(monthKey, uList);
+    await deletePosDanaAcrossAllMonths(nama);
+  }
+
+  /// Menghapus Pos Dana secara terintegrasi antar semua bulan dengan syarat
+  /// nominal pos dana di bulan tersebut sudah menyentuh 0 (balance <= 0).
+  /// Pos dana yang masih memiliki sisa saldo > 0 di bulan lain akan tetap dipertahankan.
+  static Future<void> deletePosDanaAcrossAllMonths(String posName) async {
+    final cleanName = posName.trim().toLowerCase();
+    if (cleanName.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final allKeys = prefs.getKeys();
+
+    // 1. Kumpulkan semua key bulan untuk PribadiData
+    final pribadiMonthKeys = <String>{};
+    for (final k in allKeys) {
+      if (k.startsWith('pribadi_keuangan_data_')) {
+        pribadiMonthKeys.add(k.replaceFirst('pribadi_keuangan_data_', ''));
+      }
+      if (k.startsWith('uangku_') && k != 'uangku_only_cair') {
+        pribadiMonthKeys.add(k.replaceFirst('uangku_', ''));
+      }
+    }
+
+    final now = DateTime.now();
+    pribadiMonthKeys.add('${now.year}_${now.month.toString().padLeft(2, '0')}');
+
+    for (final monthKey in pribadiMonthKeys) {
+      final monthlyKey = 'pribadi_keuangan_data_$monthKey';
+      final raw = prefs.getString(monthlyKey);
+      if (raw != null) {
+        try {
+          final decoded = jsonDecode(raw);
+          if (decoded is Map<String, dynamic>) {
+            final data = PribadiData.fromJson(decoded);
+            final targetPosIdx = data.posDanaList.indexWhere(
+              (p) => p.nama.trim().toLowerCase() == cleanName,
+            );
+
+            if (targetPosIdx != -1) {
+              final targetPos = data.posDanaList[targetPosIdx];
+              // Syarat: nominalnya sudah menyentuh 0
+              if (targetPos.balance <= 0) {
+                data.posDanaList.removeAt(targetPosIdx);
+                if (data.posDanaList.isEmpty && data.transactions.isEmpty) {
+                  data.rekeningPribadi.balance = 0;
+                  data.onHandDebit.balance = 0;
+                  data.onHandCash.balance = 0;
+                }
+                await prefs.setString(monthlyKey, jsonEncode(data.toJson()));
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      // Hapus dari uangku_$monthKey jika saldonya <= 0
+      final uangkuKey = 'uangku_$monthKey';
+      final uRaw = prefs.getStringList(uangkuKey);
+      if (uRaw != null) {
+        try {
+          final uList = uRaw
+              .map((e) => Uangku.fromJson(jsonDecode(e) as Map<String, dynamic>))
+              .toList();
+          final beforeLen = uList.length;
+          uList.removeWhere((u) =>
+              u.nama.trim().toLowerCase() == cleanName && u.jumlah <= 0);
+          if (uList.length != beforeLen) {
+            await prefs.setStringList(
+              uangkuKey,
+              uList.map((e) => jsonEncode(e.toJson())).toList(),
+            );
+          }
+        } catch (_) {}
+      }
+    }
+
+    // 2. Bersihkan dari template pribadi_keuangan_data jika balance <= 0
+    final templateRaw = prefs.getString('pribadi_keuangan_data');
+    if (templateRaw != null) {
+      try {
+        final decoded = jsonDecode(templateRaw);
+        if (decoded is Map<String, dynamic>) {
+          final template = PribadiData.fromJson(decoded);
+          final posIdx = template.posDanaList.indexWhere(
+            (p) => p.nama.trim().toLowerCase() == cleanName,
+          );
+          if (posIdx != -1 && template.posDanaList[posIdx].balance <= 0) {
+            template.posDanaList.removeAt(posIdx);
+            await prefs.setString(
+                'pribadi_keuangan_data', jsonEncode(template.toJson()));
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. Bersihkan dari legacy 'uangku' jika jumlah <= 0
+    final legacyRaw = prefs.getStringList('uangku');
+    if (legacyRaw != null) {
+      try {
+        final uList = legacyRaw
+            .map((e) => Uangku.fromJson(jsonDecode(e) as Map<String, dynamic>))
+            .toList();
+        final beforeLen = uList.length;
+        uList.removeWhere(
+            (u) => u.nama.trim().toLowerCase() == cleanName && u.jumlah <= 0);
+        if (uList.length != beforeLen) {
+          await prefs.setStringList(
+            'uangku',
+            uList.map((e) => jsonEncode(e.toJson())).toList(),
+          );
+        }
+      } catch (_) {}
+    }
+
+    notifyFinanceDataChanged();
   }
 
   /// Memeriksa apakah daftar pos Uangku terhubung dengan Pos Dana Keuangan Pribadi

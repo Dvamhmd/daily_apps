@@ -94,49 +94,23 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
   void didUpdateWidget(covariant InfoCardUangku oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.onlyCair != widget.onlyCair ||
-        oldWidget.amount != widget.amount) {
+        oldWidget.amount != widget.amount ||
+        oldWidget.selectedMonth != widget.selectedMonth) {
       _loadUangku();
     }
   }
 
   Future<void> _saveUangku() async {
-    final prefs = await SharedPreferences.getInstance();
-    final data = uangkuList
-        .map((e) => jsonEncode(e.toJson()))
-        .toList();
-    await prefs.setStringList('uangku', data);
     final monthKey = PribadiSyncService.getMonthKey(null, widget.selectedMonth);
-    await prefs.setStringList('uangku_$monthKey', data);
-    PribadiSyncService.notifyFinanceDataChanged();
+    await PribadiSyncService.saveUangkuList(monthKey, uangkuList);
   }
 
   Future<void> _loadUangku() async {
-    final prefs = await SharedPreferences.getInstance();
-    var data = prefs.getStringList('uangku');
-
-    // Migrasi data jika 'uangku' belum ada tapi ada key 'uangku_YYYY_MM'
-    if (data == null || data.isEmpty) {
-      final allKeys = prefs
-          .getKeys()
-          .where((k) => k.startsWith('uangku_') && k != 'uangku_only_cair')
-          .toList();
-      allKeys.sort();
-      if (allKeys.isNotEmpty) {
-        final latestData = prefs.getStringList(allKeys.last);
-        if (latestData != null && latestData.isNotEmpty) {
-          data = latestData;
-          await prefs.setStringList('uangku', latestData);
-        }
-      }
-    }
-
-    data ??= [];
-
+    final monthKey = PribadiSyncService.getMonthKey(null, widget.selectedMonth);
+    final list = await PribadiSyncService.loadUangkuList(monthKey);
     if (!mounted) return;
     setState(() {
-      uangkuList = data!
-          .map((e) => Uangku.fromJson(jsonDecode(e)))
-          .toList();
+      uangkuList = list;
     });
   }
 
@@ -414,13 +388,16 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                     if (isDpEnabled && jumlah > 0 && newUangku.isCair) {
                       await _tambah10PersenKeTagihanDp(jumlah);
                     }
-                    await PribadiSyncService.recordPemasukanFromUangku(
-                      nama: nama,
-                      nominal: jumlah,
-                      date: selectedTanggalCair,
-                      selectedMonth: widget.selectedMonth,
-                      keterangan: nama,
-                    );
+                    if (newUangku.isCair) {
+                      await PribadiSyncService.recordPemasukanFromUangku(
+                        nama: nama,
+                        nominal: jumlah,
+                        date: selectedTanggalCair,
+                        selectedMonth: widget.selectedMonth,
+                        keterangan: nama,
+                        isInitialCreation: true,
+                      );
+                    }
                     await RiwayatService.catatTambahUangku(
                       nama,
                       jumlah,
@@ -986,12 +963,14 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                         if (isDpEnabled && item.isCair) {
                           await _tambah10PersenKeTagihanDp(nominal);
                         }
-                        await PribadiSyncService.recordPemasukanFromUangku(
-                          nama: item.nama,
-                          nominal: nominal,
-                          selectedMonth: widget.selectedMonth,
-                          keterangan: '${item.nama} (Debit)',
-                        );
+                        if (item.isCair) {
+                          await PribadiSyncService.recordPemasukanFromUangku(
+                            nama: item.nama,
+                            nominal: nominal,
+                            selectedMonth: widget.selectedMonth,
+                            keterangan: '${item.nama} (Debit)',
+                          );
+                        }
                         await RiwayatService.catatEditUangku(
                           namaLama: namaLama,
                           jumlahLama: jumlahLama,
@@ -1059,12 +1038,14 @@ class _InfoCardExpandableState extends State<InfoCardUangku> {
                         });
 
                         await _saveUangku();
-                        await PribadiSyncService.recordPengeluaranFromUangku(
-                          nama: item.nama,
-                          nominal: nominal,
-                          selectedMonth: widget.selectedMonth,
-                          keterangan: '${item.nama} (Kredit)',
-                        );
+                        if (item.isCair) {
+                          await PribadiSyncService.recordPengeluaranFromUangku(
+                            nama: item.nama,
+                            nominal: nominal,
+                            selectedMonth: widget.selectedMonth,
+                            keterangan: '${item.nama} (Kredit)',
+                          );
+                        }
                         await RiwayatService.catatEditUangku(
                           namaLama: namaLama,
                           jumlahLama: jumlahLama,

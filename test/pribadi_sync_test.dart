@@ -357,5 +357,219 @@ void main() {
       expect(parsed.title, 'Makan (BCA)');
       expect(parsed.note, 'Makan (BCA)');
     });
+
+    test('Uangku Belum Cair tidak masuk ke Pos Dana Keuangan Pribadi (hanya mencatat dana real)', () async {
+      final now = DateTime.now();
+      final testMonth = DateTime(now.year, now.month, 1);
+      final futureDate = DateTime(now.year, now.month, now.day + 10);
+      final monthKey = PribadiSyncService.getMonthKey(null, testMonth);
+
+      // Simpan item Uangku: 1 Cair (Gaji) dan 1 Belum Cair (Bonus Masa Depan)
+      final itemsUangku = [
+        Uangku('Gaji Kantor', 5000000), // Cair
+        Uangku('Bonus Belum Cair', 3000000, tanggalCair: futureDate), // Belum Cair
+      ];
+      await PribadiSyncService.saveUangkuList(monthKey, itemsUangku);
+
+      final loaded = await PribadiSyncService.loadPribadiData(monthKey);
+      // Hanya 1 Pos Dana yang masuk (Gaji Kantor), Bonus Belum Cair TIDAK masuk
+      expect(loaded.posDanaList.length, 1);
+      expect(loaded.posDanaList.first.nama, 'Gaji Kantor');
+      expect(loaded.posDanaList.first.balance, 5000000);
+      expect(loaded.totalPosDana, 5000000);
+      expect(loaded.totalDanaPribadi, 5000000);
+    });
+
+    test('Uangku Belum Cair dapat diedit dan dihapus tanpa nilainya kembali atau rusak', () async {
+      final now = DateTime.now();
+      final testMonth = DateTime(now.year, now.month, 1);
+      final futureDate = DateTime(now.year, now.month, now.day + 10);
+      final monthKey = PribadiSyncService.getMonthKey(null, testMonth);
+
+      // 1. Simpan Uangku Belum Cair
+      final initial = [
+        Uangku('Proyek Belum Cair', 4000000, tanggalCair: futureDate),
+      ];
+      await PribadiSyncService.saveUangkuList(monthKey, initial);
+
+      // 2. Edit nominal Uangku Belum Cair
+      final updated = [
+        Uangku('Proyek Belum Cair', 6000000, tanggalCair: futureDate),
+      ];
+      await PribadiSyncService.saveUangkuList(monthKey, updated);
+      await PribadiSyncService.syncEditUangku(
+        namaLama: 'Proyek Belum Cair',
+        jumlahLama: 4000000,
+        namaBaru: 'Proyek Belum Cair',
+        jumlahBaru: 6000000,
+        tanggalCairLama: futureDate,
+        tanggalCairBaru: futureDate,
+        selectedMonth: testMonth,
+      );
+
+      // Pastikan nominal di Uangku tetap 6.000.000 (tidak revert)
+      var uList = await PribadiSyncService.loadUangkuList(monthKey);
+      expect(uList.length, 1);
+      expect(uList.first.jumlah, 6000000);
+
+      // Dan di Keuangan Pribadi tetap kosong (karena belum cair)
+      var loaded = await PribadiSyncService.loadPribadiData(monthKey);
+      expect(loaded.posDanaList.isEmpty, true);
+
+      // 3. Hapus Uangku Belum Cair
+      await PribadiSyncService.saveUangkuList(monthKey, []);
+      await PribadiSyncService.syncHapusUangku(
+        nama: 'Proyek Belum Cair',
+        jumlah: 6000000,
+        tanggalCair: futureDate,
+        selectedMonth: testMonth,
+      );
+
+      // Pastikan benar-benar terhapus
+      uList = await PribadiSyncService.loadUangkuList(monthKey);
+      expect(uList.isEmpty, true);
+      loaded = await PribadiSyncService.loadPribadiData(monthKey);
+      expect(loaded.posDanaList.isEmpty, true);
+    });
+
+    test('Uangku Belum Cair berubah menjadi Cair otomatis masuk ke Pos Dana & Transaksi Keuangan Pribadi', () async {
+      final now = DateTime.now();
+      final testMonth = DateTime(now.year, now.month, 1);
+      final futureDate = DateTime(now.year, now.month, now.day + 10);
+      final monthKey = PribadiSyncService.getMonthKey(null, testMonth);
+
+      // 1. Awalnya belum cair
+      final initial = [
+        Uangku('Gaji Freelance', 2000000, tanggalCair: futureDate),
+      ];
+      await PribadiSyncService.saveUangkuList(monthKey, initial);
+      var loaded = await PribadiSyncService.loadPribadiData(monthKey);
+      expect(loaded.posDanaList.isEmpty, true);
+
+      // 2. Diedit tanggal cair dihapus (menjadi cair)
+      final cairList = [
+        Uangku('Gaji Freelance', 2000000), // cair (tanggalCair = null)
+      ];
+      await PribadiSyncService.saveUangkuList(monthKey, cairList);
+      await PribadiSyncService.syncEditUangku(
+        namaLama: 'Gaji Freelance',
+        jumlahLama: 2000000,
+        namaBaru: 'Gaji Freelance',
+        jumlahBaru: 2000000,
+        tanggalCairLama: futureDate,
+        tanggalCairBaru: null,
+        selectedMonth: testMonth,
+      );
+
+      // Sekarang masuk ke Keuangan Pribadi
+      loaded = await PribadiSyncService.loadPribadiData(monthKey);
+      expect(loaded.posDanaList.length, 1);
+      expect(loaded.posDanaList.first.nama, 'Gaji Freelance');
+      expect(loaded.posDanaList.first.balance, 2000000);
+      expect(loaded.transactions.length, 1);
+      expect(loaded.transactions.first.amount, 2000000);
+    });
+
+    test('Pos Dana terintegrasi antar bulan: Hapus di satu bulan menghapus di bulan lain jika nominal 0, tetap ada jika nominal > 0', () async {
+      final monthA = '2026_08';
+      final monthB = '2026_09';
+      final monthC = '2026_10';
+
+      // Month A: Pos Dana "Dana Cadangan" = 0
+      final dataA = PribadiData(
+        posDanaList: [
+          PosDana(id: 'pos_1', nama: 'Dana Cadangan', balance: 0),
+          PosDana(id: 'pos_2', nama: 'BCA', balance: 1000000),
+        ],
+      );
+      await PribadiSyncService.savePribadiData(monthA, dataA);
+      await PribadiSyncService.saveUangkuList(monthA, [
+        Uangku('Dana Cadangan', 0),
+        Uangku('BCA', 1000000),
+      ]);
+
+      // Month B: Pos Dana "Dana Cadangan" = 0
+      final dataB = PribadiData(
+        posDanaList: [
+          PosDana(id: 'pos_1', nama: 'Dana Cadangan', balance: 0),
+          PosDana(id: 'pos_3', nama: 'Dompet', balance: 500000),
+        ],
+      );
+      await PribadiSyncService.savePribadiData(monthB, dataB);
+      await PribadiSyncService.saveUangkuList(monthB, [
+        Uangku('Dana Cadangan', 0),
+        Uangku('Dompet', 500000),
+      ]);
+
+      // Month C: Pos Dana "Dana Cadangan" = 750.000 (> 0)
+      final dataC = PribadiData(
+        posDanaList: [
+          PosDana(id: 'pos_1', nama: 'Dana Cadangan', balance: 750000),
+          PosDana(id: 'pos_4', nama: 'Tabungan', balance: 2000000),
+        ],
+      );
+      await PribadiSyncService.savePribadiData(monthC, dataC);
+      await PribadiSyncService.saveUangkuList(monthC, [
+        Uangku('Dana Cadangan', 750000),
+        Uangku('Tabungan', 2000000),
+      ]);
+
+      // Hapus Pos Dana "Dana Cadangan" dari Month A
+      await PribadiSyncService.deletePosDanaAcrossAllMonths('Dana Cadangan');
+
+      // Verifikasi Month A: "Dana Cadangan" hilang, "BCA" tetap ada
+      final loadedA = await PribadiSyncService.loadPribadiData(monthA);
+      expect(loadedA.posDanaList.any((p) => p.nama == 'Dana Cadangan'), isFalse);
+      expect(loadedA.posDanaList.any((p) => p.nama == 'BCA'), isTrue);
+
+      // Verifikasi Month B: "Dana Cadangan" juga ikut hilang (karena nominalnya 0)!
+      final loadedB = await PribadiSyncService.loadPribadiData(monthB);
+      expect(loadedB.posDanaList.any((p) => p.nama == 'Dana Cadangan'), isFalse);
+      expect(loadedB.posDanaList.any((p) => p.nama == 'Dompet'), isTrue);
+
+      // Verifikasi Month C: "Dana Cadangan" TETAP ADA (karena nominalnya 750.000 > 0)!
+      final loadedC = await PribadiSyncService.loadPribadiData(monthC);
+      expect(loadedC.posDanaList.any((p) => p.nama == 'Dana Cadangan'), isTrue);
+      expect(loadedC.posDanaList.firstWhere((p) => p.nama == 'Dana Cadangan').balance, 750000);
+      expect(loadedC.posDanaList.any((p) => p.nama == 'Tabungan'), isTrue);
+    });
+
+    test('Quick Debit pada Pos Dana yang belum memiliki transaksi langsung bertambah pada input pertama (tidak perlu 2x)', () async {
+      final now = DateTime.now();
+      final testMonth = DateTime(now.year, now.month, 1);
+      final monthKey = PribadiSyncService.getMonthKey(null, testMonth);
+
+      // Pos Dana dibuat dari template/Uangku tanpa transaksi riwayat
+      final initialData = PribadiData(
+        posDanaList: [
+          PosDana(id: 'pos_kas', nama: 'Kas Tunai', balance: 1000000),
+        ],
+        transactions: [], // Belum ada transaksi sebelumnya
+      );
+      await PribadiSyncService.savePribadiData(monthKey, initialData);
+      await PribadiSyncService.saveUangkuList(monthKey, [
+        Uangku('Kas Tunai', 1000000),
+      ]);
+
+      // Lakukan Quick Debit Rp 500.000 (input pertama kali)
+      await PribadiSyncService.recordPemasukanFromUangku(
+        nama: 'Kas Tunai',
+        nominal: 500000,
+        selectedMonth: testMonth,
+        keterangan: 'Kas Tunai (Debit)',
+        isInitialCreation: false,
+      );
+
+      // Verifikasi langsung bertambah menjadi 1.500.000 pada input pertama
+      final loaded = await PribadiSyncService.loadPribadiData(monthKey);
+      expect(loaded.posDanaList.first.balance, 1500000);
+      expect(loaded.totalDanaPribadi, 1500000);
+      expect(loaded.transactions.length, 1);
+      expect(loaded.transactions.first.amount, 500000);
+
+      // Verifikasi Uangku juga tersinkron ke 1.500.000
+      final uList = await PribadiSyncService.loadUangkuList(monthKey);
+      expect(uList.first.jumlah, 1500000);
+    });
   });
 }
