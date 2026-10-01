@@ -55,7 +55,13 @@ class PribadiSyncService {
     final prefs = await SharedPreferences.getInstance();
     final data = uangkuList.map((e) => jsonEncode(e.toJson())).toList();
     await prefs.setStringList('uangku_$monthKey', data);
-    await prefs.setStringList('uangku', data);
+
+    final now = DateTime.now();
+    final currentMonthKey =
+        '${now.year}_${now.month.toString().padLeft(2, '0')}';
+    if (monthKey == currentMonthKey) {
+      await prefs.setStringList('uangku', data);
+    }
 
     notifyFinanceDataChanged();
   }
@@ -272,7 +278,14 @@ class PribadiSyncService {
     final monthlyKey = 'pribadi_keuangan_data_$monthKey';
     final jsonStr = jsonEncode(data.toJson());
     await prefs.setString(monthlyKey, jsonStr);
-    await prefs.setString('pribadi_keuangan_data', jsonStr);
+
+    final now = DateTime.now();
+    final currentMonthKey =
+        '${now.year}_${now.month.toString().padLeft(2, '0')}';
+    if (monthKey == currentMonthKey) {
+      await prefs.setString('pribadi_keuangan_data', jsonStr);
+    }
+
     await syncAllPosDanaBalancesToUangku(
       monthKey: monthKey,
       posDanaList: data.posDanaList,
@@ -307,6 +320,20 @@ class PribadiSyncService {
           uList[i] = u.copyWith(jumlah: posBalance);
           isChanged = true;
         }
+      }
+    }
+
+    // Pastikan setiap Pos Dana yang ada di Keuangan Pribadi (termasuk hasil import / saldo awal bulan sebelumnya) tercatat di daftar Uangku
+    for (final pos in posDanaList) {
+      final existsInUangku = uList.any(
+        (u) =>
+            u.nama.trim().toLowerCase() == pos.nama.trim().toLowerCase() ||
+            pos.id.trim().toLowerCase() == u.nama.trim().toLowerCase(),
+      );
+      if (!existsInUangku) {
+        final posBalance = pos.balance < 0 ? 0 : pos.balance;
+        uList.add(Uangku(pos.nama.trim(), posBalance));
+        isChanged = true;
       }
     }
 
@@ -560,6 +587,22 @@ class PribadiSyncService {
     if (oldMonthKey == newMonthKey) {
       final data = await loadPribadiData(oldMonthKey);
 
+      // Update data Uangku
+      final uList = await loadUangkuList(oldMonthKey);
+      final uIdx = uList.indexWhere(
+        (u) =>
+            u.nama.trim().toLowerCase() == namaLama.trim().toLowerCase() ||
+            u.nama.trim().toLowerCase() == namaBaru.trim().toLowerCase(),
+      );
+      if (uIdx != -1) {
+        uList[uIdx] = uList[uIdx].copyWith(
+          nama: namaBaru.trim(),
+          jumlah: jumlahBaru,
+          tanggalCair: tanggalCairBaru,
+        );
+        await saveUangkuList(oldMonthKey, uList);
+      }
+
       // Update Pos Dana
       final posIdx = data.posDanaList.indexWhere(
         (p) =>
@@ -734,6 +777,14 @@ class PribadiSyncService {
     DateTime? selectedMonth,
   }) async {
     final monthKey = getMonthKey(tanggalCair, selectedMonth);
+
+    // Hapus dari daftar Uangku bulan terkait
+    final uList = await loadUangkuList(monthKey);
+    uList.removeWhere(
+      (u) => u.nama.trim().toLowerCase() == nama.trim().toLowerCase(),
+    );
+    await saveUangkuList(monthKey, uList);
+
     final data = await loadPribadiData(monthKey);
 
     // Hapus Pos Dana yang bersangkutan

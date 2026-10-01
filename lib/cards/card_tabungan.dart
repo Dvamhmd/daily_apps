@@ -815,7 +815,9 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: Column(
+              child: SafeArea(
+                top: false,
+                child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // DRAG HANDLE
@@ -1483,7 +1485,8 @@ class _InfoCardTabunganState extends State<InfoCardTabungan> {
                   ),
                 ],
               ),
-            );
+            ),
+          );
           },
         );
       },

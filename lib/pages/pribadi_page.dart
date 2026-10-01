@@ -339,10 +339,12 @@ class _PribadiPageState extends State<PribadiPage> {
                   borderRadius:
                       BorderRadius.vertical(top: Radius.circular(24)),
                 ),
-                child: Column(
-                  children: [
-                    // Header handle
-                    Container(
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    children: [
+                      // Header handle
+                      Container(
                       margin: const EdgeInsets.only(top: 12, bottom: 8),
                       width: 40,
                       height: 4,
@@ -502,7 +504,8 @@ class _PribadiPageState extends State<PribadiPage> {
                   ],
                 ),
               ),
-            );
+            ),
+          );
           },
         );
       },
@@ -1213,23 +1216,25 @@ class _PribadiPageState extends State<PribadiPage> {
             );
 
             return Container(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-                top: 20,
-                left: 20,
-                right: 20,
-              ),
               decoration: const BoxDecoration(
                 color: lightCard,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom,
+                  ),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
@@ -1653,11 +1658,13 @@ class _PribadiPageState extends State<PribadiPage> {
                   ],
                 ),
               ),
-            );
-          },
+            ),
+          ),
         );
       },
     );
+  },
+);
   }
 
   // ==========================================
@@ -1686,23 +1693,25 @@ class _PribadiPageState extends State<PribadiPage> {
             );
 
             return Container(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-                top: 20,
-                left: 20,
-                right: 20,
-              ),
               decoration: const BoxDecoration(
                 color: lightCard,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom,
+                  ),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
@@ -2196,11 +2205,13 @@ class _PribadiPageState extends State<PribadiPage> {
                   ],
                 ),
               ),
-            );
-          },
+            ),
+          ),
         );
       },
     );
+  },
+);
   }
 
   // ==========================================
@@ -2235,23 +2246,25 @@ class _PribadiPageState extends State<PribadiPage> {
             );
 
             return Container(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-                top: 20,
-                left: 20,
-                right: 20,
-              ),
               decoration: const BoxDecoration(
                 color: lightCard,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom,
+                  ),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
@@ -2528,11 +2541,13 @@ class _PribadiPageState extends State<PribadiPage> {
                   ],
                 ),
               ),
-            );
-          },
+            ),
+          ),
         );
       },
     );
+  },
+);
   }
 
 
@@ -2556,23 +2571,25 @@ class _PribadiPageState extends State<PribadiPage> {
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return Container(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-            top: 20,
-            left: 20,
-            right: 20,
-          ),
           decoration: const BoxDecoration(
             color: lightCard,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
@@ -2798,9 +2815,11 @@ class _PribadiPageState extends State<PribadiPage> {
               ],
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
+  },
+);
   }
 
   // --- LOGIKA ROLLBACK SALDO TRANSAKSI (MANAJEMEN RISIKO) ---
@@ -3160,10 +3179,13 @@ class _PribadiPageState extends State<PribadiPage> {
               _data.onHandDebit.balance = 0;
               _data.onHandCash.balance = 0;
 
-              // 3. Bersihkan data Uangku untuk bulan ini
+              // 3. Matikan toggle saldo awal untuk bulan ini agar tidak di-recreate otomatis
+              await PribadiSaldoAwalService.setSaldoAwalEnabled(_monthKey, false);
+
+              // 4. Bersihkan data Uangku untuk bulan ini
               await PribadiSyncService.saveUangkuList(_monthKey, []);
 
-              // 4. Simpan perubahan ke SharedPreferences
+              // 5. Simpan perubahan ke SharedPreferences
               await _saveData();
 
               if (mounted) {
@@ -3625,23 +3647,25 @@ class _PribadiPageState extends State<PribadiPage> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Container(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-                top: 16,
-                left: 20,
-                right: 20,
-              ),
               decoration: const BoxDecoration(
                 color: lightCard,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom,
+                  ),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
@@ -3994,11 +4018,13 @@ class _PribadiPageState extends State<PribadiPage> {
                   ],
                 ),
               ),
-            );
-          },
+            ),
+          ),
         );
       },
     );
+  },
+);
   }
 
   Widget _buildSaldoAwalDetailRow(String label, String value, IconData icon,
@@ -4150,22 +4176,25 @@ class _PribadiPageState extends State<PribadiPage> {
               constraints: BoxConstraints(
                 maxHeight: MediaQuery.of(context).size.height * 0.85,
               ),
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-                top: 16,
-                left: 20,
-                right: 20,
-              ),
               decoration: const BoxDecoration(
                 color: lightCard,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom,
+                  ),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
@@ -4217,6 +4246,58 @@ class _PribadiPageState extends State<PribadiPage> {
                       ),
                       Row(
                         children: [
+                          IconButton(
+                            onPressed: () async {
+                              final breakdown = await PribadiSaldoAwalService
+                                  .getBreakdownSisaDanaBulanSebelumnya(_monthKey);
+                              if (breakdown.isEmpty) {
+                                if (ctx.mounted) {
+                                  CustomToast.showWarning(
+                                    context,
+                                    title: 'Tidak ada Pos Dana di bulan sebelumnya.',
+                                  );
+                                }
+                                return;
+                              }
+                              int count = 0;
+                              for (final info in breakdown) {
+                                final exists = _data.posDanaList.any((p) =>
+                                    p.nama.trim().toLowerCase() ==
+                                    info.nama.trim().toLowerCase());
+                                if (!exists) {
+                                  _data.posDanaList.add(PosDana(
+                                    id: 'pos_${_data.posDanaList.length + 1}_${info.nama.hashCode}',
+                                    nama: info.nama,
+                                    balance: 0,
+                                    deskripsi: info.deskripsi ??
+                                        'Pos dana: ${info.nama}',
+                                    iconName: info.iconName,
+                                    colorValue: info.colorValue,
+                                  ));
+                                  count++;
+                                }
+                              }
+                              await _saveData();
+                              if (ctx.mounted) {
+                                setModalState(() {});
+                                setState(() {});
+                                if (count > 0) {
+                                  CustomToast.showSuccess(
+                                    context,
+                                    title: '$count Pos Dana disalin dari bulan sebelumnya!',
+                                  );
+                                } else {
+                                  CustomToast.showInfo(
+                                    context,
+                                    title: 'Semua Pos Dana bulan lalu sudah ada di bulan ini.',
+                                  );
+                                }
+                              }
+                            },
+                            icon: const Icon(Icons.copy_all_rounded,
+                                color: primaryBlue, size: 20),
+                            tooltip: 'Salin Pos dari Bulan Lalu',
+                          ),
                           if (_data.posDanaList.length >= 2) ...[
                             IconButton(
                               onPressed: () {
@@ -4276,6 +4357,60 @@ class _PribadiPageState extends State<PribadiPage> {
                             style: TextStyle(
                               fontSize: 12,
                               color: textMuted,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          OutlinedButton.icon(
+                            onPressed: () async {
+                              final breakdown = await PribadiSaldoAwalService
+                                  .getBreakdownSisaDanaBulanSebelumnya(_monthKey);
+                              if (breakdown.isEmpty) {
+                                if (ctx.mounted) {
+                                  CustomToast.showWarning(
+                                    context,
+                                    title: 'Tidak ada Pos Dana di bulan sebelumnya.',
+                                  );
+                                }
+                                return;
+                              }
+                              int count = 0;
+                              for (final info in breakdown) {
+                                final exists = _data.posDanaList.any((p) =>
+                                    p.nama.trim().toLowerCase() ==
+                                    info.nama.trim().toLowerCase());
+                                if (!exists) {
+                                  _data.posDanaList.add(PosDana(
+                                    id: 'pos_${_data.posDanaList.length + 1}_${info.nama.hashCode}',
+                                    nama: info.nama,
+                                    balance: 0,
+                                    deskripsi: info.deskripsi ??
+                                        'Pos dana: ${info.nama}',
+                                    iconName: info.iconName,
+                                    colorValue: info.colorValue,
+                                  ));
+                                  count++;
+                                }
+                              }
+                              await _saveData();
+                              if (ctx.mounted) {
+                                setModalState(() {});
+                                setState(() {});
+                                CustomToast.showSuccess(
+                                  context,
+                                  title: '$count Pos Dana berhasil disalin dari bulan lalu!',
+                                );
+                              }
+                            },
+                            icon: const Icon(Icons.copy_all_rounded, size: 16),
+                            label: const Text('Salin Pos dari Bulan Lalu'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: primaryBlue,
+                              side: const BorderSide(color: primaryBlue),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
                           ),
                         ],
@@ -4626,11 +4761,14 @@ class _PribadiPageState extends State<PribadiPage> {
                     ),
                 ],
               ),
-            );
-          },
-        );
-      },
-    );
+            ),
+          ),
+        ),
+      );
+    },
+  );
+},
+);
   }
 
   void _showWarningPosDanaTercatatPengeluaranDialog(
@@ -5331,227 +5469,233 @@ class _PribadiPageState extends State<PribadiPage> {
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return Container(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           decoration: const BoxDecoration(
             color: lightCard,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Handle bar
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Kartu Ringkasan Data Transaksi yang Dipilih
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: lightCardElevated,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: lightBorder),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
+          child: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Handle bar
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
                       decoration: BoxDecoration(
-                        color: typeColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        isDebit
-                            ? Icons.arrow_downward_rounded
-                            : Icons.arrow_upward_rounded,
-                        color: typeColor,
-                        size: 20,
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: primaryBlue.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  displayKategori,
-                                  style: const TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: primaryBlue,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: typeColor.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  typeLabel,
-                                  style: TextStyle(
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: typeColor,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            tx.title.isNotEmpty ? tx.title : displayKategori,
-                            style: const TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.bold,
-                              color: textDark,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${DateFormat('dd MMMM yyyy, HH:mm').format(tx.timestamp)} • Rp ${RupiahFormatter.format(tx.amount)}',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: textMuted,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
+                  ),
+                  const SizedBox(height: 16),
 
-              // Pilihan Menu: Ubah Transaksi
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _showEditTransactionModal(tx, onRefresh);
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
+                  // Kartu Ringkasan Data Transaksi yang Dipilih
+                  Container(
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
+                      color: lightCardElevated,
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: lightBorder),
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.edit_outlined,
-                            size: 20, color: primaryBlue),
-                        SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: typeColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            isDebit
+                                ? Icons.arrow_downward_rounded
+                                : Icons.arrow_upward_rounded,
+                            color: typeColor,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: primaryBlue.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      displayKategori,
+                                      style: const TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: primaryBlue,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: typeColor.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      typeLabel,
+                                      style: TextStyle(
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: typeColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
                               Text(
-                                'Ubah Transaksi',
-                                style: TextStyle(
+                                tx.title.isNotEmpty ? tx.title : displayKategori,
+                                style: const TextStyle(
                                   fontSize: 13.5,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.bold,
                                   color: textDark,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
+                              const SizedBox(height: 2),
                               Text(
-                                'Edit judul, nominal, kategori, atau catatan',
-                                style: TextStyle(
+                                '${DateFormat('dd MMMM yyyy, HH:mm').format(tx.timestamp)} • Rp ${RupiahFormatter.format(tx.amount)}',
+                                style: const TextStyle(
                                   fontSize: 11,
                                   color: textMuted,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
                         ),
-                        Icon(Icons.chevron_right_rounded,
-                            size: 18, color: textMuted),
                       ],
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 10),
+                  const SizedBox(height: 16),
 
-              // Pilihan Menu: Hapus Transaksi
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _confirmDeleteTransaction(tx, onRefresh);
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: primaryRose.withValues(alpha: 0.05),
+                  // Pilihan Menu: Ubah Transaksi
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _showEditTransactionModal(tx, onRefresh);
+                      },
                       borderRadius: BorderRadius.circular(12),
-                      border:
-                          Border.all(color: primaryRose.withValues(alpha: 0.2)),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.delete_outline_rounded,
-                            size: 20, color: primaryRose),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Hapus Transaksi',
-                                style: TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: primaryRose,
-                                ),
-                              ),
-                              Text(
-                                'Hapus transaksi ini dan pulihkan saldo',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: textMuted,
-                                ),
-                              ),
-                            ],
-                          ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: lightBorder),
                         ),
-                        Icon(Icons.chevron_right_rounded,
-                            size: 18, color: textMuted),
-                      ],
+                        child: const Row(
+                          children: [
+                            Icon(Icons.edit_outlined,
+                                size: 20, color: primaryBlue),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Ubah Transaksi',
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: textDark,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Edit judul, nominal, kategori, atau catatan',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.chevron_right_rounded,
+                                size: 18, color: textMuted),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(height: 10),
+
+                  // Pilihan Menu: Hapus Transaksi
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _confirmDeleteTransaction(tx, onRefresh);
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: primaryRose.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border:
+                              Border.all(color: primaryRose.withValues(alpha: 0.2)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.delete_outline_rounded,
+                                size: 20, color: primaryRose),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Hapus Transaksi',
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: primaryRose,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Hapus transaksi ini dan pulihkan saldo',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.chevron_right_rounded,
+                                size: 18, color: textMuted),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         );
       },
@@ -5644,6 +5788,18 @@ class _PribadiPageState extends State<PribadiPage> {
                               ],
                             ),
                           ),
+                          if (_data.transactions.isNotEmpty || _data.posDanaList.isNotEmpty)
+                            IconButton(
+                              icon: const Icon(Icons.delete_sweep_rounded,
+                                  color: primaryRose),
+                              tooltip: 'Hapus Semua Data & Pos',
+                              onPressed: () {
+                                _confirmDeleteAllTransactions(() {
+                                  setModalState(() {});
+                                  setState(() {});
+                                });
+                              },
+                            ),
                           IconButton(
                             icon: const Icon(Icons.close_rounded,
                                 color: textMuted),
@@ -5946,7 +6102,7 @@ class _PribadiPageState extends State<PribadiPage> {
         final catName = (rawCat != '-' && rawCat.trim().isNotEmpty)
             ? rawCat.trim()
             : 'Umum';
-        pemasukanByCat[catName] = (pemasukanByCat[catName] ?? 0) + t.amount;
+        pemasukanByCat[catName] = (pemasukanByCat[catName] ?? 0) + t.amount.toInt();
       }
     }
     // Filter kategori yang jumlahnya > 0
@@ -5961,7 +6117,7 @@ class _PribadiPageState extends State<PribadiPage> {
         final catName = (rawCat != '-' && rawCat.trim().isNotEmpty)
             ? rawCat.trim()
             : 'Umum';
-        pengeluaranByCat[catName] = (pengeluaranByCat[catName] ?? 0) + t.amount;
+        pengeluaranByCat[catName] = (pengeluaranByCat[catName] ?? 0) + t.amount.toInt();
       }
     }
     // Filter kategori yang jumlahnya > 0

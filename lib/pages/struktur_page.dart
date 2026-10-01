@@ -1566,11 +1566,15 @@ class _StrukturPageState extends State<StrukturPage> {
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+              child: SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                   // Handle Bar
                   Center(
                     child: Container(
@@ -1857,7 +1861,9 @@ class _StrukturPageState extends State<StrukturPage> {
                       elevation: 2,
                     ),
                   ),
-                ],
+                    ],
+                  ),
+                ),
               ),
             );
           },
@@ -1914,11 +1920,14 @@ class _StrukturPageState extends State<StrukturPage> {
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                   Center(
                     child: Container(
                       width: 40,
@@ -2590,7 +2599,9 @@ class _StrukturPageState extends State<StrukturPage> {
                             },
                           ),
                   ),
-                ],
+                    ],
+                  ),
+                ),
               ),
             );
           },
@@ -4123,10 +4134,13 @@ class _StrukturPageState extends State<StrukturPage> {
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -4505,7 +4519,9 @@ class _StrukturPageState extends State<StrukturPage> {
                   ],
                 ),
               ),
-            );
+            ),
+          ),
+        );
           },
         );
       },
@@ -4540,10 +4556,13 @@ class _StrukturPageState extends State<StrukturPage> {
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -4909,7 +4928,9 @@ class _StrukturPageState extends State<StrukturPage> {
                   ],
                 ),
               ),
-            );
+            ),
+          ),
+        );
           },
         );
       },
@@ -4974,10 +4995,13 @@ class _StrukturPageState extends State<StrukturPage> {
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -5531,7 +5555,9 @@ class _StrukturPageState extends State<StrukturPage> {
                   ],
                 ),
               ),
-            );
+            ),
+          ),
+        );
           },
         );
       },
@@ -5599,10 +5625,13 @@ class _StrukturPageState extends State<StrukturPage> {
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -6217,7 +6246,9 @@ class _StrukturPageState extends State<StrukturPage> {
                   ],
                 ),
               ),
-            );
+            ),
+          ),
+        );
           },
         );
       },
@@ -6353,10 +6384,13 @@ class _StrukturPageState extends State<StrukturPage> {
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -7233,7 +7267,9 @@ class _StrukturPageState extends State<StrukturPage> {
                   ],
                 ),
               ),
-            );
+            ),
+          ),
+        );
           },
         );
       },
@@ -7402,10 +7438,13 @@ class _StrukturPageState extends State<StrukturPage> {
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -8208,7 +8247,9 @@ class _StrukturPageState extends State<StrukturPage> {
                   ],
                 ),
               ),
-            );
+            ),
+          ),
+        );
           },
         );
       },
@@ -10421,7 +10462,9 @@ class _StrukturPageState extends State<StrukturPage> {
                 color: Color(0xFFFFFDF5),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: Column(
+              child: SafeArea(
+                top: false,
+                child: Column(
                 children: [
                   // --- TOP DRAG HANDLE & HEADER MODAL ---
                   Container(
@@ -12776,7 +12819,8 @@ class _StrukturPageState extends State<StrukturPage> {
                   ),
                 ],
               ),
-            );
+            ),
+          );
           },
         );
       },
@@ -12824,7 +12868,9 @@ class _StrukturPageState extends State<StrukturPage> {
                 color: Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: Column(
+              child: SafeArea(
+                top: false,
+                child: Column(
                 children: [
                   // Top Drag Handle & Header
                   Container(
@@ -13188,7 +13234,8 @@ class _StrukturPageState extends State<StrukturPage> {
                   ),
                 ],
               ),
-            );
+            ),
+          );
           },
         );
       },

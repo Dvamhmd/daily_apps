@@ -342,7 +342,9 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
         color: Color(0xFFF7F9FC),
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: Column(
+      child: SafeArea(
+        top: false,
+        child: Column(
         children: [
           // Drag handle
           const SizedBox(height: 12),
@@ -472,7 +474,8 @@ class _BackupRestoreModalState extends State<BackupRestoreModal>
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildExportTab() {

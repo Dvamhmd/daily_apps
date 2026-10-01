@@ -367,7 +367,9 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
               ? Border.all(color: seriousCardBorder, width: 1.5)
               : null,
         ),
-        child: Column(
+        child: SafeArea(
+          top: false,
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const SizedBox(height: 12),
@@ -1113,7 +1115,8 @@ class _DailyTaskFormSheetState extends State<DailyTaskFormSheet> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildPresetChip({

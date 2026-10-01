@@ -234,6 +234,96 @@ void main() {
 
       // Total Dana Pribadi now reflects 350.000
       expect(find.textContaining('350.000'), findsWidgets);
+
+      // Verify imported Pos Dana are also synchronized to Uangku
+      final uList = await PribadiSyncService.loadUangkuList(curKey);
+      expect(uList.length, 2);
+      expect(uList.any((u) => u.nama == 'Cash' && u.jumlah == 150000), isTrue);
+      expect(uList.any((u) => u.nama == 'BCA' && u.jumlah == 200000), isTrue);
+    });
+
+    testWidgets('Hapus Semua in PribadiPage completely deletes all data, pos dana, and resets saldo awal flag',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+
+      final now = DateTime.now();
+      final curKey = '${now.year}_${now.month.toString().padLeft(2, '0')}';
+      final prevDate = DateTime(now.year, now.month - 1, 1);
+      final prevKey = '${prevDate.year}_${prevDate.month.toString().padLeft(2, '0')}';
+
+      // Setup previous month with Pos Dana
+      final prevData = PribadiData(
+        posDanaList: [
+          PosDana(id: 'pos_cash', nama: 'Cash', balance: 150000),
+          PosDana(id: 'pos_bca', nama: 'BCA', balance: 200000),
+        ],
+      );
+      await PribadiSyncService.savePribadiData(prevKey, prevData);
+
+      // Setup current month with active saldo awal & pos dana
+      await PribadiSaldoAwalService.setSaldoAwalEnabled(curKey, true);
+      final curData = PribadiData(
+        posDanaList: [
+          PosDana(id: 'pos_cash', nama: 'Cash', balance: 150000),
+          PosDana(id: 'pos_bca', nama: 'BCA', balance: 200000),
+        ],
+        transactions: [
+          PribadiTransaction(
+            id: 'saldo_awal_${curKey}_Cash',
+            title: 'Sisa Dana (Cash)',
+            type: 'pemasukan',
+            targetAccount: 'Cash',
+            amount: 150000,
+          ),
+          PribadiTransaction(
+            id: 'saldo_awal_${curKey}_BCA',
+            title: 'Sisa Dana (BCA)',
+            type: 'pemasukan',
+            targetAccount: 'BCA',
+            amount: 200000,
+          ),
+        ],
+      );
+      await PribadiSyncService.savePribadiData(curKey, curData);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: PribadiPage(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Hapus Semua'), findsOneWidget);
+      await tester.tap(find.text('Hapus Semua'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Hapus Semua Data & Pos?'), findsOneWidget);
+      await tester.tap(find.text('Hapus Semua Data & Pos'));
+      await tester.pumpAndSettle();
+
+      // Verify everything is reset
+      final isSaldoAwalEnabledAfter = await PribadiSaldoAwalService.isSaldoAwalEnabled(curKey);
+      expect(isSaldoAwalEnabledAfter, isFalse);
+
+      final reloadedData = await PribadiSyncService.loadPribadiData(curKey);
+      expect(reloadedData.transactions.isEmpty, isTrue);
+      expect(reloadedData.posDanaList.isEmpty, isTrue);
+
+      final uListAfter = await PribadiSyncService.loadUangkuList(curKey);
+      expect(uListAfter.isEmpty, isTrue);
+
+      // Verify re-sync does not regenerate any data
+      await PribadiSaldoAwalService.syncSaldoAwal(
+        currentMonthKey: curKey,
+        currentData: reloadedData,
+      );
+      expect(reloadedData.transactions.isEmpty, isTrue);
+      expect(reloadedData.posDanaList.isEmpty, isTrue);
     });
   });
 }

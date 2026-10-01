@@ -352,7 +352,9 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
             ? Border.all(color: seriousCardBorder, width: 1.5)
             : null,
       ),
-      child: Column(
+      child: SafeArea(
+        top: false,
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // Drag Handle
@@ -902,7 +904,8 @@ class _TodoAlarmSetupSheetState extends State<TodoAlarmSetupSheet> {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildModeTab({

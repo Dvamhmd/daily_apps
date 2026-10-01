@@ -2267,12 +2267,14 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
           color: _isSeriousMode ? seriousCardBg : Colors.white,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           clipBehavior: Clip.antiAlias,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          child: SafeArea(
+            top: false,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
               Center(
                 child: Container(
                   width: 40,
@@ -2410,8 +2412,9 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
             ],
           ),
         ),
-      );
-    },
+      ),
+    );
+  },
     );
   }
 

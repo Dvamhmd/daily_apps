@@ -159,12 +159,6 @@ class _SeriousPunishmentConfigPageState
         return StatefulBuilder(
           builder: (context, setSheetState) {
             return Container(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-                top: 20,
-                left: 20,
-                right: 20,
-              ),
               decoration: const BoxDecoration(
                 color: darkBg,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -172,7 +166,16 @@ class _SeriousPunishmentConfigPageState
                   top: BorderSide(color: accentGold, width: 2),
                 ),
               ),
-              child: SingleChildScrollView(
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                    top: 20,
+                    left: 20,
+                    right: 20,
+                  ),
+                  child: SingleChildScrollView(
                 child: Form(
                   key: formKey,
                   child: Column(
@@ -561,7 +564,9 @@ class _SeriousPunishmentConfigPageState
                   ),
                 ),
               ),
-            );
+            ),
+          ),
+        );
           },
         );
       },

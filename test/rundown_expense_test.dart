@@ -94,7 +94,7 @@ void main() {
   group('RundownExpenseService Integration Tests', () {
     test('executeRealisasi cuts Pos Dana in Uangku & Keuangan Pribadi and records transaction',
         () async {
-      final now = DateTime(2026, 9, 18);
+      final now = DateTime.now();
       final monthKey = PribadiSyncService.getMonthKey(now, null);
 
       // Setup initial Uangku / Pos Dana data

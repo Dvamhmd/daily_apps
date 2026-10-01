@@ -153,7 +153,9 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
           ),
         ],
       ),
-      child: Column(
+      child: SafeArea(
+        top: false,
+        child: Column(
         children: [
           Center(
             child: Container(
@@ -311,8 +313,9 @@ class _SeriousLeaderboardModalState extends State<SeriousLeaderboardModal> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildTop3Podium(List<SeriousUser> top3) {
     SeriousUser? first = top3.isNotEmpty ? top3[0] : null;

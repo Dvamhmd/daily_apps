@@ -1429,27 +1429,30 @@ class _GoogleSheetsConfigModalState extends State<GoogleSheetsConfigModal>
           color: Color(0xFFF8FAFC),
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        child: Column(
-          children: [
-            // Drag handle & Header
-            _buildHeader(),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              // Drag handle & Header
+              _buildHeader(),
 
-            // Tab Navigation Bar
-            _buildTabBar(),
+              // Tab Navigation Bar
+              _buildTabBar(),
 
-            // Body Content
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                physics: const BouncingScrollPhysics(),
-                children: [
-                  _KeepAliveWrapper(child: _buildConnectionTab()),
-                  _KeepAliveWrapper(child: _buildColumnMappingTab()),
-                  _KeepAliveWrapper(child: _buildScriptGuideTab()),
-                ],
+              // Body Content
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  physics: const BouncingScrollPhysics(),
+                  children: [
+                    _KeepAliveWrapper(child: _buildConnectionTab()),
+                    _KeepAliveWrapper(child: _buildColumnMappingTab()),
+                    _KeepAliveWrapper(child: _buildScriptGuideTab()),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
