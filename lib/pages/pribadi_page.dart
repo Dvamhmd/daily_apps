@@ -2660,266 +2660,443 @@ class _PribadiPageState extends State<PribadiPage> {
         text: tx.adminFee > 0 ? RupiahFormatter.format(tx.adminFee) : '0');
     final noteCtrl = TextEditingController(text: tx.note ?? '');
     final kodeCtrl = TextEditingController(text: tx.kode ?? '');
+    DateTime selectedDate = tx.timestamp;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: lightCard,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
+        return StatefulBuilder(
+          builder: (modalCtx, modalSetState) {
+            final targetMonthKey =
+                PribadiSyncService.getMonthKey(selectedDate, null);
+            final isDifferentMonth = targetMonthKey != _monthKey;
+
+            return Container(
+              decoration: const BoxDecoration(
+                color: lightCard,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom,
                   ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Edit Transaksi',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: textDark,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text('Judul Transaksi',
-                    style: TextStyle(fontSize: 12, color: textMuted)),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: titleCtrl,
-                  style: const TextStyle(color: textDark, fontSize: 13),
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: lightCardElevated,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: lightBorder),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Nominal',
-                              style:
-                                  TextStyle(fontSize: 12, color: textMuted)),
-                          const SizedBox(height: 6),
-                          TextField(
-                            controller: amountCtrl,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              RupiahInputFormatter(),
-                            ],
-                            style: const TextStyle(
-                                color: textDark,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold),
-                            decoration: InputDecoration(
-                              prefixText: 'Rp ',
-                              prefixStyle: const TextStyle(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Edit Transaksi',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: textDark,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text('Judul Transaksi',
+                            style: TextStyle(fontSize: 12, color: textMuted)),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: titleCtrl,
+                          style: const TextStyle(color: textDark, fontSize: 13),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: lightCardElevated,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: lightBorder),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // Tanggal Transaksi
+                        const Text('Tanggal Transaksi',
+                            style: TextStyle(fontSize: 12, color: textMuted)),
+                        const SizedBox(height: 6),
+                        InkWell(
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: selectedDate,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2035),
+                              builder: (context, child) {
+                                return Theme(
+                                  data: Theme.of(context).copyWith(
+                                    colorScheme: const ColorScheme.light(
+                                      primary: primaryGreen,
+                                      onPrimary: Colors.white,
+                                      onSurface: textDark,
+                                    ),
+                                  ),
+                                  child: child!,
+                                );
+                              },
+                            );
+                            if (picked != null) {
+                              modalSetState(() {
+                                selectedDate = DateTime(
+                                  picked.year,
+                                  picked.month,
+                                  picked.day,
+                                  selectedDate.hour,
+                                  selectedDate.minute,
+                                  selectedDate.second,
+                                );
+                              });
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 11),
+                            decoration: BoxDecoration(
+                              color: lightCardElevated,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: lightBorder),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.calendar_today_rounded,
+                                  size: 16,
                                   color: primaryGreen,
-                                  fontWeight: FontWeight.bold),
-                              filled: true,
-                              fillColor: lightCardElevated,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: const BorderSide(color: lightBorder),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 10),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    '${selectedDate.day} ${_namaBulan[selectedDate.month - 1]} ${selectedDate.year}',
+                                    style: const TextStyle(
+                                      color: textDark,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                const Text(
+                                  'Ubah',
+                                  style: TextStyle(
+                                    color: primaryGreen,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (isDifferentMonth) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                  color: Colors.amber.withValues(alpha: 0.4)),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.info_outline_rounded,
+                                    color: Colors.amber, size: 18),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Transaksi akan dipindahkan ke buku kas bulan ${_namaBulan[selectedDate.month - 1]} ${selectedDate.year}. Saldo bulan saat ini dan bulan target akan otomatis disesuaikan.',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: textDark,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Admin Fee',
-                              style:
-                                  TextStyle(fontSize: 12, color: textMuted)),
-                          const SizedBox(height: 6),
-                          TextField(
-                            controller: adminFeeCtrl,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              RupiahInputFormatter(),
-                            ],
-                            style: const TextStyle(
-                                color: textDark, fontSize: 13),
-                            decoration: InputDecoration(
-                              prefixText: 'Rp ',
-                              prefixStyle: const TextStyle(color: textMuted),
-                              filled: true,
-                              fillColor: lightCardElevated,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: const BorderSide(color: lightBorder),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Nominal',
+                                      style: TextStyle(
+                                          fontSize: 12, color: textMuted)),
+                                  const SizedBox(height: 6),
+                                  TextField(
+                                    controller: amountCtrl,
+                                    keyboardType: TextInputType.number,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                      RupiahInputFormatter(),
+                                    ],
+                                    style: const TextStyle(
+                                        color: textDark,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold),
+                                    decoration: InputDecoration(
+                                      prefixText: 'Rp ',
+                                      prefixStyle: const TextStyle(
+                                          color: primaryGreen,
+                                          fontWeight: FontWeight.bold),
+                                      filled: true,
+                                      fillColor: lightCardElevated,
+                                      border: OutlineInputBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                        borderSide:
+                                            const BorderSide(color: lightBorder),
+                                      ),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 10),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 10),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 2,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Admin Fee',
+                                      style: TextStyle(
+                                          fontSize: 12, color: textMuted)),
+                                  const SizedBox(height: 6),
+                                  TextField(
+                                    controller: adminFeeCtrl,
+                                    keyboardType: TextInputType.number,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                      RupiahInputFormatter(),
+                                    ],
+                                    style: const TextStyle(
+                                        color: textDark, fontSize: 13),
+                                    decoration: InputDecoration(
+                                      prefixText: 'Rp ',
+                                      prefixStyle:
+                                          const TextStyle(color: textMuted),
+                                      filled: true,
+                                      fillColor: lightCardElevated,
+                                      border: OutlineInputBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                        borderSide:
+                                            const BorderSide(color: lightBorder),
+                                      ),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 10),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('Kategori',
+                            style: TextStyle(fontSize: 12, color: textMuted)),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: kodeCtrl,
+                          style: const TextStyle(
+                              color: textDark, fontSize: 13),
+                          decoration: InputDecoration(
+                            hintText: 'Contoh: Makanan & Minuman, Gaji, dll',
+                            hintStyle: const TextStyle(color: Colors.grey),
+                            filled: true,
+                            fillColor: lightCardElevated,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: lightBorder),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('Catatan',
+                            style: TextStyle(fontSize: 12, color: textMuted)),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: noteCtrl,
+                          style: const TextStyle(color: textDark, fontSize: 13),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: lightCardElevated,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: lightBorder),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              final newAmt =
+                                  RupiahFormatter.parse(amountCtrl.text);
+                              final newFee =
+                                  RupiahFormatter.parse(adminFeeCtrl.text);
+                              final newTitle = titleCtrl.text.trim();
+                              if (newTitle.isEmpty || newAmt <= 0) return;
+
+                              final updatedTx = PribadiTransaction(
+                                id: tx.id,
+                                title: newTitle,
+                                type: tx.type,
+                                sourceAccount: tx.sourceAccount,
+                                targetAccount: tx.targetAccount,
+                                manualSource: tx.manualSource,
+                                amount: newAmt,
+                                adminFee: newFee,
+                                timestamp: selectedDate,
+                                note: noteCtrl.text.trim().isNotEmpty
+                                    ? noteCtrl.text.trim()
+                                    : null,
+                                ku: tx.ku,
+                                kode: kodeCtrl.text.trim().isNotEmpty
+                                    ? kodeCtrl.text.trim()
+                                    : null,
+                              );
+
+                              final currentMonthKey = _monthKey;
+                              final destMonthKey =
+                                  PribadiSyncService.getMonthKey(
+                                      selectedDate, null);
+
+                              if (currentMonthKey == destMonthKey) {
+                                // 1. Rollback saldo dari transaksi lama
+                                _rollbackTransactionBalance(tx);
+
+                                // 2. Terapkan saldo dari transaksi baru
+                                _applyTransactionBalance(updatedTx);
+
+                                // 3. Sanitasi & proteksi batas saldo (Manajemen Risiko anti-minus)
+                                _sanitizeAllBalances();
+
+                                final idx = _data.transactions
+                                    .indexWhere((t) => t.id == tx.id);
+                                if (idx != -1) {
+                                  _data.transactions[idx] = updatedTx;
+                                }
+
+                                await _saveData();
+                                if (mounted) {
+                                  setState(() {});
+                                  onSaved?.call();
+                                  Navigator.of(context).pop();
+                                  CustomToast.showSuccess(
+                                    context,
+                                    title: 'Transaksi Diperbarui',
+                                    subtitle:
+                                        'Perubahan transaksi & saldo berhasil disimpan.',
+                                  );
+                                }
+                              } else {
+                                // Skenario Beda Bulan: Pindahkan transaksi ke bulan target
+                                // 1. Rollback saldo transaksi lama & hapus dari bulan saat ini
+                                _rollbackTransactionBalance(tx);
+                                _sanitizeAllBalances();
+                                _data.transactions
+                                    .removeWhere((t) => t.id == tx.id);
+                                await _saveData();
+
+                                // 2. Muat data bulan target, terapkan saldo & tambahkan transaksi
+                                final targetData =
+                                    await PribadiSyncService.loadPribadiData(
+                                        destMonthKey);
+                                _applyTransactionBalanceToData(
+                                    targetData, updatedTx);
+                                _sanitizeDataBalances(targetData);
+                                targetData.transactions.add(updatedTx);
+                                targetData.transactions.sort((a, b) =>
+                                    b.timestamp.compareTo(a.timestamp));
+                                await PribadiSyncService.savePribadiData(
+                                    destMonthKey, targetData);
+
+                                // 3. Notifikasi sinkronisasi global
+                                PribadiSyncService.notifyFinanceDataChanged();
+
+                                if (mounted) {
+                                  setState(() {});
+                                  onSaved?.call();
+                                  Navigator.of(context).pop();
+                                  CustomToast.showSuccess(
+                                    context,
+                                    title: 'Transaksi Dipindahkan',
+                                    subtitle:
+                                        'Transaksi berhasil dipindahkan ke bulan ${_namaBulan[selectedDate.month - 1]} ${selectedDate.year}.',
+                                  );
+                                }
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryGreen,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              isDifferentMonth
+                                  ? 'Pindahkan ke ${_namaBulan[selectedDate.month - 1]} ${selectedDate.year}'
+                                  : 'Simpan Perubahan',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 14),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const Text('Kategori',
-                    style: TextStyle(fontSize: 12, color: textMuted)),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: kodeCtrl,
-                  style: const TextStyle(
-                      color: textDark, fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: 'Contoh: Makanan & Minuman, Gaji, dll',
-                    hintStyle: const TextStyle(color: Colors.grey),
-                    filled: true,
-                    fillColor: lightCardElevated,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: lightBorder),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
                   ),
                 ),
-                const SizedBox(height: 12),
-                const Text('Catatan',
-                    style: TextStyle(fontSize: 12, color: textMuted)),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: noteCtrl,
-                  style: const TextStyle(color: textDark, fontSize: 13),
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: lightCardElevated,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: lightBorder),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      final newAmt = RupiahFormatter.parse(amountCtrl.text);
-                      final newFee = RupiahFormatter.parse(adminFeeCtrl.text);
-                      final newTitle = titleCtrl.text.trim();
-                      if (newTitle.isEmpty || newAmt <= 0) return;
-
-                      final updatedTx = PribadiTransaction(
-                        id: tx.id,
-                        title: newTitle,
-                        type: tx.type,
-                        sourceAccount: tx.sourceAccount,
-                        targetAccount: tx.targetAccount,
-                        manualSource: tx.manualSource,
-                        amount: newAmt,
-                        adminFee: newFee,
-                        timestamp: tx.timestamp,
-                        note: noteCtrl.text.trim().isNotEmpty
-                            ? noteCtrl.text.trim()
-                            : null,
-                        ku: null,
-                        kode: kodeCtrl.text.trim().isNotEmpty
-                            ? kodeCtrl.text.trim()
-                            : null,
-                      );
-
-                      // 1. Rollback saldo dari transaksi lama
-                      _rollbackTransactionBalance(tx);
-
-                      // 2. Terapkan saldo dari transaksi baru
-                      _applyTransactionBalance(updatedTx);
-
-                      // 3. Sanitasi & proteksi batas saldo (Manajemen Risiko anti-minus)
-                      _sanitizeAllBalances();
-
-                      final idx =
-                          _data.transactions.indexWhere((t) => t.id == tx.id);
-                      if (idx != -1) {
-                        _data.transactions[idx] = updatedTx;
-                      }
-
-                      await _saveData();
-                      if (mounted) {
-                        setState(() {});
-                        onSaved?.call();
-                        Navigator.of(context).pop();
-                        CustomToast.showSuccess(
-                          context,
-                          title: 'Transaksi Diperbarui',
-                          subtitle:
-                              'Perubahan transaksi & saldo berhasil disimpan.',
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryGreen,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text('Simpan Perubahan',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 14)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+              ),
+            );
+          },
+        );
+      },
     );
-  },
-);
   }
 
   // --- LOGIKA ROLLBACK SALDO TRANSAKSI (MANAJEMEN RISIKO) ---
   void _rollbackTransactionBalance(PribadiTransaction tx) {
+    _rollbackTransactionBalanceFromData(_data, tx);
+  }
+
+  void _rollbackTransactionBalanceFromData(
+      PribadiData data, PribadiTransaction tx) {
     final total = tx.amount + tx.adminFee;
     final targetStr = tx.targetAccount?.trim().toLowerCase() ?? '';
     final sourceStr = tx.sourceAccount?.trim().toLowerCase() ?? '';
@@ -2927,105 +3104,109 @@ class _PribadiPageState extends State<PribadiPage> {
     if (tx.isPemasukan) {
       // Pemasukan menambah saldo target, jadi saat rollback kita kurangi dari target
       bool handled = false;
-      if (_data.posDanaList.isNotEmpty) {
-        final posIdx = _data.posDanaList.indexWhere(
-            (p) => p.nama.trim().toLowerCase() == targetStr || p.id.trim().toLowerCase() == targetStr);
+      if (data.posDanaList.isNotEmpty) {
+        final posIdx = data.posDanaList.indexWhere((p) =>
+            p.nama.trim().toLowerCase() == targetStr ||
+            p.id.trim().toLowerCase() == targetStr);
         if (posIdx != -1) {
-          _data.posDanaList[posIdx].balance -= tx.amount;
-          if (_data.posDanaList[posIdx].balance < 0) {
-            _data.posDanaList[posIdx].balance = 0;
+          data.posDanaList[posIdx].balance -= tx.amount;
+          if (data.posDanaList[posIdx].balance < 0) {
+            data.posDanaList[posIdx].balance = 0;
           }
           handled = true;
         }
       }
       if (!handled) {
         if (targetStr == 'rekening') {
-          _data.rekeningPribadi.balance -= tx.amount;
-          if (_data.rekeningPribadi.balance < 0) {
-            _data.rekeningPribadi.balance = 0;
+          data.rekeningPribadi.balance -= tx.amount;
+          if (data.rekeningPribadi.balance < 0) {
+            data.rekeningPribadi.balance = 0;
           }
         } else if (targetStr == 'debit') {
-          _data.onHandDebit.balance -= tx.amount;
-          if (_data.onHandDebit.balance < 0) {
-            _data.onHandDebit.balance = 0;
+          data.onHandDebit.balance -= tx.amount;
+          if (data.onHandDebit.balance < 0) {
+            data.onHandDebit.balance = 0;
           }
         } else if (targetStr == 'cash') {
-          _data.onHandCash.balance -= tx.amount;
-          if (_data.onHandCash.balance < 0) {
-            _data.onHandCash.balance = 0;
+          data.onHandCash.balance -= tx.amount;
+          if (data.onHandCash.balance < 0) {
+            data.onHandCash.balance = 0;
           }
         }
       }
     } else if (tx.isPengeluaran) {
       // Pengeluaran memotong saldo source, jadi saat rollback kita kembalikan ke source
       bool handled = false;
-      if (_data.posDanaList.isNotEmpty) {
-        final posIdx = _data.posDanaList.indexWhere(
-            (p) => p.nama.trim().toLowerCase() == sourceStr || p.id.trim().toLowerCase() == sourceStr);
+      if (data.posDanaList.isNotEmpty) {
+        final posIdx = data.posDanaList.indexWhere((p) =>
+            p.nama.trim().toLowerCase() == sourceStr ||
+            p.id.trim().toLowerCase() == sourceStr);
         if (posIdx != -1) {
-          _data.posDanaList[posIdx].balance += total;
+          data.posDanaList[posIdx].balance += total;
           handled = true;
         }
       }
       if (!handled) {
         if (sourceStr == 'rekening') {
-          _data.rekeningPribadi.balance += total;
+          data.rekeningPribadi.balance += total;
         } else if (sourceStr == 'debit') {
-          _data.onHandDebit.balance += total;
+          data.onHandDebit.balance += total;
         } else if (sourceStr == 'cash') {
-          _data.onHandCash.balance += total;
+          data.onHandCash.balance += total;
         }
       }
     } else {
       // Transfer / Alokasi internal:
       // Kembalikan ke source (tambah)
       bool srcHandled = false;
-      if (_data.posDanaList.isNotEmpty) {
-        final srcIdx = _data.posDanaList.indexWhere(
-            (p) => p.nama.trim().toLowerCase() == sourceStr || p.id.trim().toLowerCase() == sourceStr);
+      if (data.posDanaList.isNotEmpty) {
+        final srcIdx = data.posDanaList.indexWhere((p) =>
+            p.nama.trim().toLowerCase() == sourceStr ||
+            p.id.trim().toLowerCase() == sourceStr);
         if (srcIdx != -1) {
-          _data.posDanaList[srcIdx].balance += total;
+          data.posDanaList[srcIdx].balance += total;
           srcHandled = true;
         }
       }
       if (!srcHandled) {
         if (sourceStr == 'rekening') {
-          _data.rekeningPribadi.balance += total;
+          data.rekeningPribadi.balance += total;
         } else if (sourceStr == 'debit') {
-          _data.onHandDebit.balance += total;
+          data.onHandDebit.balance += total;
         } else if (sourceStr == 'cash') {
-          _data.onHandCash.balance += total;
+          data.onHandCash.balance += total;
         }
       }
 
       // Kurangi dari target (kurang)
       bool tgtHandled = false;
-      if (_data.posDanaList.isNotEmpty) {
-        final tgtIdx = _data.posDanaList.indexWhere(
-            (p) => p.nama.trim().toLowerCase() == targetStr || p.id.trim().toLowerCase() == targetStr);
+      if (data.posDanaList.isNotEmpty) {
+        final tgtIdx = data.posDanaList.indexWhere((p) =>
+            p.nama.trim().toLowerCase() == targetStr ||
+            p.id.trim().toLowerCase() == targetStr);
         if (tgtIdx != -1) {
-          _data.posDanaList[tgtIdx].balance -= tx.amount;
-          if (_data.posDanaList[tgtIdx].balance < 0) {
-            _data.posDanaList[tgtIdx].balance = 0;
+          data.posDanaList[tgtIdx].balance -= tx.amount;
+          if (data.posDanaList[tgtIdx].balance < 0) {
+            data.posDanaList[tgtIdx].balance = 0;
           }
           tgtHandled = true;
         }
       }
       if (!tgtHandled) {
         if (targetStr == 'rekening') {
-          _data.rekeningPribadi.balance -= tx.amount;
-          if (_data.rekeningPribadi.balance < 0) {
-            _data.rekeningPribadi.balance = 0;
+          data.rekeningPribadi.balance -= tx.amount;
+          if (data.rekeningPribadi.balance < 0) {
+            data.rekeningPribadi.balance = 0;
           }
         } else if (targetStr == 'debit') {
-          _data.onHandDebit.balance -= tx.amount;
-          if (_data.onHandDebit.balance < 0) {
-            _data.onHandDebit.balance = 0;
+          data.onHandDebit.balance -= tx.amount;
+          if (data.onHandDebit.balance < 0) {
+            data.onHandDebit.balance = 0;
           }
         } else if (targetStr == 'cash') {
-          _data.onHandCash.balance -= tx.amount;
-          if (_data.onHandCash.balance < 0) {
-            _data.onHandCash.balance = 0;
+          data.onHandCash.balance -= tx.amount;
+          if (data.onHandCash.balance < 0) {
+            data.onHandCash.balance = 0;
           }
         }
       }
@@ -3034,64 +3215,71 @@ class _PribadiPageState extends State<PribadiPage> {
 
   // --- LOGIKA MENERAPKAN SALDO TRANSAKSI BARU ---
   void _applyTransactionBalance(PribadiTransaction tx) {
+    _applyTransactionBalanceToData(_data, tx);
+  }
+
+  void _applyTransactionBalanceToData(
+      PribadiData data, PribadiTransaction tx) {
     final total = tx.amount + tx.adminFee;
     final targetStr = tx.targetAccount?.trim().toLowerCase() ?? '';
     final sourceStr = tx.sourceAccount?.trim().toLowerCase() ?? '';
 
     if (tx.isPemasukan) {
       bool handled = false;
-      if (_data.posDanaList.isNotEmpty) {
-        final posIdx = _data.posDanaList.indexWhere(
-            (p) => p.nama.trim().toLowerCase() == targetStr || p.id.trim().toLowerCase() == targetStr);
+      if (data.posDanaList.isNotEmpty) {
+        final posIdx = data.posDanaList.indexWhere((p) =>
+            p.nama.trim().toLowerCase() == targetStr ||
+            p.id.trim().toLowerCase() == targetStr);
         if (posIdx != -1) {
-          _data.posDanaList[posIdx].balance += tx.amount;
+          data.posDanaList[posIdx].balance += tx.amount;
           handled = true;
         }
       }
       if (!handled) {
         if (targetStr == 'rekening') {
-          _data.rekeningPribadi.balance += tx.amount;
+          data.rekeningPribadi.balance += tx.amount;
         } else if (targetStr == 'debit') {
-          _data.onHandDebit.balance += tx.amount;
+          data.onHandDebit.balance += tx.amount;
         } else if (targetStr == 'cash') {
-          _data.onHandCash.balance += tx.amount;
-        } else if (_data.posDanaList.isNotEmpty) {
-          _data.posDanaList.first.balance += tx.amount;
+          data.onHandCash.balance += tx.amount;
+        } else if (data.posDanaList.isNotEmpty) {
+          data.posDanaList.first.balance += tx.amount;
         }
       }
     } else if (tx.isPengeluaran) {
       bool handled = false;
-      if (_data.posDanaList.isNotEmpty) {
-        final posIdx = _data.posDanaList.indexWhere(
-            (p) => p.nama.trim().toLowerCase() == sourceStr || p.id.trim().toLowerCase() == sourceStr);
+      if (data.posDanaList.isNotEmpty) {
+        final posIdx = data.posDanaList.indexWhere((p) =>
+            p.nama.trim().toLowerCase() == sourceStr ||
+            p.id.trim().toLowerCase() == sourceStr);
         if (posIdx != -1) {
-          _data.posDanaList[posIdx].balance -= total;
-          if (_data.posDanaList[posIdx].balance < 0) {
-            _data.posDanaList[posIdx].balance = 0;
+          data.posDanaList[posIdx].balance -= total;
+          if (data.posDanaList[posIdx].balance < 0) {
+            data.posDanaList[posIdx].balance = 0;
           }
           handled = true;
         }
       }
       if (!handled) {
         if (sourceStr == 'rekening') {
-          _data.rekeningPribadi.balance -= total;
-          if (_data.rekeningPribadi.balance < 0) {
-            _data.rekeningPribadi.balance = 0;
+          data.rekeningPribadi.balance -= total;
+          if (data.rekeningPribadi.balance < 0) {
+            data.rekeningPribadi.balance = 0;
           }
         } else if (sourceStr == 'debit') {
-          _data.onHandDebit.balance -= total;
-          if (_data.onHandDebit.balance < 0) {
-            _data.onHandDebit.balance = 0;
+          data.onHandDebit.balance -= total;
+          if (data.onHandDebit.balance < 0) {
+            data.onHandDebit.balance = 0;
           }
         } else if (sourceStr == 'cash') {
-          _data.onHandCash.balance -= total;
-          if (_data.onHandCash.balance < 0) {
-            _data.onHandCash.balance = 0;
+          data.onHandCash.balance -= total;
+          if (data.onHandCash.balance < 0) {
+            data.onHandCash.balance = 0;
           }
-        } else if (_data.posDanaList.isNotEmpty) {
-          _data.posDanaList.first.balance -= total;
-          if (_data.posDanaList.first.balance < 0) {
-            _data.posDanaList.first.balance = 0;
+        } else if (data.posDanaList.isNotEmpty) {
+          data.posDanaList.first.balance -= total;
+          if (data.posDanaList.first.balance < 0) {
+            data.posDanaList.first.balance = 0;
           }
         }
       }
@@ -3100,12 +3288,16 @@ class _PribadiPageState extends State<PribadiPage> {
 
   // --- MANAJEMEN RISIKO: SANITASI SELURUH SALDO AGAR TIDAK ADA YANG MINUS (< 0) ---
   void _sanitizeAllBalances() {
-    for (final pos in _data.posDanaList) {
+    _sanitizeDataBalances(_data);
+  }
+
+  void _sanitizeDataBalances(PribadiData data) {
+    for (final pos in data.posDanaList) {
       if (pos.balance < 0) pos.balance = 0;
     }
-    if (_data.rekeningPribadi.balance < 0) _data.rekeningPribadi.balance = 0;
-    if (_data.onHandDebit.balance < 0) _data.onHandDebit.balance = 0;
-    if (_data.onHandCash.balance < 0) _data.onHandCash.balance = 0;
+    if (data.rekeningPribadi.balance < 0) data.rekeningPribadi.balance = 0;
+    if (data.onHandDebit.balance < 0) data.onHandDebit.balance = 0;
+    if (data.onHandCash.balance < 0) data.onHandCash.balance = 0;
   }
 
   void _confirmDeleteTransaction(PribadiTransaction tx,
