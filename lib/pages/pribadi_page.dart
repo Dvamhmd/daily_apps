@@ -4923,21 +4923,6 @@ class _PribadiPageState extends State<PribadiPage> {
                                     );
                                   },
                                 ),
-                                if (_data.posDanaList.length >= 2)
-                                  IconButton(
-                                    icon: const Icon(Icons.swap_horiz_rounded,
-                                        size: 18, color: primaryBlue),
-                                    tooltip: 'Pindah Saldo dari Pos Ini',
-                                    onPressed: () {
-                                      _showDistribusiDanaModal(
-                                        initialFromPosId: pos.id,
-                                        onCompleted: () {
-                                          setModalState(() {});
-                                          setState(() {});
-                                        },
-                                      );
-                                    },
-                                  ),
                                 IconButton(
                                     icon: const Icon(Icons.delete_outline_rounded,
                                         size: 18, color: primaryRose),
