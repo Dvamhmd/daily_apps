@@ -1426,19 +1426,6 @@ class _PribadiPageState extends State<PribadiPage> {
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              Icon(Icons.info_outline_rounded, size: 13, color: primaryGreen.withValues(alpha: 0.8)),
-                              const SizedBox(width: 4),
-                              const Expanded(
-                                child: Text(
-                                  'Pos dana baru akan otomatis terintegrasi ke Keuangan & Uangku.',
-                                  style: TextStyle(fontSize: 11, color: primaryGreen, fontWeight: FontWeight.w500),
-                                ),
-                              ),
-                            ],
-                          ),
                         ],
 
                         const SizedBox(height: 14),
@@ -2310,15 +2297,48 @@ class _PribadiPageState extends State<PribadiPage> {
 );
   }
 
+  Widget _buildQuickPercentChip({
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: primaryBlue.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: primaryBlue.withValues(alpha: 0.3)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: primaryBlue,
+          ),
+        ),
+      ),
+    );
+  }
+
   // ==========================================
   // MODAL DISTRIBUSI / ALOKASI DANA PRIBADI
   // ==========================================
-  void _showDistribusiDanaModal() {
-    String fromPosId =
-        _data.posDanaList.isNotEmpty ? _data.posDanaList.first.id : '';
-    String toPosId = _data.posDanaList.length > 1
-        ? _data.posDanaList[1].id
-        : (_data.posDanaList.isNotEmpty ? _data.posDanaList.first.id : '');
+  void _showDistribusiDanaModal({
+    String? initialFromPosId,
+    String? initialToPosId,
+    VoidCallback? onCompleted,
+  }) {
+    String fromPosId = initialFromPosId ??
+        (_data.posDanaList.isNotEmpty ? _data.posDanaList.first.id : '');
+    String toPosId = initialToPosId ??
+        (_data.posDanaList.length > 1
+            ? (_data.posDanaList.first.id == fromPosId
+                ? _data.posDanaList[1].id
+                : _data.posDanaList.first.id)
+            : (_data.posDanaList.isNotEmpty ? _data.posDanaList.first.id : ''));
     final amountCtrl = TextEditingController();
     final feeCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
@@ -2340,6 +2360,8 @@ class _PribadiPageState extends State<PribadiPage> {
                   ? _data.posDanaList[1]
                   : _data.posDanaList.first,
             );
+            final isSamePos =
+                fromPosId.isNotEmpty && toPosId.isNotEmpty && fromPosId == toPosId;
 
             return Container(
               decoration: const BoxDecoration(
@@ -2386,13 +2408,25 @@ class _PribadiPageState extends State<PribadiPage> {
                         ),
                         const SizedBox(width: 12),
                         const Expanded(
-                          child: Text(
-                            'Alokasi & Pindah Saldo Antar Pos',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: textDark,
-                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Alokasi & Pindah Saldo Antar Pos',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: textDark,
+                                ),
+                              ),
+                              Text(
+                                'Pindah saldo antar pos dana tanpa dicatat di transaksi',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: textMuted,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -2408,8 +2442,15 @@ class _PribadiPageState extends State<PribadiPage> {
                         children: _data.posDanaList.map((pos) {
                           final isSel = fromPosId == pos.id;
                           return InkWell(
-                            onTap: () =>
-                                setModalState(() => fromPosId = pos.id),
+                            onTap: () {
+                              setModalState(() => fromPosId = pos.id);
+                              if (pos.id == toPosId) {
+                                CustomToast.showError(
+                                  context,
+                                  title: 'Error: Pos dana sama',
+                                );
+                              }
+                            },
                             borderRadius: BorderRadius.circular(8),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -2424,7 +2465,7 @@ class _PribadiPageState extends State<PribadiPage> {
                                 ),
                               ),
                               child: Text(
-                                pos.nama,
+                                '${pos.nama} (Rp ${RupiahFormatter.format(pos.balance)})',
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: isSel
@@ -2448,8 +2489,15 @@ class _PribadiPageState extends State<PribadiPage> {
                         children: _data.posDanaList.map((pos) {
                           final isSel = toPosId == pos.id;
                           return InkWell(
-                            onTap: () =>
-                                setModalState(() => toPosId = pos.id),
+                            onTap: () {
+                              setModalState(() => toPosId = pos.id);
+                              if (fromPosId == pos.id) {
+                                CustomToast.showError(
+                                  context,
+                                  title: 'Error: Pos dana sama',
+                                );
+                              }
+                            },
                             borderRadius: BorderRadius.circular(8),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -2464,7 +2512,7 @@ class _PribadiPageState extends State<PribadiPage> {
                                 ),
                               ),
                               child: Text(
-                                pos.nama,
+                                '${pos.nama} (Rp ${RupiahFormatter.format(pos.balance)})',
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: isSel
@@ -2481,28 +2529,75 @@ class _PribadiPageState extends State<PribadiPage> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: lightCardElevated,
+                        color: isSamePos
+                            ? primaryRose.withValues(alpha: 0.05)
+                            : lightCardElevated,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: lightBorder),
+                        border: Border.all(
+                            color: isSamePos ? primaryRose.withValues(alpha: 0.4) : lightBorder),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(fromPos.nama,
+                          Flexible(
+                            child: Text(
+                              '${fromPos.nama} (Rp ${RupiahFormatter.format(fromPos.balance)})',
                               style: const TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: textDark)),
-                          const SizedBox(width: 12),
-                          const Icon(Icons.arrow_forward_rounded,
-                              size: 16, color: primaryBlue),
-                          const SizedBox(width: 12),
-                          Text(toPos.nama,
-                              style: const TextStyle(
+                                  fontSize: 12,
+                                  color: textDark),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(Icons.arrow_forward_rounded,
+                              size: 16,
+                              color: isSamePos ? primaryRose : primaryBlue),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              '${toPos.nama} (Rp ${RupiahFormatter.format(toPos.balance)})',
+                              style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: primaryGreen)),
+                                  fontSize: 12,
+                                  color: isSamePos ? primaryRose : primaryGreen),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ],
                       ),
                     ),
+                    if (isSamePos) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: primaryRose.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: primaryRose.withValues(alpha: 0.3)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.error_outline_rounded,
+                                color: primaryRose, size: 16),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Error: Pos dana sama',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: primaryRose,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 14),
                     const Text('Nominal Alokasi',
                         style: TextStyle(fontSize: 12, color: textMuted)),
@@ -2536,6 +2631,38 @@ class _PribadiPageState extends State<PribadiPage> {
                             horizontal: 12, vertical: 10),
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    // Quick presets (25%, 50%, 100% max)
+                    Row(
+                      children: [
+                        _buildQuickPercentChip(
+                          label: '25%',
+                          onTap: () {
+                            final val = (fromPos.balance * 0.25).round();
+                            amountCtrl.text = RupiahFormatter.format(val);
+                            setModalState(() {});
+                          },
+                        ),
+                        const SizedBox(width: 6),
+                        _buildQuickPercentChip(
+                          label: '50%',
+                          onTap: () {
+                            final val = (fromPos.balance * 0.5).round();
+                            amountCtrl.text = RupiahFormatter.format(val);
+                            setModalState(() {});
+                          },
+                        ),
+                        const SizedBox(width: 6),
+                        _buildQuickPercentChip(
+                          label: 'Semua (Max)',
+                          onTap: () {
+                            amountCtrl.text =
+                                RupiahFormatter.format(fromPos.balance);
+                            setModalState(() {});
+                          },
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 14),
                     const Text('Biaya Admin (Bila Ada)',
                         style: TextStyle(fontSize: 12, color: textMuted)),
@@ -2565,7 +2692,7 @@ class _PribadiPageState extends State<PribadiPage> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    const Text('Catatan / Keterangan',
+                    const Text('Catatan / Keterangan (Opsional)',
                         style: TextStyle(fontSize: 12, color: textMuted)),
                     const SizedBox(height: 6),
                     TextField(
@@ -2588,42 +2715,60 @@ class _PribadiPageState extends State<PribadiPage> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () async {
-                          final amt = RupiahFormatter.parse(amountCtrl.text);
-                          final fee = RupiahFormatter.parse(feeCtrl.text);
-                          if (amt <= 0 || fromPosId == toPosId) return;
+                        onPressed: isSamePos
+                            ? null
+                            : () async {
+                                final amt =
+                                    RupiahFormatter.parse(amountCtrl.text);
+                                final fee =
+                                    RupiahFormatter.parse(feeCtrl.text);
+                                if (amt <= 0 || fromPosId == toPosId) return;
 
-                          fromPos.balance -= (amt + fee);
-                          toPos.balance += amt;
+                                final totalDeduct = amt + fee;
+                                if (totalDeduct > fromPos.balance) {
+                                  CustomToast.showWarning(
+                                    context,
+                                    title:
+                                        'Saldo ${fromPos.nama} tidak mencukupi (Tersedia: Rp ${RupiahFormatter.format(fromPos.balance)})',
+                                  );
+                                  return;
+                                }
 
-                          final tx = PribadiTransaction(
-                            id: DateTime.now()
-                                .microsecondsSinceEpoch
-                                .toString(),
-                            title:
-                                'Pindah Saldo (${fromPos.nama} -> ${toPos.nama})',
-                            type: 'transfer_pos',
-                            sourceAccount: fromPos.nama,
-                            targetAccount: toPos.nama,
-                            amount: amt,
-                            adminFee: fee,
-                            note: noteCtrl.text.trim().isNotEmpty
-                                ? noteCtrl.text.trim()
-                                : null,
-                            kode: 'Mutasi Internal',
-                            ku: 'Alokasi Pos Dana',
-                          );
+                                fromPos.balance -= totalDeduct;
+                                toPos.balance += amt;
 
-                          _data.transactions.add(tx);
-                          Navigator.pop(ctx);
-                          await _saveData();
-                          if (mounted) {
-                            setState(() {});
-                          }
-                        },
+                                // Perubahan saldo Pos Dana disimpan dan disinkronkan ke Uangku,
+                                // TANPA dicatat di daftar transaksi (tidak mempengaruhi pemasukan/pengeluaran).
+                                await _saveData();
+                                await PribadiSyncService.syncEditPosDanaToUangku(
+                                  monthKey: _monthKey,
+                                  namaLama: fromPos.nama,
+                                  namaBaru: fromPos.nama,
+                                  saldoBaru: fromPos.balance,
+                                );
+                                await PribadiSyncService.syncEditPosDanaToUangku(
+                                  monthKey: _monthKey,
+                                  namaLama: toPos.nama,
+                                  namaBaru: toPos.nama,
+                                  saldoBaru: toPos.balance,
+                                );
+
+                                Navigator.pop(ctx);
+                                if (mounted) {
+                                  setState(() {});
+                                  CustomToast.showSuccess(
+                                    context,
+                                    title:
+                                        'Alokasi Rp ${RupiahFormatter.format(amt)} dari ${fromPos.nama} ke ${toPos.nama} berhasil.',
+                                  );
+                                  onCompleted?.call();
+                                }
+                              },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryBlue,
                           foregroundColor: Colors.white,
+                          disabledBackgroundColor: Colors.grey[300],
+                          disabledForegroundColor: Colors.grey[600],
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -4589,7 +4734,12 @@ class _PribadiPageState extends State<PribadiPage> {
                           if (_data.posDanaList.length >= 2) ...[
                             IconButton(
                               onPressed: () {
-                                _showDistribusiDanaModal();
+                                _showDistribusiDanaModal(
+                                  onCompleted: () {
+                                    setModalState(() {});
+                                    setState(() {});
+                                  },
+                                );
                               },
                               icon: const Icon(Icons.swap_horiz_rounded,
                                   color: primaryBlue, size: 20),
@@ -4763,18 +4913,7 @@ class _PribadiPageState extends State<PribadiPage> {
                                 IconButton(
                                   icon: const Icon(Icons.edit_outlined,
                                       size: 18, color: textMuted),
-                                  onPressed: () async {
-                                    final expenseTx = await PribadiSyncService
-                                        .getPengeluaranTransactionsForPos(
-                                      posName: pos.nama,
-                                      selectedMonth: _selectedMonth,
-                                    );
-                                    if (!context.mounted) return;
-                                    if (expenseTx.isNotEmpty) {
-                                      _showWarningPosDanaTercatatPengeluaranDialog(
-                                          pos.nama, expenseTx);
-                                      return;
-                                    }
+                                  onPressed: () {
                                     _showTambahEditPosDanaDialog(
                                       pos: pos,
                                       onSaved: () {
@@ -4784,6 +4923,21 @@ class _PribadiPageState extends State<PribadiPage> {
                                     );
                                   },
                                 ),
+                                if (_data.posDanaList.length >= 2)
+                                  IconButton(
+                                    icon: const Icon(Icons.swap_horiz_rounded,
+                                        size: 18, color: primaryBlue),
+                                    tooltip: 'Pindah Saldo dari Pos Ini',
+                                    onPressed: () {
+                                      _showDistribusiDanaModal(
+                                        initialFromPosId: pos.id,
+                                        onCompleted: () {
+                                          setModalState(() {});
+                                          setState(() {});
+                                        },
+                                      );
+                                    },
+                                  ),
                                 IconButton(
                                     icon: const Icon(Icons.delete_outline_rounded,
                                         size: 18, color: primaryRose),
@@ -5171,19 +5325,6 @@ class _PribadiPageState extends State<PribadiPage> {
       {PosDana? pos, VoidCallback? onSaved}) async {
     final isEdit = pos != null;
 
-    if (isEdit) {
-      final expenseTx =
-          await PribadiSyncService.getPengeluaranTransactionsForPos(
-        posName: pos.nama,
-        selectedMonth: _selectedMonth,
-      );
-      if (expenseTx.isNotEmpty) {
-        if (!mounted) return;
-        _showWarningPosDanaTercatatPengeluaranDialog(pos.nama, expenseTx);
-        return;
-      }
-    }
-
     final namaCtrl = TextEditingController(text: isEdit ? pos.nama : '');
     final saldoCtrl = TextEditingController(
         text: isEdit && pos.balance > 0
@@ -5192,156 +5333,587 @@ class _PribadiPageState extends State<PribadiPage> {
     final descCtrl =
         TextEditingController(text: isEdit ? (pos.deskripsi ?? '') : '');
 
+    // State untuk Alokasi Dana Antar Pos (jika isEdit && pos dana >= 2)
+    final otherPosList = isEdit
+        ? _data.posDanaList.where((p) => p.id != pos.id).toList()
+        : <PosDana>[];
+    String selectedOtherPosId =
+        otherPosList.isNotEmpty ? otherPosList.first.id : '';
+    bool isTransferOut = true; // true: Kirim ke Pos Lain, false: Tarik dari Pos Lain
+    final alokasiNominalCtrl = TextEditingController();
+
     if (!mounted) return;
 
     showDialog(
       context: context,
       builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: lightCard,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Text(
-            isEdit ? 'Edit Pos Dana' : 'Tambah Pos Dana Baru',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Nama Pos Dana',
-                    style: TextStyle(fontSize: 12, color: textMuted)),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: namaCtrl,
-                  style: const TextStyle(color: textDark, fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: 'Contoh: Tabungan, Gaji, Kas Harian, dll',
-                    hintStyle: const TextStyle(color: Colors.grey),
-                    filled: true,
-                    fillColor: lightCardElevated,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: lightBorder),
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            final otherPos = otherPosList.firstWhere(
+              (p) => p.id == selectedOtherPosId,
+              orElse: () => otherPosList.isNotEmpty
+                  ? otherPosList.first
+                  : PosDana(id: '', nama: '-'),
+            );
+            final sourcePos = isTransferOut ? pos : otherPos;
+            final targetPos = isTransferOut ? otherPos : pos;
+
+            return AlertDialog(
+              backgroundColor: lightCard,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: primaryGreen.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
+                    child: Icon(
+                      isEdit
+                          ? Icons.edit_note_rounded
+                          : Icons.add_circle_outline_rounded,
+                      color: primaryGreen,
+                      size: 20,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),
-                const Text('Saldo Pos Dana',
-                    style: TextStyle(fontSize: 12, color: textMuted)),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: saldoCtrl,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    RupiahInputFormatter(),
+                  const SizedBox(width: 8),
+                  Text(
+                    isEdit ? 'Edit Pos Dana' : 'Tambah Pos Dana Baru',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Nama Pos Dana',
+                        style: TextStyle(fontSize: 12, color: textMuted)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: namaCtrl,
+                      style: const TextStyle(color: textDark, fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: 'Contoh: Tabungan, Gaji, Kas Harian, dll',
+                        hintStyle: const TextStyle(color: Colors.grey),
+                        filled: true,
+                        fillColor: lightCardElevated,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: lightBorder),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text('Saldo Pos Dana Saat Ini',
+                        style: TextStyle(fontSize: 12, color: textMuted)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: saldoCtrl,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        RupiahInputFormatter(),
+                      ],
+                      style: const TextStyle(
+                          color: textDark,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold),
+                      decoration: InputDecoration(
+                        prefixText: 'Rp ',
+                        prefixStyle: const TextStyle(
+                            color: primaryGreen, fontWeight: FontWeight.bold),
+                        filled: true,
+                        fillColor: lightCardElevated,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: lightBorder),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text('Deskripsi / Keterangan (Opsional)',
+                        style: TextStyle(fontSize: 12, color: textMuted)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: descCtrl,
+                      style: const TextStyle(color: textDark, fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: 'Keterangan wadah dana...',
+                        hintStyle: const TextStyle(color: Colors.grey),
+                        filled: true,
+                        fillColor: lightCardElevated,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: lightBorder),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                      ),
+                    ),
+
+                    // SECTION ALOKASI DANA ANTAR POS (Hanya saat edit & terdapat pos dana lain)
+                    if (isEdit && otherPosList.isNotEmpty) ...[
+                      const SizedBox(height: 18),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: lightCardElevated,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: primaryBlue.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: primaryBlue.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Icon(
+                                    Icons.swap_horiz_rounded,
+                                    color: primaryBlue,
+                                    size: 16,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Expanded(
+                                  child: Text(
+                                    'Alokasi Dana Antar Pos',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color: textDark,
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: primaryBlue.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'Tanpa Transaksi',
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: primaryBlue,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Pindahkan saldo langsung tanpa mempengaruhi total pemasukan maupun pengeluaran.',
+                              style: TextStyle(fontSize: 10.5, color: textMuted),
+                            ),
+                            const SizedBox(height: 10),
+                            // Direction toggle
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () {
+                                      setDialogState(() {
+                                        isTransferOut = true;
+                                      });
+                                    },
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 6, horizontal: 4),
+                                      decoration: BoxDecoration(
+                                        color: isTransferOut
+                                            ? primaryBlue
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: isTransferOut
+                                              ? primaryBlue
+                                              : lightBorder,
+                                        ),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        'Kirim ke Pos Lain',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: isTransferOut
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                          color: isTransferOut
+                                              ? Colors.white
+                                              : textDark,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () {
+                                      setDialogState(() {
+                                        isTransferOut = false;
+                                      });
+                                    },
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 6, horizontal: 4),
+                                      decoration: BoxDecoration(
+                                        color: !isTransferOut
+                                            ? primaryBlue
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: !isTransferOut
+                                              ? primaryBlue
+                                              : lightBorder,
+                                        ),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        'Tarik dari Pos Lain',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: !isTransferOut
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                          color: !isTransferOut
+                                              ? Colors.white
+                                              : textDark,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              isTransferOut
+                                  ? 'Pilih Pos Dana Tujuan:'
+                                  : 'Pilih Pos Dana Sumber:',
+                              style: const TextStyle(
+                                  fontSize: 11, color: textMuted),
+                            ),
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: lightBorder),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  isExpanded: true,
+                                  value: selectedOtherPosId,
+                                  items: otherPosList.map((p) {
+                                    return DropdownMenuItem<String>(
+                                      value: p.id,
+                                      child: Text(
+                                        '${p.nama} (Rp ${RupiahFormatter.format(p.balance)})',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: textDark,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setDialogState(() {
+                                        selectedOtherPosId = val;
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            // Flow indicator box
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: lightBorder),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      '${sourcePos?.nama ?? ''} (Rp ${RupiahFormatter.format(sourcePos?.balance ?? 0)})',
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: textDark),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Icon(Icons.arrow_forward_rounded,
+                                      size: 14, color: primaryBlue),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      '${targetPos?.nama ?? ''} (Rp ${RupiahFormatter.format(targetPos?.balance ?? 0)})',
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: primaryGreen),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            const Text('Nominal Alokasi',
+                                style:
+                                    TextStyle(fontSize: 11, color: textMuted)),
+                            const SizedBox(height: 4),
+                            TextField(
+                              controller: alokasiNominalCtrl,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                RupiahInputFormatter(),
+                              ],
+                              style: const TextStyle(
+                                color: textDark,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              decoration: InputDecoration(
+                                prefixText: 'Rp ',
+                                prefixStyle: const TextStyle(
+                                    color: primaryBlue,
+                                    fontWeight: FontWeight.bold),
+                                hintText: '0',
+                                hintStyle:
+                                    const TextStyle(color: Colors.grey),
+                                filled: true,
+                                fillColor: Colors.white,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide:
+                                      const BorderSide(color: lightBorder),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 8),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            // Quick presets
+                            Row(
+                              children: [
+                                _buildQuickPercentChip(
+                                  label: '25%',
+                                  onTap: () {
+                                    final curBal = sourcePos?.balance ?? 0;
+                                    final val = (curBal * 0.25).round();
+                                    alokasiNominalCtrl.text =
+                                        RupiahFormatter.format(val);
+                                    setDialogState(() {});
+                                  },
+                                ),
+                                const SizedBox(width: 6),
+                                _buildQuickPercentChip(
+                                  label: '50%',
+                                  onTap: () {
+                                    final curBal = sourcePos?.balance ?? 0;
+                                    final val = (curBal * 0.5).round();
+                                    alokasiNominalCtrl.text =
+                                        RupiahFormatter.format(val);
+                                    setDialogState(() {});
+                                  },
+                                ),
+                                const SizedBox(width: 6),
+                                _buildQuickPercentChip(
+                                  label: 'Semua (Max)',
+                                  onTap: () {
+                                    final curBal = sourcePos?.balance ?? 0;
+                                    alokasiNominalCtrl.text =
+                                        RupiahFormatter.format(curBal);
+                                    setDialogState(() {});
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () async {
+                                  final nominal = RupiahFormatter.parse(
+                                      alokasiNominalCtrl.text);
+                                  if (nominal <= 0) {
+                                    CustomToast.showWarning(context,
+                                        title: 'Masukkan nominal alokasi!');
+                                    return;
+                                  }
+                                  final curSourceBal =
+                                      sourcePos?.balance ?? 0;
+                                  if (nominal > curSourceBal) {
+                                    CustomToast.showWarning(
+                                      context,
+                                      title:
+                                          'Saldo ${sourcePos?.nama} tidak mencukupi (Tersedia: Rp ${RupiahFormatter.format(curSourceBal)})',
+                                    );
+                                    return;
+                                  }
+
+                                  if (sourcePos == null || targetPos == null) {
+                                    return;
+                                  }
+
+                                  sourcePos.balance -= nominal;
+                                  targetPos.balance += nominal;
+
+                                  // Simpan dan sinkronkan ke Uangku tanpa mencatat transaksi
+                                  await _saveData();
+                                  await PribadiSyncService
+                                      .syncEditPosDanaToUangku(
+                                    monthKey: _monthKey,
+                                    namaLama: sourcePos.nama,
+                                    namaBaru: sourcePos.nama,
+                                    saldoBaru: sourcePos.balance,
+                                  );
+                                  await PribadiSyncService
+                                      .syncEditPosDanaToUangku(
+                                    monthKey: _monthKey,
+                                    namaLama: targetPos.nama,
+                                    namaBaru: targetPos.nama,
+                                    saldoBaru: targetPos.balance,
+                                  );
+
+                                  saldoCtrl.text =
+                                      RupiahFormatter.format(pos.balance);
+                                  alokasiNominalCtrl.clear();
+
+                                  setDialogState(() {});
+                                  setState(() {});
+                                  onSaved?.call();
+
+                                  if (ctx.mounted) {
+                                    CustomToast.showSuccess(
+                                      context,
+                                      title:
+                                          'Alokasi Rp ${RupiahFormatter.format(nominal)} dari ${sourcePos.nama} ke ${targetPos.nama} berhasil.',
+                                    );
+                                  }
+                                },
+                                icon: const Icon(Icons.swap_horiz_rounded,
+                                    size: 16),
+                                label: const Text('Alokasikan Dana Sekarang'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primaryBlue,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 10),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  elevation: 0,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
-                  style: const TextStyle(
-                      color: textDark,
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold),
-                  decoration: InputDecoration(
-                    prefixText: 'Rp ',
-                    prefixStyle: const TextStyle(
-                        color: primaryGreen, fontWeight: FontWeight.bold),
-                    filled: true,
-                    fillColor: lightCardElevated,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: lightBorder),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                const Text('Deskripsi / Keterangan (Opsional)',
-                    style: TextStyle(fontSize: 12, color: textMuted)),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: descCtrl,
-                  style: const TextStyle(color: textDark, fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: 'Keterangan wadah dana...',
-                    hintStyle: const TextStyle(color: Colors.grey),
-                    filled: true,
-                    fillColor: lightCardElevated,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: lightBorder),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Batal', style: TextStyle(color: textMuted)),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final nama = namaCtrl.text.trim();
-                if (nama.isEmpty) return;
-                final saldo = RupiahFormatter.parse(saldoCtrl.text);
-                final desc = descCtrl.text.trim().isNotEmpty
-                    ? descCtrl.text.trim()
-                    : null;
-
-                if (isEdit) {
-                  final oldName = pos.nama;
-                  pos.nama = nama;
-                  pos.balance = saldo;
-                  pos.deskripsi = desc;
-                  await _saveData();
-                  await PribadiSyncService.syncEditPosDanaToUangku(
-                    monthKey: _monthKey,
-                    namaLama: oldName,
-                    namaBaru: nama,
-                    saldoBaru: saldo,
-                  );
-                } else {
-                  _data.posDanaList.add(
-                    PosDana(
-                      id: DateTime.now().microsecondsSinceEpoch.toString(),
-                      nama: nama,
-                      balance: saldo,
-                      deskripsi: desc,
-                    ),
-                  );
-                  await _saveData();
-                  await PribadiSyncService.syncAddPosDanaToUangku(
-                    monthKey: _monthKey,
-                    nama: nama,
-                    saldo: saldo,
-                  );
-                }
-
-                if (ctx.mounted) {
-                  Navigator.pop(ctx);
-                }
-                if (mounted) {
-                  onSaved?.call();
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryGreen,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: const Text('Simpan'),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child:
+                      const Text('Batal', style: TextStyle(color: textMuted)),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final nama = namaCtrl.text.trim();
+                    if (nama.isEmpty) return;
+                    final saldo = RupiahFormatter.parse(saldoCtrl.text);
+                    final desc = descCtrl.text.trim().isNotEmpty
+                        ? descCtrl.text.trim()
+                        : null;
+
+                    if (isEdit) {
+                      final oldName = pos.nama;
+                      pos.nama = nama;
+                      pos.balance = saldo;
+                      pos.deskripsi = desc;
+                      await _saveData();
+                      await PribadiSyncService.syncEditPosDanaToUangku(
+                        monthKey: _monthKey,
+                        namaLama: oldName,
+                        namaBaru: nama,
+                        saldoBaru: saldo,
+                      );
+                    } else {
+                      _data.posDanaList.add(
+                        PosDana(
+                          id: DateTime.now()
+                              .microsecondsSinceEpoch
+                              .toString(),
+                          nama: nama,
+                          balance: saldo,
+                          deskripsi: desc,
+                        ),
+                      );
+                      await _saveData();
+                      await PribadiSyncService.syncAddPosDanaToUangku(
+                        monthKey: _monthKey,
+                        nama: nama,
+                        saldo: saldo,
+                      );
+                    }
+
+                    if (ctx.mounted) {
+                      Navigator.pop(ctx);
+                    }
+                    if (mounted) {
+                      onSaved?.call();
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryGreen,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text('Simpan'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

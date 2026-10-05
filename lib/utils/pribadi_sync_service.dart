@@ -1043,7 +1043,7 @@ class PribadiSyncService {
     final cleanName = posName.trim().toLowerCase();
 
     return data.transactions.where((tx) {
-      if (!tx.isPengeluaran && tx.type != 'transfer_pos') return false;
+      if (!tx.isPengeluaran) return false;
 
       final source = tx.sourceAccount?.trim().toLowerCase() ?? '';
       final manual = tx.manualSource?.trim().toLowerCase() ?? '';
