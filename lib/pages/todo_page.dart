@@ -1265,12 +1265,16 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                                     selectedDate.day,
                                   );
                                   final taskTitle = taskController.text.trim();
+                                  final taskTitles = _parseImportTaskTitles(taskTitle);
 
-                                  if (taskTitle.isNotEmpty && _isSeriousMode) {
+                                  if (taskTitles.isNotEmpty && _isSeriousMode) {
+                                    final summaryTitle = taskTitles.length == 1
+                                        ? taskTitles.first
+                                        : '${taskTitles.length} tugas (${taskTitles.first}...)';
                                     final confirmed =
                                         await SeriousConfirmAddDialog.show(
                                       context,
-                                      taskTitle: taskTitle,
+                                      taskTitle: summaryTitle,
                                     );
                                     if (!confirmed) return;
                                     if (!mounted) return;
@@ -1291,16 +1295,16 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                                     _collapsedGroupIds.remove(existingGroup.id);
                                     alarmConfig.applyToGroup(existingGroup);
 
-                                    if (taskTitle.isNotEmpty) {
-                                      existingGroup.items.add(
-                                        TodoItem(
-                                          id: DateTime.now()
-                                              .microsecondsSinceEpoch
-                                              .toString(),
-                                          title: taskTitle,
+                                    if (taskTitles.isNotEmpty) {
+                                      final newItems = taskTitles.map((t) {
+                                        return TodoItem(
+                                          id: '${DateTime.now().microsecondsSinceEpoch}_${t.hashCode.abs()}',
+                                          title: t,
                                           isCompleted: false,
-                                        ),
-                                      );
+                                        );
+                                      }).toList();
+
+                                      existingGroup.items.addAll(newItems);
                                       existingGroup.items = [
                                         ...existingGroup.items
                                             .where((i) => !i.isCompleted),
@@ -1316,16 +1320,14 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                                           .toString(),
                                       date: cleanDate,
                                       isArchived: false,
-                                      items: taskTitle.isNotEmpty
-                                          ? [
-                                              TodoItem(
-                                                id: DateTime.now()
-                                                    .microsecondsSinceEpoch
-                                                    .toString(),
-                                                title: taskTitle,
+                                      items: taskTitles.isNotEmpty
+                                          ? taskTitles.map((t) {
+                                              return TodoItem(
+                                                id: '${DateTime.now().microsecondsSinceEpoch}_${t.hashCode.abs()}',
+                                                title: t,
                                                 isCompleted: false,
-                                              ),
-                                            ]
+                                              );
+                                            }).toList()
                                           : [],
                                     );
                                     alarmConfig.applyToGroup(newGroup);
@@ -1404,6 +1406,408 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
       default:
         return 'Chime Klasik';
     }
+  }
+
+  /// Parser untuk mengubah teks multi-baris (dipisahkan Enter) menjadi daftar nama tugas yang bersih
+  List<String> _parseImportTaskTitles(String rawText) {
+    if (rawText.trim().isEmpty) return [];
+    return rawText
+        .split(RegExp(r'\r?\n'))
+        .map((line) {
+          return line
+              .trim()
+              .replaceFirst(
+                RegExp(r'^(\d+[\.\)]\s*|[-*•]\s*|\[[\sXx]?\]\s*|\([\sXx]?\)\s*)'),
+                '',
+              )
+              .trim();
+        })
+        .where((line) => line.isNotEmpty)
+        .toList();
+  }
+
+  /// Dialog Khusus Import Banyak Tugas ke Section (Dipisahkan Enter)
+  Future<void> _showImportTasksDialog(TodoDateGroup group) async {
+    final importController = TextEditingController();
+    final isDark = _isSeriousMode;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final parsedTasks = _parseImportTaskTitles(importController.text);
+            final taskCount = parsedTasks.length;
+
+            return SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                ),
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(ctx).size.height * 0.9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isDark ? seriousCardBg : Colors.white,
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(28)),
+                    border: isDark
+                        ? Border.all(
+                            color: seriousGold.withValues(alpha: 0.35),
+                            width: 1.5,
+                          )
+                        : null,
+                  ),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 44,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? const Color(0xFF475569)
+                                  : Colors.grey[300],
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: (isDark ? seriousGold : primaryTerracotta)
+                                    .withValues(alpha: isDark ? 0.15 : 0.12),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Icon(
+                                Icons.playlist_add_rounded,
+                                color: isDark ? seriousGold : primaryTerracotta,
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Import Banyak Tugas',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF1E293B),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    group.formattedFullDate,
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      color: isDark
+                                          ? seriousGold
+                                          : primaryTerracotta,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Daftar Tugas',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isDark
+                                    ? const Color(0xFFCBD5E1)
+                                    : const Color(0xFF334155),
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () async {
+                                final data = await Clipboard.getData(Clipboard.kTextPlain);
+                                if (data != null && data.text != null && data.text!.isNotEmpty) {
+                                  HapticFeedback.selectionClick();
+                                  setModalState(() {
+                                    if (importController.text.trim().isEmpty) {
+                                      importController.text = data.text!;
+                                    } else {
+                                      importController.text =
+                                          '${importController.text.trim()}\n${data.text!}';
+                                    }
+                                  });
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: (isDark ? seriousGold : primaryTerracotta)
+                                      .withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.content_paste_rounded,
+                                      size: 13,
+                                      color: isDark
+                                          ? seriousGold
+                                          : primaryTerracotta,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Tempel Clipboard',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark
+                                            ? seriousGold
+                                            : primaryTerracotta,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+
+                        TextField(
+                          controller: importController,
+                          autofocus: true,
+                          style: TextStyle(
+                            color: isDark ? Colors.white : Colors.black87,
+                            fontSize: 13.5,
+                            height: 1.4,
+                          ),
+                          maxLines: 8,
+                          minLines: 4,
+                          keyboardType: TextInputType.multiline,
+                          onChanged: (_) {
+                            setModalState(() {});
+                          },
+                          decoration: InputDecoration(
+                            hintText: 'Contoh:\nMengambil buku di perpus\nMengembalikan sepeda ke pak roni\nBeli bahan makanan',
+                            hintStyle: TextStyle(
+                              color: isDark
+                                  ? const Color(0xFF64748B)
+                                  : Colors.grey[400],
+                              fontSize: 13,
+                              height: 1.4,
+                            ),
+                            filled: true,
+                            fillColor: isDark ? seriousBg : const Color(0xFFF8FAFC),
+                            contentPadding: const EdgeInsets.all(14),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
+                                color: isDark
+                                    ? seriousBorder
+                                    : Colors.grey[300]!,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
+                                color: isDark
+                                    ? seriousBorder
+                                    : Colors.grey.withValues(alpha: 0.25),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
+                                color: isDark ? seriousGold : primaryTerracotta,
+                                width: 1.8,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        if (taskCount > 0) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: (isDark ? seriousGold : primaryTerracotta)
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.checklist_rounded,
+                                  size: 16,
+                                  color: isDark ? seriousGold : primaryTerracotta,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Terdeteksi: $taskCount tugas siap diimport',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark
+                                        ? seriousGold
+                                        : primaryTerracotta,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  side: BorderSide(
+                                    color: isDark
+                                        ? seriousBorder
+                                        : Colors.grey[300]!,
+                                  ),
+                                ),
+                                child: Text(
+                                  'Batal',
+                                  style: TextStyle(
+                                    color: isDark
+                                        ? const Color(0xFF94A3B8)
+                                        : const Color(0xFF64748B),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: ElevatedButton.icon(
+                                onPressed: taskCount == 0
+                                    ? null
+                                    : () async {
+                                        if (_isSeriousMode) {
+                                          final confirmed =
+                                              await SeriousConfirmAddDialog.show(
+                                            ctx,
+                                            taskTitle:
+                                                '$taskCount tugas (${parsedTasks.first}${taskCount > 1 ? " dan ${taskCount - 1} lainnya" : ""})',
+                                          );
+                                          if (!confirmed) return;
+                                          if (!mounted) return;
+                                        }
+
+                                        final newItems = parsedTasks.map((title) {
+                                          return TodoItem(
+                                            id: '${DateTime.now().microsecondsSinceEpoch}_${title.hashCode.abs()}',
+                                            title: title,
+                                            isCompleted: false,
+                                          );
+                                        }).toList();
+
+                                        setState(() {
+                                          group.items.addAll(newItems);
+                                          group.items = [
+                                            ...group.items.where((i) => !i.isCompleted),
+                                            ...group.items.where((i) => i.isCompleted),
+                                          ];
+                                        });
+
+                                        if (group.reminderEnabled) {
+                                          TodoAlarmService.scheduleGroupAlarm(group);
+                                        }
+
+                                        if (ctx.mounted) {
+                                          Navigator.pop(ctx);
+                                        }
+                                        _saveTodoData();
+                                        HapticFeedback.lightImpact();
+
+                                        if (!mounted || !context.mounted) return;
+                                        CustomToast.showSuccess(
+                                          context,
+                                          title: 'Tugas Terimport',
+                                          subtitle:
+                                              '$taskCount tugas berhasil diimport ke ${group.formattedDateShort}!',
+                                        );
+                                      },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: isDark
+                                      ? seriousGold
+                                      : primaryTerracotta,
+                                  foregroundColor:
+                                      isDark ? Colors.black : Colors.white,
+                                  disabledBackgroundColor: isDark
+                                      ? const Color(0xFF334155)
+                                      : Colors.grey[300],
+                                  disabledForegroundColor: isDark
+                                      ? const Color(0xFF64748B)
+                                      : Colors.grey[500],
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                icon: const Icon(Icons.download_done_rounded, size: 20),
+                                label: Text(
+                                  taskCount > 0
+                                      ? 'Import $taskCount Tugas'
+                                      : 'Import Tugas',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   /// Tambah Kerjaan Baru ke Section Tanggal
@@ -1504,15 +1908,61 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    Text(
-                      'Tugas / Pekerjaan yang Harus Dikerjakan',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFCBD5E1)
-                            : const Color(0xFF334155),
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Tugas / Pekerjaan yang Harus Dikerjakan',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? const Color(0xFFCBD5E1)
+                                : const Color(0xFF334155),
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            _showImportTasksDialog(group);
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: (isDark ? seriousGold : primaryTerracotta)
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.playlist_add_rounded,
+                                  size: 14,
+                                  color: isDark
+                                      ? seriousGold
+                                      : primaryTerracotta,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Import Banyak',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark
+                                        ? seriousGold
+                                        : primaryTerracotta,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     TextField(
@@ -1522,10 +1972,10 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                         color: isDark ? Colors.white : Colors.black87,
                       ),
                       textCapitalization: TextCapitalization.sentences,
-                      maxLines: 2,
+                      maxLines: 3,
                       minLines: 1,
                       decoration: InputDecoration(
-                        hintText: 'Ketik apa tugas kamu...',
+                        hintText: 'Ketik apa tugas kamu (atau paste banyak baris)...',
                         hintStyle: TextStyle(
                           color: isDark
                               ? const Color(0xFF64748B)
@@ -1597,7 +2047,8 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                           child: ElevatedButton.icon(
                             onPressed: () async {
                               final text = taskController.text.trim();
-                              if (text.isEmpty) {
+                              final taskTitles = _parseImportTaskTitles(text);
+                              if (taskTitles.isEmpty) {
                                 CustomToast.showWarning(
                                   context,
                                   title: 'Nama Tugas Kosong',
@@ -1607,25 +2058,28 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                               }
 
                               if (_isSeriousMode) {
+                                final summaryTitle = taskTitles.length == 1
+                                    ? taskTitles.first
+                                    : '${taskTitles.length} tugas (${taskTitles.first}...)';
                                 final confirmed =
                                     await SeriousConfirmAddDialog.show(
                                   context,
-                                  taskTitle: text,
+                                  taskTitle: summaryTitle,
                                 );
                                 if (!confirmed) return;
                                 if (!mounted) return;
                               }
 
-                              setState(() {
-                                group.items.add(
-                                  TodoItem(
-                                    id: DateTime.now()
-                                        .microsecondsSinceEpoch
-                                        .toString(),
-                                    title: text,
-                                    isCompleted: false,
-                                  ),
+                              final newItems = taskTitles.map((t) {
+                                return TodoItem(
+                                  id: '${DateTime.now().microsecondsSinceEpoch}_${t.hashCode.abs()}',
+                                  title: t,
+                                  isCompleted: false,
                                 );
+                              }).toList();
+
+                              setState(() {
+                                group.items.addAll(newItems);
                                 group.items = [
                                   ...group.items.where((i) => !i.isCompleted),
                                   ...group.items.where((i) => i.isCompleted),
@@ -1641,6 +2095,14 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                               }
                               _saveTodoData();
                               HapticFeedback.lightImpact();
+
+                              if (taskTitles.length > 1 && mounted) {
+                                CustomToast.showSuccess(
+                                  context,
+                                  title: 'Tugas Ditambahkan',
+                                  subtitle: '${taskTitles.length} tugas berhasil ditambahkan!',
+                                );
+                              }
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor:
@@ -4242,6 +4704,8 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                         onSelected: (val) {
                           if (val == 'add') {
                             _showAddTaskDialog(group);
+                          } else if (val == 'import') {
+                            _showImportTasksDialog(group);
                           } else if (val == 'alarm') {
                             _showConfigureAlarmDialog(group);
                           } else if (val == 'archive') {
@@ -4307,6 +4771,33 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                                 Flexible(
                                   child: Text(
                                     'Tambah Tugas',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: _isSeriousMode
+                                          ? Colors.white
+                                          : const Color(0xFF1E293B),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'import',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.playlist_add_rounded,
+                                  size: 18,
+                                  color: _isSeriousMode
+                                      ? seriousGold
+                                      : primaryTerracotta,
+                                ),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    'Import Tugas (Multi-line)',
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w500,
@@ -4794,51 +5285,104 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                               },
                             ),
 
-                          // Tombol + Tambah Kerjaan pada section ini
+                          // Tombol + Tambah Kerjaan & Import pada section ini
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
-                            child: InkWell(
-                              onTap: () => _showAddTaskDialog(group),
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 7),
-                                decoration: BoxDecoration(
-                                  color: _isSeriousMode
-                                      ? const Color(0xFF0F172A).withValues(alpha: 0.4)
-                                      : primaryTerracotta.withValues(alpha: 0.06),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: _isSeriousMode
-                                        ? seriousGold.withValues(alpha: 0.3)
-                                        : primaryTerracotta.withValues(alpha: 0.2),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.add_circle_rounded,
-                                      size: 16,
-                                      color: _isSeriousMode
-                                          ? seriousGold
-                                          : primaryTerracotta,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Tambah Kerjaan',
-                                      style: TextStyle(
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: InkWell(
+                                    onTap: () => _showAddTaskDialog(group),
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Container(
+                                      padding:
+                                          const EdgeInsets.symmetric(vertical: 7),
+                                      decoration: BoxDecoration(
                                         color: _isSeriousMode
-                                            ? seriousGold
-                                            : primaryTerracotta,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
+                                            ? const Color(0xFF0F172A).withValues(alpha: 0.4)
+                                            : primaryTerracotta.withValues(alpha: 0.06),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: _isSeriousMode
+                                              ? seriousGold.withValues(alpha: 0.3)
+                                              : primaryTerracotta.withValues(alpha: 0.2),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.add_circle_rounded,
+                                            size: 16,
+                                            color: _isSeriousMode
+                                                ? seriousGold
+                                                : primaryTerracotta,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Tambah Kerjaan',
+                                            style: TextStyle(
+                                              color: _isSeriousMode
+                                                  ? seriousGold
+                                                  : primaryTerracotta,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ],
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  flex: 2,
+                                  child: InkWell(
+                                    onTap: () => _showImportTasksDialog(group),
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Container(
+                                      padding:
+                                          const EdgeInsets.symmetric(vertical: 7),
+                                      decoration: BoxDecoration(
+                                        color: _isSeriousMode
+                                            ? const Color(0xFF0F172A).withValues(alpha: 0.4)
+                                            : primaryTerracotta.withValues(alpha: 0.06),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: _isSeriousMode
+                                              ? seriousGold.withValues(alpha: 0.3)
+                                              : primaryTerracotta.withValues(alpha: 0.2),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.playlist_add_rounded,
+                                            size: 17,
+                                            color: _isSeriousMode
+                                                ? seriousGold
+                                                : primaryTerracotta,
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            'Import',
+                                            style: TextStyle(
+                                              color: _isSeriousMode
+                                                  ? seriousGold
+                                                  : primaryTerracotta,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],

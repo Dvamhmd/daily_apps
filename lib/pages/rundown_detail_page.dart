@@ -7,7 +7,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
-import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:daily_apps/widgets/dialog_rundown_expense.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -561,152 +560,165 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
     final selectedDuration = await showModalBottomSheet<int>(
       context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Icon(Icons.timer_outlined, color: primaryTeal),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Atur Durasi (Baris ${rowIndex + 1})',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A),
+        final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.9,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.only(bottom: bottomInset),
+          child: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Waktu Mulai: ${row.startTime.isNotEmpty ? row.startTime : "08:00"}',
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    color: Color(0xFF64748B),
                   ),
-                ),
-                const SizedBox(height: 16),
-
-                // Quick Preset Chips
-                const Text(
-                  'Pilihan Cepat (Menit):',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF334155),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [15, 30, 45, 60, 90, 120, 180].map((mins) {
-                    final isSel = mins == currentDuration;
-                    return ChoiceChip(
-                      label: Text(
-                        mins >= 60 && mins % 60 == 0
-                            ? '${mins ~/ 60} Jam'
-                            : '$mins Mnt',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight:
-                              isSel ? FontWeight.bold : FontWeight.w500,
-                          color: isSel ? Colors.white : const Color(0xFF334155),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Icon(Icons.timer_outlined, color: primaryTeal),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Atur Durasi (Baris ${rowIndex + 1})',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
                         ),
                       ),
-                      selected: isSel,
-                      selectedColor: primaryTeal,
-                      backgroundColor: const Color(0xFFF1F5F9),
-                      onSelected: (_) => Navigator.of(ctx).pop(mins),
-                    );
-                  }).toList(),
-                ),
-
-                const SizedBox(height: 18),
-
-                // Custom Input
-                const Text(
-                  'Atau Masukkan Menit Kustom:',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF334155),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: customCtrl,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly
-                        ],
-                        decoration: InputDecoration(
-                          hintText: 'Contoh: 25',
-                          suffixText: 'Menit',
-                          filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 12),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide:
-                                const BorderSide(color: Color(0xFFCBD5E1)),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Waktu Mulai: ${row.startTime.isNotEmpty ? row.startTime : "08:00"}',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Quick Preset Chips
+                  const Text(
+                    'Pilihan Cepat (Menit):',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF334155),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [15, 30, 45, 60, 90, 120, 180].map((mins) {
+                      final isSel = mins == currentDuration;
+                      return ChoiceChip(
+                        label: Text(
+                          mins >= 60 && mins % 60 == 0
+                              ? '${mins ~/ 60} Jam'
+                              : '$mins Mnt',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight:
+                                isSel ? FontWeight.bold : FontWeight.w500,
+                            color: isSel ? Colors.white : const Color(0xFF334155),
+                          ),
+                        ),
+                        selected: isSel,
+                        selectedColor: primaryTeal,
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        onSelected: (_) => Navigator.of(ctx).pop(mins),
+                      );
+                    }).toList(),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  // Custom Input
+                  const Text(
+                    'Atau Masukkan Menit Kustom:',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF334155),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: customCtrl,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly
+                          ],
+                          decoration: InputDecoration(
+                            hintText: 'Contoh: 25',
+                            suffixText: 'Menit',
+                            filled: true,
+                            fillColor: const Color(0xFFF8FAFC),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                                  const BorderSide(color: Color(0xFFCBD5E1)),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    ElevatedButton(
-                      onPressed: () {
-                        final val = int.tryParse(customCtrl.text.trim());
-                        if (val != null && val > 0) {
-                          Navigator.of(ctx).pop(val);
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryTeal,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 14),
+                      const SizedBox(width: 10),
+                      ElevatedButton(
+                        onPressed: () {
+                          final val = int.tryParse(customCtrl.text.trim());
+                          if (val != null && val > 0) {
+                            Navigator.of(ctx).pop(val);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryTeal,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 14),
+                        ),
+                        child: const Text('Terapkan',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
-                      child: const Text('Terapkan',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-              ],
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
             ),
           ),
         );
       },
     );
+
+    customCtrl.dispose();
 
     if (selectedDuration != null && selectedDuration > 0) {
       final updatedRows = List<RundownTableRow>.from(activeDay.rows);
