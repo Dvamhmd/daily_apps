@@ -3605,7 +3605,7 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                           ),
 
                         const SliverToBoxAdapter(
-                          child: SizedBox(height: 100),
+                          child: SizedBox(height: 140),
                         ),
                       ],
                     ),
@@ -3625,7 +3625,7 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                   ),
                 if (!_isSeriousMode && _selectedTaskIds.isNotEmpty)
                   Positioned(
-                    bottom: 24,
+                    bottom: 84,
                     left: 16,
                     right: 16,
                     child: _buildMultiSelectBottomBar(),
