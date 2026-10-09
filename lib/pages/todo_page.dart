@@ -1908,224 +1908,184 @@ class _TodoPageState extends State<TodoPage> with TickerProviderStateMixin {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Tugas / Pekerjaan yang Harus Dikerjakan',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: isDark
-                                ? const Color(0xFFCBD5E1)
-                                : const Color(0xFF334155),
-                          ),
-                        ),
-                        InkWell(
-                          onTap: () {
+                    Text(
+                      'Tugas / Pekerjaan yang Harus Dikerjakan',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? const Color(0xFFCBD5E1)
+                            : const Color(0xFF334155),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Builder(
+                      builder: (fieldCtx) {
+                        Future<void> submitTask() async {
+                          final text = taskController.text.trim();
+                          if (text.isEmpty) {
+                            CustomToast.showWarning(
+                              context,
+                              title: 'Nama Tugas Kosong',
+                              subtitle: 'Tolong isi nama tugas terlebih dahulu.',
+                            );
+                            return;
+                          }
+
+                          if (_isSeriousMode) {
+                            final confirmed = await SeriousConfirmAddDialog.show(
+                              context,
+                              taskTitle: text,
+                            );
+                            if (!confirmed) return;
+                            if (!mounted) return;
+                          }
+
+                          final newItem = TodoItem(
+                            id: '${DateTime.now().microsecondsSinceEpoch}_${text.hashCode.abs()}',
+                            title: text,
+                            isCompleted: false,
+                          );
+
+                          setState(() {
+                            group.items.add(newItem);
+                            group.items = [
+                              ...group.items.where((i) => !i.isCompleted),
+                              ...group.items.where((i) => i.isCompleted),
+                            ];
+                          });
+
+                          if (group.reminderEnabled) {
+                            TodoAlarmService.scheduleGroupAlarm(group);
+                          }
+
+                          if (ctx.mounted) {
                             Navigator.pop(ctx);
-                            _showImportTasksDialog(group);
-                          },
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: (isDark ? seriousGold : primaryTerracotta)
-                                  .withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.playlist_add_rounded,
-                                  size: 14,
+                          }
+                          _saveTodoData();
+                          HapticFeedback.lightImpact();
+                        }
+
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TextField(
+                              controller: taskController,
+                              autofocus: true,
+                              style: TextStyle(
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                              textCapitalization: TextCapitalization.sentences,
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) async => submitTask(),
+                              decoration: InputDecoration(
+                                hintText: 'Ketik apa tugas kamu',
+                                hintStyle: TextStyle(
                                   color: isDark
-                                      ? seriousGold
-                                      : primaryTerracotta,
+                                      ? const Color(0xFF64748B)
+                                      : Colors.grey[400],
+                                  fontSize: 14,
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Import Banyak',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
+                                filled: true,
+                                fillColor:
+                                    isDark ? seriousBg : const Color(0xFFF8FAFC),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(
+                                    color: isDark
+                                        ? seriousBorder
+                                        : Colors.grey[300]!,
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(
+                                    color: isDark
+                                        ? seriousBorder
+                                        : Colors.grey.withValues(alpha: 0.25),
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(
                                     color: isDark
                                         ? seriousGold
                                         : primaryTerracotta,
+                                    width: 1.8,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(14),
+                                      ),
+                                      side: BorderSide(
+                                        color: isDark
+                                            ? seriousBorder
+                                            : Colors.grey[300]!,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Batal',
+                                      style: TextStyle(
+                                        color: isDark
+                                            ? const Color(0xFF94A3B8)
+                                            : const Color(0xFF64748B),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  flex: 2,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () async => submitTask(),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: isDark
+                                          ? seriousGold
+                                          : primaryTerracotta,
+                                      foregroundColor:
+                                          isDark ? Colors.black : Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(14),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                    icon:
+                                        const Icon(Icons.add_rounded, size: 20),
+                                    label: const Text(
+                                      'Simpan Tugas',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14.5,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: taskController,
-                      autofocus: true,
-                      style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                      textCapitalization: TextCapitalization.sentences,
-                      maxLines: 3,
-                      minLines: 1,
-                      decoration: InputDecoration(
-                        hintText: 'Ketik apa tugas kamu (atau paste banyak baris)...',
-                        hintStyle: TextStyle(
-                          color: isDark
-                              ? const Color(0xFF64748B)
-                              : Colors.grey[400],
-                          fontSize: 14,
-                        ),
-                        filled: true,
-                        fillColor: isDark ? seriousBg : const Color(0xFFF8FAFC),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(
-                            color: isDark
-                                ? seriousBorder
-                                : Colors.grey[300]!,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(
-                            color: isDark
-                                ? seriousBorder
-                                : Colors.grey.withValues(alpha: 0.25),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(
-                            color: isDark ? seriousGold : primaryTerracotta,
-                            width: 1.8,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              side: BorderSide(
-                                color: isDark
-                                    ? seriousBorder
-                                    : Colors.grey[300]!,
-                              ),
-                            ),
-                            child: Text(
-                              'Batal',
-                              style: TextStyle(
-                                color: isDark
-                                    ? const Color(0xFF94A3B8)
-                                    : const Color(0xFF64748B),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 2,
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              final text = taskController.text.trim();
-                              final taskTitles = _parseImportTaskTitles(text);
-                              if (taskTitles.isEmpty) {
-                                CustomToast.showWarning(
-                                  context,
-                                  title: 'Nama Tugas Kosong',
-                                  subtitle: 'Tolong isi nama tugas terlebih dahulu.',
-                                );
-                                return;
-                              }
-
-                              if (_isSeriousMode) {
-                                final summaryTitle = taskTitles.length == 1
-                                    ? taskTitles.first
-                                    : '${taskTitles.length} tugas (${taskTitles.first}...)';
-                                final confirmed =
-                                    await SeriousConfirmAddDialog.show(
-                                  context,
-                                  taskTitle: summaryTitle,
-                                );
-                                if (!confirmed) return;
-                                if (!mounted) return;
-                              }
-
-                              final newItems = taskTitles.map((t) {
-                                return TodoItem(
-                                  id: '${DateTime.now().microsecondsSinceEpoch}_${t.hashCode.abs()}',
-                                  title: t,
-                                  isCompleted: false,
-                                );
-                              }).toList();
-
-                              setState(() {
-                                group.items.addAll(newItems);
-                                group.items = [
-                                  ...group.items.where((i) => !i.isCompleted),
-                                  ...group.items.where((i) => i.isCompleted),
-                                ];
-                              });
-
-                              if (group.reminderEnabled) {
-                                TodoAlarmService.scheduleGroupAlarm(group);
-                              }
-
-                              if (ctx.mounted) {
-                                Navigator.pop(ctx);
-                              }
-                              _saveTodoData();
-                              HapticFeedback.lightImpact();
-
-                              if (taskTitles.length > 1 && mounted) {
-                                CustomToast.showSuccess(
-                                  context,
-                                  title: 'Tugas Ditambahkan',
-                                  subtitle: '${taskTitles.length} tugas berhasil ditambahkan!',
-                                );
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  isDark ? seriousGold : primaryTerracotta,
-                              foregroundColor:
-                                  isDark ? Colors.black : Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              elevation: 0,
-                            ),
-                            icon: const Icon(Icons.add_rounded, size: 20),
-                            label: const Text(
-                              'Simpan Tugas',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14.5,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),
