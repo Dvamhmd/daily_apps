@@ -103,6 +103,8 @@ class PribadiTransaction {
   final String? note;
   final String? ku;
   final String? kode; // Kategori
+  final String? rundownId;
+  final String? rundownExpenseId;
 
   PribadiTransaction({
     required this.id,
@@ -117,6 +119,8 @@ class PribadiTransaction {
     this.note,
     this.ku,
     this.kode,
+    this.rundownId,
+    this.rundownExpenseId,
   }) : timestamp = timestamp ?? DateTime.now();
 
   int get totalDeduction => amount + adminFee;
@@ -258,6 +262,8 @@ class PribadiTransaction {
         'note': note,
         'ku': ku,
         'kode': kode,
+        'rundownId': rundownId,
+        'rundownExpenseId': rundownExpenseId,
       };
 
   static String _cleanTitle(String raw) {
@@ -283,6 +289,8 @@ class PribadiTransaction {
       note: rawNote != null ? _cleanTitle(rawNote) : null,
       ku: json['ku'] as String?,
       kode: json['kode'] as String?,
+      rundownId: json['rundownId'] as String?,
+      rundownExpenseId: json['rundownExpenseId'] as String?,
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:daily_apps/models/model_pribadi.dart';
 import 'package:daily_apps/models/model_rundown.dart';
 import 'package:daily_apps/utils/responsive_text.dart';
@@ -7,6 +8,7 @@ import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ModalEstimasiPengeluaran extends StatefulWidget {
   final Rundown rundown;
@@ -53,6 +55,35 @@ class _ModalEstimasiPengeluaranState extends State<ModalEstimasiPengeluaran> {
   void initState() {
     super.initState();
     _rundown = widget.rundown;
+    RundownExpenseService.rundownDataUpdatedNotifier
+        .addListener(_onRundownDataChanged);
+  }
+
+  @override
+  void dispose() {
+    RundownExpenseService.rundownDataUpdatedNotifier
+        .removeListener(_onRundownDataChanged);
+    super.dispose();
+  }
+
+  Future<void> _onRundownDataChanged() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rawData = prefs.getStringList('rundowns_data');
+      if (rawData != null && mounted) {
+        final list = rawData
+            .map((e) => Rundown.fromJson(jsonDecode(e) as Map<String, dynamic>))
+            .toList();
+        final match = list.firstWhere(
+          (r) => r.id == _rundown.id,
+          orElse: () => _rundown,
+        );
+        setState(() {
+          _rundown = match;
+        });
+        widget.onRundownUpdated(match);
+      }
+    } catch (_) {}
   }
 
   void _updateRundown(Rundown updated) {
@@ -1519,11 +1550,14 @@ class _DialogIsiRealisasiState extends State<DialogIsiRealisasi> {
   List<PosDana> _posDanaList = [];
   String? _selectedPosDanaNama;
   bool _isLoading = true;
-  DateTime _tanggalRealisasi = DateTime.now();
+  late DateTime _tanggalRealisasi;
 
   @override
   void initState() {
     super.initState();
+    _tanggalRealisasi = widget.item.tanggalRealisasi ??
+        widget.selectedMonth ??
+        widget.rundown.startDate;
     _nominalRealCtrl = TextEditingController(
       text: RupiahFormatter.format(widget.item.nominalEstimasi),
     );
@@ -1538,9 +1572,10 @@ class _DialogIsiRealisasiState extends State<DialogIsiRealisasi> {
     super.dispose();
   }
 
-  Future<void> _loadPosDana() async {
+  Future<void> _loadPosDana([DateTime? date]) async {
+    final targetDate = date ?? _tanggalRealisasi;
     final list = await RundownExpenseService.loadAvailablePosDana(
-      date: widget.selectedMonth ?? widget.rundown.startDate,
+      date: targetDate,
       selectedMonth: widget.selectedMonth,
     );
 
@@ -1548,7 +1583,12 @@ class _DialogIsiRealisasiState extends State<DialogIsiRealisasi> {
       setState(() {
         _posDanaList = list;
         if (list.isNotEmpty) {
-          _selectedPosDanaNama = list.first.nama;
+          if (_selectedPosDanaNama == null ||
+              !list.any((p) => p.nama == _selectedPosDanaNama)) {
+            _selectedPosDanaNama = list.first.nama;
+          }
+        } else {
+          _selectedPosDanaNama = null;
         }
         _isLoading = false;
       });
@@ -1855,7 +1895,11 @@ class _DialogIsiRealisasiState extends State<DialogIsiRealisasi> {
                         lastDate: DateTime(2100),
                       );
                       if (picked != null) {
-                        setState(() => _tanggalRealisasi = picked);
+                        setState(() {
+                          _tanggalRealisasi = picked;
+                          _isLoading = true;
+                        });
+                        await _loadPosDana(picked);
                       }
                     },
                     borderRadius: BorderRadius.circular(10),

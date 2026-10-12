@@ -7,6 +7,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:daily_apps/utils/rundown_expense_service.dart';
 import 'package:daily_apps/widgets/dialog_rundown_expense.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -83,6 +84,27 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
     _rundown = widget.rundown;
     _ensureDefaultRows();
     _loadTableSettings();
+    RundownExpenseService.rundownDataUpdatedNotifier
+        .addListener(_onRundownDataChanged);
+  }
+
+  Future<void> _onRundownDataChanged() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rawData = prefs.getStringList('rundowns_data');
+      if (rawData != null && mounted) {
+        final list = rawData
+            .map((e) => Rundown.fromJson(jsonDecode(e) as Map<String, dynamic>))
+            .toList();
+        final match = list.firstWhere(
+          (r) => r.id == _rundown.id,
+          orElse: () => _rundown,
+        );
+        setState(() {
+          _rundown = match;
+        });
+      }
+    } catch (_) {}
   }
 
   double _getColCustomWidth(String colName) {
@@ -238,6 +260,8 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
 
   @override
   void dispose() {
+    RundownExpenseService.rundownDataUpdatedNotifier
+        .removeListener(_onRundownDataChanged);
     _horizontalScrollController.dispose();
     _activePointers.clear();
     super.dispose();
@@ -1200,6 +1224,7 @@ class _RundownDetailPageState extends State<RundownDetailPage> {
         });
         _notifyChange();
       },
+      selectedMonth: _rundown.startDate,
     );
   }
 

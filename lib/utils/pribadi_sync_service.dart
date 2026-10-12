@@ -443,6 +443,8 @@ class PribadiSyncService {
     DateTime? date,
     DateTime? selectedMonth,
     String? keterangan,
+    String? rundownId,
+    String? rundownExpenseId,
   }) async {
     if (nominal <= 0) return;
 
@@ -464,17 +466,23 @@ class PribadiSyncService {
         data.posDanaList[idx].balance = 0;
       }
       srcName = data.posDanaList[idx].nama;
-    } else if (data.posDanaList.isNotEmpty) {
-      data.posDanaList.first.balance -= nominal;
-      if (data.posDanaList.first.balance < 0) {
-        data.posDanaList.first.balance = 0;
-      }
-      srcName = data.posDanaList.first.nama;
     } else {
-      data.rekeningPribadi.balance -= nominal;
-      if (data.rekeningPribadi.balance < 0) {
-        data.rekeningPribadi.balance = 0;
-      }
+      // Pos Dana belum ada di posDanaList, cari di Uangku atau buat pos baru
+      final uList = await loadUangkuList(monthKey);
+      final matchU = uList.cast<Uangku?>().firstWhere(
+            (u) => u?.nama.trim().toLowerCase() == srcName.toLowerCase(),
+            orElse: () => null,
+          );
+      final initialAmt = matchU != null ? matchU.jumlah : 0;
+      final sisa = (initialAmt - nominal) < 0 ? 0 : (initialAmt - nominal);
+      final newPos = PosDana(
+        id: 'pos_${data.posDanaList.length + 1}_${srcName.hashCode}',
+        nama: srcName,
+        balance: sisa,
+        deskripsi: 'Pos dana Uangku: $srcName',
+      );
+      data.posDanaList.add(newPos);
+      srcName = newPos.nama;
     }
 
     final titleText = keterangan ?? nama;
@@ -498,6 +506,8 @@ class PribadiSyncService {
       timestamp: txDate,
       ku: autoKu != '-' ? autoKu : null,
       kode: autoKode != '-' ? autoKode : null,
+      rundownId: rundownId,
+      rundownExpenseId: rundownExpenseId,
     );
 
     data.transactions.add(tx);

@@ -5,6 +5,7 @@ import 'package:daily_apps/utils/custom_rule_import_helper.dart';
 import 'package:daily_apps/utils/pribadi_saldo_awal_service.dart';
 import 'package:daily_apps/utils/pribadi_sync_service.dart';
 import 'package:daily_apps/utils/riwayat_service.dart';
+import 'package:daily_apps/utils/rundown_expense_service.dart';
 import 'package:daily_apps/utils/rupiah_formatter.dart';
 import 'package:daily_apps/widgets/custom_toast.dart';
 import 'package:file_picker/file_picker.dart';
@@ -3133,6 +3134,8 @@ class _PribadiPageState extends State<PribadiPage> {
                                 kode: kodeCtrl.text.trim().isNotEmpty
                                     ? kodeCtrl.text.trim()
                                     : null,
+                                rundownId: tx.rundownId,
+                                rundownExpenseId: tx.rundownExpenseId,
                               );
 
                               final currentMonthKey = _monthKey;
@@ -3482,6 +3485,7 @@ class _PribadiPageState extends State<PribadiPage> {
 
               _data.transactions.removeWhere((t) => t.id == tx.id);
               await _saveData();
+              await RundownExpenseService.onTransactionDeleted(tx);
               if (mounted) {
                 setState(() {});
                 onDeleted?.call();
@@ -3604,6 +3608,7 @@ class _PribadiPageState extends State<PribadiPage> {
               Navigator.pop(ctx);
 
               // 1. Bersihkan seluruh transaksi & pos dana
+              final oldTxList = List<PribadiTransaction>.from(_data.transactions);
               _data.transactions.clear();
               _data.posDanaList.clear();
 
@@ -3620,6 +3625,7 @@ class _PribadiPageState extends State<PribadiPage> {
 
               // 5. Simpan perubahan ke SharedPreferences
               await _saveData();
+              await RundownExpenseService.onTransactionsDeleted(oldTxList);
 
               if (mounted) {
                 setState(() {});

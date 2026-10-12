@@ -206,6 +206,108 @@ void main() {
       expect(revertedPData.posDanaList.first.balance, 500000);
       expect(revertedPData.transactions.isEmpty, isTrue);
     });
+
+    test(
+        'Deleting/rolling back transaction in Keuangan Pribadi updates rundown expense status to not realized',
+        () async {
+      final now = DateTime.now();
+      final monthKey = PribadiSyncService.getMonthKey(now, null);
+      final prefs = await SharedPreferences.getInstance();
+
+      // Setup initial data
+      await PribadiSyncService.saveUangkuList(monthKey, [
+        Uangku('Dana Operasional', 1000000),
+      ]);
+      await PribadiSyncService.savePribadiData(
+        monthKey,
+        PribadiData(
+          posDanaList: [
+            PosDana(id: 'pos_op', nama: 'Dana Operasional', balance: 1000000),
+          ],
+          transactions: [],
+        ),
+      );
+
+      final rundown = Rundown(
+        id: 'rd_sync_test',
+        title: 'Workshop Flutter',
+        startDate: now,
+        totalDays: 1,
+        days: [],
+        expenses: [
+          RundownExpenseItem(
+            id: 'exp_konsumsi',
+            nama: 'Snack Box',
+            nominalEstimasi: 300000,
+          ),
+        ],
+      );
+
+      // Save initial rundown to storage
+      await prefs.setStringList(
+        'rundowns_data',
+        [jsonEncode(rundown.toJson())],
+      );
+
+      // 1. Lunasi pengeluaran rundown
+      final updatedItem = await RundownExpenseService.executeRealisasi(
+        rundown: rundown,
+        item: rundown.expenses.first,
+        nominalRealisasi: 250000,
+        posDanaNama: 'Dana Operasional',
+        tanggalRealisasi: now,
+        selectedMonth: now,
+      );
+
+      expect(updatedItem.isRealized, isTrue);
+
+      // Saldo Pos Dana berkurang menjadi 750.000
+      var pData = await PribadiSyncService.loadPribadiData(monthKey);
+      expect(pData.posDanaList.first.balance, 750000);
+      expect(pData.transactions.length, 1);
+
+      // Verifikasi rundown di storage tersimpan dengan status lunas
+      var rawRundowns = prefs.getStringList('rundowns_data')!;
+      var loadedRundown =
+          Rundown.fromJson(jsonDecode(rawRundowns.first) as Map<String, dynamic>);
+      expect(loadedRundown.expenses.first.isRealized, isTrue);
+
+      // 2. Simulasikan rollback & hapus transaksi dari Keuangan Pribadi
+      final txToDelete = pData.transactions.first;
+
+      // Rollback saldo di Keuangan Pribadi
+      pData.posDanaList.first.balance += txToDelete.amount; // 750.000 + 250.000 = 1.000.000
+      pData.transactions.removeWhere((t) => t.id == txToDelete.id);
+      await PribadiSyncService.savePribadiData(monthKey, pData);
+
+      // Panggil sinkronisasi hapus transaksi ke Rundown
+      await RundownExpenseService.onTransactionDeleted(txToDelete);
+
+      // Verifikasi status item di rundown_data otomatis kembali ke belum lunas
+      rawRundowns = prefs.getStringList('rundowns_data')!;
+      loadedRundown =
+          Rundown.fromJson(jsonDecode(rawRundowns.first) as Map<String, dynamic>);
+      expect(loadedRundown.expenses.first.isRealized, isFalse);
+      expect(loadedRundown.expenses.first.nominalRealisasi, isNull);
+      expect(loadedRundown.expenses.first.posDana, isNull);
+
+      // 3. Tes proteksi: Jika user selanjutnya membatalkan realisasi (batal lunasi) pada rundown,
+      // saldo TIDAK BOLEH bertambah 2 kali!
+      final reReverted = await RundownExpenseService.revertRealisasi(
+        rundown: loadedRundown,
+        item: loadedRundown.expenses.first,
+        selectedMonth: now,
+      );
+
+      expect(reReverted.isRealized, isFalse);
+
+      // Saldo harus TETAP 1.000.000, BUKAN 1.250.000
+      pData = await PribadiSyncService.loadPribadiData(monthKey);
+      expect(pData.posDanaList.first.balance, 1000000);
+
+      final uList = await PribadiSyncService.loadUangkuList(monthKey);
+      expect(uList.first.jumlah, 1000000);
+    });
   });
 
   group('Rundown Expense UI Tests', () {
