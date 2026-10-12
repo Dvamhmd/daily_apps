@@ -52,6 +52,15 @@ class RundownExpenseService {
         return true;
       }
     }
+
+    if ((titleLower.contains(rundownTitle) || noteLower.contains(rundownTitle)) &&
+        (titleLower.contains(effectiveNama) ||
+            noteLower.contains(effectiveNama) ||
+            titleLower.contains(itemNama) ||
+            noteLower.contains(itemNama))) {
+      return true;
+    }
+
     return false;
   }
 
@@ -195,12 +204,16 @@ class RundownExpenseService {
         tx.isPengeluaran &&
         matchesRundownItem(tx: tx, rundown: rundown, item: item));
 
+    bool foundAndRemoved = false;
+
     if (txIdx != -1) {
       // Transaksi MASIH ADA -> Hapus transaksi dan kembalikan saldo ke Pos Dana
       data.transactions.removeAt(txIdx);
 
       final pIdx = data.posDanaList.indexWhere(
-        (p) => p.nama.trim().toLowerCase() == posName.trim().toLowerCase(),
+        (p) =>
+            p.nama.trim().toLowerCase() == posName.trim().toLowerCase() ||
+            p.id.trim().toLowerCase() == posName.trim().toLowerCase(),
       );
 
       if (pIdx != -1) {
@@ -208,7 +221,52 @@ class RundownExpenseService {
       }
 
       await PribadiSyncService.savePribadiData(monthKey, data);
+      foundAndRemoved = true;
+    } else {
+      // Transaksi tidak ada di monthKey primer, cari di bulan alternatif yang relevan
+      final prefs = await SharedPreferences.getInstance();
+      final candidateMonthKeys = <String>{};
+      if (selectedMonth != null) {
+        candidateMonthKeys.add(PribadiSyncService.getMonthKey(null, selectedMonth));
+      }
+      if (item.tanggalRealisasi != null) {
+        candidateMonthKeys
+            .add(PribadiSyncService.getMonthKey(item.tanggalRealisasi, null));
+      }
+      candidateMonthKeys
+          .add(PribadiSyncService.getMonthKey(rundown.startDate, null));
 
+      for (final k in prefs.getKeys()) {
+        if (k.startsWith('pribadi_keuangan_data_')) {
+          candidateMonthKeys.add(k.replaceFirst('pribadi_keuangan_data_', ''));
+        }
+      }
+
+      for (final mKey in candidateMonthKeys) {
+        if (mKey == monthKey) continue;
+        final otherData = await PribadiSyncService.loadPribadiData(mKey);
+        final otherTxIdx = otherData.transactions.lastIndexWhere((tx) =>
+            tx.isPengeluaran &&
+            matchesRundownItem(tx: tx, rundown: rundown, item: item));
+
+        if (otherTxIdx != -1) {
+          otherData.transactions.removeAt(otherTxIdx);
+          final pIdx = otherData.posDanaList.indexWhere(
+            (p) =>
+                p.nama.trim().toLowerCase() == posName.trim().toLowerCase() ||
+                p.id.trim().toLowerCase() == posName.trim().toLowerCase(),
+          );
+          if (pIdx != -1) {
+            otherData.posDanaList[pIdx].balance += nominal;
+          }
+          await PribadiSyncService.savePribadiData(mKey, otherData);
+          foundAndRemoved = true;
+          break;
+        }
+      }
+    }
+
+    if (foundAndRemoved) {
       // Catat di Riwayat Keuangan
       final effectiveNama =
           (item.catatan != null && item.catatan!.trim().isNotEmpty)

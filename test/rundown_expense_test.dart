@@ -308,6 +308,84 @@ void main() {
       final uList = await PribadiSyncService.loadUangkuList(monthKey);
       expect(uList.first.jumlah, 1000000);
     });
+
+    test(
+        'Batal Lunas in Rundown deletes transaction from Keuangan Pribadi across candidate months',
+        () async {
+      final txDate = DateTime(2026, 4, 10);
+      final monthKey = PribadiSyncService.getMonthKey(txDate, null);
+      final prefs = await SharedPreferences.getInstance();
+
+      // Setup initial data
+      await PribadiSyncService.saveUangkuList(monthKey, [
+        Uangku('Dana Acara', 2000000),
+      ]);
+      await PribadiSyncService.savePribadiData(
+        monthKey,
+        PribadiData(
+          posDanaList: [
+            PosDana(id: 'pos_acara', nama: 'Dana Acara', balance: 2000000),
+          ],
+          transactions: [],
+        ),
+      );
+
+      final rundown = Rundown(
+        id: 'rd_cross_test',
+        title: 'Reuni Akbar 2026',
+        startDate: txDate,
+        totalDays: 1,
+        days: [],
+        expenses: [
+          RundownExpenseItem(
+            id: 'exp_sound',
+            nama: 'Sewa Sound System',
+            nominalEstimasi: 500000,
+          ),
+        ],
+      );
+
+      await prefs.setStringList(
+        'rundowns_data',
+        [jsonEncode(rundown.toJson())],
+      );
+
+      // 1. Lunasi pengeluaran
+      final realizedItem = await RundownExpenseService.executeRealisasi(
+        rundown: rundown,
+        item: rundown.expenses.first,
+        nominalRealisasi: 450000,
+        posDanaNama: 'Dana Acara',
+        tanggalRealisasi: txDate,
+      );
+
+      // Verifikasi transaksi tercatat di Keuangan Pribadi
+      var pData = await PribadiSyncService.loadPribadiData(monthKey);
+      expect(pData.transactions.length, 1);
+      expect(pData.transactions.first.amount, 450000);
+      expect(pData.posDanaList.first.balance, 1550000);
+
+      // 2. Sekarang batalkan lunas (revertRealisasi), misalnya dipanggil saat user membuka bulan lain
+      final otherMonth = DateTime(2026, 5, 1);
+      final revertedItem = await RundownExpenseService.revertRealisasi(
+        rundown: rundown,
+        item: realizedItem,
+        selectedMonth: otherMonth,
+      );
+
+      expect(revertedItem.isRealized, isFalse);
+      expect(revertedItem.nominalRealisasi, isNull);
+      expect(revertedItem.posDana, isNull);
+
+      // Verifikasi transaksi di Keuangan Pribadi telah terhapus
+      pData = await PribadiSyncService.loadPribadiData(monthKey);
+      expect(pData.transactions.isEmpty, isTrue);
+
+      // Verifikasi saldo Pos Dana dan Uangku telah dipulihkan
+      expect(pData.posDanaList.first.balance, 2000000);
+      final uList = await PribadiSyncService.loadUangkuList(monthKey);
+      expect(uList.first.jumlah, 2000000);
+    });
   });
 
   group('Rundown Expense UI Tests', () {

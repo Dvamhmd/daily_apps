@@ -60,10 +60,28 @@ class _PribadiPageState extends State<PribadiPage> {
   String get _monthKey =>
       '${_selectedMonth.year}_${_selectedMonth.month.toString().padLeft(2, '0')}';
 
+  bool _isSyncing = false;
+
   @override
   void initState() {
     super.initState();
+    PribadiSyncService.financeDataUpdatedNotifier.addListener(_onFinanceUpdated);
     _loadData();
+  }
+
+  void _onFinanceUpdated() {
+    if (!mounted || _isSyncing) return;
+    _isSyncing = true;
+    _loadData().whenComplete(() {
+      if (mounted) _isSyncing = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    PribadiSyncService.financeDataUpdatedNotifier
+        .removeListener(_onFinanceUpdated);
+    super.dispose();
   }
 
   void _prevMonth() {
@@ -3476,26 +3494,30 @@ class _PribadiPageState extends State<PribadiPage> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
+              _isSyncing = true;
+              try {
+                // 1. Rollback saldo transaksi yang dihapus
+                _rollbackTransactionBalance(tx);
 
-              // 1. Rollback saldo transaksi yang dihapus
-              _rollbackTransactionBalance(tx);
+                // 2. Sanitasi saldo dari nilai negatif
+                _sanitizeAllBalances();
 
-              // 2. Sanitasi saldo dari nilai negatif
-              _sanitizeAllBalances();
-
-              _data.transactions.removeWhere((t) => t.id == tx.id);
-              await _saveData();
-              await RundownExpenseService.onTransactionDeleted(tx);
-              if (mounted) {
-                setState(() {});
-                onDeleted?.call();
-                CustomToast.showSuccess(
-                  context,
-                  title: 'Transaksi Dihapus',
-                  subtitle:
-                      'Transaksi "${tx.title}" berhasil dihapus & saldo dipulihkan.',
-                  icon: Icons.delete_outline_rounded,
-                );
+                _data.transactions.removeWhere((t) => t.id == tx.id);
+                await _saveData();
+                await RundownExpenseService.onTransactionDeleted(tx);
+                if (mounted) {
+                  setState(() {});
+                  onDeleted?.call();
+                  CustomToast.showSuccess(
+                    context,
+                    title: 'Transaksi Dihapus',
+                    subtitle:
+                        'Transaksi "${tx.title}" berhasil dihapus & saldo dipulihkan.',
+                    icon: Icons.delete_outline_rounded,
+                  );
+                }
+              } finally {
+                _isSyncing = false;
               }
             },
             style: ElevatedButton.styleFrom(
@@ -3606,37 +3628,41 @@ class _PribadiPageState extends State<PribadiPage> {
           ElevatedButton.icon(
             onPressed: () async {
               Navigator.pop(ctx);
+              _isSyncing = true;
+              try {
+                // 1. Bersihkan seluruh transaksi & pos dana
+                final oldTxList = List<PribadiTransaction>.from(_data.transactions);
+                _data.transactions.clear();
+                _data.posDanaList.clear();
 
-              // 1. Bersihkan seluruh transaksi & pos dana
-              final oldTxList = List<PribadiTransaction>.from(_data.transactions);
-              _data.transactions.clear();
-              _data.posDanaList.clear();
+                // 2. Pastikan saldo akun penampung bersih 0
+                _data.rekeningPribadi.balance = 0;
+                _data.onHandDebit.balance = 0;
+                _data.onHandCash.balance = 0;
 
-              // 2. Pastikan saldo akun penampung bersih 0
-              _data.rekeningPribadi.balance = 0;
-              _data.onHandDebit.balance = 0;
-              _data.onHandCash.balance = 0;
+                // 3. Matikan toggle saldo awal untuk bulan ini agar tidak di-recreate otomatis
+                await PribadiSaldoAwalService.setSaldoAwalEnabled(_monthKey, false);
 
-              // 3. Matikan toggle saldo awal untuk bulan ini agar tidak di-recreate otomatis
-              await PribadiSaldoAwalService.setSaldoAwalEnabled(_monthKey, false);
+                // 4. Bersihkan data Uangku untuk bulan ini
+                await PribadiSyncService.saveUangkuList(_monthKey, []);
 
-              // 4. Bersihkan data Uangku untuk bulan ini
-              await PribadiSyncService.saveUangkuList(_monthKey, []);
+                // 5. Simpan perubahan ke SharedPreferences
+                await _saveData();
+                await RundownExpenseService.onTransactionsDeleted(oldTxList);
 
-              // 5. Simpan perubahan ke SharedPreferences
-              await _saveData();
-              await RundownExpenseService.onTransactionsDeleted(oldTxList);
-
-              if (mounted) {
-                setState(() {});
-                onDeleted?.call();
-                CustomToast.showSuccess(
-                  context,
-                  title: 'Semua Data & Pos Dihapus',
-                  subtitle:
-                      '$txCount transaksi dan $posCount pos dana di Uangku berhasil dihapus.',
-                  icon: Icons.delete_sweep_rounded,
-                );
+                if (mounted) {
+                  setState(() {});
+                  onDeleted?.call();
+                  CustomToast.showSuccess(
+                    context,
+                    title: 'Semua Data & Pos Dihapus',
+                    subtitle:
+                        '$txCount transaksi dan $posCount pos dana di Uangku berhasil dihapus.',
+                    icon: Icons.delete_sweep_rounded,
+                  );
+                }
+              } finally {
+                _isSyncing = false;
               }
             },
             icon: const Icon(Icons.delete_forever_rounded, size: 16),
